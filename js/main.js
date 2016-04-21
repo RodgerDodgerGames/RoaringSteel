@@ -18,7 +18,7 @@ $(function(){
         map = new L.Map('map', {
             layers: [Stamen_TerrainBackground, Stamen_TonerLabels],
             center: new L.LatLng(38.221863, -104.780391),
-            zoom: 10
+            zoom: 12
         });
         // trackLayer = new L.TrackLayer(map);
 

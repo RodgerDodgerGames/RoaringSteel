@@ -6,14 +6,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
     <!-- Le styles -->
-<!--     <link href="../lib/bootstrap/css/bootstrap.css" rel="stylesheet">
-    <link href="../lib/bootstrap/css/bootstrap-responsive.css" rel="stylesheet"> -->
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+
+    <!-- Optional theme -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css" integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r" crossorigin="anonymous">
+
     <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
     <!--[if lt IE 9]>
       <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
     <![endif]-->
 
-    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet/v1.0.0-rc.1/leaflet.css" />
+    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.css" />
+    <link rel="stylesheet" href="lib/css/Leaflet.Draw.css" />
+
     <!--[if lte IE 8]>
         <link rel="stylesheet" href="../lib/leaflet-0.6.4/leaflet.ie.css" />
     <![endif]-->
@@ -36,52 +42,30 @@
         top:10px;
         right:20px;
         position:absolute;
-        z-index:5;
+        z-index:500;
     }
     .btn-margins {
         margin:5px;
     }
-    .measuring-line-class {
-        stroke-dasharray:2, 10;
-        stroke:red;
-    }
-
-    .measuring-line-not-doted {
-        stroke:green;
-    }
-
-    .measuring-line-for-look {
-        stroke-dasharray:3, 20;
-    }
-
-    .measuring-label-tooltip .leaflet-popup-content-wrapper {
-        border-radius: 4px 4px 4px 4px;
-        opacity: 0.7;
-        padding: 1px;
-        text-align: center;
-    }
-    .measuring-label-tooltip .leaflet-popup-content {
-        margin: 0 5px;
-        /*width: 0;*/
-    }
-    .measuring-label-tooltip .leaflet-popup-tip-container {
-        display: none;
+    .leaflet-control-draw-measure {
+        background-image: url(images/RR_track.png);
     }
 
 </style>
 
 </head>
 <body>
-<div id="btn-options" class="btn-container">
-    <div id="measuring-tool" class="btn btn-primary btn-large btn-margins">Start measuring</div>
-    <div id="mt-drag-icons" class="btn btn-primary btn-large btn-margins">Different drag icons</div>
-    <div id="mt-tt-look" class="btn btn-primary btn-large btn-margins">Different tooltip look</div>
-</div>
-    <div id="map" style="border: 1px solid #ccc"></div>
 
-<script src="http://cdn.leafletjs.com/leaflet/v1.0.0-rc.1/leaflet.js"></script>
-<!-- <script src="../lib/jquery-1.6.4.min.js"></script> -->
-<script src="lib/js/MeasuringTool.js"></script>
+<div id="map" style="border: 1px solid #ccc"></div>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+<script src="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.js"></script>
+<!-- <script src="lib/js/Leaflet.Draw.Feature.js"></script> -->
+<script src="lib/js/Leaflet.Draw.js"></script>
+<script src="lib/js/Leaflet.MeasureControl.js"></script>
+<script src="js/TrackLayer.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

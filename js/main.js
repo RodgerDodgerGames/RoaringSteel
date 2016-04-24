@@ -19,29 +19,36 @@
             map = new L.Map('map', {
                 layers: [Stamen_TerrainBackground, Stamen_TonerLabels],
                 center: new L.LatLng(39.073348, -108.572076),
-                zoom: 14
-            });
-            // trackLayer = new L.TrackLayer(map);
+                zoom: 12
+            }),
             // load layers
-            loadLayers(map);
+            costLayers = loadLayers(map);
+
+            // trackLayer = new L.TrackLayer(map,{
+            //     costLayers : costLayers
+            // });
 
             // add measure control
-            L.Control.measureControl().addTo(map);
+            L.Control.measureControl({
+                costLayers : costLayers
+            }).addTo(map);
 
     });
     // end doc ready function
 
     // load map layers
     function loadLayers(map) {
+        layers = [];
         // towns layer dynamic
         // L.esri.dynamicMapLayer({
-        //   url: "http://services.nationalmap.gov/arcgis/rest/services/geonames/MapServer",
-        //   layers: [4],
+        //   url: "https://maps.bts.dot.gov/services/rest/services/NTAD/Populated_Places/MapServer",
+        //   layers: [0],
         //   opacity: 1
         // }).addTo(map);
         // towns feature layer
         L.esri.featureLayer({
-            url: 'http://services.nationalmap.gov/arcgis/rest/services/geonames/MapServer/4',
+            url: 'https://maps.bts.dot.gov/services/rest/services/NTAD/Populated_Places/MapServer/0',
+            useCors: false,
             pointToLayer: function (geojson, latlng) {
               return L.marker(latlng, {
                 icon: L.icon({
@@ -53,6 +60,18 @@
               });
             },
           }).addTo(map);
+
+        // land cover raster
+        var landCover = L.esri.dynamicMapLayer({
+          url: 'http://raster.nationalmap.gov/arcgis/rest/services/LandCover/USGS_EROS_LandCover_NLCD/MapServer',
+          layers:[6],
+          opacity: 0.5,
+          useCors: true
+        }).addTo(map);
+
+        layers.push(landCover);
+
+        return layers;
 
 
     }

@@ -1,4 +1,4 @@
-L.Polyline.Measure = L.Draw.Polyline.extend({
+TrackLayer = L.Draw.Polyline.extend({
     options : {
         trackCostMessage: '$%cost%',
         // minimum distance (in meters) before cost of track is found
@@ -107,9 +107,9 @@ L.Polyline.Measure = L.Draw.Polyline.extend({
         this._container.style.cursor = 'crosshair';
 
         // enable cost layer
-        // if (!this._CostLayer.enabled) {
-        //     this._CostLayer.enable();
-        // }
+        if (!this._CostLayer.enabled) {
+            this._CostLayer.enable();
+        }
 
         this._updateTooltip();
         this._map
@@ -172,71 +172,3 @@ L.Polyline.Measure = L.Draw.Polyline.extend({
     }
 });
 
-L.Control.MeasureControl = L.Control.extend({
-
-    statics: {
-        TITLE: 'Measure distances'
-    },
-    options: {
-        position: 'topleft',
-        handler: {}
-    },
-
-    toggle: function() {
-        if (this.handler.enabled()) {
-            this.handler.disable.call(this.handler);
-        } else {
-            this.handler.enable.call(this.handler);
-        }
-    },
-
-    onAdd: function(map) {
-        var className = 'leaflet-control-draw';
-
-        this._container = L.DomUtil.create('div', 'leaflet-bar');
-
-        // create new track layer
-        this.options.handler.trackLayer = new TrackLayer(map, {
-            costLayers : this.options.costLayers
-        });
-        this.handler = new L.Polyline.Measure(map, this.options.handler);
-
-        this.handler.on('enabled', function () {
-            this.enabled = true;
-            L.DomUtil.addClass(this._container, 'enabled');
-        }, this);
-
-        this.handler.on('disabled', function () {
-            delete this.enabled;
-            L.DomUtil.removeClass(this._container, 'enabled');
-        }, this);
-
-        var link = L.DomUtil.create('a', className+'-measure', this._container);
-        link.href = '#';
-        link.title = L.Control.MeasureControl.TITLE;
-
-        L.DomEvent
-            .addListener(link, 'click', L.DomEvent.stopPropagation)
-            .addListener(link, 'click', L.DomEvent.preventDefault)
-            .addListener(link, 'click', this.toggle, this);
-
-        return this._container;
-    }
-});
-
-
-L.Map.mergeOptions({
-    measureControl: false
-});
-
-
-L.Map.addInitHook(function () {
-    if (this.options.measureControl) {
-        this.measureControl = L.Control.measureControl().addTo(this);
-    }
-});
-
-
-L.Control.measureControl = function (options) {
-    return new L.Control.MeasureControl(options);
-};

@@ -1,91 +1,52 @@
 <!DOCTYPE html>
-<html>
-<head>
-    <title>Leaflet - Measuring tool</title>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js"> <!--<![endif]-->
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title></title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <style>
+          #map {
+            border: 1px solid #000;
+            max-width: 960px;
+            margin: 0 auto;
+            width: 100%;
+          }
+          .state {
+            fill: #EEE;
+            stroke: #DDD;
+          }
+          .point {
+            fill: #F00;
+            stroke: #f00;
+          }
+          .node {
+            fill: none;
+            stroke: #7acc73;
+            shape-rendering: crispEdges;
+          }
+          .grid {
+            fill: none;
+            stroke: #afb1cc;
+            stroke-width: 0.5px;
+          }
+        </style>
+    </head>
+    <body>
+        <!--[if lt IE 7]>
+            <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
+        <![endif]-->
 
-    <!-- Le styles -->
-    <!-- Latest compiled and minified CSS -->
-<!--     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous"> -->
+        <div id="map">
 
-    <!-- Optional theme -->
-<!--     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css" integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r" crossorigin="anonymous"> -->
+        </div>
 
-    <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
-    <!--[if lt IE 9]>
-      <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
-    <![endif]-->
-
-    <link rel="stylesheet" href="lib/leaflet/leaflet.css" />
-    <link rel="stylesheet" href="lib/css/Leaflet.Draw.css" />
-
-    <!--[if lte IE 8]>
-        <link rel="stylesheet" href="../lib/leaflet-0.6.4/leaflet.ie.css" />
-    <![endif]-->
-
-
-<style type="text/css">
-    body {
-        padding: 0;
-        margin: 0;
-    }
-    html, body{
-        height: 100%;
-    }
-
-    #map {
-        height: 100%;
-    }
-
-    .btn-container {
-        top:10px;
-        right:20px;
-        position:absolute;
-        z-index:500;
-    }
-    .btn-margins {
-        margin:5px;
-    }
-    .leaflet-control-draw-measure {
-        background-image: url(images/RR_track.png);
-    }
-
-</style>
-
-</head>
-<body>
-
-<div id="map" style="border: 1px solid #ccc"></div>
-
-
-<!-- Load Scripts -->
-
-<!-- Library Scripts -->
-<!-- JQuery CDN -->
-<script src="lib/js/jquery.min.js"></script>
-<!-- Bootstrap CDN -->
-<!-- <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script> -->
-<!-- Leaflet CDN -->
-<script src="lib/leaflet/leaflet-src.js"></script>
-<!-- Esri Leaflet -->
-<script src="lib/js/esri-leaflet-src.js"></script>
-<!-- <script src="lib/js/Leaflet.Draw.Feature.js"></script> -->
-<!-- Leaflet Draw -->
-<script src="lib/js/Leaflet.Draw.js"></script>
-<!-- Leaflet Measure (reqs Leaflet Draw) -->
-<script src="lib/js/Leaflet.MeasureControl.js"></script>
-<!-- Leaflet Grid plugin -->
-<script src="lib/js/Leaflet.Grid.js"></script>
-
-
-<!-- Custom Scripts -->
-<!-- Track Layer -->
-<script src="js/TrackLayer.js"></script>
-<!-- Cost Layer -->
-<script src="js/CostLayer.js"></script>
-
-<!-- Main -->
-<script src="js/main.js"></script>
-</body>
+        <script src="js/d3/d3.js"></script>
+        <script src="js/app.js"></script>
+    </body>
 </html>

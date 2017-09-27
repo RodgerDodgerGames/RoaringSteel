@@ -1,30 +1,40 @@
 // custom LatLngBounds (cell)
-var CostCell = L.Rectangle.extend({
+L.Rectangle.CostCell = L.Rectangle.extend({
     options: {
         style: {
-            color: '#3ac1f0',
+            color: '#fff',
             weight: 2,
             opacity: 0.5,
             fillOpacity: 0.25
-        }
+        },
+        // colorRange: {
+        //     '0:5' : '#15FF59',
+        //     '6:10' : '#53FF7F',
+        //     '7:25' : '#98FFA6',
+        //     '26:50' : '#E8FFDE',
+        //     '51:Infinity' : '#FFCAD2'
+        // }
+        colorRange : d3.scaleSequential(d3.interpolateCool)
+                        .domain([0,999])
     },
 
     initialize: function(bounds, options) {
         // set options; there are no options
-        options = L.setOptions(this, options);
-        this._bounds = bounds;
-        // find center
-        this._center = this._bounds.getCenter();
+        // options = L.setOptions(this, options);
+        L.Rectangle.prototype.initialize.call(this, bounds, options);
+        this._startTime = performance.now();
+        this._initCount = 0;
+
     },
 
     onAdd: function(map) {
-
         // set value for cell
-        this._setValue();
+        L.Rectangle.prototype.onAdd.call(this, map);
+        this._queryLayers();
     },
 
     // run identify request for layer
-    _identify: function(layer) {
+    _identify: function(layer, callback) {
         L.esri.identifyFeatures({
             url: layer.url
         })
@@ -32,8 +42,13 @@ var CostCell = L.Rectangle.extend({
         .at(this._center)
         .layers('all:#'.replace('#', layer.layerID))
         .returnGeometry(false)
-        .run(function(error, featureCollection, response){
-            return featureCollection.features[0].properties['NLCD_2011'];
+        .run(function(error, results){
+            if (error !== undefined || results === undefined) {
+                console.log(error);
+                return false;
+            }
+            // console.log('results', results);
+            callback(layer, parseInt(results.features[0].properties[layer.costField]));
         });
     },
 
@@ -42,27 +57,118 @@ var CostCell = L.Rectangle.extend({
     _queryLayers: function() {
         // loop through cost layers
         for (var costLayer in settings.costLayers) {
-            var raw, adjusted;
             if (settings.costLayers.hasOwnProperty(costLayer)) {
-                // raw  = '';
-                this._identify(settings.costLayers[costLayer]);
+                // send identify request to server
+                this._identify(settings.costLayers[costLayer], this._setValue.bind(this));
             }
         }
     },
 
-    // set the value for this cell
-    _setValue: function() {
-
-        // query layers to get layer's value at cell center
-        this._rawValues = this._queryLayers();
+    // convert raw value to adjusted dollar amount based on dollar value
+    // mapping in settings
+    // takes costLayer settings object and raw value from identify
+    _setValue: function(layer, rawValue) {
+        // console.log(layer.title + ' [raw]:', rawValue);
+        // check which kind of value map this is
+        if (layer.valueType == 'distinct') {
+            for (var pixval in layer.valueMap) {
+                if (layer.valueMap.hasOwnProperty(pixval)) {
+                    // list
+                    // convert key to array
+                    var pixvalArray = JSON.parse(pixval);
+                    // check if pixel value is in value map key
+                    if (pixvalArray.indexOf(rawValue) > -1) {
+                        this._dollarValue += layer.valueMap[pixval];
+                    }
+                }
+            }
+        }
+        // scales
+        else {
+            // create d3 scale according to settings
+            var scale = layer.valueMap.type
+                .domain(layer.valueMap.domain)
+                .range(layer.valueMap.range);
+            // interpolate dollar value from scale
+            this._dollarValue += scale(rawValue);
+        }
+                // ranges
+                // else if (pixval.indexOf(':') > -1 ) {
+                //     // convert key to range
+                //     var range = pixval.split(':');
+                //     // check if value in range
+                //     if (rawValue >= range[0] && rawValue <= range[1]) {
+                //         this._dollarValue = layer.valueMap[pixval];
+                //     }
+                // }
+                // d3 scale
+        //         else {
+        //         }
+        //     }
+        // }
+        // console.log(layer.title + '[dollar]:', this._dollarValue);
+        this._setSymbology(this._dollarValue);
+        // this._debugCostValues();
+        this._initCount += 1;
+        if (this._initCount >= Object.keys(settings.costLayers).length) {
+            this._endTime = performance.now();
+            console.log('derive cell value time', this._endTime - this._startTime, 'ms');
+        }
     },
+
+    _setSymbology: function(dv) {
+        // var color,
+        //     classif = this.options.colorRange;
+        // for (var val in classif) {
+        //     if (classif.hasOwnProperty(val)) {
+        //         var range = val.split(':');
+        //         // check if value in range
+        //         if (dv >= range[0] && dv <= range[1]) {
+        //             color = classif[val];
+        //         }
+        //     }
+        // }
+        var color = this.options.colorRange(dv);
+        color = color !== undefined ? color : this.options.style.color;
+        // console.log('val', dv, 'color', color);
+        this.setStyle({
+            color : color
+        });
+    },
+
+    _debugCostValues : function() {
+        var debugIcon = L.divIcon({
+                    className : 'debug-cost-values-icon',
+                    html : '$' + this._dollarValue
+                });
+        if (this._marker) {
+            this._marker.setIcon(debugIcon);
+        }
+        else {
+            this._marker = L.marker(this._center, {
+                icon: debugIcon
+            }).addTo(map);
+        }
+    }
 
 
 });
 
+L.Rectangle.CostCell.addInitHook(function() {
+        // find center
+        this._center = this._bounds.getCenter();
+        this._dollarValue = 0;
+        // console.log('center', this._center);
+});
+// factory
+L.rectangle.costcell = function(bounds, options) {
+    return new L.Rectangle.CostCell(bounds, options);
+};
+
 // make a new VirtualGrid
 var DebugGrid = VirtualGrid.extend({
     options: {
+        // cellSize: 153.45,
         cellSize: 15.345,
         pathStyle: {
             color: '#3ac1f0',
@@ -80,7 +186,7 @@ var DebugGrid = VirtualGrid.extend({
     createCell: function(bounds, coords) {
         // console.log('cell size', bounds.getSouthWest().distanceTo(bounds.getNorthWest()));
         // this.rects[this.coordsToKey(coords)] = L.rectangle(bounds, this.options.pathStyle).addTo(map);
-        this.rects[this.coordsToKey(coords)] = new CostCell(bounds, this.options.pathStyle).addTo(map);
+        this.rects[this.coordsToKey(coords)] = L.rectangle.costcell(bounds,this.options.pathStyle).addTo(map);
     },
 
     cellEnter: function(bounds, coords) {

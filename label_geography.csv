@@ -1,0 +1,4871 @@
+geography,label,geo_level
+00,"National (50 States + DC)",N
+01,"Alabama",S
+02,"Alaska",S
+04,"Arizona",S
+05,"Arkansas",S
+06,"California",S
+08,"Colorado",S
+09,"Connecticut",S
+10,"Delaware",S
+11,"District of Columbia",S
+12,"Florida",S
+13,"Georgia",S
+15,"Hawaii",S
+16,"Idaho",S
+17,"Illinois",S
+18,"Indiana",S
+19,"Iowa",S
+20,"Kansas",S
+21,"Kentucky",S
+22,"Louisiana",S
+23,"Maine",S
+24,"Maryland",S
+25,"Massachusetts",S
+26,"Michigan",S
+27,"Minnesota",S
+27SDA010,"01 Northwest Minnesota WSA",W
+27SDA020,"02 Rural Minnesota CEP WSA",W
+27SDA030,"03 Northeast Minnesota WSA",W
+27SDA040,"04 City of Duluth WSA",W
+27SDA050,"05 Central Minnesota WSA",W
+27SDA060,"06 Southwest Minnesota WSA",W
+27SDA070,"07 South Central Minnesota WSA",W
+27SDA080,"08 Southeast Minnesota WSA",W
+27SDA090,"09 Hennepin/Carver WSA",W
+27SDA100,"10 City of Minneapolis WSA",W
+27SDA120,"12 Anoka County WSA",W
+27SDA140,"14 Dakota/Scott County WSA",W
+27SDA150,"15 Ramsey County WSA",W
+27SDA160,"16 Washington County WSA",W
+27SDA170,"17 Stearns/Benton WSA",W
+27SDA180,"18 Winona County WSA",W
+28,"Mississippi",S
+29,"Missouri",S
+30,"Montana",S
+31,"Nebraska",S
+32,"Nevada",S
+33,"New Hampshire",S
+34,"New Jersey",S
+35,"New Mexico",S
+36,"New York",S
+37,"North Carolina",S
+38,"North Dakota",S
+39,"Ohio",S
+40,"Oklahoma",S
+41,"Oregon",S
+42,"Pennsylvania",S
+44,"Rhode Island",S
+45,"South Carolina",S
+46,"South Dakota",S
+47LWIA01,"01 Local Workforce Investment Area",W
+47LWIA02,"02 Local Workforce Investment Area",W
+47LWIA03,"03 Local Workforce Investment Area",W
+47LWIA04,"04 Local Workforce Investment Area",W
+47LWIA05,"05 Local Workforce Investment Area",W
+47LWIA06,"06 Local Workforce Investment Area",W
+47LWIA07,"07 Local Workforce Investment Area",W
+47LWIA08,"08 Local Workforce Investment Area",W
+47LWIA09,"09 Local Workforce Investment Area",W
+47LWIA10,"10 Local Workforce Investment Area",W
+47LWIA11,"11 Local Workforce Investment Area",W
+47LWIA12,"12 Local Workforce Investment Area",W
+47LWIA13,"13 Local Workforce Investment Area",W
+47,"Tennessee",S
+48,"Texas",S
+49,"Utah",S
+50,"Vermont",S
+51,"Virginia",S
+53,"Washington",S
+54,"West Virginia",S
+55,"Wisconsin",S
+56,"Wyoming",S
+420CE175,"175 Central PA WIA",W
+420LV070,"070 Lehigh Valley WIA",W
+420NC125,"125 North Central WIA",W
+420NE055,"055 Lackawanna County WIA",W
+420NE075,"075 Luzerne-Schuylkill Counties WIA",W
+420NE135,"135 Pocono Counties WIA",W
+420NT130,"130 Northern Tier WIA",W
+420NW145,"145 West Central Job Partnership WIA",W
+420NW170,"170 Northwest WIA",W
+420SA100,"100 Southern Alleghenies WIA",W
+420SC180,"180 South Central WIA",W
+420SE015,"015 Berks County WIA",W
+420SE020,"020 Bucks County WIA",W
+420SE030,"030 Chester County WIA",W
+420SE035,"035 Delaware County WIA",W
+420SE060,"060 Lancaster County WIA",W
+420SE080,"080 Montgomery County WIA",W
+420SE090,"090 Philadelphia County WIA",W
+420SW005,"005 Allegheny County WIA",W
+420SW045,"045 Westmoreland/Fayette WIA",W
+420SW095,"095 City of Pittsburgh WIA",W
+420SW110,"110 Tri-County WIA",W
+420SW165,"165 Southwest Corner WIA",W
+01001,"Autauga, AL",C
+01003,"Baldwin, AL",C
+01005,"Barbour, AL",C
+01007,"Bibb, AL",C
+01009,"Blount, AL",C
+01011,"Bullock, AL",C
+01013,"Butler, AL",C
+01015,"Calhoun, AL",C
+01017,"Chambers, AL",C
+01019,"Cherokee, AL",C
+01021,"Chilton, AL",C
+01023,"Choctaw, AL",C
+01025,"Clarke, AL",C
+01027,"Clay, AL",C
+01029,"Cleburne, AL",C
+01031,"Coffee, AL",C
+01033,"Colbert, AL",C
+01035,"Conecuh, AL",C
+01037,"Coosa, AL",C
+01039,"Covington, AL",C
+01041,"Crenshaw, AL",C
+01043,"Cullman, AL",C
+01045,"Dale, AL",C
+01047,"Dallas, AL",C
+01049,"DeKalb, AL",C
+01051,"Elmore, AL",C
+01053,"Escambia, AL",C
+01055,"Etowah, AL",C
+01057,"Fayette, AL",C
+01059,"Franklin, AL",C
+01061,"Geneva, AL",C
+01063,"Greene, AL",C
+01065,"Hale, AL",C
+01067,"Henry, AL",C
+01069,"Houston, AL",C
+01071,"Jackson, AL",C
+01073,"Jefferson, AL",C
+01075,"Lamar, AL",C
+01077,"Lauderdale, AL",C
+01079,"Lawrence, AL",C
+01081,"Lee, AL",C
+01083,"Limestone, AL",C
+01085,"Lowndes, AL",C
+01087,"Macon, AL",C
+01089,"Madison, AL",C
+01091,"Marengo, AL",C
+01093,"Marion, AL",C
+01095,"Marshall, AL",C
+01097,"Mobile, AL",C
+01099,"Monroe, AL",C
+01101,"Montgomery, AL",C
+01103,"Morgan, AL",C
+01105,"Perry, AL",C
+01107,"Pickens, AL",C
+01109,"Pike, AL",C
+01111,"Randolph, AL",C
+01113,"Russell, AL",C
+01115,"St. Clair, AL",C
+01117,"Shelby, AL",C
+01119,"Sumter, AL",C
+01121,"Talladega, AL",C
+01123,"Tallapoosa, AL",C
+01125,"Tuscaloosa, AL",C
+01127,"Walker, AL",C
+01129,"Washington, AL",C
+01131,"Wilcox, AL",C
+01133,"Winston, AL",C
+02013,"Aleutians East, AK",C
+02016,"Aleutians West, AK",C
+02020,"Anchorage, AK",C
+02050,"Bethel, AK",C
+02060,"Bristol Bay, AK",C
+02068,"Denali, AK",C
+02070,"Dillingham, AK",C
+02090,"Fairbanks North Star, AK",C
+02100,"Haines, AK",C
+02105,"Hoonah-Angoon, AK",C
+02110,"Juneau, AK",C
+02122,"Kenai Peninsula, AK",C
+02130,"Ketchikan Gateway, AK",C
+02150,"Kodiak Island, AK",C
+02158,"Kusilvak, AK",C
+02164,"Lake and Peninsula, AK",C
+02170,"Matanuska-Susitna, AK",C
+02180,"Nome, AK",C
+02185,"North Slope, AK",C
+02188,"Northwest Arctic, AK",C
+02195,"Petersburg, AK",C
+02198,"Prince of Wales-Hyder, AK",C
+02220,"Sitka, AK",C
+02230,"Skagway, AK",C
+02240,"Southeast Fairbanks, AK",C
+02261,"Valdez-Cordova, AK",C
+02275,"Wrangell, AK",C
+02282,"Yakutat, AK",C
+02290,"Yukon-Koyukuk, AK",C
+04001,"Apache, AZ",C
+04003,"Cochise, AZ",C
+04005,"Coconino, AZ",C
+04007,"Gila, AZ",C
+04009,"Graham, AZ",C
+04011,"Greenlee, AZ",C
+04012,"La Paz, AZ",C
+04013,"Maricopa, AZ",C
+04015,"Mohave, AZ",C
+04017,"Navajo, AZ",C
+04019,"Pima, AZ",C
+04021,"Pinal, AZ",C
+04023,"Santa Cruz, AZ",C
+04025,"Yavapai, AZ",C
+04027,"Yuma, AZ",C
+05001,"Arkansas, AR",C
+05003,"Ashley, AR",C
+05005,"Baxter, AR",C
+05007,"Benton, AR",C
+05009,"Boone, AR",C
+05011,"Bradley, AR",C
+05013,"Calhoun, AR",C
+05015,"Carroll, AR",C
+05017,"Chicot, AR",C
+05019,"Clark, AR",C
+05021,"Clay, AR",C
+05023,"Cleburne, AR",C
+05025,"Cleveland, AR",C
+05027,"Columbia, AR",C
+05029,"Conway, AR",C
+05031,"Craighead, AR",C
+05033,"Crawford, AR",C
+05035,"Crittenden, AR",C
+05037,"Cross, AR",C
+05039,"Dallas, AR",C
+05041,"Desha, AR",C
+05043,"Drew, AR",C
+05045,"Faulkner, AR",C
+05047,"Franklin, AR",C
+05049,"Fulton, AR",C
+05051,"Garland, AR",C
+05053,"Grant, AR",C
+05055,"Greene, AR",C
+05057,"Hempstead, AR",C
+05059,"Hot Spring, AR",C
+05061,"Howard, AR",C
+05063,"Independence, AR",C
+05065,"Izard, AR",C
+05067,"Jackson, AR",C
+05069,"Jefferson, AR",C
+05071,"Johnson, AR",C
+05073,"Lafayette, AR",C
+05075,"Lawrence, AR",C
+05077,"Lee, AR",C
+05079,"Lincoln, AR",C
+05081,"Little River, AR",C
+05083,"Logan, AR",C
+05085,"Lonoke, AR",C
+05087,"Madison, AR",C
+05089,"Marion, AR",C
+05091,"Miller, AR",C
+05093,"Mississippi, AR",C
+05095,"Monroe, AR",C
+05097,"Montgomery, AR",C
+05099,"Nevada, AR",C
+05101,"Newton, AR",C
+05103,"Ouachita, AR",C
+05105,"Perry, AR",C
+05107,"Phillips, AR",C
+05109,"Pike, AR",C
+05111,"Poinsett, AR",C
+05113,"Polk, AR",C
+05115,"Pope, AR",C
+05117,"Prairie, AR",C
+05119,"Pulaski, AR",C
+05121,"Randolph, AR",C
+05123,"St. Francis, AR",C
+05125,"Saline, AR",C
+05127,"Scott, AR",C
+05129,"Searcy, AR",C
+05131,"Sebastian, AR",C
+05133,"Sevier, AR",C
+05135,"Sharp, AR",C
+05137,"Stone, AR",C
+05139,"Union, AR",C
+05141,"Van Buren, AR",C
+05143,"Washington, AR",C
+05145,"White, AR",C
+05147,"Woodruff, AR",C
+05149,"Yell, AR",C
+5454WIA1,"01 Workforce Investment Area Region 1",W
+5454WIA2,"02 Workforce Investment Area Region 2",W
+5454WIA3,"03 Workforce Investment Area Region 3",W
+5454WIA4,"04 Workforce Investment Area Region 4",W
+5454WIA5,"05 Workforce Investment Area Region 5",W
+5454WIA6,"06 Workforce Investment Area Region 6",W
+5454WIA7,"07 Workforce Investment Area Region 7",W
+06001,"Alameda, CA",C
+06003,"Alpine, CA",C
+06005,"Amador, CA",C
+06007,"Butte, CA",C
+06009,"Calaveras, CA",C
+06011,"Colusa, CA",C
+06013,"Contra Costa, CA",C
+06015,"Del Norte, CA",C
+06017,"El Dorado, CA",C
+06019,"Fresno, CA",C
+06021,"Glenn, CA",C
+06023,"Humboldt, CA",C
+06025,"Imperial, CA",C
+06027,"Inyo, CA",C
+06029,"Kern, CA",C
+06031,"Kings, CA",C
+06033,"Lake, CA",C
+06035,"Lassen, CA",C
+06037,"Los Angeles, CA",C
+06039,"Madera, CA",C
+06041,"Marin, CA",C
+06043,"Mariposa, CA",C
+06045,"Mendocino, CA",C
+06047,"Merced, CA",C
+06049,"Modoc, CA",C
+06051,"Mono, CA",C
+06053,"Monterey, CA",C
+06055,"Napa, CA",C
+06057,"Nevada, CA",C
+06059,"Orange, CA",C
+06061,"Placer, CA",C
+06063,"Plumas, CA",C
+06065,"Riverside, CA",C
+06067,"Sacramento, CA",C
+06069,"San Benito, CA",C
+06071,"San Bernardino, CA",C
+06073,"San Diego, CA",C
+06075,"San Francisco, CA",C
+06077,"San Joaquin, CA",C
+06079,"San Luis Obispo, CA",C
+06081,"San Mateo, CA",C
+06083,"Santa Barbara, CA",C
+06085,"Santa Clara, CA",C
+06087,"Santa Cruz, CA",C
+06089,"Shasta, CA",C
+06091,"Sierra, CA",C
+06093,"Siskiyou, CA",C
+06095,"Solano, CA",C
+06097,"Sonoma, CA",C
+06099,"Stanislaus, CA",C
+06101,"Sutter, CA",C
+06103,"Tehama, CA",C
+06105,"Trinity, CA",C
+06107,"Tulare, CA",C
+06109,"Tuolumne, CA",C
+06111,"Ventura, CA",C
+06113,"Yolo, CA",C
+06115,"Yuba, CA",C
+08001,"Adams, CO",C
+08003,"Alamosa, CO",C
+08005,"Arapahoe, CO",C
+08007,"Archuleta, CO",C
+08009,"Baca, CO",C
+08011,"Bent, CO",C
+08013,"Boulder, CO",C
+08014,"Broomfield, CO",C
+08015,"Chaffee, CO",C
+08017,"Cheyenne, CO",C
+08019,"Clear Creek, CO",C
+08021,"Conejos, CO",C
+08023,"Costilla, CO",C
+08025,"Crowley, CO",C
+08027,"Custer, CO",C
+08029,"Delta, CO",C
+08031,"Denver, CO",C
+08033,"Dolores, CO",C
+08035,"Douglas, CO",C
+08037,"Eagle, CO",C
+08039,"Elbert, CO",C
+08041,"El Paso, CO",C
+08043,"Fremont, CO",C
+08045,"Garfield, CO",C
+08047,"Gilpin, CO",C
+08049,"Grand, CO",C
+08051,"Gunnison, CO",C
+08053,"Hinsdale, CO",C
+08055,"Huerfano, CO",C
+08057,"Jackson, CO",C
+08059,"Jefferson, CO",C
+08061,"Kiowa, CO",C
+08063,"Kit Carson, CO",C
+08065,"Lake, CO",C
+08067,"La Plata, CO",C
+08069,"Larimer, CO",C
+08071,"Las Animas, CO",C
+08073,"Lincoln, CO",C
+08075,"Logan, CO",C
+08077,"Mesa, CO",C
+08079,"Mineral, CO",C
+08081,"Moffat, CO",C
+08083,"Montezuma, CO",C
+08085,"Montrose, CO",C
+08087,"Morgan, CO",C
+08089,"Otero, CO",C
+08091,"Ouray, CO",C
+08093,"Park, CO",C
+08095,"Phillips, CO",C
+08097,"Pitkin, CO",C
+08099,"Prowers, CO",C
+08101,"Pueblo, CO",C
+08103,"Rio Blanco, CO",C
+08105,"Rio Grande, CO",C
+08107,"Routt, CO",C
+08109,"Saguache, CO",C
+08111,"San Juan, CO",C
+08113,"San Miguel, CO",C
+08115,"Sedgwick, CO",C
+08117,"Summit, CO",C
+08119,"Teller, CO",C
+08121,"Washington, CO",C
+08123,"Weld, CO",C
+08125,"Yuma, CO",C
+09001,"Fairfield, CT",C
+09003,"Hartford, CT",C
+09005,"Litchfield, CT",C
+09007,"Middlesex, CT",C
+09009,"New Haven, CT",C
+09011,"New London, CT",C
+09013,"Tolland, CT",C
+09015,"Windham, CT",C
+10001,"Kent, DE",C
+10003,"New Castle, DE",C
+10005,"Sussex, DE",C
+11001,"District of Columbia, DC",C
+12001,"Alachua, FL",C
+12003,"Baker, FL",C
+12005,"Bay, FL",C
+12007,"Bradford, FL",C
+12009,"Brevard, FL",C
+12011,"Broward, FL",C
+12013,"Calhoun, FL",C
+12015,"Charlotte, FL",C
+12017,"Citrus, FL",C
+12019,"Clay, FL",C
+12021,"Collier, FL",C
+12023,"Columbia, FL",C
+12027,"DeSoto, FL",C
+12029,"Dixie, FL",C
+12031,"Duval, FL",C
+12033,"Escambia, FL",C
+12035,"Flagler, FL",C
+12037,"Franklin, FL",C
+12039,"Gadsden, FL",C
+12041,"Gilchrist, FL",C
+12043,"Glades, FL",C
+12045,"Gulf, FL",C
+12047,"Hamilton, FL",C
+12049,"Hardee, FL",C
+12051,"Hendry, FL",C
+12053,"Hernando, FL",C
+12055,"Highlands, FL",C
+12057,"Hillsborough, FL",C
+12059,"Holmes, FL",C
+12061,"Indian River, FL",C
+12063,"Jackson, FL",C
+12065,"Jefferson, FL",C
+12067,"Lafayette, FL",C
+12069,"Lake, FL",C
+12071,"Lee, FL",C
+12073,"Leon, FL",C
+12075,"Levy, FL",C
+12077,"Liberty, FL",C
+12079,"Madison, FL",C
+12081,"Manatee, FL",C
+12083,"Marion, FL",C
+12085,"Martin, FL",C
+12086,"Miami-Dade, FL",C
+12087,"Monroe, FL",C
+12089,"Nassau, FL",C
+12091,"Okaloosa, FL",C
+12093,"Okeechobee, FL",C
+12095,"Orange, FL",C
+12097,"Osceola, FL",C
+12099,"Palm Beach, FL",C
+12101,"Pasco, FL",C
+12103,"Pinellas, FL",C
+12105,"Polk, FL",C
+12107,"Putnam, FL",C
+12109,"St. Johns, FL",C
+12111,"St. Lucie, FL",C
+12113,"Santa Rosa, FL",C
+12115,"Sarasota, FL",C
+12117,"Seminole, FL",C
+12119,"Sumter, FL",C
+12121,"Suwannee, FL",C
+12123,"Taylor, FL",C
+12125,"Union, FL",C
+12127,"Volusia, FL",C
+12129,"Wakulla, FL",C
+12131,"Walton, FL",C
+12133,"Washington, FL",C
+13001,"Appling, GA",C
+13003,"Atkinson, GA",C
+13005,"Bacon, GA",C
+13007,"Baker, GA",C
+13009,"Baldwin, GA",C
+13011,"Banks, GA",C
+13013,"Barrow, GA",C
+13015,"Bartow, GA",C
+13017,"Ben Hill, GA",C
+13019,"Berrien, GA",C
+13021,"Bibb, GA",C
+13023,"Bleckley, GA",C
+13025,"Brantley, GA",C
+13027,"Brooks, GA",C
+13029,"Bryan, GA",C
+13031,"Bulloch, GA",C
+13033,"Burke, GA",C
+13035,"Butts, GA",C
+13037,"Calhoun, GA",C
+13039,"Camden, GA",C
+13043,"Candler, GA",C
+13045,"Carroll, GA",C
+13047,"Catoosa, GA",C
+13049,"Charlton, GA",C
+13051,"Chatham, GA",C
+13053,"Chattahoochee, GA",C
+13055,"Chattooga, GA",C
+13057,"Cherokee, GA",C
+13059,"Clarke, GA",C
+13061,"Clay, GA",C
+13063,"Clayton, GA",C
+13065,"Clinch, GA",C
+13067,"Cobb, GA",C
+13069,"Coffee, GA",C
+13071,"Colquitt, GA",C
+13073,"Columbia, GA",C
+13075,"Cook, GA",C
+13077,"Coweta, GA",C
+13079,"Crawford, GA",C
+13081,"Crisp, GA",C
+13083,"Dade, GA",C
+13085,"Dawson, GA",C
+13087,"Decatur, GA",C
+13089,"DeKalb, GA",C
+13091,"Dodge, GA",C
+13093,"Dooly, GA",C
+13095,"Dougherty, GA",C
+13097,"Douglas, GA",C
+13099,"Early, GA",C
+13101,"Echols, GA",C
+13103,"Effingham, GA",C
+13105,"Elbert, GA",C
+13107,"Emanuel, GA",C
+13109,"Evans, GA",C
+13111,"Fannin, GA",C
+13113,"Fayette, GA",C
+13115,"Floyd, GA",C
+13117,"Forsyth, GA",C
+13119,"Franklin, GA",C
+13121,"Fulton, GA",C
+13123,"Gilmer, GA",C
+13125,"Glascock, GA",C
+13127,"Glynn, GA",C
+13129,"Gordon, GA",C
+13131,"Grady, GA",C
+13133,"Greene, GA",C
+13135,"Gwinnett, GA",C
+13137,"Habersham, GA",C
+13139,"Hall, GA",C
+13141,"Hancock, GA",C
+13143,"Haralson, GA",C
+13145,"Harris, GA",C
+13147,"Hart, GA",C
+13149,"Heard, GA",C
+13151,"Henry, GA",C
+13153,"Houston, GA",C
+13155,"Irwin, GA",C
+13157,"Jackson, GA",C
+13159,"Jasper, GA",C
+13161,"Jeff Davis, GA",C
+13163,"Jefferson, GA",C
+13165,"Jenkins, GA",C
+13167,"Johnson, GA",C
+13169,"Jones, GA",C
+13171,"Lamar, GA",C
+13173,"Lanier, GA",C
+13175,"Laurens, GA",C
+13177,"Lee, GA",C
+13179,"Liberty, GA",C
+13181,"Lincoln, GA",C
+13183,"Long, GA",C
+13185,"Lowndes, GA",C
+13187,"Lumpkin, GA",C
+13189,"McDuffie, GA",C
+13191,"McIntosh, GA",C
+13193,"Macon, GA",C
+13195,"Madison, GA",C
+13197,"Marion, GA",C
+13199,"Meriwether, GA",C
+13201,"Miller, GA",C
+13205,"Mitchell, GA",C
+13207,"Monroe, GA",C
+13209,"Montgomery, GA",C
+13211,"Morgan, GA",C
+13213,"Murray, GA",C
+13215,"Muscogee, GA",C
+13217,"Newton, GA",C
+13219,"Oconee, GA",C
+13221,"Oglethorpe, GA",C
+13223,"Paulding, GA",C
+13225,"Peach, GA",C
+13227,"Pickens, GA",C
+13229,"Pierce, GA",C
+13231,"Pike, GA",C
+13233,"Polk, GA",C
+13235,"Pulaski, GA",C
+13237,"Putnam, GA",C
+13239,"Quitman, GA",C
+13241,"Rabun, GA",C
+13243,"Randolph, GA",C
+13245,"Richmond, GA",C
+13247,"Rockdale, GA",C
+13249,"Schley, GA",C
+13251,"Screven, GA",C
+13253,"Seminole, GA",C
+13255,"Spalding, GA",C
+13257,"Stephens, GA",C
+13259,"Stewart, GA",C
+13261,"Sumter, GA",C
+13263,"Talbot, GA",C
+13265,"Taliaferro, GA",C
+13267,"Tattnall, GA",C
+13269,"Taylor, GA",C
+13271,"Telfair, GA",C
+13273,"Terrell, GA",C
+13275,"Thomas, GA",C
+13277,"Tift, GA",C
+13279,"Toombs, GA",C
+13281,"Towns, GA",C
+13283,"Treutlen, GA",C
+13285,"Troup, GA",C
+13287,"Turner, GA",C
+13289,"Twiggs, GA",C
+13291,"Union, GA",C
+13293,"Upson, GA",C
+13295,"Walker, GA",C
+13297,"Walton, GA",C
+13299,"Ware, GA",C
+13301,"Warren, GA",C
+13303,"Washington, GA",C
+13305,"Wayne, GA",C
+13307,"Webster, GA",C
+13309,"Wheeler, GA",C
+13311,"White, GA",C
+13313,"Whitfield, GA",C
+13315,"Wilcox, GA",C
+13317,"Wilkes, GA",C
+13319,"Wilkinson, GA",C
+13321,"Worth, GA",C
+15001,"Hawaii, HI",C
+15003,"Honolulu, HI",C
+15005,"Kalawao, HI",C
+15007,"Kauai, HI",C
+15009,"Maui, HI",C
+16001,"Ada, ID",C
+16003,"Adams, ID",C
+16005,"Bannock, ID",C
+16007,"Bear Lake, ID",C
+16009,"Benewah, ID",C
+16011,"Bingham, ID",C
+16013,"Blaine, ID",C
+16015,"Boise, ID",C
+16017,"Bonner, ID",C
+16019,"Bonneville, ID",C
+16021,"Boundary, ID",C
+16023,"Butte, ID",C
+16025,"Camas, ID",C
+16027,"Canyon, ID",C
+16029,"Caribou, ID",C
+16031,"Cassia, ID",C
+16033,"Clark, ID",C
+16035,"Clearwater, ID",C
+16037,"Custer, ID",C
+16039,"Elmore, ID",C
+16041,"Franklin, ID",C
+16043,"Fremont, ID",C
+16045,"Gem, ID",C
+16047,"Gooding, ID",C
+16049,"Idaho, ID",C
+16051,"Jefferson, ID",C
+16053,"Jerome, ID",C
+16055,"Kootenai, ID",C
+16057,"Latah, ID",C
+16059,"Lemhi, ID",C
+16061,"Lewis, ID",C
+16063,"Lincoln, ID",C
+16065,"Madison, ID",C
+16067,"Minidoka, ID",C
+16069,"Nez Perce, ID",C
+16071,"Oneida, ID",C
+16073,"Owyhee, ID",C
+16075,"Payette, ID",C
+16077,"Power, ID",C
+16079,"Shoshone, ID",C
+16081,"Teton, ID",C
+16083,"Twin Falls, ID",C
+16085,"Valley, ID",C
+16087,"Washington, ID",C
+17001,"Adams, IL",C
+17003,"Alexander, IL",C
+17005,"Bond, IL",C
+17007,"Boone, IL",C
+17009,"Brown, IL",C
+17011,"Bureau, IL",C
+17013,"Calhoun, IL",C
+17015,"Carroll, IL",C
+17017,"Cass, IL",C
+17019,"Champaign, IL",C
+17021,"Christian, IL",C
+17023,"Clark, IL",C
+17025,"Clay, IL",C
+17027,"Clinton, IL",C
+17029,"Coles, IL",C
+17031,"Cook, IL",C
+17033,"Crawford, IL",C
+17035,"Cumberland, IL",C
+17037,"DeKalb, IL",C
+17039,"De Witt, IL",C
+17041,"Douglas, IL",C
+17043,"DuPage, IL",C
+17045,"Edgar, IL",C
+17047,"Edwards, IL",C
+17049,"Effingham, IL",C
+17051,"Fayette, IL",C
+17053,"Ford, IL",C
+17055,"Franklin, IL",C
+17057,"Fulton, IL",C
+17059,"Gallatin, IL",C
+17061,"Greene, IL",C
+17063,"Grundy, IL",C
+17065,"Hamilton, IL",C
+17067,"Hancock, IL",C
+17069,"Hardin, IL",C
+17071,"Henderson, IL",C
+17073,"Henry, IL",C
+17075,"Iroquois, IL",C
+17077,"Jackson, IL",C
+17079,"Jasper, IL",C
+17081,"Jefferson, IL",C
+17083,"Jersey, IL",C
+17085,"Jo Daviess, IL",C
+17087,"Johnson, IL",C
+17089,"Kane, IL",C
+17091,"Kankakee, IL",C
+17093,"Kendall, IL",C
+17095,"Knox, IL",C
+17097,"Lake, IL",C
+17099,"LaSalle, IL",C
+17101,"Lawrence, IL",C
+17103,"Lee, IL",C
+17105,"Livingston, IL",C
+17107,"Logan, IL",C
+17109,"McDonough, IL",C
+17111,"McHenry, IL",C
+17113,"McLean, IL",C
+17115,"Macon, IL",C
+17117,"Macoupin, IL",C
+17119,"Madison, IL",C
+17121,"Marion, IL",C
+17123,"Marshall, IL",C
+17125,"Mason, IL",C
+17127,"Massac, IL",C
+17129,"Menard, IL",C
+17131,"Mercer, IL",C
+17133,"Monroe, IL",C
+17135,"Montgomery, IL",C
+17137,"Morgan, IL",C
+17139,"Moultrie, IL",C
+17141,"Ogle, IL",C
+17143,"Peoria, IL",C
+17145,"Perry, IL",C
+17147,"Piatt, IL",C
+17149,"Pike, IL",C
+17151,"Pope, IL",C
+17153,"Pulaski, IL",C
+17155,"Putnam, IL",C
+17157,"Randolph, IL",C
+17159,"Richland, IL",C
+17161,"Rock Island, IL",C
+17163,"St. Clair, IL",C
+17165,"Saline, IL",C
+17167,"Sangamon, IL",C
+17169,"Schuyler, IL",C
+17171,"Scott, IL",C
+17173,"Shelby, IL",C
+17175,"Stark, IL",C
+17177,"Stephenson, IL",C
+17179,"Tazewell, IL",C
+17181,"Union, IL",C
+17183,"Vermilion, IL",C
+17185,"Wabash, IL",C
+17187,"Warren, IL",C
+17189,"Washington, IL",C
+17191,"Wayne, IL",C
+17193,"White, IL",C
+17195,"Whiteside, IL",C
+17197,"Will, IL",C
+17199,"Williamson, IL",C
+17201,"Winnebago, IL",C
+17203,"Woodford, IL",C
+18001,"Adams, IN",C
+18003,"Allen, IN",C
+18005,"Bartholomew, IN",C
+18007,"Benton, IN",C
+18009,"Blackford, IN",C
+18011,"Boone, IN",C
+18013,"Brown, IN",C
+18015,"Carroll, IN",C
+18017,"Cass, IN",C
+18019,"Clark, IN",C
+18021,"Clay, IN",C
+18023,"Clinton, IN",C
+18025,"Crawford, IN",C
+18027,"Daviess, IN",C
+18029,"Dearborn, IN",C
+18031,"Decatur, IN",C
+18033,"DeKalb, IN",C
+18035,"Delaware, IN",C
+18037,"Dubois, IN",C
+18039,"Elkhart, IN",C
+18041,"Fayette, IN",C
+18043,"Floyd, IN",C
+18045,"Fountain, IN",C
+18047,"Franklin, IN",C
+18049,"Fulton, IN",C
+18051,"Gibson, IN",C
+18053,"Grant, IN",C
+18055,"Greene, IN",C
+18057,"Hamilton, IN",C
+18059,"Hancock, IN",C
+18061,"Harrison, IN",C
+18063,"Hendricks, IN",C
+18065,"Henry, IN",C
+18067,"Howard, IN",C
+18069,"Huntington, IN",C
+18071,"Jackson, IN",C
+18073,"Jasper, IN",C
+18075,"Jay, IN",C
+18077,"Jefferson, IN",C
+18079,"Jennings, IN",C
+18081,"Johnson, IN",C
+18083,"Knox, IN",C
+18085,"Kosciusko, IN",C
+18087,"LaGrange, IN",C
+18089,"Lake, IN",C
+18091,"LaPorte, IN",C
+18093,"Lawrence, IN",C
+18095,"Madison, IN",C
+18097,"Marion, IN",C
+18099,"Marshall, IN",C
+18101,"Martin, IN",C
+18103,"Miami, IN",C
+18105,"Monroe, IN",C
+18107,"Montgomery, IN",C
+18109,"Morgan, IN",C
+18111,"Newton, IN",C
+18113,"Noble, IN",C
+18115,"Ohio, IN",C
+18117,"Orange, IN",C
+18119,"Owen, IN",C
+18121,"Parke, IN",C
+18123,"Perry, IN",C
+18125,"Pike, IN",C
+18127,"Porter, IN",C
+18129,"Posey, IN",C
+18131,"Pulaski, IN",C
+18133,"Putnam, IN",C
+18135,"Randolph, IN",C
+18137,"Ripley, IN",C
+18139,"Rush, IN",C
+18141,"St. Joseph, IN",C
+18143,"Scott, IN",C
+18145,"Shelby, IN",C
+18147,"Spencer, IN",C
+18149,"Starke, IN",C
+18151,"Steuben, IN",C
+18153,"Sullivan, IN",C
+18155,"Switzerland, IN",C
+18157,"Tippecanoe, IN",C
+18159,"Tipton, IN",C
+18161,"Union, IN",C
+18163,"Vanderburgh, IN",C
+18165,"Vermillion, IN",C
+18167,"Vigo, IN",C
+18169,"Wabash, IN",C
+18171,"Warren, IN",C
+18173,"Warrick, IN",C
+18175,"Washington, IN",C
+18177,"Wayne, IN",C
+18179,"Wells, IN",C
+18181,"White, IN",C
+18183,"Whitley, IN",C
+19001,"Adair, IA",C
+19003,"Adams, IA",C
+19005,"Allamakee, IA",C
+19007,"Appanoose, IA",C
+19009,"Audubon, IA",C
+19011,"Benton, IA",C
+19013,"Black Hawk, IA",C
+19015,"Boone, IA",C
+19017,"Bremer, IA",C
+19019,"Buchanan, IA",C
+19021,"Buena Vista, IA",C
+19023,"Butler, IA",C
+19025,"Calhoun, IA",C
+19027,"Carroll, IA",C
+19029,"Cass, IA",C
+19031,"Cedar, IA",C
+19033,"Cerro Gordo, IA",C
+19035,"Cherokee, IA",C
+19037,"Chickasaw, IA",C
+19039,"Clarke, IA",C
+19041,"Clay, IA",C
+19043,"Clayton, IA",C
+19045,"Clinton, IA",C
+19047,"Crawford, IA",C
+19049,"Dallas, IA",C
+19051,"Davis, IA",C
+19053,"Decatur, IA",C
+19055,"Delaware, IA",C
+19057,"Des Moines, IA",C
+19059,"Dickinson, IA",C
+19061,"Dubuque, IA",C
+19063,"Emmet, IA",C
+19065,"Fayette, IA",C
+19067,"Floyd, IA",C
+19069,"Franklin, IA",C
+19071,"Fremont, IA",C
+19073,"Greene, IA",C
+19075,"Grundy, IA",C
+19077,"Guthrie, IA",C
+19079,"Hamilton, IA",C
+19081,"Hancock, IA",C
+19083,"Hardin, IA",C
+19085,"Harrison, IA",C
+19087,"Henry, IA",C
+19089,"Howard, IA",C
+19091,"Humboldt, IA",C
+19093,"Ida, IA",C
+19095,"Iowa, IA",C
+19097,"Jackson, IA",C
+19099,"Jasper, IA",C
+19101,"Jefferson, IA",C
+19103,"Johnson, IA",C
+19105,"Jones, IA",C
+19107,"Keokuk, IA",C
+19109,"Kossuth, IA",C
+19111,"Lee, IA",C
+19113,"Linn, IA",C
+19115,"Louisa, IA",C
+19117,"Lucas, IA",C
+19119,"Lyon, IA",C
+19121,"Madison, IA",C
+19123,"Mahaska, IA",C
+19125,"Marion, IA",C
+19127,"Marshall, IA",C
+19129,"Mills, IA",C
+19131,"Mitchell, IA",C
+19133,"Monona, IA",C
+19135,"Monroe, IA",C
+19137,"Montgomery, IA",C
+19139,"Muscatine, IA",C
+19141,"OBrien, IA",C
+19143,"Osceola, IA",C
+19145,"Page, IA",C
+19147,"Palo Alto, IA",C
+19149,"Plymouth, IA",C
+19151,"Pocahontas, IA",C
+19153,"Polk, IA",C
+19155,"Pottawattamie, IA",C
+19157,"Poweshiek, IA",C
+19159,"Ringgold, IA",C
+19161,"Sac, IA",C
+19163,"Scott, IA",C
+19165,"Shelby, IA",C
+19167,"Sioux, IA",C
+19169,"Story, IA",C
+19171,"Tama, IA",C
+19173,"Taylor, IA",C
+19175,"Union, IA",C
+19177,"Van Buren, IA",C
+19179,"Wapello, IA",C
+19181,"Warren, IA",C
+19183,"Washington, IA",C
+19185,"Wayne, IA",C
+19187,"Webster, IA",C
+19189,"Winnebago, IA",C
+19191,"Winneshiek, IA",C
+19193,"Woodbury, IA",C
+19195,"Worth, IA",C
+19197,"Wright, IA",C
+20001,"Allen, KS",C
+20003,"Anderson, KS",C
+20005,"Atchison, KS",C
+20007,"Barber, KS",C
+20009,"Barton, KS",C
+20011,"Bourbon, KS",C
+20013,"Brown, KS",C
+20015,"Butler, KS",C
+20017,"Chase, KS",C
+20019,"Chautauqua, KS",C
+20021,"Cherokee, KS",C
+20023,"Cheyenne, KS",C
+20025,"Clark, KS",C
+20027,"Clay, KS",C
+20029,"Cloud, KS",C
+20031,"Coffey, KS",C
+20033,"Comanche, KS",C
+20035,"Cowley, KS",C
+20037,"Crawford, KS",C
+20039,"Decatur, KS",C
+20041,"Dickinson, KS",C
+20043,"Doniphan, KS",C
+20045,"Douglas, KS",C
+20047,"Edwards, KS",C
+20049,"Elk, KS",C
+20051,"Ellis, KS",C
+20053,"Ellsworth, KS",C
+20055,"Finney, KS",C
+20057,"Ford, KS",C
+20059,"Franklin, KS",C
+20061,"Geary, KS",C
+20063,"Gove, KS",C
+20065,"Graham, KS",C
+20067,"Grant, KS",C
+20069,"Gray, KS",C
+20071,"Greeley, KS",C
+20073,"Greenwood, KS",C
+20075,"Hamilton, KS",C
+20077,"Harper, KS",C
+20079,"Harvey, KS",C
+20081,"Haskell, KS",C
+20083,"Hodgeman, KS",C
+20085,"Jackson, KS",C
+20087,"Jefferson, KS",C
+20089,"Jewell, KS",C
+20091,"Johnson, KS",C
+20093,"Kearny, KS",C
+20095,"Kingman, KS",C
+20097,"Kiowa, KS",C
+20099,"Labette, KS",C
+20101,"Lane, KS",C
+20103,"Leavenworth, KS",C
+20105,"Lincoln, KS",C
+20107,"Linn, KS",C
+20109,"Logan, KS",C
+20111,"Lyon, KS",C
+20113,"McPherson, KS",C
+20115,"Marion, KS",C
+20117,"Marshall, KS",C
+20119,"Meade, KS",C
+20121,"Miami, KS",C
+20123,"Mitchell, KS",C
+20125,"Montgomery, KS",C
+20127,"Morris, KS",C
+20129,"Morton, KS",C
+20131,"Nemaha, KS",C
+20133,"Neosho, KS",C
+20135,"Ness, KS",C
+20137,"Norton, KS",C
+20139,"Osage, KS",C
+20141,"Osborne, KS",C
+20143,"Ottawa, KS",C
+20145,"Pawnee, KS",C
+20147,"Phillips, KS",C
+20149,"Pottawatomie, KS",C
+20151,"Pratt, KS",C
+20153,"Rawlins, KS",C
+20155,"Reno, KS",C
+20157,"Republic, KS",C
+20159,"Rice, KS",C
+20161,"Riley, KS",C
+20163,"Rooks, KS",C
+20165,"Rush, KS",C
+20167,"Russell, KS",C
+20169,"Saline, KS",C
+20171,"Scott, KS",C
+20173,"Sedgwick, KS",C
+20175,"Seward, KS",C
+20177,"Shawnee, KS",C
+20179,"Sheridan, KS",C
+20181,"Sherman, KS",C
+20183,"Smith, KS",C
+20185,"Stafford, KS",C
+20187,"Stanton, KS",C
+20189,"Stevens, KS",C
+20191,"Sumner, KS",C
+20193,"Thomas, KS",C
+20195,"Trego, KS",C
+20197,"Wabaunsee, KS",C
+20199,"Wallace, KS",C
+20201,"Washington, KS",C
+20203,"Wichita, KS",C
+20205,"Wilson, KS",C
+20207,"Woodson, KS",C
+20209,"Wyandotte, KS",C
+21001,"Adair, KY",C
+21003,"Allen, KY",C
+21005,"Anderson, KY",C
+21007,"Ballard, KY",C
+21009,"Barren, KY",C
+21011,"Bath, KY",C
+21013,"Bell, KY",C
+21015,"Boone, KY",C
+21017,"Bourbon, KY",C
+21019,"Boyd, KY",C
+21021,"Boyle, KY",C
+21023,"Bracken, KY",C
+21025,"Breathitt, KY",C
+21027,"Breckinridge, KY",C
+21029,"Bullitt, KY",C
+21031,"Butler, KY",C
+21033,"Caldwell, KY",C
+21035,"Calloway, KY",C
+21037,"Campbell, KY",C
+21039,"Carlisle, KY",C
+21041,"Carroll, KY",C
+21043,"Carter, KY",C
+21045,"Casey, KY",C
+21047,"Christian, KY",C
+21049,"Clark, KY",C
+21051,"Clay, KY",C
+21053,"Clinton, KY",C
+21055,"Crittenden, KY",C
+21057,"Cumberland, KY",C
+21059,"Daviess, KY",C
+21061,"Edmonson, KY",C
+21063,"Elliott, KY",C
+21065,"Estill, KY",C
+21067,"Fayette, KY",C
+21069,"Fleming, KY",C
+21071,"Floyd, KY",C
+21073,"Franklin, KY",C
+21075,"Fulton, KY",C
+21077,"Gallatin, KY",C
+21079,"Garrard, KY",C
+21081,"Grant, KY",C
+21083,"Graves, KY",C
+21085,"Grayson, KY",C
+21087,"Green, KY",C
+21089,"Greenup, KY",C
+21091,"Hancock, KY",C
+21093,"Hardin, KY",C
+21095,"Harlan, KY",C
+21097,"Harrison, KY",C
+21099,"Hart, KY",C
+21101,"Henderson, KY",C
+21103,"Henry, KY",C
+21105,"Hickman, KY",C
+21107,"Hopkins, KY",C
+21109,"Jackson, KY",C
+21111,"Jefferson, KY",C
+21113,"Jessamine, KY",C
+21115,"Johnson, KY",C
+21117,"Kenton, KY",C
+21119,"Knott, KY",C
+21121,"Knox, KY",C
+21123,"Larue, KY",C
+21125,"Laurel, KY",C
+21127,"Lawrence, KY",C
+21129,"Lee, KY",C
+21131,"Leslie, KY",C
+21133,"Letcher, KY",C
+21135,"Lewis, KY",C
+21137,"Lincoln, KY",C
+21139,"Livingston, KY",C
+21141,"Logan, KY",C
+21143,"Lyon, KY",C
+21145,"McCracken, KY",C
+21147,"McCreary, KY",C
+21149,"McLean, KY",C
+21151,"Madison, KY",C
+21153,"Magoffin, KY",C
+21155,"Marion, KY",C
+21157,"Marshall, KY",C
+21159,"Martin, KY",C
+21161,"Mason, KY",C
+21163,"Meade, KY",C
+21165,"Menifee, KY",C
+21167,"Mercer, KY",C
+21169,"Metcalfe, KY",C
+21171,"Monroe, KY",C
+21173,"Montgomery, KY",C
+21175,"Morgan, KY",C
+21177,"Muhlenberg, KY",C
+21179,"Nelson, KY",C
+21181,"Nicholas, KY",C
+21183,"Ohio, KY",C
+21185,"Oldham, KY",C
+21187,"Owen, KY",C
+21189,"Owsley, KY",C
+21191,"Pendleton, KY",C
+21193,"Perry, KY",C
+21195,"Pike, KY",C
+21197,"Powell, KY",C
+21199,"Pulaski, KY",C
+21201,"Robertson, KY",C
+21203,"Rockcastle, KY",C
+21205,"Rowan, KY",C
+21207,"Russell, KY",C
+21209,"Scott, KY",C
+21211,"Shelby, KY",C
+21213,"Simpson, KY",C
+21215,"Spencer, KY",C
+21217,"Taylor, KY",C
+21219,"Todd, KY",C
+21221,"Trigg, KY",C
+21223,"Trimble, KY",C
+21225,"Union, KY",C
+21227,"Warren, KY",C
+21229,"Washington, KY",C
+21231,"Wayne, KY",C
+21233,"Webster, KY",C
+21235,"Whitley, KY",C
+21237,"Wolfe, KY",C
+21239,"Woodford, KY",C
+22001,"Acadia, LA",C
+22003,"Allen, LA",C
+22005,"Ascension, LA",C
+22007,"Assumption, LA",C
+22009,"Avoyelles, LA",C
+22011,"Beauregard, LA",C
+22013,"Bienville, LA",C
+22015,"Bossier, LA",C
+22017,"Caddo, LA",C
+22019,"Calcasieu, LA",C
+22021,"Caldwell, LA",C
+22023,"Cameron, LA",C
+22025,"Catahoula, LA",C
+22027,"Claiborne, LA",C
+22029,"Concordia, LA",C
+22031,"De Soto, LA",C
+22033,"East Baton Rouge, LA",C
+22035,"East Carroll, LA",C
+22037,"East Feliciana, LA",C
+22039,"Evangeline, LA",C
+22041,"Franklin, LA",C
+22043,"Grant, LA",C
+22045,"Iberia, LA",C
+22047,"Iberville, LA",C
+22049,"Jackson, LA",C
+22051,"Jefferson, LA",C
+22053,"Jefferson Davis, LA",C
+22055,"Lafayette, LA",C
+22057,"Lafourche, LA",C
+22059,"LaSalle, LA",C
+22061,"Lincoln, LA",C
+22063,"Livingston, LA",C
+22065,"Madison, LA",C
+22067,"Morehouse, LA",C
+22069,"Natchitoches, LA",C
+22071,"Orleans, LA",C
+22073,"Ouachita, LA",C
+22075,"Plaquemines, LA",C
+22077,"Pointe Coupee, LA",C
+22079,"Rapides, LA",C
+22081,"Red River, LA",C
+22083,"Richland, LA",C
+22085,"Sabine, LA",C
+22087,"St. Bernard, LA",C
+22089,"St. Charles, LA",C
+22091,"St. Helena, LA",C
+22093,"St. James, LA",C
+22095,"St. John the Baptist, LA",C
+22097,"St. Landry, LA",C
+22099,"St. Martin, LA",C
+22101,"St. Mary, LA",C
+22103,"St. Tammany, LA",C
+22105,"Tangipahoa, LA",C
+22107,"Tensas, LA",C
+22109,"Terrebonne, LA",C
+22111,"Union, LA",C
+22113,"Vermilion, LA",C
+22115,"Vernon, LA",C
+22117,"Washington, LA",C
+22119,"Webster, LA",C
+22121,"West Baton Rouge, LA",C
+22123,"West Carroll, LA",C
+22125,"West Feliciana, LA",C
+22127,"Winn, LA",C
+23001,"Androscoggin, ME",C
+23003,"Aroostook, ME",C
+23005,"Cumberland, ME",C
+23007,"Franklin, ME",C
+23009,"Hancock, ME",C
+23011,"Kennebec, ME",C
+23013,"Knox, ME",C
+23015,"Lincoln, ME",C
+23017,"Oxford, ME",C
+23019,"Penobscot, ME",C
+23021,"Piscataquis, ME",C
+23023,"Sagadahoc, ME",C
+23025,"Somerset, ME",C
+23027,"Waldo, ME",C
+23029,"Washington, ME",C
+23031,"York, ME",C
+24001,"Allegany, MD",C
+24003,"Anne Arundel, MD",C
+24005,"Baltimore, MD",C
+24009,"Calvert, MD",C
+24011,"Caroline, MD",C
+24013,"Carroll, MD",C
+24015,"Cecil, MD",C
+24017,"Charles, MD",C
+24019,"Dorchester, MD",C
+24021,"Frederick, MD",C
+24023,"Garrett, MD",C
+24025,"Harford, MD",C
+24027,"Howard, MD",C
+24029,"Kent, MD",C
+24031,"Montgomery, MD",C
+24033,"Prince Georges, MD",C
+24035,"Queen Annes, MD",C
+24037,"St. Marys, MD",C
+24039,"Somerset, MD",C
+24041,"Talbot, MD",C
+24043,"Washington, MD",C
+24045,"Wicomico, MD",C
+24047,"Worcester, MD",C
+24510,"Baltimore, MD",C
+25001,"Barnstable, MA",C
+25003,"Berkshire, MA",C
+25005,"Bristol, MA",C
+25007,"Dukes, MA",C
+25009,"Essex, MA",C
+25011,"Franklin, MA",C
+25013,"Hampden, MA",C
+25015,"Hampshire, MA",C
+25017,"Middlesex, MA",C
+25019,"Nantucket, MA",C
+25021,"Norfolk, MA",C
+25023,"Plymouth, MA",C
+25025,"Suffolk, MA",C
+25027,"Worcester, MA",C
+26001,"Alcona, MI",C
+26003,"Alger, MI",C
+26005,"Allegan, MI",C
+26007,"Alpena, MI",C
+26009,"Antrim, MI",C
+26011,"Arenac, MI",C
+26013,"Baraga, MI",C
+26015,"Barry, MI",C
+26017,"Bay, MI",C
+26019,"Benzie, MI",C
+26021,"Berrien, MI",C
+26023,"Branch, MI",C
+26025,"Calhoun, MI",C
+26027,"Cass, MI",C
+26029,"Charlevoix, MI",C
+26031,"Cheboygan, MI",C
+26033,"Chippewa, MI",C
+26035,"Clare, MI",C
+26037,"Clinton, MI",C
+26039,"Crawford, MI",C
+26041,"Delta, MI",C
+26043,"Dickinson, MI",C
+26045,"Eaton, MI",C
+26047,"Emmet, MI",C
+26049,"Genesee, MI",C
+26051,"Gladwin, MI",C
+26053,"Gogebic, MI",C
+26055,"Grand Traverse, MI",C
+26057,"Gratiot, MI",C
+26059,"Hillsdale, MI",C
+26061,"Houghton, MI",C
+26063,"Huron, MI",C
+26065,"Ingham, MI",C
+26067,"Ionia, MI",C
+26069,"Iosco, MI",C
+26071,"Iron, MI",C
+26073,"Isabella, MI",C
+26075,"Jackson, MI",C
+26077,"Kalamazoo, MI",C
+26079,"Kalkaska, MI",C
+26081,"Kent, MI",C
+26083,"Keweenaw, MI",C
+26085,"Lake, MI",C
+26087,"Lapeer, MI",C
+26089,"Leelanau, MI",C
+26091,"Lenawee, MI",C
+26093,"Livingston, MI",C
+26095,"Luce, MI",C
+26097,"Mackinac, MI",C
+26099,"Macomb, MI",C
+26101,"Manistee, MI",C
+26103,"Marquette, MI",C
+26105,"Mason, MI",C
+26107,"Mecosta, MI",C
+26109,"Menominee, MI",C
+26111,"Midland, MI",C
+26113,"Missaukee, MI",C
+26115,"Monroe, MI",C
+26117,"Montcalm, MI",C
+26119,"Montmorency, MI",C
+26121,"Muskegon, MI",C
+26123,"Newaygo, MI",C
+26125,"Oakland, MI",C
+26127,"Oceana, MI",C
+26129,"Ogemaw, MI",C
+26131,"Ontonagon, MI",C
+26133,"Osceola, MI",C
+26135,"Oscoda, MI",C
+26137,"Otsego, MI",C
+26139,"Ottawa, MI",C
+26141,"Presque Isle, MI",C
+26143,"Roscommon, MI",C
+26145,"Saginaw, MI",C
+26147,"St. Clair, MI",C
+26149,"St. Joseph, MI",C
+26151,"Sanilac, MI",C
+26153,"Schoolcraft, MI",C
+26155,"Shiawassee, MI",C
+26157,"Tuscola, MI",C
+26159,"Van Buren, MI",C
+26161,"Washtenaw, MI",C
+26163,"Wayne, MI",C
+26165,"Wexford, MI",C
+27001,"Aitkin, MN",C
+27003,"Anoka, MN",C
+27005,"Becker, MN",C
+27007,"Beltrami, MN",C
+27009,"Benton, MN",C
+27011,"Big Stone, MN",C
+27013,"Blue Earth, MN",C
+27015,"Brown, MN",C
+27017,"Carlton, MN",C
+27019,"Carver, MN",C
+27021,"Cass, MN",C
+27023,"Chippewa, MN",C
+27025,"Chisago, MN",C
+27027,"Clay, MN",C
+27029,"Clearwater, MN",C
+27031,"Cook, MN",C
+27033,"Cottonwood, MN",C
+27035,"Crow Wing, MN",C
+27037,"Dakota, MN",C
+27039,"Dodge, MN",C
+27041,"Douglas, MN",C
+27043,"Faribault, MN",C
+27045,"Fillmore, MN",C
+27047,"Freeborn, MN",C
+27049,"Goodhue, MN",C
+27051,"Grant, MN",C
+27053,"Hennepin, MN",C
+27055,"Houston, MN",C
+27057,"Hubbard, MN",C
+27059,"Isanti, MN",C
+27061,"Itasca, MN",C
+27063,"Jackson, MN",C
+27065,"Kanabec, MN",C
+27067,"Kandiyohi, MN",C
+27069,"Kittson, MN",C
+27071,"Koochiching, MN",C
+27073,"Lac qui Parle, MN",C
+27075,"Lake, MN",C
+27077,"Lake of the Woods, MN",C
+27079,"Le Sueur, MN",C
+27081,"Lincoln, MN",C
+27083,"Lyon, MN",C
+27085,"McLeod, MN",C
+27087,"Mahnomen, MN",C
+27089,"Marshall, MN",C
+27091,"Martin, MN",C
+27093,"Meeker, MN",C
+27095,"Mille Lacs, MN",C
+27097,"Morrison, MN",C
+27099,"Mower, MN",C
+27101,"Murray, MN",C
+27103,"Nicollet, MN",C
+27105,"Nobles, MN",C
+27107,"Norman, MN",C
+27109,"Olmsted, MN",C
+27111,"Otter Tail, MN",C
+27113,"Pennington, MN",C
+27115,"Pine, MN",C
+27117,"Pipestone, MN",C
+27119,"Polk, MN",C
+27121,"Pope, MN",C
+27123,"Ramsey, MN",C
+27125,"Red Lake, MN",C
+27127,"Redwood, MN",C
+27129,"Renville, MN",C
+27131,"Rice, MN",C
+27133,"Rock, MN",C
+27135,"Roseau, MN",C
+27137,"St. Louis, MN",C
+27139,"Scott, MN",C
+27141,"Sherburne, MN",C
+27143,"Sibley, MN",C
+27145,"Stearns, MN",C
+27147,"Steele, MN",C
+27149,"Stevens, MN",C
+27151,"Swift, MN",C
+27153,"Todd, MN",C
+27155,"Traverse, MN",C
+27157,"Wabasha, MN",C
+27159,"Wadena, MN",C
+27161,"Waseca, MN",C
+27163,"Washington, MN",C
+27165,"Watonwan, MN",C
+27167,"Wilkin, MN",C
+27169,"Winona, MN",C
+27171,"Wright, MN",C
+27173,"Yellow Medicine, MN",C
+28001,"Adams, MS",C
+28003,"Alcorn, MS",C
+28005,"Amite, MS",C
+28007,"Attala, MS",C
+28009,"Benton, MS",C
+28011,"Bolivar, MS",C
+28013,"Calhoun, MS",C
+28015,"Carroll, MS",C
+28017,"Chickasaw, MS",C
+28019,"Choctaw, MS",C
+28021,"Claiborne, MS",C
+28023,"Clarke, MS",C
+28025,"Clay, MS",C
+28027,"Coahoma, MS",C
+28029,"Copiah, MS",C
+28031,"Covington, MS",C
+28033,"DeSoto, MS",C
+28035,"Forrest, MS",C
+28037,"Franklin, MS",C
+28039,"George, MS",C
+28041,"Greene, MS",C
+28043,"Grenada, MS",C
+28045,"Hancock, MS",C
+28047,"Harrison, MS",C
+28049,"Hinds, MS",C
+28051,"Holmes, MS",C
+28053,"Humphreys, MS",C
+28055,"Issaquena, MS",C
+28057,"Itawamba, MS",C
+28059,"Jackson, MS",C
+28061,"Jasper, MS",C
+28063,"Jefferson, MS",C
+28065,"Jefferson Davis, MS",C
+28067,"Jones, MS",C
+28069,"Kemper, MS",C
+28071,"Lafayette, MS",C
+28073,"Lamar, MS",C
+28075,"Lauderdale, MS",C
+28077,"Lawrence, MS",C
+28079,"Leake, MS",C
+28081,"Lee, MS",C
+28083,"Leflore, MS",C
+28085,"Lincoln, MS",C
+28087,"Lowndes, MS",C
+28089,"Madison, MS",C
+28091,"Marion, MS",C
+28093,"Marshall, MS",C
+28095,"Monroe, MS",C
+28097,"Montgomery, MS",C
+28099,"Neshoba, MS",C
+28101,"Newton, MS",C
+28103,"Noxubee, MS",C
+28105,"Oktibbeha, MS",C
+28107,"Panola, MS",C
+28109,"Pearl River, MS",C
+28111,"Perry, MS",C
+28113,"Pike, MS",C
+28115,"Pontotoc, MS",C
+28117,"Prentiss, MS",C
+28119,"Quitman, MS",C
+28121,"Rankin, MS",C
+28123,"Scott, MS",C
+28125,"Sharkey, MS",C
+28127,"Simpson, MS",C
+28129,"Smith, MS",C
+28131,"Stone, MS",C
+28133,"Sunflower, MS",C
+28135,"Tallahatchie, MS",C
+28137,"Tate, MS",C
+28139,"Tippah, MS",C
+28141,"Tishomingo, MS",C
+28143,"Tunica, MS",C
+28145,"Union, MS",C
+28147,"Walthall, MS",C
+28149,"Warren, MS",C
+28151,"Washington, MS",C
+28153,"Wayne, MS",C
+28155,"Webster, MS",C
+28157,"Wilkinson, MS",C
+28159,"Winston, MS",C
+28161,"Yalobusha, MS",C
+28163,"Yazoo, MS",C
+29001,"Adair, MO",C
+29003,"Andrew, MO",C
+29005,"Atchison, MO",C
+29007,"Audrain, MO",C
+29009,"Barry, MO",C
+29011,"Barton, MO",C
+29013,"Bates, MO",C
+29015,"Benton, MO",C
+29017,"Bollinger, MO",C
+29019,"Boone, MO",C
+29021,"Buchanan, MO",C
+29023,"Butler, MO",C
+29025,"Caldwell, MO",C
+29027,"Callaway, MO",C
+29029,"Camden, MO",C
+29031,"Cape Girardeau, MO",C
+29033,"Carroll, MO",C
+29035,"Carter, MO",C
+29037,"Cass, MO",C
+29039,"Cedar, MO",C
+29041,"Chariton, MO",C
+29043,"Christian, MO",C
+29045,"Clark, MO",C
+29047,"Clay, MO",C
+29049,"Clinton, MO",C
+29051,"Cole, MO",C
+29053,"Cooper, MO",C
+29055,"Crawford, MO",C
+29057,"Dade, MO",C
+29059,"Dallas, MO",C
+29061,"Daviess, MO",C
+29063,"DeKalb, MO",C
+29065,"Dent, MO",C
+29067,"Douglas, MO",C
+29069,"Dunklin, MO",C
+29071,"Franklin, MO",C
+29073,"Gasconade, MO",C
+29075,"Gentry, MO",C
+29077,"Greene, MO",C
+29079,"Grundy, MO",C
+29081,"Harrison, MO",C
+29083,"Henry, MO",C
+29085,"Hickory, MO",C
+29087,"Holt, MO",C
+29089,"Howard, MO",C
+29091,"Howell, MO",C
+29093,"Iron, MO",C
+29095,"Jackson, MO",C
+29097,"Jasper, MO",C
+29099,"Jefferson, MO",C
+29101,"Johnson, MO",C
+29103,"Knox, MO",C
+29105,"Laclede, MO",C
+29107,"Lafayette, MO",C
+29109,"Lawrence, MO",C
+29111,"Lewis, MO",C
+29113,"Lincoln, MO",C
+29115,"Linn, MO",C
+29117,"Livingston, MO",C
+29119,"McDonald, MO",C
+29121,"Macon, MO",C
+29123,"Madison, MO",C
+29125,"Maries, MO",C
+29127,"Marion, MO",C
+29129,"Mercer, MO",C
+29131,"Miller, MO",C
+29133,"Mississippi, MO",C
+29135,"Moniteau, MO",C
+29137,"Monroe, MO",C
+29139,"Montgomery, MO",C
+29141,"Morgan, MO",C
+29143,"New Madrid, MO",C
+29145,"Newton, MO",C
+29147,"Nodaway, MO",C
+29149,"Oregon, MO",C
+29151,"Osage, MO",C
+29153,"Ozark, MO",C
+29155,"Pemiscot, MO",C
+29157,"Perry, MO",C
+29159,"Pettis, MO",C
+29161,"Phelps, MO",C
+29163,"Pike, MO",C
+29165,"Platte, MO",C
+29167,"Polk, MO",C
+29169,"Pulaski, MO",C
+29171,"Putnam, MO",C
+29173,"Ralls, MO",C
+29175,"Randolph, MO",C
+29177,"Ray, MO",C
+29179,"Reynolds, MO",C
+29181,"Ripley, MO",C
+29183,"St. Charles, MO",C
+29185,"St. Clair, MO",C
+29186,"Ste. Genevieve, MO",C
+29187,"St. Francois, MO",C
+29189,"St. Louis, MO",C
+29195,"Saline, MO",C
+29197,"Schuyler, MO",C
+29199,"Scotland, MO",C
+29201,"Scott, MO",C
+29203,"Shannon, MO",C
+29205,"Shelby, MO",C
+29207,"Stoddard, MO",C
+29209,"Stone, MO",C
+29211,"Sullivan, MO",C
+29213,"Taney, MO",C
+29215,"Texas, MO",C
+29217,"Vernon, MO",C
+29219,"Warren, MO",C
+29221,"Washington, MO",C
+29223,"Wayne, MO",C
+29225,"Webster, MO",C
+29227,"Worth, MO",C
+29229,"Wright, MO",C
+29510,"St. Louis, MO",C
+30001,"Beaverhead, MT",C
+30003,"Big Horn, MT",C
+30005,"Blaine, MT",C
+30007,"Broadwater, MT",C
+30009,"Carbon, MT",C
+30011,"Carter, MT",C
+30013,"Cascade, MT",C
+30015,"Chouteau, MT",C
+30017,"Custer, MT",C
+30019,"Daniels, MT",C
+30021,"Dawson, MT",C
+30023,"Deer Lodge, MT",C
+30025,"Fallon, MT",C
+30027,"Fergus, MT",C
+30029,"Flathead, MT",C
+30031,"Gallatin, MT",C
+30033,"Garfield, MT",C
+30035,"Glacier, MT",C
+30037,"Golden Valley, MT",C
+30039,"Granite, MT",C
+30041,"Hill, MT",C
+30043,"Jefferson, MT",C
+30045,"Judith Basin, MT",C
+30047,"Lake, MT",C
+30049,"Lewis and Clark, MT",C
+30051,"Liberty, MT",C
+30053,"Lincoln, MT",C
+30055,"McCone, MT",C
+30057,"Madison, MT",C
+30059,"Meagher, MT",C
+30061,"Mineral, MT",C
+30063,"Missoula, MT",C
+30065,"Musselshell, MT",C
+30067,"Park, MT",C
+30069,"Petroleum, MT",C
+30071,"Phillips, MT",C
+30073,"Pondera, MT",C
+30075,"Powder River, MT",C
+30077,"Powell, MT",C
+30079,"Prairie, MT",C
+30081,"Ravalli, MT",C
+30083,"Richland, MT",C
+30085,"Roosevelt, MT",C
+30087,"Rosebud, MT",C
+30089,"Sanders, MT",C
+30091,"Sheridan, MT",C
+30093,"Silver Bow, MT",C
+30095,"Stillwater, MT",C
+30097,"Sweet Grass, MT",C
+30099,"Teton, MT",C
+30101,"Toole, MT",C
+30103,"Treasure, MT",C
+30105,"Valley, MT",C
+30107,"Wheatland, MT",C
+30109,"Wibaux, MT",C
+30111,"Yellowstone, MT",C
+31001,"Adams, NE",C
+31003,"Antelope, NE",C
+31005,"Arthur, NE",C
+31007,"Banner, NE",C
+31009,"Blaine, NE",C
+31011,"Boone, NE",C
+31013,"Box Butte, NE",C
+31015,"Boyd, NE",C
+31017,"Brown, NE",C
+31019,"Buffalo, NE",C
+31021,"Burt, NE",C
+31023,"Butler, NE",C
+31025,"Cass, NE",C
+31027,"Cedar, NE",C
+31029,"Chase, NE",C
+31031,"Cherry, NE",C
+31033,"Cheyenne, NE",C
+31035,"Clay, NE",C
+31037,"Colfax, NE",C
+31039,"Cuming, NE",C
+31041,"Custer, NE",C
+31043,"Dakota, NE",C
+31045,"Dawes, NE",C
+31047,"Dawson, NE",C
+31049,"Deuel, NE",C
+31051,"Dixon, NE",C
+31053,"Dodge, NE",C
+31055,"Douglas, NE",C
+31057,"Dundy, NE",C
+31059,"Fillmore, NE",C
+31061,"Franklin, NE",C
+31063,"Frontier, NE",C
+31065,"Furnas, NE",C
+31067,"Gage, NE",C
+31069,"Garden, NE",C
+31071,"Garfield, NE",C
+31073,"Gosper, NE",C
+31075,"Grant, NE",C
+31077,"Greeley, NE",C
+31079,"Hall, NE",C
+31081,"Hamilton, NE",C
+31083,"Harlan, NE",C
+31085,"Hayes, NE",C
+31087,"Hitchcock, NE",C
+31089,"Holt, NE",C
+31091,"Hooker, NE",C
+31093,"Howard, NE",C
+31095,"Jefferson, NE",C
+31097,"Johnson, NE",C
+31099,"Kearney, NE",C
+31101,"Keith, NE",C
+31103,"Keya Paha, NE",C
+31105,"Kimball, NE",C
+31107,"Knox, NE",C
+31109,"Lancaster, NE",C
+31111,"Lincoln, NE",C
+31113,"Logan, NE",C
+31115,"Loup, NE",C
+31117,"McPherson, NE",C
+31119,"Madison, NE",C
+31121,"Merrick, NE",C
+31123,"Morrill, NE",C
+31125,"Nance, NE",C
+31127,"Nemaha, NE",C
+31129,"Nuckolls, NE",C
+31131,"Otoe, NE",C
+31133,"Pawnee, NE",C
+31135,"Perkins, NE",C
+31137,"Phelps, NE",C
+31139,"Pierce, NE",C
+31141,"Platte, NE",C
+31143,"Polk, NE",C
+31145,"Red Willow, NE",C
+31147,"Richardson, NE",C
+31149,"Rock, NE",C
+31151,"Saline, NE",C
+31153,"Sarpy, NE",C
+31155,"Saunders, NE",C
+31157,"Scotts Bluff, NE",C
+31159,"Seward, NE",C
+31161,"Sheridan, NE",C
+31163,"Sherman, NE",C
+31165,"Sioux, NE",C
+31167,"Stanton, NE",C
+31169,"Thayer, NE",C
+31171,"Thomas, NE",C
+31173,"Thurston, NE",C
+31175,"Valley, NE",C
+31177,"Washington, NE",C
+31179,"Wayne, NE",C
+31181,"Webster, NE",C
+31183,"Wheeler, NE",C
+31185,"York, NE",C
+32001,"Churchill, NV",C
+32003,"Clark, NV",C
+32005,"Douglas, NV",C
+32007,"Elko, NV",C
+32009,"Esmeralda, NV",C
+32011,"Eureka, NV",C
+32013,"Humboldt, NV",C
+32015,"Lander, NV",C
+32017,"Lincoln, NV",C
+32019,"Lyon, NV",C
+32021,"Mineral, NV",C
+32023,"Nye, NV",C
+32027,"Pershing, NV",C
+32029,"Storey, NV",C
+32031,"Washoe, NV",C
+32033,"White Pine, NV",C
+32510,"Carson City, NV",C
+33001,"Belknap, NH",C
+33003,"Carroll, NH",C
+33005,"Cheshire, NH",C
+33007,"Coos, NH",C
+33009,"Grafton, NH",C
+33011,"Hillsborough, NH",C
+33013,"Merrimack, NH",C
+33015,"Rockingham, NH",C
+33017,"Strafford, NH",C
+33019,"Sullivan, NH",C
+34001,"Atlantic, NJ",C
+34003,"Bergen, NJ",C
+34005,"Burlington, NJ",C
+34007,"Camden, NJ",C
+34009,"Cape May, NJ",C
+34011,"Cumberland, NJ",C
+34013,"Essex, NJ",C
+34015,"Gloucester, NJ",C
+34017,"Hudson, NJ",C
+34019,"Hunterdon, NJ",C
+34021,"Mercer, NJ",C
+34023,"Middlesex, NJ",C
+34025,"Monmouth, NJ",C
+34027,"Morris, NJ",C
+34029,"Ocean, NJ",C
+34031,"Passaic, NJ",C
+34033,"Salem, NJ",C
+34035,"Somerset, NJ",C
+34037,"Sussex, NJ",C
+34039,"Union, NJ",C
+34041,"Warren, NJ",C
+35001,"Bernalillo, NM",C
+35003,"Catron, NM",C
+35005,"Chaves, NM",C
+35006,"Cibola, NM",C
+35007,"Colfax, NM",C
+35009,"Curry, NM",C
+35011,"De Baca, NM",C
+35013,"Doña Ana, NM",C
+35015,"Eddy, NM",C
+35017,"Grant, NM",C
+35019,"Guadalupe, NM",C
+35021,"Harding, NM",C
+35023,"Hidalgo, NM",C
+35025,"Lea, NM",C
+35027,"Lincoln, NM",C
+35028,"Los Alamos, NM",C
+35029,"Luna, NM",C
+35031,"McKinley, NM",C
+35033,"Mora, NM",C
+35035,"Otero, NM",C
+35037,"Quay, NM",C
+35039,"Rio Arriba, NM",C
+35041,"Roosevelt, NM",C
+35043,"Sandoval, NM",C
+35045,"San Juan, NM",C
+35047,"San Miguel, NM",C
+35049,"Santa Fe, NM",C
+35051,"Sierra, NM",C
+35053,"Socorro, NM",C
+35055,"Taos, NM",C
+35057,"Torrance, NM",C
+35059,"Union, NM",C
+35061,"Valencia, NM",C
+36001,"Albany, NY",C
+36003,"Allegany, NY",C
+36005,"Bronx, NY",C
+36007,"Broome, NY",C
+36009,"Cattaraugus, NY",C
+36011,"Cayuga, NY",C
+36013,"Chautauqua, NY",C
+36015,"Chemung, NY",C
+36017,"Chenango, NY",C
+36019,"Clinton, NY",C
+36021,"Columbia, NY",C
+36023,"Cortland, NY",C
+36025,"Delaware, NY",C
+36027,"Dutchess, NY",C
+36029,"Erie, NY",C
+36031,"Essex, NY",C
+36033,"Franklin, NY",C
+36035,"Fulton, NY",C
+36037,"Genesee, NY",C
+36039,"Greene, NY",C
+36041,"Hamilton, NY",C
+36043,"Herkimer, NY",C
+36045,"Jefferson, NY",C
+36047,"Kings, NY",C
+36049,"Lewis, NY",C
+36051,"Livingston, NY",C
+36053,"Madison, NY",C
+36055,"Monroe, NY",C
+36057,"Montgomery, NY",C
+36059,"Nassau, NY",C
+36061,"New York, NY",C
+36063,"Niagara, NY",C
+36065,"Oneida, NY",C
+36067,"Onondaga, NY",C
+36069,"Ontario, NY",C
+36071,"Orange, NY",C
+36073,"Orleans, NY",C
+36075,"Oswego, NY",C
+36077,"Otsego, NY",C
+36079,"Putnam, NY",C
+36081,"Queens, NY",C
+36083,"Rensselaer, NY",C
+36085,"Richmond, NY",C
+36087,"Rockland, NY",C
+36089,"St. Lawrence, NY",C
+36091,"Saratoga, NY",C
+36093,"Schenectady, NY",C
+36095,"Schoharie, NY",C
+36097,"Schuyler, NY",C
+36099,"Seneca, NY",C
+36101,"Steuben, NY",C
+36103,"Suffolk, NY",C
+36105,"Sullivan, NY",C
+36107,"Tioga, NY",C
+36109,"Tompkins, NY",C
+36111,"Ulster, NY",C
+36113,"Warren, NY",C
+36115,"Washington, NY",C
+36117,"Wayne, NY",C
+36119,"Westchester, NY",C
+36121,"Wyoming, NY",C
+36123,"Yates, NY",C
+37001,"Alamance, NC",C
+37003,"Alexander, NC",C
+37005,"Alleghany, NC",C
+37007,"Anson, NC",C
+37009,"Ashe, NC",C
+37011,"Avery, NC",C
+37013,"Beaufort, NC",C
+37015,"Bertie, NC",C
+37017,"Bladen, NC",C
+37019,"Brunswick, NC",C
+37021,"Buncombe, NC",C
+37023,"Burke, NC",C
+37025,"Cabarrus, NC",C
+37027,"Caldwell, NC",C
+37029,"Camden, NC",C
+37031,"Carteret, NC",C
+37033,"Caswell, NC",C
+37035,"Catawba, NC",C
+37037,"Chatham, NC",C
+37039,"Cherokee, NC",C
+37041,"Chowan, NC",C
+37043,"Clay, NC",C
+37045,"Cleveland, NC",C
+37047,"Columbus, NC",C
+37049,"Craven, NC",C
+37051,"Cumberland, NC",C
+37053,"Currituck, NC",C
+37055,"Dare, NC",C
+37057,"Davidson, NC",C
+37059,"Davie, NC",C
+37061,"Duplin, NC",C
+37063,"Durham, NC",C
+37065,"Edgecombe, NC",C
+37067,"Forsyth, NC",C
+37069,"Franklin, NC",C
+37071,"Gaston, NC",C
+37073,"Gates, NC",C
+37075,"Graham, NC",C
+37077,"Granville, NC",C
+37079,"Greene, NC",C
+37081,"Guilford, NC",C
+37083,"Halifax, NC",C
+37085,"Harnett, NC",C
+37087,"Haywood, NC",C
+37089,"Henderson, NC",C
+37091,"Hertford, NC",C
+37093,"Hoke, NC",C
+37095,"Hyde, NC",C
+37097,"Iredell, NC",C
+37099,"Jackson, NC",C
+37101,"Johnston, NC",C
+37103,"Jones, NC",C
+37105,"Lee, NC",C
+37107,"Lenoir, NC",C
+37109,"Lincoln, NC",C
+37111,"McDowell, NC",C
+37113,"Macon, NC",C
+37115,"Madison, NC",C
+37117,"Martin, NC",C
+37119,"Mecklenburg, NC",C
+37121,"Mitchell, NC",C
+37123,"Montgomery, NC",C
+37125,"Moore, NC",C
+37127,"Nash, NC",C
+37129,"New Hanover, NC",C
+37131,"Northampton, NC",C
+37133,"Onslow, NC",C
+37135,"Orange, NC",C
+37137,"Pamlico, NC",C
+37139,"Pasquotank, NC",C
+37141,"Pender, NC",C
+37143,"Perquimans, NC",C
+37145,"Person, NC",C
+37147,"Pitt, NC",C
+37149,"Polk, NC",C
+37151,"Randolph, NC",C
+37153,"Richmond, NC",C
+37155,"Robeson, NC",C
+37157,"Rockingham, NC",C
+37159,"Rowan, NC",C
+37161,"Rutherford, NC",C
+37163,"Sampson, NC",C
+37165,"Scotland, NC",C
+37167,"Stanly, NC",C
+37169,"Stokes, NC",C
+37171,"Surry, NC",C
+37173,"Swain, NC",C
+37175,"Transylvania, NC",C
+37177,"Tyrrell, NC",C
+37179,"Union, NC",C
+37181,"Vance, NC",C
+37183,"Wake, NC",C
+37185,"Warren, NC",C
+37187,"Washington, NC",C
+37189,"Watauga, NC",C
+37191,"Wayne, NC",C
+37193,"Wilkes, NC",C
+37195,"Wilson, NC",C
+37197,"Yadkin, NC",C
+37199,"Yancey, NC",C
+38001,"Adams, ND",C
+38003,"Barnes, ND",C
+38005,"Benson, ND",C
+38007,"Billings, ND",C
+38009,"Bottineau, ND",C
+38011,"Bowman, ND",C
+38013,"Burke, ND",C
+38015,"Burleigh, ND",C
+38017,"Cass, ND",C
+38019,"Cavalier, ND",C
+38021,"Dickey, ND",C
+38023,"Divide, ND",C
+38025,"Dunn, ND",C
+38027,"Eddy, ND",C
+38029,"Emmons, ND",C
+38031,"Foster, ND",C
+38033,"Golden Valley, ND",C
+38035,"Grand Forks, ND",C
+38037,"Grant, ND",C
+38039,"Griggs, ND",C
+38041,"Hettinger, ND",C
+38043,"Kidder, ND",C
+38045,"LaMoure, ND",C
+38047,"Logan, ND",C
+38049,"McHenry, ND",C
+38051,"McIntosh, ND",C
+38053,"McKenzie, ND",C
+38055,"McLean, ND",C
+38057,"Mercer, ND",C
+38059,"Morton, ND",C
+38061,"Mountrail, ND",C
+38063,"Nelson, ND",C
+38065,"Oliver, ND",C
+38067,"Pembina, ND",C
+38069,"Pierce, ND",C
+38071,"Ramsey, ND",C
+38073,"Ransom, ND",C
+38075,"Renville, ND",C
+38077,"Richland, ND",C
+38079,"Rolette, ND",C
+38081,"Sargent, ND",C
+38083,"Sheridan, ND",C
+38085,"Sioux, ND",C
+38087,"Slope, ND",C
+38089,"Stark, ND",C
+38091,"Steele, ND",C
+38093,"Stutsman, ND",C
+38095,"Towner, ND",C
+38097,"Traill, ND",C
+38099,"Walsh, ND",C
+38101,"Ward, ND",C
+38103,"Wells, ND",C
+38105,"Williams, ND",C
+39001,"Adams, OH",C
+39003,"Allen, OH",C
+39005,"Ashland, OH",C
+39007,"Ashtabula, OH",C
+39009,"Athens, OH",C
+39011,"Auglaize, OH",C
+39013,"Belmont, OH",C
+39015,"Brown, OH",C
+39017,"Butler, OH",C
+39019,"Carroll, OH",C
+39021,"Champaign, OH",C
+39023,"Clark, OH",C
+39025,"Clermont, OH",C
+39027,"Clinton, OH",C
+39029,"Columbiana, OH",C
+39031,"Coshocton, OH",C
+39033,"Crawford, OH",C
+39035,"Cuyahoga, OH",C
+39037,"Darke, OH",C
+39039,"Defiance, OH",C
+39041,"Delaware, OH",C
+39043,"Erie, OH",C
+39045,"Fairfield, OH",C
+39047,"Fayette, OH",C
+39049,"Franklin, OH",C
+39051,"Fulton, OH",C
+39053,"Gallia, OH",C
+39055,"Geauga, OH",C
+39057,"Greene, OH",C
+39059,"Guernsey, OH",C
+39061,"Hamilton, OH",C
+39063,"Hancock, OH",C
+39065,"Hardin, OH",C
+39067,"Harrison, OH",C
+39069,"Henry, OH",C
+39071,"Highland, OH",C
+39073,"Hocking, OH",C
+39075,"Holmes, OH",C
+39077,"Huron, OH",C
+39079,"Jackson, OH",C
+39081,"Jefferson, OH",C
+39083,"Knox, OH",C
+39085,"Lake, OH",C
+39087,"Lawrence, OH",C
+39089,"Licking, OH",C
+39091,"Logan, OH",C
+39093,"Lorain, OH",C
+39095,"Lucas, OH",C
+39097,"Madison, OH",C
+39099,"Mahoning, OH",C
+39101,"Marion, OH",C
+39103,"Medina, OH",C
+39105,"Meigs, OH",C
+39107,"Mercer, OH",C
+39109,"Miami, OH",C
+39111,"Monroe, OH",C
+39113,"Montgomery, OH",C
+39115,"Morgan, OH",C
+39117,"Morrow, OH",C
+39119,"Muskingum, OH",C
+39121,"Noble, OH",C
+39123,"Ottawa, OH",C
+39125,"Paulding, OH",C
+39127,"Perry, OH",C
+39129,"Pickaway, OH",C
+39131,"Pike, OH",C
+39133,"Portage, OH",C
+39135,"Preble, OH",C
+39137,"Putnam, OH",C
+39139,"Richland, OH",C
+39141,"Ross, OH",C
+39143,"Sandusky, OH",C
+39145,"Scioto, OH",C
+39147,"Seneca, OH",C
+39149,"Shelby, OH",C
+39151,"Stark, OH",C
+39153,"Summit, OH",C
+39155,"Trumbull, OH",C
+39157,"Tuscarawas, OH",C
+39159,"Union, OH",C
+39161,"Van Wert, OH",C
+39163,"Vinton, OH",C
+39165,"Warren, OH",C
+39167,"Washington, OH",C
+39169,"Wayne, OH",C
+39171,"Williams, OH",C
+39173,"Wood, OH",C
+39175,"Wyandot, OH",C
+40001,"Adair, OK",C
+40003,"Alfalfa, OK",C
+40005,"Atoka, OK",C
+40007,"Beaver, OK",C
+40009,"Beckham, OK",C
+40011,"Blaine, OK",C
+40013,"Bryan, OK",C
+40015,"Caddo, OK",C
+40017,"Canadian, OK",C
+40019,"Carter, OK",C
+40021,"Cherokee, OK",C
+40023,"Choctaw, OK",C
+40025,"Cimarron, OK",C
+40027,"Cleveland, OK",C
+40029,"Coal, OK",C
+40031,"Comanche, OK",C
+40033,"Cotton, OK",C
+40035,"Craig, OK",C
+40037,"Creek, OK",C
+40039,"Custer, OK",C
+40041,"Delaware, OK",C
+40043,"Dewey, OK",C
+40045,"Ellis, OK",C
+40047,"Garfield, OK",C
+40049,"Garvin, OK",C
+40051,"Grady, OK",C
+40053,"Grant, OK",C
+40055,"Greer, OK",C
+40057,"Harmon, OK",C
+40059,"Harper, OK",C
+40061,"Haskell, OK",C
+40063,"Hughes, OK",C
+40065,"Jackson, OK",C
+40067,"Jefferson, OK",C
+40069,"Johnston, OK",C
+40071,"Kay, OK",C
+40073,"Kingfisher, OK",C
+40075,"Kiowa, OK",C
+40077,"Latimer, OK",C
+40079,"Le Flore, OK",C
+40081,"Lincoln, OK",C
+40083,"Logan, OK",C
+40085,"Love, OK",C
+40087,"McClain, OK",C
+40089,"McCurtain, OK",C
+40091,"McIntosh, OK",C
+40093,"Major, OK",C
+40095,"Marshall, OK",C
+40097,"Mayes, OK",C
+40099,"Murray, OK",C
+40101,"Muskogee, OK",C
+40103,"Noble, OK",C
+40105,"Nowata, OK",C
+40107,"Okfuskee, OK",C
+40109,"Oklahoma, OK",C
+40111,"Okmulgee, OK",C
+40113,"Osage, OK",C
+40115,"Ottawa, OK",C
+40117,"Pawnee, OK",C
+40119,"Payne, OK",C
+40121,"Pittsburg, OK",C
+40123,"Pontotoc, OK",C
+40125,"Pottawatomie, OK",C
+40127,"Pushmataha, OK",C
+40129,"Roger Mills, OK",C
+40131,"Rogers, OK",C
+40133,"Seminole, OK",C
+40135,"Sequoyah, OK",C
+40137,"Stephens, OK",C
+40139,"Texas, OK",C
+40141,"Tillman, OK",C
+40143,"Tulsa, OK",C
+40145,"Wagoner, OK",C
+40147,"Washington, OK",C
+40149,"Washita, OK",C
+40151,"Woods, OK",C
+40153,"Woodward, OK",C
+41001,"Baker, OR",C
+41003,"Benton, OR",C
+41005,"Clackamas, OR",C
+41007,"Clatsop, OR",C
+41009,"Columbia, OR",C
+41011,"Coos, OR",C
+41013,"Crook, OR",C
+41015,"Curry, OR",C
+41017,"Deschutes, OR",C
+41019,"Douglas, OR",C
+41021,"Gilliam, OR",C
+41023,"Grant, OR",C
+41025,"Harney, OR",C
+41027,"Hood River, OR",C
+41029,"Jackson, OR",C
+41031,"Jefferson, OR",C
+41033,"Josephine, OR",C
+41035,"Klamath, OR",C
+41037,"Lake, OR",C
+41039,"Lane, OR",C
+41041,"Lincoln, OR",C
+41043,"Linn, OR",C
+41045,"Malheur, OR",C
+41047,"Marion, OR",C
+41049,"Morrow, OR",C
+41051,"Multnomah, OR",C
+41053,"Polk, OR",C
+41055,"Sherman, OR",C
+41057,"Tillamook, OR",C
+41059,"Umatilla, OR",C
+41061,"Union, OR",C
+41063,"Wallowa, OR",C
+41065,"Wasco, OR",C
+41067,"Washington, OR",C
+41069,"Wheeler, OR",C
+41071,"Yamhill, OR",C
+42001,"Adams, PA",C
+42003,"Allegheny, PA",C
+42005,"Armstrong, PA",C
+42007,"Beaver, PA",C
+42009,"Bedford, PA",C
+42011,"Berks, PA",C
+42013,"Blair, PA",C
+42015,"Bradford, PA",C
+42017,"Bucks, PA",C
+42019,"Butler, PA",C
+42021,"Cambria, PA",C
+42023,"Cameron, PA",C
+42025,"Carbon, PA",C
+42027,"Centre, PA",C
+42029,"Chester, PA",C
+42031,"Clarion, PA",C
+42033,"Clearfield, PA",C
+42035,"Clinton, PA",C
+42037,"Columbia, PA",C
+42039,"Crawford, PA",C
+42041,"Cumberland, PA",C
+42043,"Dauphin, PA",C
+42045,"Delaware, PA",C
+42047,"Elk, PA",C
+42049,"Erie, PA",C
+42051,"Fayette, PA",C
+42053,"Forest, PA",C
+42055,"Franklin, PA",C
+42057,"Fulton, PA",C
+42059,"Greene, PA",C
+42061,"Huntingdon, PA",C
+42063,"Indiana, PA",C
+42065,"Jefferson, PA",C
+42067,"Juniata, PA",C
+42069,"Lackawanna, PA",C
+42071,"Lancaster, PA",C
+42073,"Lawrence, PA",C
+42075,"Lebanon, PA",C
+42077,"Lehigh, PA",C
+42079,"Luzerne, PA",C
+42081,"Lycoming, PA",C
+42083,"McKean, PA",C
+42085,"Mercer, PA",C
+42087,"Mifflin, PA",C
+42089,"Monroe, PA",C
+42091,"Montgomery, PA",C
+42093,"Montour, PA",C
+42095,"Northampton, PA",C
+42097,"Northumberland, PA",C
+42099,"Perry, PA",C
+42101,"Philadelphia, PA",C
+42103,"Pike, PA",C
+42105,"Potter, PA",C
+42107,"Schuylkill, PA",C
+42109,"Snyder, PA",C
+42111,"Somerset, PA",C
+42113,"Sullivan, PA",C
+42115,"Susquehanna, PA",C
+42117,"Tioga, PA",C
+42119,"Union, PA",C
+42121,"Venango, PA",C
+42123,"Warren, PA",C
+42125,"Washington, PA",C
+42127,"Wayne, PA",C
+42129,"Westmoreland, PA",C
+42131,"Wyoming, PA",C
+42133,"York, PA",C
+44001,"Bristol, RI",C
+44003,"Kent, RI",C
+44005,"Newport, RI",C
+44007,"Providence, RI",C
+44009,"Washington, RI",C
+45001,"Abbeville, SC",C
+45003,"Aiken, SC",C
+45005,"Allendale, SC",C
+45007,"Anderson, SC",C
+45009,"Bamberg, SC",C
+45011,"Barnwell, SC",C
+45013,"Beaufort, SC",C
+45015,"Berkeley, SC",C
+45017,"Calhoun, SC",C
+45019,"Charleston, SC",C
+45021,"Cherokee, SC",C
+45023,"Chester, SC",C
+45025,"Chesterfield, SC",C
+45027,"Clarendon, SC",C
+45029,"Colleton, SC",C
+45031,"Darlington, SC",C
+45033,"Dillon, SC",C
+45035,"Dorchester, SC",C
+45037,"Edgefield, SC",C
+45039,"Fairfield, SC",C
+45041,"Florence, SC",C
+45043,"Georgetown, SC",C
+45045,"Greenville, SC",C
+45047,"Greenwood, SC",C
+45049,"Hampton, SC",C
+45051,"Horry, SC",C
+45053,"Jasper, SC",C
+45055,"Kershaw, SC",C
+45057,"Lancaster, SC",C
+45059,"Laurens, SC",C
+45061,"Lee, SC",C
+45063,"Lexington, SC",C
+45065,"McCormick, SC",C
+45067,"Marion, SC",C
+45069,"Marlboro, SC",C
+45071,"Newberry, SC",C
+45073,"Oconee, SC",C
+45075,"Orangeburg, SC",C
+45077,"Pickens, SC",C
+45079,"Richland, SC",C
+45081,"Saluda, SC",C
+45083,"Spartanburg, SC",C
+45085,"Sumter, SC",C
+45087,"Union, SC",C
+45089,"Williamsburg, SC",C
+45091,"York, SC",C
+46003,"Aurora, SD",C
+46005,"Beadle, SD",C
+46007,"Bennett, SD",C
+46009,"Bon Homme, SD",C
+46011,"Brookings, SD",C
+46013,"Brown, SD",C
+46015,"Brule, SD",C
+46017,"Buffalo, SD",C
+46019,"Butte, SD",C
+46021,"Campbell, SD",C
+46023,"Charles Mix, SD",C
+46025,"Clark, SD",C
+46027,"Clay, SD",C
+46029,"Codington, SD",C
+46031,"Corson, SD",C
+46033,"Custer, SD",C
+46035,"Davison, SD",C
+46037,"Day, SD",C
+46039,"Deuel, SD",C
+46041,"Dewey, SD",C
+46043,"Douglas, SD",C
+46045,"Edmunds, SD",C
+46047,"Fall River, SD",C
+46049,"Faulk, SD",C
+46051,"Grant, SD",C
+46053,"Gregory, SD",C
+46055,"Haakon, SD",C
+46057,"Hamlin, SD",C
+46059,"Hand, SD",C
+46061,"Hanson, SD",C
+46063,"Harding, SD",C
+46065,"Hughes, SD",C
+46067,"Hutchinson, SD",C
+46069,"Hyde, SD",C
+46071,"Jackson, SD",C
+46073,"Jerauld, SD",C
+46075,"Jones, SD",C
+46077,"Kingsbury, SD",C
+46079,"Lake, SD",C
+46081,"Lawrence, SD",C
+46083,"Lincoln, SD",C
+46085,"Lyman, SD",C
+46087,"McCook, SD",C
+46089,"McPherson, SD",C
+46091,"Marshall, SD",C
+46093,"Meade, SD",C
+46095,"Mellette, SD",C
+46097,"Miner, SD",C
+46099,"Minnehaha, SD",C
+46101,"Moody, SD",C
+46102,"Oglala Lakota, SD",C
+46103,"Pennington, SD",C
+46105,"Perkins, SD",C
+46107,"Potter, SD",C
+46109,"Roberts, SD",C
+46111,"Sanborn, SD",C
+46115,"Spink, SD",C
+46117,"Stanley, SD",C
+46119,"Sully, SD",C
+46121,"Todd, SD",C
+46123,"Tripp, SD",C
+46125,"Turner, SD",C
+46127,"Union, SD",C
+46129,"Walworth, SD",C
+46135,"Yankton, SD",C
+46137,"Ziebach, SD",C
+47001,"Anderson, TN",C
+47003,"Bedford, TN",C
+47005,"Benton, TN",C
+47007,"Bledsoe, TN",C
+47009,"Blount, TN",C
+47011,"Bradley, TN",C
+47013,"Campbell, TN",C
+47015,"Cannon, TN",C
+47017,"Carroll, TN",C
+47019,"Carter, TN",C
+47021,"Cheatham, TN",C
+47023,"Chester, TN",C
+47025,"Claiborne, TN",C
+47027,"Clay, TN",C
+47029,"Cocke, TN",C
+47031,"Coffee, TN",C
+47033,"Crockett, TN",C
+47035,"Cumberland, TN",C
+47037,"Davidson, TN",C
+47039,"Decatur, TN",C
+47041,"DeKalb, TN",C
+47043,"Dickson, TN",C
+47045,"Dyer, TN",C
+47047,"Fayette, TN",C
+47049,"Fentress, TN",C
+47051,"Franklin, TN",C
+47053,"Gibson, TN",C
+47055,"Giles, TN",C
+47057,"Grainger, TN",C
+47059,"Greene, TN",C
+47061,"Grundy, TN",C
+47063,"Hamblen, TN",C
+47065,"Hamilton, TN",C
+47067,"Hancock, TN",C
+47069,"Hardeman, TN",C
+47071,"Hardin, TN",C
+47073,"Hawkins, TN",C
+47075,"Haywood, TN",C
+47077,"Henderson, TN",C
+47079,"Henry, TN",C
+47081,"Hickman, TN",C
+47083,"Houston, TN",C
+47085,"Humphreys, TN",C
+47087,"Jackson, TN",C
+47089,"Jefferson, TN",C
+47091,"Johnson, TN",C
+47093,"Knox, TN",C
+47095,"Lake, TN",C
+47097,"Lauderdale, TN",C
+47099,"Lawrence, TN",C
+47101,"Lewis, TN",C
+47103,"Lincoln, TN",C
+47105,"Loudon, TN",C
+47107,"McMinn, TN",C
+47109,"McNairy, TN",C
+47111,"Macon, TN",C
+47113,"Madison, TN",C
+47115,"Marion, TN",C
+47117,"Marshall, TN",C
+47119,"Maury, TN",C
+47121,"Meigs, TN",C
+47123,"Monroe, TN",C
+47125,"Montgomery, TN",C
+47127,"Moore, TN",C
+47129,"Morgan, TN",C
+47131,"Obion, TN",C
+47133,"Overton, TN",C
+47135,"Perry, TN",C
+47137,"Pickett, TN",C
+47139,"Polk, TN",C
+47141,"Putnam, TN",C
+47143,"Rhea, TN",C
+47145,"Roane, TN",C
+47147,"Robertson, TN",C
+47149,"Rutherford, TN",C
+47151,"Scott, TN",C
+47153,"Sequatchie, TN",C
+47155,"Sevier, TN",C
+47157,"Shelby, TN",C
+47159,"Smith, TN",C
+47161,"Stewart, TN",C
+47163,"Sullivan, TN",C
+47165,"Sumner, TN",C
+47167,"Tipton, TN",C
+47169,"Trousdale, TN",C
+47171,"Unicoi, TN",C
+47173,"Union, TN",C
+47175,"Van Buren, TN",C
+47177,"Warren, TN",C
+47179,"Washington, TN",C
+47181,"Wayne, TN",C
+47183,"Weakley, TN",C
+47185,"White, TN",C
+47187,"Williamson, TN",C
+47189,"Wilson, TN",C
+48001,"Anderson, TX",C
+48003,"Andrews, TX",C
+48005,"Angelina, TX",C
+48007,"Aransas, TX",C
+48009,"Archer, TX",C
+48011,"Armstrong, TX",C
+48013,"Atascosa, TX",C
+48015,"Austin, TX",C
+48017,"Bailey, TX",C
+48019,"Bandera, TX",C
+48021,"Bastrop, TX",C
+48023,"Baylor, TX",C
+48025,"Bee, TX",C
+48027,"Bell, TX",C
+48029,"Bexar, TX",C
+48031,"Blanco, TX",C
+48033,"Borden, TX",C
+48035,"Bosque, TX",C
+48037,"Bowie, TX",C
+48039,"Brazoria, TX",C
+48041,"Brazos, TX",C
+48043,"Brewster, TX",C
+48045,"Briscoe, TX",C
+48047,"Brooks, TX",C
+48049,"Brown, TX",C
+48051,"Burleson, TX",C
+48053,"Burnet, TX",C
+48055,"Caldwell, TX",C
+48057,"Calhoun, TX",C
+48059,"Callahan, TX",C
+48061,"Cameron, TX",C
+48063,"Camp, TX",C
+48065,"Carson, TX",C
+48067,"Cass, TX",C
+48069,"Castro, TX",C
+48071,"Chambers, TX",C
+48073,"Cherokee, TX",C
+48075,"Childress, TX",C
+48077,"Clay, TX",C
+48079,"Cochran, TX",C
+48081,"Coke, TX",C
+48083,"Coleman, TX",C
+48085,"Collin, TX",C
+48087,"Collingsworth, TX",C
+48089,"Colorado, TX",C
+48091,"Comal, TX",C
+48093,"Comanche, TX",C
+48095,"Concho, TX",C
+48097,"Cooke, TX",C
+48099,"Coryell, TX",C
+48101,"Cottle, TX",C
+48103,"Crane, TX",C
+48105,"Crockett, TX",C
+48107,"Crosby, TX",C
+48109,"Culberson, TX",C
+48111,"Dallam, TX",C
+48113,"Dallas, TX",C
+48115,"Dawson, TX",C
+48117,"Deaf Smith, TX",C
+48119,"Delta, TX",C
+48121,"Denton, TX",C
+48123,"DeWitt, TX",C
+48125,"Dickens, TX",C
+48127,"Dimmit, TX",C
+48129,"Donley, TX",C
+48131,"Duval, TX",C
+48133,"Eastland, TX",C
+48135,"Ector, TX",C
+48137,"Edwards, TX",C
+48139,"Ellis, TX",C
+48141,"El Paso, TX",C
+48143,"Erath, TX",C
+48145,"Falls, TX",C
+48147,"Fannin, TX",C
+48149,"Fayette, TX",C
+48151,"Fisher, TX",C
+48153,"Floyd, TX",C
+48155,"Foard, TX",C
+48157,"Fort Bend, TX",C
+48159,"Franklin, TX",C
+48161,"Freestone, TX",C
+48163,"Frio, TX",C
+48165,"Gaines, TX",C
+48167,"Galveston, TX",C
+48169,"Garza, TX",C
+48171,"Gillespie, TX",C
+48173,"Glasscock, TX",C
+48175,"Goliad, TX",C
+48177,"Gonzales, TX",C
+48179,"Gray, TX",C
+48181,"Grayson, TX",C
+48183,"Gregg, TX",C
+48185,"Grimes, TX",C
+48187,"Guadalupe, TX",C
+48189,"Hale, TX",C
+48191,"Hall, TX",C
+48193,"Hamilton, TX",C
+48195,"Hansford, TX",C
+48197,"Hardeman, TX",C
+48199,"Hardin, TX",C
+48201,"Harris, TX",C
+48203,"Harrison, TX",C
+48205,"Hartley, TX",C
+48207,"Haskell, TX",C
+48209,"Hays, TX",C
+48211,"Hemphill, TX",C
+48213,"Henderson, TX",C
+48215,"Hidalgo, TX",C
+48217,"Hill, TX",C
+48219,"Hockley, TX",C
+48221,"Hood, TX",C
+48223,"Hopkins, TX",C
+48225,"Houston, TX",C
+48227,"Howard, TX",C
+48229,"Hudspeth, TX",C
+48231,"Hunt, TX",C
+48233,"Hutchinson, TX",C
+48235,"Irion, TX",C
+48237,"Jack, TX",C
+48239,"Jackson, TX",C
+48241,"Jasper, TX",C
+48243,"Jeff Davis, TX",C
+48245,"Jefferson, TX",C
+48247,"Jim Hogg, TX",C
+48249,"Jim Wells, TX",C
+48251,"Johnson, TX",C
+48253,"Jones, TX",C
+48255,"Karnes, TX",C
+48257,"Kaufman, TX",C
+48259,"Kendall, TX",C
+48261,"Kenedy, TX",C
+48263,"Kent, TX",C
+48265,"Kerr, TX",C
+48267,"Kimble, TX",C
+48269,"King, TX",C
+48271,"Kinney, TX",C
+48273,"Kleberg, TX",C
+48275,"Knox, TX",C
+48277,"Lamar, TX",C
+48279,"Lamb, TX",C
+48281,"Lampasas, TX",C
+48283,"La Salle, TX",C
+48285,"Lavaca, TX",C
+48287,"Lee, TX",C
+48289,"Leon, TX",C
+48291,"Liberty, TX",C
+48293,"Limestone, TX",C
+48295,"Lipscomb, TX",C
+48297,"Live Oak, TX",C
+48299,"Llano, TX",C
+48301,"Loving, TX",C
+48303,"Lubbock, TX",C
+48305,"Lynn, TX",C
+48307,"McCulloch, TX",C
+48309,"McLennan, TX",C
+48311,"McMullen, TX",C
+48313,"Madison, TX",C
+48315,"Marion, TX",C
+48317,"Martin, TX",C
+48319,"Mason, TX",C
+48321,"Matagorda, TX",C
+48323,"Maverick, TX",C
+48325,"Medina, TX",C
+48327,"Menard, TX",C
+48329,"Midland, TX",C
+48331,"Milam, TX",C
+48333,"Mills, TX",C
+48335,"Mitchell, TX",C
+48337,"Montague, TX",C
+48339,"Montgomery, TX",C
+48341,"Moore, TX",C
+48343,"Morris, TX",C
+48345,"Motley, TX",C
+48347,"Nacogdoches, TX",C
+48349,"Navarro, TX",C
+48351,"Newton, TX",C
+48353,"Nolan, TX",C
+48355,"Nueces, TX",C
+48357,"Ochiltree, TX",C
+48359,"Oldham, TX",C
+48361,"Orange, TX",C
+48363,"Palo Pinto, TX",C
+48365,"Panola, TX",C
+48367,"Parker, TX",C
+48369,"Parmer, TX",C
+48371,"Pecos, TX",C
+48373,"Polk, TX",C
+48375,"Potter, TX",C
+48377,"Presidio, TX",C
+48379,"Rains, TX",C
+48381,"Randall, TX",C
+48383,"Reagan, TX",C
+48385,"Real, TX",C
+48387,"Red River, TX",C
+48389,"Reeves, TX",C
+48391,"Refugio, TX",C
+48393,"Roberts, TX",C
+48395,"Robertson, TX",C
+48397,"Rockwall, TX",C
+48399,"Runnels, TX",C
+48401,"Rusk, TX",C
+48403,"Sabine, TX",C
+48405,"San Augustine, TX",C
+48407,"San Jacinto, TX",C
+48409,"San Patricio, TX",C
+48411,"San Saba, TX",C
+48413,"Schleicher, TX",C
+48415,"Scurry, TX",C
+48417,"Shackelford, TX",C
+48419,"Shelby, TX",C
+48421,"Sherman, TX",C
+48423,"Smith, TX",C
+48425,"Somervell, TX",C
+48427,"Starr, TX",C
+48429,"Stephens, TX",C
+48431,"Sterling, TX",C
+48433,"Stonewall, TX",C
+48435,"Sutton, TX",C
+48437,"Swisher, TX",C
+48439,"Tarrant, TX",C
+48441,"Taylor, TX",C
+48443,"Terrell, TX",C
+48445,"Terry, TX",C
+48447,"Throckmorton, TX",C
+48449,"Titus, TX",C
+48451,"Tom Green, TX",C
+48453,"Travis, TX",C
+48455,"Trinity, TX",C
+48457,"Tyler, TX",C
+48459,"Upshur, TX",C
+48461,"Upton, TX",C
+48463,"Uvalde, TX",C
+48465,"Val Verde, TX",C
+48467,"Van Zandt, TX",C
+48469,"Victoria, TX",C
+48471,"Walker, TX",C
+48473,"Waller, TX",C
+48475,"Ward, TX",C
+48477,"Washington, TX",C
+48479,"Webb, TX",C
+48481,"Wharton, TX",C
+48483,"Wheeler, TX",C
+48485,"Wichita, TX",C
+48487,"Wilbarger, TX",C
+48489,"Willacy, TX",C
+48491,"Williamson, TX",C
+48493,"Wilson, TX",C
+48495,"Winkler, TX",C
+48497,"Wise, TX",C
+48499,"Wood, TX",C
+48501,"Yoakum, TX",C
+48503,"Young, TX",C
+48505,"Zapata, TX",C
+48507,"Zavala, TX",C
+49001,"Beaver, UT",C
+49003,"Box Elder, UT",C
+49005,"Cache, UT",C
+49007,"Carbon, UT",C
+49009,"Daggett, UT",C
+49011,"Davis, UT",C
+49013,"Duchesne, UT",C
+49015,"Emery, UT",C
+49017,"Garfield, UT",C
+49019,"Grand, UT",C
+49021,"Iron, UT",C
+49023,"Juab, UT",C
+49025,"Kane, UT",C
+49027,"Millard, UT",C
+49029,"Morgan, UT",C
+49031,"Piute, UT",C
+49033,"Rich, UT",C
+49035,"Salt Lake, UT",C
+49037,"San Juan, UT",C
+49039,"Sanpete, UT",C
+49041,"Sevier, UT",C
+49043,"Summit, UT",C
+49045,"Tooele, UT",C
+49047,"Uintah, UT",C
+49049,"Utah, UT",C
+49051,"Wasatch, UT",C
+49053,"Washington, UT",C
+49055,"Wayne, UT",C
+49057,"Weber, UT",C
+50001,"Addison, VT",C
+50003,"Bennington, VT",C
+50005,"Caledonia, VT",C
+50007,"Chittenden, VT",C
+50009,"Essex, VT",C
+50011,"Franklin, VT",C
+50013,"Grand Isle, VT",C
+50015,"Lamoille, VT",C
+50017,"Orange, VT",C
+50019,"Orleans, VT",C
+50021,"Rutland, VT",C
+50023,"Washington, VT",C
+50025,"Windham, VT",C
+50027,"Windsor, VT",C
+51001,"Accomack, VA",C
+51003,"Albemarle, VA",C
+51005,"Alleghany, VA",C
+51007,"Amelia, VA",C
+51009,"Amherst, VA",C
+51011,"Appomattox, VA",C
+51013,"Arlington, VA",C
+51015,"Augusta, VA",C
+51017,"Bath, VA",C
+51019,"Bedford, VA",C
+51021,"Bland, VA",C
+51023,"Botetourt, VA",C
+51025,"Brunswick, VA",C
+51027,"Buchanan, VA",C
+51029,"Buckingham, VA",C
+51031,"Campbell, VA",C
+51033,"Caroline, VA",C
+51035,"Carroll, VA",C
+51036,"Charles City, VA",C
+51037,"Charlotte, VA",C
+51041,"Chesterfield, VA",C
+51043,"Clarke, VA",C
+51045,"Craig, VA",C
+51047,"Culpeper, VA",C
+51049,"Cumberland, VA",C
+51051,"Dickenson, VA",C
+51053,"Dinwiddie, VA",C
+51057,"Essex, VA",C
+51059,"Fairfax, VA",C
+51061,"Fauquier, VA",C
+51063,"Floyd, VA",C
+51065,"Fluvanna, VA",C
+51067,"Franklin, VA",C
+51069,"Frederick, VA",C
+51071,"Giles, VA",C
+51073,"Gloucester, VA",C
+51075,"Goochland, VA",C
+51077,"Grayson, VA",C
+51079,"Greene, VA",C
+51081,"Greensville, VA",C
+51083,"Halifax, VA",C
+51085,"Hanover, VA",C
+51087,"Henrico, VA",C
+51089,"Henry, VA",C
+51091,"Highland, VA",C
+51093,"Isle of Wight, VA",C
+51095,"James City, VA",C
+51097,"King and Queen, VA",C
+51099,"King George, VA",C
+51101,"King William, VA",C
+51103,"Lancaster, VA",C
+51105,"Lee, VA",C
+51107,"Loudoun, VA",C
+51109,"Louisa, VA",C
+51111,"Lunenburg, VA",C
+51113,"Madison, VA",C
+51115,"Mathews, VA",C
+51117,"Mecklenburg, VA",C
+51119,"Middlesex, VA",C
+51121,"Montgomery, VA",C
+51125,"Nelson, VA",C
+51127,"New Kent, VA",C
+51131,"Northampton, VA",C
+51133,"Northumberland, VA",C
+51135,"Nottoway, VA",C
+51137,"Orange, VA",C
+51139,"Page, VA",C
+51141,"Patrick, VA",C
+51143,"Pittsylvania, VA",C
+51145,"Powhatan, VA",C
+51147,"Prince Edward, VA",C
+51149,"Prince George, VA",C
+51153,"Prince William, VA",C
+51155,"Pulaski, VA",C
+51157,"Rappahannock, VA",C
+51159,"Richmond, VA",C
+51161,"Roanoke, VA",C
+51163,"Rockbridge, VA",C
+51165,"Rockingham, VA",C
+51167,"Russell, VA",C
+51169,"Scott, VA",C
+51171,"Shenandoah, VA",C
+51173,"Smyth, VA",C
+51175,"Southampton, VA",C
+51177,"Spotsylvania, VA",C
+51179,"Stafford, VA",C
+51181,"Surry, VA",C
+51183,"Sussex, VA",C
+51185,"Tazewell, VA",C
+51187,"Warren, VA",C
+51191,"Washington, VA",C
+51193,"Westmoreland, VA",C
+51195,"Wise, VA",C
+51197,"Wythe, VA",C
+51199,"York, VA",C
+51510,"Alexandria, VA",C
+51520,"Bristol, VA",C
+51530,"Buena Vista, VA",C
+51540,"Charlottesville, VA",C
+51550,"Chesapeake, VA",C
+51570,"Colonial Heights, VA",C
+51580,"Covington, VA",C
+51590,"Danville, VA",C
+51595,"Emporia, VA",C
+51600,"Fairfax, VA",C
+51610,"Falls Church, VA",C
+51620,"Franklin, VA",C
+51630,"Fredericksburg, VA",C
+51640,"Galax, VA",C
+51650,"Hampton, VA",C
+51660,"Harrisonburg, VA",C
+51670,"Hopewell, VA",C
+51678,"Lexington, VA",C
+51680,"Lynchburg, VA",C
+51683,"Manassas, VA",C
+51685,"Manassas Park, VA",C
+51690,"Martinsville, VA",C
+51700,"Newport News, VA",C
+51710,"Norfolk, VA",C
+51720,"Norton, VA",C
+51730,"Petersburg, VA",C
+51735,"Poquoson, VA",C
+51740,"Portsmouth, VA",C
+51750,"Radford, VA",C
+51760,"Richmond, VA",C
+51770,"Roanoke, VA",C
+51775,"Salem, VA",C
+51790,"Staunton, VA",C
+51800,"Suffolk, VA",C
+51810,"Virginia Beach, VA",C
+51820,"Waynesboro, VA",C
+51830,"Williamsburg, VA",C
+51840,"Winchester, VA",C
+53001,"Adams, WA",C
+53003,"Asotin, WA",C
+53005,"Benton, WA",C
+53007,"Chelan, WA",C
+53009,"Clallam, WA",C
+53011,"Clark, WA",C
+53013,"Columbia, WA",C
+53015,"Cowlitz, WA",C
+53017,"Douglas, WA",C
+53019,"Ferry, WA",C
+53021,"Franklin, WA",C
+53023,"Garfield, WA",C
+53025,"Grant, WA",C
+53027,"Grays Harbor, WA",C
+53029,"Island, WA",C
+53031,"Jefferson, WA",C
+53033,"King, WA",C
+53035,"Kitsap, WA",C
+53037,"Kittitas, WA",C
+53039,"Klickitat, WA",C
+53041,"Lewis, WA",C
+53043,"Lincoln, WA",C
+53045,"Mason, WA",C
+53047,"Okanogan, WA",C
+53049,"Pacific, WA",C
+53051,"Pend Oreille, WA",C
+53053,"Pierce, WA",C
+53055,"San Juan, WA",C
+53057,"Skagit, WA",C
+53059,"Skamania, WA",C
+53061,"Snohomish, WA",C
+53063,"Spokane, WA",C
+53065,"Stevens, WA",C
+53067,"Thurston, WA",C
+53069,"Wahkiakum, WA",C
+53071,"Walla Walla, WA",C
+53073,"Whatcom, WA",C
+53075,"Whitman, WA",C
+53077,"Yakima, WA",C
+54001,"Barbour, WV",C
+54003,"Berkeley, WV",C
+54005,"Boone, WV",C
+54007,"Braxton, WV",C
+54009,"Brooke, WV",C
+54011,"Cabell, WV",C
+54013,"Calhoun, WV",C
+54015,"Clay, WV",C
+54017,"Doddridge, WV",C
+54019,"Fayette, WV",C
+54021,"Gilmer, WV",C
+54023,"Grant, WV",C
+54025,"Greenbrier, WV",C
+54027,"Hampshire, WV",C
+54029,"Hancock, WV",C
+54031,"Hardy, WV",C
+54033,"Harrison, WV",C
+54035,"Jackson, WV",C
+54037,"Jefferson, WV",C
+54039,"Kanawha, WV",C
+54041,"Lewis, WV",C
+54043,"Lincoln, WV",C
+54045,"Logan, WV",C
+54047,"McDowell, WV",C
+54049,"Marion, WV",C
+54051,"Marshall, WV",C
+54053,"Mason, WV",C
+54055,"Mercer, WV",C
+54057,"Mineral, WV",C
+54059,"Mingo, WV",C
+54061,"Monongalia, WV",C
+54063,"Monroe, WV",C
+54065,"Morgan, WV",C
+54067,"Nicholas, WV",C
+54069,"Ohio, WV",C
+54071,"Pendleton, WV",C
+54073,"Pleasants, WV",C
+54075,"Pocahontas, WV",C
+54077,"Preston, WV",C
+54079,"Putnam, WV",C
+54081,"Raleigh, WV",C
+54083,"Randolph, WV",C
+54085,"Ritchie, WV",C
+54087,"Roane, WV",C
+54089,"Summers, WV",C
+54091,"Taylor, WV",C
+54093,"Tucker, WV",C
+54095,"Tyler, WV",C
+54097,"Upshur, WV",C
+54099,"Wayne, WV",C
+54101,"Webster, WV",C
+54103,"Wetzel, WV",C
+54105,"Wirt, WV",C
+54107,"Wood, WV",C
+54109,"Wyoming, WV",C
+55001,"Adams, WI",C
+55003,"Ashland, WI",C
+55005,"Barron, WI",C
+55007,"Bayfield, WI",C
+55009,"Brown, WI",C
+55011,"Buffalo, WI",C
+55013,"Burnett, WI",C
+55015,"Calumet, WI",C
+55017,"Chippewa, WI",C
+55019,"Clark, WI",C
+55021,"Columbia, WI",C
+55023,"Crawford, WI",C
+55025,"Dane, WI",C
+55027,"Dodge, WI",C
+55029,"Door, WI",C
+55031,"Douglas, WI",C
+55033,"Dunn, WI",C
+55035,"Eau Claire, WI",C
+55037,"Florence, WI",C
+55039,"Fond du Lac, WI",C
+55041,"Forest, WI",C
+55043,"Grant, WI",C
+55045,"Green, WI",C
+55047,"Green Lake, WI",C
+55049,"Iowa, WI",C
+55051,"Iron, WI",C
+55053,"Jackson, WI",C
+55055,"Jefferson, WI",C
+55057,"Juneau, WI",C
+55059,"Kenosha, WI",C
+55061,"Kewaunee, WI",C
+55063,"La Crosse, WI",C
+55065,"Lafayette, WI",C
+55067,"Langlade, WI",C
+55069,"Lincoln, WI",C
+55071,"Manitowoc, WI",C
+55073,"Marathon, WI",C
+55075,"Marinette, WI",C
+55077,"Marquette, WI",C
+55078,"Menominee, WI",C
+55079,"Milwaukee, WI",C
+55081,"Monroe, WI",C
+55083,"Oconto, WI",C
+55085,"Oneida, WI",C
+55087,"Outagamie, WI",C
+55089,"Ozaukee, WI",C
+55091,"Pepin, WI",C
+55093,"Pierce, WI",C
+55095,"Polk, WI",C
+55097,"Portage, WI",C
+55099,"Price, WI",C
+55101,"Racine, WI",C
+55103,"Richland, WI",C
+55105,"Rock, WI",C
+55107,"Rusk, WI",C
+55109,"St. Croix, WI",C
+55111,"Sauk, WI",C
+55113,"Sawyer, WI",C
+55115,"Shawano, WI",C
+55117,"Sheboygan, WI",C
+55119,"Taylor, WI",C
+55121,"Trempealeau, WI",C
+55123,"Vernon, WI",C
+55125,"Vilas, WI",C
+55127,"Walworth, WI",C
+55129,"Washburn, WI",C
+55131,"Washington, WI",C
+55133,"Waukesha, WI",C
+55135,"Waupaca, WI",C
+55137,"Waushara, WI",C
+55139,"Winnebago, WI",C
+55141,"Wood, WI",C
+56001,"Albany, WY",C
+56003,"Big Horn, WY",C
+56005,"Campbell, WY",C
+56007,"Carbon, WY",C
+56009,"Converse, WY",C
+56011,"Crook, WY",C
+56013,"Fremont, WY",C
+56015,"Goshen, WY",C
+56017,"Hot Springs, WY",C
+56019,"Johnson, WY",C
+56021,"Laramie, WY",C
+56023,"Lincoln, WY",C
+56025,"Natrona, WY",C
+56027,"Niobrara, WY",C
+56029,"Park, WY",C
+56031,"Platte, WY",C
+56033,"Sheridan, WY",C
+56035,"Sublette, WY",C
+56037,"Sweetwater, WY",C
+56039,"Teton, WY",C
+56041,"Uinta, WY",C
+56043,"Washakie, WY",C
+56045,"Weston, WY",C
+080800AD,"Adams WIB",W
+080800AR,"Arapahoe/Douglas WIB",W
+080800BO,"Boulder WIB",W
+080800BR,"Broomfield WIB",W
+080800DE,"Denver WIB",W
+080800EA,"Eastern WIB",W
+080800ET,"El Paso/Teller WIB",W
+080800LR,"Larimer WIB",W
+080800ME,"Mesa WIB",W
+080800NW,"Northwest WIB",W
+080800PB,"Pueblo WIB",W
+080800RR,"Rural Resort WIB",W
+080800SC,"South Central WIB",W
+080800SE,"Southeast WIB",W
+080800SW,"Southwest WIB",W
+080800TR,"Jefferson/Tri-County WIB",W
+080800UA,"Upper Arkansas WIB",W
+080800WE,"Western WIB",W
+080800WL,"Weld WIB",W
+0110700,"Albertville, AL",M
+0110760,"Alexander City, AL",M
+0111500,"Anniston-Oxford-Jacksonville, AL",M
+0112120,"Atmore, AL",M
+0112220,"Auburn-Opelika, AL",M
+0113820,"Birmingham-Hoover, AL",M
+0117980,"Columbus, GA-AL (AL part)",M
+0118980,"Cullman, AL",M
+0119300,"Daphne-Fairhope-Foley, AL",M
+0119460,"Decatur, AL",M
+0120020,"Dothan, AL",M
+0121460,"Enterprise, AL",M
+0121640,"Eufaula, AL-GA (AL part)",M
+0122520,"Florence-Muscle Shoals, AL",M
+0122840,"Fort Payne, AL",M
+0123460,"Gadsden, AL",M
+0126620,"Huntsville, AL",M
+0133660,"Mobile, AL",M
+0133860,"Montgomery, AL",M
+0137120,"Ozark, AL",M
+0142460,"Scottsboro, AL",M
+0142820,"Selma, AL",M
+0145180,"Talladega-Sylacauga, AL",M
+0145980,"Troy, AL",M
+0146220,"Tuscaloosa, AL",M
+0146740,"Valley, AL",M
+0199999,"Nonmetropolitan, nonmicropolitan",M
+0211260,"Anchorage, AK",M
+0221820,"Fairbanks, AK",M
+0227940,"Juneau, AK",M
+0228540,"Ketchikan, AK",M
+0299999,"Nonmetropolitan, nonmicropolitan",M
+0422380,"Flagstaff, AZ",M
+0429420,"Lake Havasu City-Kingman, AZ",M
+0435700,"Nogales, AZ",M
+0437740,"Payson, AZ",M
+0438060,"Phoenix-Mesa-Scottsdale, AZ",M
+0439140,"Prescott, AZ",M
+0440940,"Safford, AZ",M
+0443320,"Show Low, AZ",M
+0443420,"Sierra Vista-Douglas, AZ",M
+0446060,"Tucson, AZ",M
+0449740,"Yuma, AZ",M
+0499999,"Nonmetropolitan, nonmicropolitan",M
+0511660,"Arkadelphia, AR",M
+0512900,"Batesville, AR",M
+0514180,"Blytheville, AR",M
+0515780,"Camden, AR",M
+0520980,"El Dorado, AR",M
+0522220,"Fayetteville-Springdale-Rogers, AR-MO (AR part)",M
+0522620,"Forrest City, AR",M
+0522900,"Fort Smith, AR-OK (AR part)",M
+0525460,"Harrison, AR",M
+0525760,"Helena-West Helena, AR",M
+0526260,"Hope, AR",M
+0526300,"Hot Springs, AR",M
+0527860,"Jonesboro, AR",M
+0530780,"Little Rock-North Little Rock-Conway, AR",M
+0531620,"Magnolia, AR",M
+0531680,"Malvern, AR",M
+0532820,"Memphis, TN-MS-AR (AR part)",M
+0534260,"Mountain Home, AR",M
+0537500,"Paragould, AR",M
+0538220,"Pine Bluff, AR",M
+0540780,"Russellville, AR",M
+0542620,"Searcy, AR",M
+0545500,"Texarkana, TX-AR (AR part)",M
+0599999,"Nonmetropolitan, nonmicropolitan",M
+0612540,"Bakersfield, CA",M
+0617020,"Chico, CA",M
+0617340,"Clearlake, CA",M
+0618860,"Crescent City, CA",M
+0620940,"El Centro, CA",M
+0621700,"Eureka-Arcata-Fortuna, CA",M
+0623420,"Fresno, CA",M
+0625260,"Hanford-Corcoran, CA",M
+0631080,"Los Angeles-Long Beach-Anaheim, CA",M
+0631460,"Madera, CA",M
+0632900,"Merced, CA",M
+0633700,"Modesto, CA",M
+0634900,"Napa, CA",M
+0637100,"Oxnard-Thousand Oaks-Ventura, CA",M
+0639780,"Red Bluff, CA",M
+0639820,"Redding, CA",M
+0640140,"Riverside-San Bernardino-Ontario, CA",M
+0640900,"Sacramento--Roseville--Arden-Arcade, CA",M
+0641500,"Salinas, CA",M
+0641740,"San Diego-Carlsbad, CA",M
+0641860,"San Francisco-Oakland-Hayward, CA",M
+0641940,"San Jose-Sunnyvale-Santa Clara, CA",M
+0642020,"San Luis Obispo-Paso Robles-Arroyo Grande, CA",M
+0642100,"Santa Cruz-Watsonville, CA",M
+0642200,"Santa Maria-Santa Barbara, CA",M
+0642220,"Santa Rosa, CA",M
+0643760,"Sonora, CA",M
+0644700,"Stockton-Lodi, CA",M
+0645000,"Susanville, CA",M
+0646020,"Truckee-Grass Valley, CA",M
+0646380,"Ukiah, CA",M
+0646700,"Vallejo-Fairfield, CA",M
+0647300,"Visalia-Porterville, CA",M
+0649700,"Yuba City, CA",M
+0699999,"Nonmetropolitan, nonmicropolitan",M
+0814500,"Boulder, CO",M
+0814720,"Breckenridge, CO",M
+0815860,"Cañon City, CO",M
+0817820,"Colorado Springs, CO",M
+0818780,"Craig, CO",M
+0819740,"Denver-Aurora-Lakewood, CO",M
+0820420,"Durango, CO",M
+0820780,"Edwards, CO",M
+0822660,"Fort Collins, CO",M
+0822820,"Fort Morgan, CO",M
+0824060,"Glenwood Springs, CO",M
+0824300,"Grand Junction, CO",M
+0824540,"Greeley, CO",M
+0833940,"Montrose, CO",M
+0839380,"Pueblo, CO",M
+0844460,"Steamboat Springs, CO",M
+0844540,"Sterling, CO",M
+0899999,"Nonmetropolitan, nonmicropolitan",M
+0914860,"Bridgeport-Stamford-Norwalk, CT",M
+0925540,"Hartford-West Hartford-East Hartford, CT",M
+0935300,"New Haven-Milford, CT",M
+0935980,"Norwich-New London, CT",M
+0945860,"Torrington, CT",M
+0949340,"Worcester, MA-CT (CT part)",M
+0999999,"Nonmetropolitan, nonmicropolitan",M
+01010001,"North Alabama Works",W
+01010002,"East Alabama Works",W
+01010003,"West Alabama Works",W
+01010004,"Central Six Alabama Works",W
+01010005,"Central Alabama Works",W
+01010006,"Southeast Alabama Works",W
+01010007,"Southwest Alabama Works",W
+1020100,"Dover, DE",M
+1037980,"Philadelphia-Camden-Wilmington, PA-NJ-DE-MD (DE part)",M
+1041540,"Salisbury, MD-DE (DE part)",M
+1099999,"Nonmetropolitan, nonmicropolitan",M
+1147900,"Washington-Arlington-Alexandria, DC-VA-MD-WV (DC part)",M
+1199999,"Nonmetropolitan, nonmicropolitan",M
+1211580,"Arcadia, FL",M
+1215980,"Cape Coral-Fort Myers, FL",M
+1217500,"Clewiston, FL",M
+1218880,"Crestview-Fort Walton Beach-Destin, FL",M
+1219660,"Deltona-Daytona Beach-Ormond Beach, FL",M
+1223540,"Gainesville, FL",M
+1226140,"Homosassa Springs, FL",M
+1227260,"Jacksonville, FL",M
+1228580,"Key West, FL",M
+1229380,"Lake City, FL",M
+1229460,"Lakeland-Winter Haven, FL",M
+1233100,"Miami-Fort Lauderdale-West Palm Beach, FL",M
+1234940,"Naples-Immokalee-Marco Island, FL",M
+1235840,"North Port-Sarasota-Bradenton, FL",M
+1236100,"Ocala, FL",M
+1236380,"Okeechobee, FL",M
+1236740,"Orlando-Kissimmee-Sanford, FL",M
+1237260,"Palatka, FL",M
+1237340,"Palm Bay-Melbourne-Titusville, FL",M
+1237460,"Panama City, FL",M
+1237860,"Pensacola-Ferry Pass-Brent, FL",M
+1238940,"Port St. Lucie, FL",M
+1239460,"Punta Gorda, FL",M
+1242680,"Sebastian-Vero Beach, FL",M
+1242700,"Sebring, FL",M
+1245220,"Tallahassee, FL",M
+1245300,"Tampa-St. Petersburg-Clearwater, FL",M
+1245540,"The Villages, FL",M
+1248100,"Wauchula, FL",M
+1299999,"Nonmetropolitan, nonmicropolitan",M
+1310500,"Albany, GA",M
+1311140,"Americus, GA",M
+1312020,"Athens-Clarke County, GA",M
+1312060,"Atlanta-Sandy Springs-Roswell, GA",M
+1312260,"Augusta-Richmond County, GA-SC (GA part)",M
+1312460,"Bainbridge, GA",M
+1315260,"Brunswick, GA",M
+1315660,"Calhoun, GA",M
+1316340,"Cedartown, GA",M
+1316860,"Chattanooga, TN-GA (GA part)",M
+1317980,"Columbus, GA-AL (GA part)",M
+1318380,"Cordele, GA",M
+1318460,"Cornelia, GA",M
+1319140,"Dalton, GA",M
+1320060,"Douglas, GA",M
+1320140,"Dublin, GA",M
+1321640,"Eufaula, AL-GA (GA part)",M
+1322340,"Fitzgerald, GA",M
+1323580,"Gainesville, GA",M
+1325980,"Hinesville, GA",M
+1327600,"Jefferson, GA",M
+1327700,"Jesup, GA",M
+1329300,"LaGrange, GA",M
+1331420,"Macon-Bibb County, GA",M
+1333300,"Milledgeville, GA",M
+1334220,"Moultrie, GA",M
+1340660,"Rome, GA",M
+1341220,"St. Marys, GA",M
+1342340,"Savannah, GA",M
+1344340,"Statesboro, GA",M
+1344900,"Summerville, GA",M
+1345580,"Thomaston, GA",M
+1345620,"Thomasville, GA",M
+1345700,"Tifton, GA",M
+1345740,"Toccoa, GA",M
+1346660,"Valdosta, GA",M
+1347080,"Vidalia, GA",M
+1347580,"Warner Robins, GA",M
+1348180,"Waycross, GA",M
+1399999,"Nonmetropolitan, nonmicropolitan",M
+1525900,"Hilo, HI",M
+1527980,"Kahului-Wailuku-Lahaina, HI",M
+1528180,"Kapaa, HI",M
+1546520,"Urban Honolulu, HI",M
+1599999,"Nonmetropolitan, nonmicropolitan",M
+1613940,"Blackfoot, ID",M
+1614260,"Boise City, ID",M
+1615420,"Burley, ID",M
+1617660,"Coeur dAlene, ID",M
+1625200,"Hailey, ID",M
+1626820,"Idaho Falls, ID",M
+1627220,"Jackson, WY-ID (ID part)",M
+1630300,"Lewiston, ID-WA (ID part)",M
+1630860,"Logan, UT-ID (ID part)",M
+1634140,"Moscow, ID",M
+1634300,"Mountain Home, ID",M
+1636620,"Ontario, OR-ID (ID part)",M
+1638540,"Pocatello, ID",M
+1639940,"Rexburg, ID",M
+1641760,"Sandpoint, ID",M
+1646300,"Twin Falls, ID",M
+1699999,"Nonmetropolitan, nonmicropolitan",M
+1714010,"Bloomington, IL",M
+1715460,"Burlington, IA-IL (IL part)",M
+1715900,"Canton, IL",M
+1716020,"Cape Girardeau, MO-IL (IL part)",M
+1716060,"Carbondale-Marion, IL",M
+1716460,"Centralia, IL",M
+1716580,"Champaign-Urbana, IL",M
+1716660,"Charleston-Mattoon, IL",M
+1716980,"Chicago-Naperville-Elgin, IL-IN-WI (IL part)",M
+1719180,"Danville, IL",M
+1719340,"Davenport-Moline-Rock Island, IA-IL (IL part)",M
+1719500,"Decatur, IL",M
+1719940,"Dixon, IL",M
+1720820,"Effingham, IL",M
+1722800,"Fort Madison-Keokuk, IA-IL-MO (IL part)",M
+1723300,"Freeport, IL",M
+1723660,"Galesburg, IL",M
+1727300,"Jacksonville, IL",M
+1728100,"Kankakee, IL",M
+1730660,"Lincoln, IL",M
+1731380,"Macomb, IL",M
+1734500,"Mount Vernon, IL",M
+1736860,"Ottawa-Peru, IL",M
+1737140,"Paducah, KY-IL (IL part)",M
+1737900,"Peoria, IL",M
+1738700,"Pontiac, IL",M
+1739500,"Quincy, IL-MO (IL part)",M
+1740300,"Rochelle, IL",M
+1740420,"Rockford, IL",M
+1741180,"St. Louis, MO-IL (IL part)",M
+1744100,"Springfield, IL",M
+1744580,"Sterling, IL",M
+1745380,"Taylorville, IL",M
+1799999,"Nonmetropolitan, nonmicropolitan",M
+1811420,"Angola, IN",M
+1812140,"Auburn, IN",M
+1813260,"Bedford, IN",M
+1814020,"Bloomington, IN",M
+1816980,"Chicago-Naperville-Elgin, IL-IN-WI (IN part)",M
+1817140,"Cincinnati, OH-KY-IN (IN part)",M
+1818020,"Columbus, IN",M
+1818220,"Connersville, IN",M
+1818820,"Crawfordsville, IN",M
+1819540,"Decatur, IN",M
+1821140,"Elkhart-Goshen, IN",M
+1821780,"Evansville, IN-KY (IN part)",M
+1823060,"Fort Wayne, IN",M
+1823140,"Frankfort, IN",M
+1824700,"Greensburg, IN",M
+1826540,"Huntington, IN",M
+1826900,"Indianapolis-Carmel-Anderson, IN",M
+1827540,"Jasper, IN",M
+1828340,"Kendallville, IN",M
+1829020,"Kokomo, IN",M
+1829200,"Lafayette-West Lafayette, IN",M
+1830900,"Logansport, IN",M
+1831140,"Louisville/Jefferson County, KY-IN (IN part)",M
+1831500,"Madison, IN",M
+1831980,"Marion, IN",M
+1833140,"Michigan City-La Porte, IN",M
+1834620,"Muncie, IN",M
+1835220,"New Castle, IN",M
+1835860,"North Vernon, IN",M
+1837940,"Peru, IN",M
+1838500,"Plymouth, IN",M
+1839980,"Richmond, IN",M
+1842980,"Seymour, IN",M
+1843780,"South Bend-Mishawaka, IN-MI (IN part)",M
+1845460,"Terre Haute, IN",M
+1847180,"Vincennes, IN",M
+1847340,"Wabash, IN",M
+1847700,"Warsaw, IN",M
+1847780,"Washington, IN",M
+1899999,"Nonmetropolitan, nonmicropolitan",M
+1911180,"Ames, IA",M
+1914340,"Boone, IA",M
+1915460,"Burlington, IA-IL (IA part)",M
+1916140,"Carroll, IA",M
+1916300,"Cedar Rapids, IA",M
+1917540,"Clinton, IA",M
+1919340,"Davenport-Moline-Rock Island, IA-IL (IA part)",M
+1919780,"Des Moines-West Des Moines, IA",M
+1920220,"Dubuque, IA",M
+1921840,"Fairfield, IA",M
+1922700,"Fort Dodge, IA",M
+1922800,"Fort Madison-Keokuk, IA-IL-MO (IA part)",M
+1926980,"Iowa City, IA",M
+1932260,"Marshalltown, IA",M
+1932380,"Mason City, IA",M
+1934700,"Muscatine, IA",M
+1935500,"Newton, IA",M
+1936540,"Omaha-Council Bluffs, NE-IA (IA part)",M
+1936820,"Oskaloosa, IA",M
+1936900,"Ottumwa, IA",M
+1937800,"Pella, IA",M
+1943580,"Sioux City, IA-NE-SD (IA part)",M
+1943980,"Spencer, IA",M
+1944020,"Spirit Lake, IA",M
+1944740,"Storm Lake, IA",M
+1947940,"Waterloo-Cedar Falls, IA",M
+1999999,"Nonmetropolitan, nonmicropolitan",M
+02000001,"01 Alaska WIB",W
+2011680,"Arkansas City-Winfield, KS",M
+2011860,"Atchison, KS",M
+2017700,"Coffeyville, KS",M
+2019980,"Dodge City, KS",M
+2021380,"Emporia, KS",M
+2023780,"Garden City, KS",M
+2024460,"Great Bend, KS",M
+2025700,"Hays, KS",M
+2026740,"Hutchinson, KS",M
+2027920,"Junction City, KS",M
+2028140,"Kansas City, MO-KS (KS part)",M
+2029940,"Lawrence, KS",M
+2030580,"Liberal, KS",M
+2031740,"Manhattan, KS",M
+2032700,"McPherson, KS",M
+2036840,"Ottawa, KS",M
+2037660,"Parsons, KS",M
+2038260,"Pittsburg, KS",M
+2041140,"St. Joseph, MO-KS (KS part)",M
+2041460,"Salina, KS",M
+2045820,"Topeka, KS",M
+2048620,"Wichita, KS",M
+2099999,"Nonmetropolitan, nonmicropolitan",M
+2112680,"Bardstown, KY",M
+2114540,"Bowling Green, KY",M
+2115820,"Campbellsville, KY",M
+2116420,"Central City, KY",M
+2117140,"Cincinnati, OH-KY-IN (KY part)",M
+2117300,"Clarksville, TN-KY (KY part)",M
+2119220,"Danville, KY",M
+2121000A,"A Purchase/Pennyrile WIB",W
+2121000B,"B Lincoln Trail WIB",W
+2121000C,"C Greater Louisville WIB",W
+2121000E,"E Northern Kentucky WIB",W
+2121000F,"F Tenco WIB",W
+2121000G,"G Ekcep WIB",W
+2121000H,"H Cumberlands WIB",W
+2121000I,"I Bluegrass WIB",W
+2121000J,"J Green River WIB",W
+2121000K,"K Barren River WIB",W
+2121060,"Elizabethtown-Fort Knox, KY",M
+2121780,"Evansville, IN-KY (KY part)",M
+2123180,"Frankfort, KY",M
+2123980,"Glasgow, KY",M
+2126580,"Huntington-Ashland, WV-KY-OH (KY part)",M
+2130460,"Lexington-Fayette, KY",M
+2130940,"London, KY",M
+2131140,"Louisville/Jefferson County, KY-IN (KY part)",M
+2131580,"Madisonville, KY",M
+2132460,"Mayfield, KY",M
+2132500,"Maysville, KY",M
+2133180,"Middlesborough, KY",M
+2134460,"Mount Sterling, KY",M
+2134660,"Murray, KY",M
+2136980,"Owensboro, KY",M
+2137140,"Paducah, KY-IL (KY part)",M
+2140080,"Richmond-Berea, KY",M
+2143700,"Somerset, KY",M
+2146460,"Union City, TN-KY (KY part)",M
+2199999,"Nonmetropolitan, nonmicropolitan",M
+2210780,"Alexandria, LA",M
+2212820,"Bastrop, LA",M
+2212940,"Baton Rouge, LA",M
+2214220,"Bogalusa, LA",M
+2219760,"DeRidder, LA",M
+2222860,"Fort Polk South, LA",M
+2225220,"Hammond, LA",M
+2226380,"Houma-Thibodaux, LA",M
+2227660,"Jennings, LA",M
+2229180,"Lafayette, LA",M
+2229340,"Lake Charles, LA",M
+2233740,"Monroe, LA",M
+2234020,"Morgan City, LA",M
+2235020,"Natchez, MS-LA (LA part)",M
+2235060,"Natchitoches, LA",M
+2235380,"New Orleans-Metairie, LA",M
+2236660,"Opelousas, LA",M
+2240820,"Ruston, LA",M
+2243340,"Shreveport-Bossier City, LA",M
+2299999,"Nonmetropolitan, nonmicropolitan",M
+2312300,"Augusta-Waterville, ME",M
+2312620,"Bangor, ME",M
+2330340,"Lewiston-Auburn, ME",M
+2338860,"Portland-South Portland, ME",M
+2399999,"Nonmetropolitan, nonmicropolitan",M
+2412580,"Baltimore-Columbia-Towson, MD",M
+2415680,"California-Lexington Park, MD",M
+2415700,"Cambridge, MD",M
+2419060,"Cumberland, MD-WV (MD part)",M
+2420660,"Easton, MD",M
+2425180,"Hagerstown-Martinsburg, MD-WV (MD part)",M
+2437980,"Philadelphia-Camden-Wilmington, PA-NJ-DE-MD (MD part)",M
+2441540,"Salisbury, MD-DE (MD part)",M
+2447900,"Washington-Arlington-Alexandria, DC-VA-MD-WV (MD part)",M
+2499999,"Nonmetropolitan, nonmicropolitan",M
+2512700,"Barnstable Town, MA",M
+2514460,"Boston-Cambridge-Newton, MA-NH (MA part)",M
+2524640,"Greenfield Town, MA",M
+2538340,"Pittsfield, MA",M
+2539300,"Providence-Warwick, RI-MA (MA part)",M
+2544140,"Springfield, MA",M
+2547240,"Vineyard Haven, MA",M
+2549340,"Worcester, MA-CT (MA part)",M
+2599999,"Nonmetropolitan, nonmicropolitan",M
+2610300,"Adrian, MI",M
+2610940,"Alma, MI",M
+2610980,"Alpena, MI",M
+2611460,"Ann Arbor, MI",M
+2612980,"Battle Creek, MI",M
+2613020,"Bay City, MI",M
+2613660,"Big Rapids, MI",M
+2615620,"Cadillac, MI",M
+2617740,"Coldwater, MI",M
+2619820,"Detroit-Warren-Dearborn, MI",M
+2621540,"Escanaba, MI",M
+2622420,"Flint, MI",M
+2624340,"Grand Rapids-Wyoming, MI",M
+2625880,"Hillsdale, MI",M
+2626090,"Holland, MI",M
+2626340,"Houghton, MI",M
+2626960,"Ionia, MI",M
+2627020,"Iron Mountain, MI-WI (MI part)",M
+2627100,"Jackson, MI",M
+2628020,"Kalamazoo-Portage, MI",M
+2629620,"Lansing-East Lansing, MI",M
+2631220,"Ludington, MI",M
+2631940,"Marinette, WI-MI (MI part)",M
+2632100,"Marquette, MI",M
+2633220,"Midland, MI",M
+2633780,"Monroe, MI",M
+2634380,"Mount Pleasant, MI",M
+2634740,"Muskegon, MI",M
+2635660,"Niles-Benton Harbor, MI",M
+2637020,"Owosso, MI",M
+2640980,"Saginaw, MI",M
+2642300,"Sault Ste. Marie, MI",M
+2643780,"South Bend-Mishawaka, IN-MI (MI part)",M
+2644780,"Sturgis, MI",M
+2645900,"Traverse City, MI",M
+2699999,"Nonmetropolitan, nonmicropolitan",M
+2710660,"Albert Lea, MN",M
+2710820,"Alexandria, MN",M
+2712380,"Austin, MN",M
+2713420,"Bemidji, MN",M
+2714660,"Brainerd, MN",M
+2720260,"Duluth, MN-WI (MN part)",M
+2721860,"Fairmont, MN",M
+2722020,"Fargo, ND-MN (MN part)",M
+2722060,"Faribault-Northfield, MN",M
+2722260,"Fergus Falls, MN",M
+2724220,"Grand Forks, ND-MN (MN part)",M
+2724330,"Grand Rapids, MN",M
+2726780,"Hutchinson, MN",M
+2729100,"La Crosse-Onalaska, WI-MN (MN part)",M
+2731860,"Mankato-North Mankato, MN",M
+2732140,"Marshall, MN",M
+2733460,"Minneapolis-St. Paul-Bloomington, MN-WI (MN part)",M
+2735580,"New Ulm, MN",M
+2736940,"Owatonna, MN",M
+2739860,"Red Wing, MN",M
+2740340,"Rochester, MN",M
+2741060,"St. Cloud, MN",M
+2747420,"Wahpeton, ND-MN (MN part)",M
+2748820,"Willmar, MN",M
+2749100,"Winona, MN",M
+2749380,"Worthington, MN",M
+2799999,"Nonmetropolitan, nonmicropolitan",M
+2815020,"Brookhaven, MS",M
+2817260,"Clarksdale, MS",M
+2817380,"Cleveland, MS",M
+2818060,"Columbus, MS",M
+2818420,"Corinth, MS",M
+2824740,"Greenville, MS",M
+2824900,"Greenwood, MS",M
+2824980,"Grenada, MS",M
+2825060,"Gulfport-Biloxi-Pascagoula, MS",M
+2825620,"Hattiesburg, MS",M
+2826940,"Indianola, MS",M
+2827140,"Jackson, MS",M
+2829860,"Laurel, MS",M
+2832620,"McComb, MS",M
+2832820,"Memphis, TN-MS-AR (MS part)",M
+2832940,"Meridian, MS",M
+2835020,"Natchez, MS-LA (MS part)",M
+2837060,"Oxford, MS",M
+2838100,"Picayune, MS",M
+2844260,"Starkville, MS",M
+2846180,"Tupelo, MS",M
+2846980,"Vicksburg, MS",M
+2848500,"West Point, MS",M
+2899999,"Nonmetropolitan, nonmicropolitan",M
+2914700,"Branson, MO",M
+2916020,"Cape Girardeau, MO-IL (MO part)",M
+2917860,"Columbia, MO",M
+2922100,"Farmington, MO",M
+2922220,"Fayetteville-Springdale-Rogers, AR-MO (MO part)",M
+2922780,"Fort Leonard Wood, MO",M
+2922800,"Fort Madison-Keokuk, IA-IL-MO (MO part)",M
+2925300,"Hannibal, MO",M
+2927620,"Jefferson City, MO",M
+2927900,"Joplin, MO",M
+2928140,"Kansas City, MO-KS (MO part)",M
+2928380,"Kennett, MO",M
+2928860,"Kirksville, MO",M
+2930060,"Lebanon, MO",M
+2932180,"Marshall, MO",M
+2932340,"Maryville, MO",M
+2933020,"Mexico, MO",M
+2933620,"Moberly, MO",M
+2938740,"Poplar Bluff, MO",M
+2939500,"Quincy, IL-MO (MO part)",M
+2940620,"Rolla, MO",M
+2941140,"St. Joseph, MO-KS (MO part)",M
+2941180,"St. Louis, MO-IL (MO part)",M
+2942740,"Sedalia, MO",M
+2943460,"Sikeston, MO",M
+2944180,"Springfield, MO",M
+2947660,"Warrensburg, MO",M
+2948460,"West Plains, MO",M
+2999999,"Nonmetropolitan, nonmicropolitan",M
+3013740,"Billings, MT",M
+3014580,"Bozeman, MT",M
+3015580,"Butte-Silver Bow, MT",M
+3024500,"Great Falls, MT",M
+3025740,"Helena, MT",M
+3028060,"Kalispell, MT",M
+3033540,"Missoula, MT",M
+3099999,"Nonmetropolitan, nonmicropolitan",M
+3113100,"Beatrice, NE",M
+3118100,"Columbus, NE",M
+3123340,"Fremont, NE",M
+3124260,"Grand Island, NE",M
+3125580,"Hastings, NE",M
+3128260,"Kearney, NE",M
+3130420,"Lexington, NE",M
+3130700,"Lincoln, NE",M
+3135740,"Norfolk, NE",M
+3135820,"North Platte, NE",M
+3136540,"Omaha-Council Bluffs, NE-IA (NE part)",M
+3142420,"Scottsbluff, NE",M
+3143580,"Sioux City, IA-NE-SD (NE part)",M
+3199999,"Nonmetropolitan, nonmicropolitan",M
+3216180,"Carson City, NV",M
+3221220,"Elko, NV",M
+3221980,"Fallon, NV",M
+3222280,"Fernley, NV",M
+3223820,"Gardnerville Ranchos, NV",M
+3229820,"Las Vegas-Henderson-Paradise, NV",M
+3237220,"Pahrump, NV",M
+3239900,"Reno, NV",M
+3249080,"Winnemucca, NV",M
+3299999,"Nonmetropolitan, nonmicropolitan",M
+3313620,"Berlin, NH-VT (NH part)",M
+3314460,"Boston-Cambridge-Newton, MA-NH (NH part)",M
+3317200,"Claremont-Lebanon, NH-VT (NH part)",M
+3318180,"Concord, NH",M
+3328300,"Keene, NH",M
+3329060,"Laconia, NH",M
+3331700,"Manchester-Nashua, NH",M
+3399999,"Nonmetropolitan, nonmicropolitan",M
+3410900,"Allentown-Bethlehem-Easton, PA-NJ (NJ part)",M
+3412100,"Atlantic City-Hammonton, NJ",M
+3435620,"New York-Newark-Jersey City, NY-NJ-PA (NJ part)",M
+3436140,"Ocean City, NJ",M
+3437980,"Philadelphia-Camden-Wilmington, PA-NJ-DE-MD (NJ part)",M
+3445940,"Trenton, NJ",M
+3447220,"Vineland-Bridgeton, NJ",M
+3499999,"Nonmetropolitan, nonmicropolitan",M
+3510460,"Alamogordo, NM",M
+3510740,"Albuquerque, NM",M
+3516100,"Carlsbad-Artesia, NM",M
+3517580,"Clovis, NM",M
+3519700,"Deming, NM",M
+3521580,"Española, NM",M
+3522140,"Farmington, NM",M
+3523700,"Gallup, NM",M
+3524380,"Grants, NM",M
+3526020,"Hobbs, NM",M
+3529740,"Las Cruces, NM",M
+3529780,"Las Vegas, NM",M
+3531060,"Los Alamos, NM",M
+3538780,"Portales, NM",M
+3540740,"Roswell, NM",M
+3540760,"Ruidoso, NM",M
+3542140,"Santa Fe, NM",M
+3543500,"Silver City, NM",M
+3545340,"Taos, NM",M
+3599999,"Nonmetropolitan, nonmicropolitan",M
+3610580,"Albany-Schenectady-Troy, NY",M
+3611220,"Amsterdam, NY",M
+3612180,"Auburn, NY",M
+3612860,"Batavia, NY",M
+3613780,"Binghamton, NY",M
+3615380,"Buffalo-Cheektowaga-Niagara Falls, NY",M
+3618500,"Corning, NY",M
+3618660,"Cortland, NY",M
+3621300,"Elmira, NY",M
+3624020,"Glens Falls, NY",M
+3624100,"Gloversville, NY",M
+3626460,"Hudson, NY",M
+3627060,"Ithaca, NY",M
+3627460,"Jamestown-Dunkirk-Fredonia, NY",M
+3628740,"Kingston, NY",M
+3631660,"Malone, NY",M
+3635620,"New York-Newark-Jersey City, NY-NJ-PA (NY part)",M
+3636300,"Ogdensburg-Massena, NY",M
+3636460,"Olean, NY",M
+3636580,"Oneonta, NY",M
+3638460,"Plattsburgh, NY",M
+3640380,"Rochester, NY",M
+3642900,"Seneca Falls, NY",M
+3645060,"Syracuse, NY",M
+3646540,"Utica-Rome, NY",M
+3648060,"Watertown-Fort Drum, NY",M
+3699999,"Nonmetropolitan, nonmicropolitan",M
+3710620,"Albemarle, NC",M
+3711700,"Asheville, NC",M
+3714380,"Boone, NC",M
+3714820,"Brevard, NC",M
+3715500,"Burlington, NC",M
+3716740,"Charlotte-Concord-Gastonia, NC-SC (NC part)",M
+3719000,"Cullowhee, NC",M
+3720380,"Dunn, NC",M
+3720500,"Durham-Chapel Hill, NC",M
+3721020,"Elizabeth City, NC",M
+3722180,"Fayetteville, NC",M
+3722580,"Forest City, NC",M
+3724140,"Goldsboro, NC",M
+3724660,"Greensboro-High Point, NC",M
+3724780,"Greenville, NC",M
+3725780,"Henderson, NC",M
+3725860,"Hickory-Lenoir-Morganton, NC",M
+3727340,"Jacksonville, NC",M
+3728620,"Kill Devil Hills, NC",M
+3728820,"Kinston, NC",M
+3729900,"Laurinburg, NC",M
+3731300,"Lumberton, NC",M
+3732000,"Marion, NC",M
+3733980,"Morehead City, NC",M
+3734340,"Mount Airy, NC",M
+3734820,"Myrtle Beach-Conway-North Myrtle Beach, SC-NC (NC part)",M
+3735100,"New Bern, NC",M
+3735900,"North Wilkesboro, NC",M
+3737080,"Oxford, NC",M
+3738240,"Pinehurst-Southern Pines, NC",M
+3739580,"Raleigh, NC",M
+3740260,"Roanoke Rapids, NC",M
+3740460,"Rockingham, NC",M
+3740580,"Rocky Mount, NC",M
+3741820,"Sanford, NC",M
+3743140,"Shelby, NC",M
+3747260,"Virginia Beach-Norfolk-Newport News, VA-NC (NC part)",M
+3747820,"Washington, NC",M
+3748900,"Wilmington, NC",M
+3748980,"Wilson, NC",M
+3749180,"Winston-Salem, NC",M
+3799999,"Nonmetropolitan, nonmicropolitan",M
+3813900,"Bismarck, ND",M
+3819860,"Dickinson, ND",M
+3822020,"Fargo, ND-MN (ND part)",M
+3824220,"Grand Forks, ND-MN (ND part)",M
+3827420,"Jamestown, ND",M
+3833500,"Minot, ND",M
+3847420,"Wahpeton, ND-MN (ND part)",M
+3848780,"Williston, ND",M
+3899999,"Nonmetropolitan, nonmicropolitan",M
+3910420,"Akron, OH",M
+3911740,"Ashland, OH",M
+3911780,"Ashtabula, OH",M
+3911900,"Athens, OH",M
+3913340,"Bellefontaine, OH",M
+3915340,"Bucyrus, OH",M
+3915740,"Cambridge, OH",M
+3915940,"Canton-Massillon, OH",M
+3916380,"Celina, OH",M
+3917060,"Chillicothe, OH",M
+3917140,"Cincinnati, OH-KY-IN (OH part)",M
+3917460,"Cleveland-Elyria, OH",M
+3918140,"Columbus, OH",M
+3918740,"Coshocton, OH",M
+3919380,"Dayton, OH",M
+3919580,"Defiance, OH",M
+3922300,"Findlay, OH",M
+3923380,"Fremont, OH",M
+3924820,"Greenville, OH",M
+3926580,"Huntington-Ashland, WV-KY-OH (OH part)",M
+3927160,"Jackson, OH",M
+3930620,"Lima, OH",M
+3931900,"Mansfield, OH",M
+3931930,"Marietta, OH",M
+3932020,"Marion, OH",M
+3934540,"Mount Vernon, OH",M
+3935420,"New Philadelphia-Dover, OH",M
+3935940,"Norwalk, OH",M
+3938580,"Point Pleasant, WV-OH (OH part)",M
+3938840,"Port Clinton, OH",M
+3939020,"Portsmouth, OH",M
+3941400,"Salem, OH",M
+3941780,"Sandusky, OH",M
+3943380,"Sidney, OH",M
+3944220,"Springfield, OH",M
+3945660,"Tiffin, OH",M
+3945780,"Toledo, OH",M
+3946500,"Urbana, OH",M
+3946780,"Van Wert, OH",M
+3947540,"Wapakoneta, OH",M
+3947920,"Washington Court House, OH",M
+3948260,"Weirton-Steubenville, WV-OH (OH part)",M
+3948540,"Wheeling, WV-OH (OH part)",M
+3948940,"Wilmington, OH",M
+3949300,"Wooster, OH",M
+3949660,"Youngstown-Warren-Boardman, OH-PA (OH part)",M
+3949780,"Zanesville, OH",M
+3999999,"Nonmetropolitan, nonmicropolitan",M
+04004005,"Cochise County LWIB",W
+04004010,"Gila/Pinal LWIB",W
+04004015,"Graham County LWIB",W
+04004020,"Greenlee County LWIB",W
+04004025,"City of Phoenix LWIB",W
+04004030,"Pima County LWIB",W
+04004035,"Maricopa County LWIB",W
+04004040,"Santa Cruz County LWIB",W
+04004045,"Yuma County LWIB",W
+04004060,"Apache/Navajo LWIB",W
+04004065,"Coconino County LWIB",W
+04004070,"Mohave/LaPaz LWIB",W
+04004080,"Yavapai County LWIB",W
+4010220,"Ada, OK",M
+4011060,"Altus, OK",M
+4011620,"Ardmore, OK",M
+4012780,"Bartlesville, OK",M
+4020340,"Duncan, OK",M
+4020460,"Durant, OK",M
+4021120,"Elk City, OK",M
+4021420,"Enid, OK",M
+4022900,"Fort Smith, AR-OK (OK part)",M
+4025100,"Guymon, OK",M
+4030020,"Lawton, OK",M
+4032540,"McAlester, OK",M
+4033060,"Miami, OK",M
+4034780,"Muskogee, OK",M
+4036420,"Oklahoma City, OK",M
+4038620,"Ponca City, OK",M
+4043060,"Shawnee, OK",M
+4044660,"Stillwater, OK",M
+4045140,"Tahlequah, OK",M
+4046140,"Tulsa, OK",M
+4048220,"Weatherford, OK",M
+4049260,"Woodward, OK",M
+4099999,"Nonmetropolitan, nonmicropolitan",M
+4110540,"Albany, OR",M
+4111820,"Astoria, OR",M
+4113460,"Bend-Redmond, OR",M
+4115060,"Brookings, OR",M
+4118300,"Coos Bay, OR",M
+4118700,"Corvallis, OR",M
+4121660,"Eugene, OR",M
+4124420,"Grants Pass, OR",M
+4125840,"Hermiston-Pendleton, OR",M
+4126220,"Hood River, OR",M
+4128900,"Klamath Falls, OR",M
+4129260,"La Grande, OR",M
+4132780,"Medford, OR",M
+4135440,"Newport, OR",M
+4136620,"Ontario, OR-ID (OR part)",M
+4138900,"Portland-Vancouver-Hillsboro, OR-WA (OR part)",M
+4139260,"Prineville, OR",M
+4140700,"Roseburg, OR",M
+4141420,"Salem, OR",M
+4145520,"The Dalles, OR",M
+4199999,"Nonmetropolitan, nonmicropolitan",M
+4210900,"Allentown-Bethlehem-Easton, PA-NJ (PA part)",M
+4211020,"Altoona, PA",M
+4214100,"Bloomsburg-Berwick, PA",M
+4214620,"Bradford, PA",M
+4216540,"Chambersburg-Waynesboro, PA",M
+4220180,"DuBois, PA",M
+4220700,"East Stroudsburg, PA",M
+4221500,"Erie, PA",M
+4223900,"Gettysburg, PA",M
+4225420,"Harrisburg-Carlisle, PA",M
+4226500,"Huntingdon, PA",M
+4226860,"Indiana, PA",M
+4227780,"Johnstown, PA",M
+4229540,"Lancaster, PA",M
+4230140,"Lebanon, PA",M
+4230260,"Lewisburg, PA",M
+4230380,"Lewistown, PA",M
+4230820,"Lock Haven, PA",M
+4232740,"Meadville, PA",M
+4235260,"New Castle, PA",M
+4235620,"New York-Newark-Jersey City, NY-NJ-PA (PA part)",M
+4236340,"Oil City, PA",M
+4237980,"Philadelphia-Camden-Wilmington, PA-NJ-DE-MD (PA part)",M
+4238300,"Pittsburgh, PA",M
+4239060,"Pottsville, PA",M
+4239740,"Reading, PA",M
+4241260,"St. Marys, PA",M
+4242380,"Sayre, PA",M
+4242540,"Scranton--Wilkes-Barre--Hazleton, PA",M
+4242780,"Selinsgrove, PA",M
+4243740,"Somerset, PA",M
+4244300,"State College, PA",M
+4244980,"Sunbury, PA",M
+4247620,"Warren, PA",M
+4248700,"Williamsport, PA",M
+4249620,"York-Hanover, PA",M
+4249660,"Youngstown-Warren-Boardman, OH-PA (PA part)",M
+4299999,"Nonmetropolitan, nonmicropolitan",M
+4439300,"Providence-Warwick, RI-MA (RI part)",M
+4499999,"Nonmetropolitan, nonmicropolitan",M
+4512260,"Augusta-Richmond County, GA-SC (SC part)",M
+4513500,"Bennettsville, SC",M
+4516700,"Charleston-North Charleston, SC",M
+4516740,"Charlotte-Concord-Gastonia, NC-SC (SC part)",M
+4517900,"Columbia, SC",M
+4522500,"Florence, SC",M
+4523500,"Gaffney, SC",M
+4523860,"Georgetown, SC",M
+4524860,"Greenville-Anderson-Mauldin, SC",M
+4524940,"Greenwood, SC",M
+4525940,"Hilton Head Island-Bluffton-Beaufort, SC",M
+4534820,"Myrtle Beach-Conway-North Myrtle Beach, SC-NC (SC part)",M
+4535140,"Newberry, SC",M
+4536700,"Orangeburg, SC",M
+4542860,"Seneca, SC",M
+4543900,"Spartanburg, SC",M
+4544940,"Sumter, SC",M
+4599999,"Nonmetropolitan, nonmicropolitan",M
+4610100,"Aberdeen, SD",M
+4615100,"Brookings, SD",M
+4626700,"Huron, SD",M
+4633580,"Mitchell, SD",M
+4638180,"Pierre, SD",M
+4639660,"Rapid City, SD",M
+4643580,"Sioux City, IA-NE-SD (SD part)",M
+4643620,"Sioux Falls, SD",M
+4643940,"Spearfish, SD",M
+4646820,"Vermillion, SD",M
+4647980,"Watertown, SD",M
+4649460,"Yankton, SD",M
+4699999,"Nonmetropolitan, nonmicropolitan",M
+4711940,"Athens, TN",M
+4715140,"Brownsville, TN",M
+4716860,"Chattanooga, TN-GA (TN part)",M
+4717300,"Clarksville, TN-KY (TN part)",M
+4717420,"Cleveland, TN",M
+4718260,"Cookeville, TN",M
+4718900,"Crossville, TN",M
+4719420,"Dayton, TN",M
+4720540,"Dyersburg, TN",M
+4724620,"Greeneville, TN",M
+4727180,"Jackson, TN",M
+4727740,"Johnson City, TN",M
+4728700,"Kingsport-Bristol-Bristol, TN-VA (TN part)",M
+4728940,"Knoxville, TN",M
+4729980,"Lawrenceburg, TN",M
+4730280,"Lewisburg, TN",M
+4732280,"Martin, TN",M
+4732660,"McMinnville, TN",M
+4732820,"Memphis, TN-MS-AR (TN part)",M
+4734100,"Morristown, TN",M
+4734980,"Nashville-Davidson--Murfreesboro--Franklin, TN",M
+4735460,"Newport, TN",M
+4737540,"Paris, TN",M
+4742940,"Sevierville, TN",M
+4743180,"Shelbyville, TN",M
+4746100,"Tullahoma-Manchester, TN",M
+4746460,"Union City, TN-KY (TN part)",M
+4799999,"Nonmetropolitan, nonmicropolitan",M
+4810180,"Abilene, TX",M
+4810860,"Alice, TX",M
+4811100,"Amarillo, TX",M
+4811380,"Andrews, TX",M
+4811980,"Athens, TX",M
+4812420,"Austin-Round Rock, TX",M
+4813060,"Bay City, TX",M
+4813140,"Beaumont-Port Arthur, TX",M
+4813300,"Beeville, TX",M
+4813700,"Big Spring, TX",M
+4814300,"Bonham, TX",M
+4814420,"Borger, TX",M
+4814780,"Brenham, TX",M
+4815180,"Brownsville-Harlingen, TX",M
+4815220,"Brownwood, TX",M
+4817780,"College Station-Bryan, TX",M
+4818580,"Corpus Christi, TX",M
+4818620,"Corsicana, TX",M
+4819100,"Dallas-Fort Worth-Arlington, TX",M
+4819620,"Del Rio, TX",M
+4820300,"Dumas, TX",M
+4820580,"Eagle Pass, TX",M
+4820900,"El Campo, TX",M
+4821340,"El Paso, TX",M
+4823240,"Fredericksburg, TX",M
+4823620,"Gainesville, TX",M
+4825820,"Hereford, TX",M
+4826420,"Houston-The Woodlands-Sugar Land, TX",M
+4826660,"Huntsville, TX",M
+4827380,"Jacksonville, TX",M
+4828500,"Kerrville, TX",M
+4828660,"Killeen-Temple, TX",M
+4828780,"Kingsville, TX",M
+4829500,"Lamesa, TX",M
+4829700,"Laredo, TX",M
+4830220,"Levelland, TX",M
+4830980,"Longview, TX",M
+4831180,"Lubbock, TX",M
+4831260,"Lufkin, TX",M
+4832220,"Marshall, TX",M
+4832580,"McAllen-Edinburg-Mission, TX",M
+4833260,"Midland, TX",M
+4833420,"Mineral Wells, TX",M
+4834420,"Mount Pleasant, TX",M
+4834860,"Nacogdoches, TX",M
+4836220,"Odessa, TX",M
+4837300,"Palestine, TX",M
+4837420,"Pampa, TX",M
+4837580,"Paris, TX",M
+4837780,"Pecos, TX",M
+4838380,"Plainview, TX",M
+4838920,"Port Lavaca, TX",M
+4839700,"Raymondville, TX",M
+4840100,"Rio Grande City, TX",M
+4841660,"San Angelo, TX",M
+4841700,"San Antonio-New Braunfels, TX",M
+4843300,"Sherman-Denison, TX",M
+4843660,"Snyder, TX",M
+4844500,"Stephenville, TX",M
+4844860,"Sulphur Springs, TX",M
+4845020,"Sweetwater, TX",M
+4845500,"Texarkana, TX-AR (TX part)",M
+4846340,"Tyler, TX",M
+4846620,"Uvalde, TX",M
+4846900,"Vernon, TX",M
+4847020,"Victoria, TX",M
+4847380,"Waco, TX",M
+4848660,"Wichita Falls, TX",M
+4849820,"Zapata, TX",M
+4899999,"Nonmetropolitan, nonmicropolitan",M
+4916260,"Cedar City, UT",M
+4925720,"Heber, UT",M
+4930860,"Logan, UT-ID (UT part)",M
+4936260,"Ogden-Clearfield, UT",M
+4939220,"Price, UT",M
+4939340,"Provo-Orem, UT",M
+4941100,"St. George, UT",M
+4941620,"Salt Lake City, UT",M
+4944920,"Summit Park, UT",M
+4946860,"Vernal, UT",M
+4999999,"Nonmetropolitan, nonmicropolitan",M
+05000001,"01 Central WIB",W
+05000002,"02 Eastern WIB",W
+05000003,"03 Little Rock WIB",W
+05000004,"04 North Central WIB",W
+05000005,"05 Northeast WIB",W
+05000006,"06 Northwest WIB",W
+05000007,"07 Southeast WIB",W
+05000008,"08 Southwest WIB",W
+05000009,"09 West Central WIB",W
+05000010,"10 Western WIB",W
+5012740,"Barre, VT",M
+5013540,"Bennington, VT",M
+5013620,"Berlin, NH-VT (VT part)",M
+5015540,"Burlington-South Burlington, VT",M
+5017200,"Claremont-Lebanon, NH-VT (VT part)",M
+5040860,"Rutland, VT",M
+5099999,"Nonmetropolitan, nonmicropolitan",M
+5113720,"Big Stone Gap, VA",M
+5113980,"Blacksburg-Christiansburg-Radford, VA",M
+5114140,"Bluefield, WV-VA (VA part)",M
+5116820,"Charlottesville, VA",M
+5119260,"Danville, VA",M
+5125500,"Harrisonburg, VA",M
+5128700,"Kingsport-Bristol-Bristol, TN-VA (VA part)",M
+5131340,"Lynchburg, VA",M
+5132300,"Martinsville, VA",M
+5140060,"Richmond, VA",M
+5140220,"Roanoke, VA",M
+5144420,"Staunton-Waynesboro, VA",M
+5147260,"Virginia Beach-Norfolk-Newport News, VA-NC (VA part)",M
+5147900,"Washington-Arlington-Alexandria, DC-VA-MD-WV (VA part)",M
+5149020,"Winchester, VA-WV (VA part)",M
+5199999,"Nonmetropolitan, nonmicropolitan",M
+5310140,"Aberdeen, WA",M
+5313380,"Bellingham, WA",M
+5314740,"Bremerton-Silverdale, WA",M
+5316500,"Centralia, WA",M
+5321260,"Ellensburg, WA",M
+5328420,"Kennewick-Richland, WA",M
+5330300,"Lewiston, ID-WA (WA part)",M
+5331020,"Longview, WA",M
+5334180,"Moses Lake, WA",M
+5334580,"Mount Vernon-Anacortes, WA",M
+5336020,"Oak Harbor, WA",M
+5336500,"Olympia-Tumwater, WA",M
+5336830,"Othello, WA",M
+5338820,"Port Angeles, WA",M
+5338900,"Portland-Vancouver-Hillsboro, OR-WA (WA part)",M
+5339420,"Pullman, WA",M
+5342660,"Seattle-Tacoma-Bellevue, WA",M
+5343220,"Shelton, WA",M
+5344060,"Spokane-Spokane Valley, WA",M
+5347460,"Walla Walla, WA",M
+5348300,"Wenatchee, WA",M
+5349420,"Yakima, WA",M
+5399999,"Nonmetropolitan, nonmicropolitan",M
+5413220,"Beckley, WV",M
+5414140,"Bluefield, WV-VA (WV part)",M
+5416620,"Charleston, WV",M
+5417220,"Clarksburg, WV",M
+5419060,"Cumberland, MD-WV (WV part)",M
+5421180,"Elkins, WV",M
+5421900,"Fairmont, WV",M
+5425180,"Hagerstown-Martinsburg, MD-WV (WV part)",M
+5426580,"Huntington-Ashland, WV-KY-OH (WV part)",M
+5430880,"Logan, WV",M
+5434060,"Morgantown, WV",M
+5437620,"Parkersburg-Vienna, WV",M
+5438580,"Point Pleasant, WV-OH (WV part)",M
+5447900,"Washington-Arlington-Alexandria, DC-VA-MD-WV (WV part)",M
+5448260,"Weirton-Steubenville, WV-OH (WV part)",M
+5448540,"Wheeling, WV-OH (WV part)",M
+5449020,"Winchester, VA-WV (WV part)",M
+5499999,"Nonmetropolitan, nonmicropolitan",M
+5511540,"Appleton, WI",M
+5512660,"Baraboo, WI",M
+5513180,"Beaver Dam, WI",M
+5516980,"Chicago-Naperville-Elgin, IL-IN-WI (WI part)",M
+5520260,"Duluth, MN-WI (WI part)",M
+5520740,"Eau Claire, WI",M
+5522540,"Fond du Lac, WI",M
+5524580,"Green Bay, WI",M
+5527020,"Iron Mountain, MI-WI (WI part)",M
+5527500,"Janesville-Beloit, WI",M
+5529100,"La Crosse-Onalaska, WI-MN (WI part)",M
+5531540,"Madison, WI",M
+5531820,"Manitowoc, WI",M
+5531940,"Marinette, WI-MI (WI part)",M
+5532860,"Menomonie, WI",M
+5532980,"Merrill, WI",M
+5533340,"Milwaukee-Waukesha-West Allis, WI",M
+5533460,"Minneapolis-St. Paul-Bloomington, MN-WI (WI part)",M
+5536780,"Oshkosh-Neenah, WI",M
+5538420,"Platteville, WI",M
+5539540,"Racine, WI",M
+5543020,"Shawano, WI",M
+5543100,"Sheboygan, WI",M
+5544620,"Stevens Point, WI",M
+5548020,"Watertown-Fort Atkinson, WI",M
+5548140,"Wausau, WI",M
+5548580,"Whitewater-Elkhorn, WI",M
+5549220,"Wisconsin Rapids-Marshfield, WI",M
+5599999,"Nonmetropolitan, nonmicropolitan",M
+5616220,"Casper, WY",M
+5616940,"Cheyenne, WY",M
+5621740,"Evanston, WY",M
+5623940,"Gillette, WY",M
+5627220,"Jackson, WY-ID (WY part)",M
+5629660,"Laramie, WY",M
+5640180,"Riverton, WY",M
+5640540,"Rock Springs, WY",M
+5643260,"Sheridan, WY",M
+5699999,"Nonmetropolitan, nonmicropolitan",M
+06000001,"01 Alameda County WIB",W
+06000003,"03 Oakland City WIB",W
+06000004,"04 Mother Lode Consortium WIB",W
+06000005,"05 Golden Sierra Consortium WIB",W
+06000007,"07 NCC (North Central Counties Consortium) WIB",W
+06000008,"08 Contra Costa County WIB",W
+06000009,"09 Richmond City WIB",W
+06000011,"11 Fresno County WIB",W
+06000012,"12 Humboldt County WIB",W
+06000013,"13 Imperial County WIB",W
+06000014,"14 Kern, Inyo, Mono Consortium WIB",W
+06000015,"15 Kings County WIB",W
+06000016,"16 NoRTEC WIB",W
+06000017,"17 Los Angeles County WIB",W
+06000019,"19 Foothill Consortium WIB",W
+06000020,"20 Verdugo Consortium WIB",W
+06000026,"26 Pacific Gateway",W
+06000027,"27 Los Angeles City WIB",W
+06000028,"28 Madera County WIB",W
+06000029,"29 Marin County WIB",W
+06000030,"30 Mendocino County WIB",W
+06000031,"31 Merced County WIB",W
+06000032,"32 Monterey County WIB",W
+06000033,"33 Napa County WIB",W
+06000034,"34 Orange County WIB",W
+06000035,"35 Riverside County WIB",W
+06000037,"37 Sacramento County WIB",W
+06000038,"38 San Benito County WIB",W
+06000040,"40 San Bernardino County WIB",W
+06000041,"41 San Bernardino City WIB",W
+06000042,"42 San Diego County WIB",W
+06000045,"45 San Francisco City/County WIB",W
+06000046,"46 San Joaquin County WIB",W
+06000048,"48 San Luis Obispo County WIB",W
+06000049,"49 San Mateo County WIB",W
+06000050,"50 Santa Barbara County WIB",W
+06000051,"51 San Jose - Silicon Valley WIB",W
+06000052,"52 NOVA (North Valley Consortium) WIB",W
+06000053,"53 Santa Cruz County WIB",W
+06000055,"55 Solano County WIB",W
+06000056,"56 Sonoma County WIB",W
+06000057,"57 Stanislaus County WIB",W
+06000058,"58 Tulare County WIB",W
+06000059,"59 Ventura County WIB",W
+06000060,"60 Yolo County WIB",W
+06000061,"61 South Bay Consortium WIB",W
+06000062,"62 SELACO (Southeast Los Angeles County) WIB",W
+06000072,"72 Anaheim City WIB",W
+06000073,"73 Santa Ana City WIB",W
+09090001,"Eastern WIA",W
+09090002,"North Central WIA",W
+09090003,"Northwest WIA",W
+09090004,"South Central WIA",W
+09090005,"Southwest WIA",W
+10000001,"01 Delaware WIB",W
+11000001,"01 District of Columbia WIB",W
+12000001,"CareerSource Escarosa",W
+12000002,"CareerSource Okaloosa Walton",W
+12000003,"CareerSource Chipola",W
+12000004,"CareerSource Gulf Coast",W
+12000005,"CareerSource Capital Region",W
+12000006,"CareerSource North Florida",W
+12000007,"CareerSource Florida Crown",W
+12000008,"CareerSource Northeast Florida",W
+12000009,"CareerSource North Central Florida",W
+12000010,"CareerSource Citrus Levy Marion",W
+12000011,"CareerSource Flagler Volusia",W
+12000012,"CareerSource Central Florida",W
+12000013,"CareerSource Brevard",W
+12000014,"CareerSource Pinellas",W
+12000015,"CareerSource Tampa Bay",W
+12000016,"CareerSource Pasco Hernando",W
+12000017,"CareerSource Polk",W
+12000018,"CareerSource Suncoast",W
+12000019,"CareerSource Heartland",W
+12000020,"CareerSource Research Coast",W
+12000021,"CareerSource Palm Beach County",W
+12000022,"CareerSource Broward",W
+12000023,"CareerSource South Florida",W
+12000024,"CareerSource Southwest Florida",W
+13000001,"01 Northwest Georgia WIB",W
+13000002,"02 Georgia Mountains WIB",W
+13000003,"03 City of Atlanta WIB",W
+13000004,"04 Cobb County WIB",W
+13000005,"05 DeKalb County WIB",W
+13000006,"06 Fulton County WIB",W
+13000007,"07 Atlanta Regional WIB",W
+13000008,"08 West Central WIB",W
+13000009,"09 Northeast WIB",W
+13000010,"10 Macon-Bibb WIB",W
+13000011,"11 Middle Georgia WIB",W
+13000012,"12 Richmond/Burke WIB",W
+13000013,"13 East Central Georgia WIB",W
+13000014,"14 Lower Chattahoochee WIB",W
+13000015,"15 Middle Flint WIB",W
+13000016,"16 Heart of Georgia/Altamaha WIB",W
+13000017,"17 Southwest Georgia WIB",W
+13000018,"18 South Georgia WIB",W
+13000019,"19 Southeast Georgia WIB",W
+13000020,"20 Coastal WIB",W
+15150001,"01 Hawaii WIB",W
+15150003,"03 Honolulu WIB",W
+15150007,"07 Kauai WIB",W
+15150009,"09 Maui WIB",W
+16160010,"01 North WIB",W
+16160020,"02 North Central WIB",W
+16160030,"03 Southwest WIB",W
+16160040,"04 South Central WIB",W
+16160050,"05 Southeast WIB",W
+16160060,"06 Northeast WIB",W
+17000001,"Lake County WIB",W
+17000002,"McHenry County WIB",W
+17000003,"Northern IL Workforce Alliance",W
+17000004,"NW Central IL Works",W
+17000005,"River Valley WIB",W
+17000006,"DuPage County WIB",W
+17000007,"Chicago-Cook WIB",W
+17000010,"WIB of Will County",W
+17000011,"Grundy-Livingston-Kankakee WIB",W
+17000013,"WDB of Rock Island-Henry-Mercer",W
+17000014,"WIB of Western IL",W
+17000015,"Career Link",W
+17000017,"WIB of East Central IL",W
+17000018,"Vermilion County WIB",W
+17000019,"Macon-Dewitt WIB",W
+17000020,"Land of Lincoln WF Alliance",W
+17000021,"West Central WF Dev Council",W
+17000022,"Madison-Bond WIB",W
+17000023,"Crossroads WIB",W
+17000024,"Mid America WIB",W
+17000025,"Southern IL WIB",W
+17000026,"Southern 14 WIB",W
+18180001,"Economic Growth Region 1",W
+18180002,"Economic Growth Region 2",W
+18180003,"Economic Growth Region 3",W
+18180004,"Economic Growth Region 4",W
+18180005,"Economic Growth Region 5",W
+18180006,"Economic Growth Region 6",W
+18180007,"Economic Growth Region 7",W
+18180008,"Economic Growth Region 8",W
+18180009,"Economic Growth Region 9",W
+18180010,"Economic Growth Region 10",W
+18180011,"Economic Growth Region 11",W
+19190001,"01 Region 1 - Dubuque WIB",W
+19190002,"02 Region 2 - Mason City WIB",W
+19190003,"03 Region 3 & 4 - Spencer WIB",W
+19190005,"05 Region 5 - Fort Dodge WIB",W
+19190006,"06 Region 6 - Marshalltown WIB",W
+19190007,"07 Region 7 - Waterloo WIB",W
+19190008,"08 Region 8 - Carroll WIB",W
+19190009,"09 Region 9 - Davenport WIB",W
+19190010,"10 Region 10 - Cedar Rapids WIB",W
+19190011,"11 Region 11 - Des Moines WIB",W
+19190012,"12 Region 12 - Sioux City WIB",W
+19190013,"13 Region 13 - Council Bluffs WIB",W
+19190014,"14 Region 14 - Creston WIB",W
+19190015,"15 Region 15 - Ottumwa WIB",W
+19190016,"16 Region 16 - Burlington WIB",W
+20200001,"01 Local Area I - Western WIB",W
+20200002,"02 Local Area II - Northeast WIB",W
+20200003,"03 Local Area III - Kansas City Area WIB",W
+20200004,"04 Local Area IV - South Central WIB",W
+20200005,"05 Local Area V - Southeast WIB",W
+22220005,"East Baton Rouge Parish WIA",W
+22220015,"Jefferson Parish WIA",W
+22220025,"Orleans Parish WIA",W
+22220030,"Ouachita Parish WIA",W
+22220035,"Rapides Parish WIA",W
+22220040,"City of Shreveport WIA",W
+22220045,"First Planning District Consortium WIA",W
+22220050,"Second Planning District Consortium WIA",W
+22220070,"Sixth Planning District Consortium WIA",W
+22220075,"Seventh Planning District Consortium WIA",W
+22220085,"Lafourche Parish WIA",W
+22220090,"St. Charles Parish Consortium WIA",W
+22220105,"Calcasieu Parish Consortium WIA",W
+22220125,"Franklin Parish Consortium WIA",W
+22220130,"Fourth Planning District Consortium WIA",W
+23000001,"01 Aroostook/Washington WIA",W
+23000002,"02 Central/Western WIA",W
+23000003,"03 Six County Coastal WIA",W
+23000004,"04 Tri County Investment Board WIA",W
+24001001,"01 Anne Arundel WIA",W
+24001002,"02 Baltimore County WIA",W
+24001003,"03 Baltimore City WIA",W
+24001004,"04 Frederick WIA",W
+24001005,"05 Lower Shore WIA",W
+24001006,"06 MID-Maryland WIA",W
+24001007,"07 Montgomery WIA",W
+24001008,"08 Prince Georges WIA",W
+24001009,"09 Southern Maryland WIA",W
+24001010,"10 Susquehanna WIA",W
+24001011,"11 Upper Shore WIA",W
+24001012,"12 Western Maryland WIA",W
+25000001,"Berkshire County WIA",W
+25000002,"Franklin/Hampshire WIA",W
+25000003,"Hampden County WIA",W
+25000004,"North Central WIA",W
+25000005,"Central MA WIA",W
+25000006,"Greater Lowell WIA",W
+25000007,"Lower Merrimack Valley WIA",W
+25000008,"North Shore WIA",W
+25000009,"Metro North WIA",W
+25000010,"Boston WIA",W
+25000011,"Metro South/West WIA",W
+25000012,"South Shore WIA",W
+25000013,"Brockton WIA",W
+25000014,"Bristol County WIA",W
+25000015,"Greater New Bedford WIA",W
+25000016,"Cape & Islands WIA",W
+26000002,"Region 7B Emp & Trng Consortium",W
+26000003,"Calhoun Intermediate School District",W
+26000004,"Saginaw-Midland-Bay Michigan Works!",W
+26000005,"Berrien-Cass-Van Buren Michigan Works!",W
+26000006,"Six County Employment Alliance",W
+26000007,"Detroit Workforce Development Department",W
+26000009,"Eastern U P Employment & Training Consortium",W
+26000010,"Career Alliance, Inc.",W
+26000011,"Central Area Michigan Works!",W
+26000013,"Thumb Area Employment & Training Consortium",W
+26000014,"Kalamazoo-St. Joseph Michigan Works!",W
+26000016,"Michigan Works! West Central",W
+26000017,"Capital Area Michigan Works!",W
+26000019,"Macomb/St. Clair Workforce Development Board, Inc.",W
+26000020,"Muskegon-Oceana Consortium",W
+26000021,"Northeast Michigan Consortium",W
+26000022,"Northwest Michigan Council of Governments",W
+26000023,"Oakland County Employment and Training Division",W
+26000026,"Western Upper Peninsula Michigan Works!",W
+26000029,"Livingston County Michigan Works!",W
+26000030,"Washtenaw County Employment Training and Community",W
+26000031,"Southeast Michigan Community Alliance",W
+26000032,"Ottawa County Michigan Works!",W
+26000033,"Kent & Allegan Michigan Works!",W
+26000034,"South Central Michigan Works!",W
+28280001,"01 Delta WIB",W
+28280002,"02 The Mississippi Partnership WIB",W
+28280003,"03 Southcentral Mississippi Works WIB",W
+28280004,"04 Twin Districts WIB",W
+29290001,"001 Northwest Region WIB",W
+29290002,"002 Northeast Region WIB",W
+29290003,"003 Kansas City Vicinity Region WIB",W
+29290004,"004 West Central Region WIB",W
+29290006,"006 St. Louis City Region WIB",W
+29290007,"007 Southwest Region WIB",W
+29290008,"008 Ozark Region WIB",W
+29290010,"010 South Central Region WIB",W
+29290011,"011 Southeast Region WIB",W
+29290012,"012 East Jackson County Region WIB",W
+29290013,"013 St. Louis County Region WIB",W
+29290014,"014 St. Charles County Region WIB",W
+29290015,"015 Jefferson/Franklin County Consortium WIB",W
+29290016,"5/9 Central Region WIB",W
+30100001,"01 CEP WIB",W
+30100002,"02 Balance of State WIB",W
+31000820,"Omaha Consortium",W
+31000821,"Lincoln MSA",W
+31000822,"Grand Island MSA",W
+31000823,"Central Economic Region",W
+31000824,"Mid Plains Economic Region",W
+31000825,"Northeast Economic Region",W
+31000826,"Panhandle Economic Region",W
+31000827,"Sandhills Economic Region",W
+31000828,"Southeast Economic Region",W
+32150001,"01 Southern Nevada WFB",W
+32150002,"02 NevadaWorks WFB",W
+33330014,"Berlin One-Stop Service Area",W
+33330034,"Claremont One-Stop Service Area",W
+33330054,"Concord One-Stop Service Area",W
+33330074,"Conway One-Stop Service Area",W
+33330114,"Somersworth One-Stop Service Area",W
+33330294,"Keene One-Stop Service Area",W
+33330314,"Laconia One-Stop Service Area",W
+33330354,"Lebanon One-Stop Service Area",W
+33330374,"Littleton One-Stop Service Area",W
+33330394,"Manchester One-Stop Service Area",W
+33330434,"Nashua One-Stop Service Area",W
+33330534,"Portsmouth One-Stop Service Area",W
+33330574,"Salem One-Stop Service Area",W
+34340001,"01 Atlantic-Cape May WIB",W
+34340002,"02 Bergen WIB",W
+34340003,"03 Burlington WIB",W
+34340004,"04 Camden WIB",W
+34340005,"05 Cumberland-Salem WIB",W
+34340006,"06 Essex WIB",W
+34340007,"07 Gloucester WIB",W
+34340008,"08 Greater Raritan WIB",W
+34340009,"09 Hudson-Jersey City WIB",W
+34340010,"10 Mercer WIB",W
+34340011,"11 Middlesex WIB",W
+34340012,"12 Monmouth WIB",W
+34340013,"13 Morris-Sussex-Warren WIB",W
+34340014,"14 Newark WIB",W
+34340015,"15 Ocean WIB",W
+34340016,"16 Passaic WIB",W
+34340017,"17 Union WIB",W
+35350005,"05 Central Area WIB",W
+35350010,"10 Southwest Area WIB",W
+35350015,"15 Northern Area WIB",W
+35350020,"20 Eastern Area WIB",W
+36360051,"Albany/Rensselaer/Schenectady LWIA",W
+36360151,"New York City LWIA",W
+36360302,"City of Yonkers LWIA",W
+36360451,"Chemung/Schuyler/Steuben LWIA",W
+36360602,"Hempstead/Long Beach Consortium LWIA",W
+36360651,"Jefferson/Lewis LWIA",W
+36360752,"Oyster Bay/North Hempstead/Glen Cove LWIA",W
+36360801,"Niagara County LWIA",W
+36360901,"Oneida/Herkimer/Madison LWIA",W
+36360951,"Orange County LWIA",W
+36361001,"Oswego County LWIA",W
+36361051,"Rockland County LWIA",W
+36361101,"St. Lawrence County LWIA",W
+36361151,"Saratoga/Warren/Washington LWIA",W
+36361201,"Suffolk County LWIA",W
+36361251,"Ulster County LWIA",W
+36361351,"Columbia/Greene LWIA",W
+36361401,"Sullivan County LWIA",W
+36361451,"Fulton/Montgomery/Schoharie LWIA",W
+36361501,"Clinton/Essex/Franklin/Hamilton LWIA",W
+36361551,"Chenango/Delaware/Otsego LWIA",W
+36361651,"Ontario/Seneca/Wayne/Yates LWIA",W
+36361701,"Genesee/Livingston/Orleans/Wyoming LWIA",W
+36361751,"Erie County LWIA",W
+36361851,"Onondaga County LWIA",W
+36361951,"Cayuga/Cortland LWIA",W
+36362101,"Allegany/Cattaraugus LWIA",W
+36362151,"Chautauqua County LWIA",W
+36362201,"Broome/Tioga LWIA",W
+36362251,"Tompkins County LWIA",W
+36362301,"Dutchess County LWIA",W
+36362352,"Putnam/Westchester LWIA",W
+36362401,"Monroe County LWIA",W
+37000001,"01 NE Workforce Investment Consortium WDB",W
+37000005,"05 Cape Fear SDA Job Training Consortium WDB",W
+37000007,"07 Capital Area Workforce Development WDB",W
+37000009,"09 Durham Service Delivery Area WDB",W
+37000011,"11 Centralina Workforce Development Consortium WDB",W
+37000013,"13 Charlotte/Mecklenburg WDB",W
+37000015,"15 Cumberland County Local Area WDB",W
+37000017,"17 Davidson County Local Area WDB",W
+37000019,"19 Gaston County Local Area WDB",W
+37000021,"21 Greensboro/High Point/Guilford Consortium WDB",W
+37000023,"23 Kerr-Tar Council of Governments WDB",W
+37000025,"25 Lumber River Council of Governments WDB",W
+37000027,"27 Mid-Carolina Local Area Council of Govts WDB",W
+37000029,"29 Mountain Area Service Delivery Area WDB",W
+37000031,"31 Eastern Carolina Job Training Consortium WDB",W
+37000033,"33 Northwest Piedmont Job Training Consortium WDB",W
+37000035,"35 Region C Job Training Consortium WDB",W
+37000037,"37 High Country Council of Governments WDB",W
+37000039,"39 Pee Dee Region Workforce Consortium WDB",W
+37000041,"41 Region L Job Training Consortium WDB",W
+37000043,"43 Region Q Workforce Investment Consortium WDB",W
+37000045,"45 Regional Partnership Local Area WDB",W
+37000047,"47 Southwestern Planning Commission WDB",W
+37000049,"49 Western Piedmont Job Training Consortium WDB",W
+38000001,"01 Williston WIB",W
+38000002,"02 Minot WIB",W
+38000003,"03 Devils Lake WIB",W
+38000004,"04 Grand Forks WIB",W
+38000005,"05 Fargo WIB",W
+38000006,"06 Jamestown WIB",W
+38000007,"07 Bismarck WIB",W
+38000008,"08 Dickinson WIB",W
+39000001,"Southwest Ohio",W
+39000002,"Northeast Ohio",W
+39000003,"Central Ohio",W
+39000004,"West Ohio",W
+39000005,"Southeast Ohio",W
+39000006,"Northwest Ohio",W
+40000001,"01 Northwest WIA",W
+40000002,"02 North Central WIA",W
+40000003,"03 Tulsa WIA",W
+40000004,"04 Northeast WIA",W
+40000005,"05 Southwest WIA",W
+40000006,"06 South Central WIA",W
+40000007,"07 Southern WIA",W
+40000008,"08 Southeast WIA",W
+40000009,"09 Central WIA",W
+40000010,"10 East Central WIA",W
+40000011,"11 Cleveland WIA",W
+40000012,"12 Eastern WIA",W
+41410001,"Northwest Oregon WIA",W
+41410002,"Portland Metro WIA",W
+41410003,"Clackamas WIA",W
+41410004,"Mid-Valley WIA",W
+41410005,"Lane WIA",W
+41410006,"Southwestern Oregon WIA",W
+41410007,"Rogue Valley WIA",W
+41410008,"Central Oregon/East Cascades WIA",W
+41410009,"Eastern Oregon WIA",W
+44440001,"Workforce Solutions of Providence/Cranston",W
+44440002,"Workforce Partnership of Greater Rhode Island",W
+45000010,"10 Pendleton District W",W
+45000015,"15 Greenville WIB",W
+45000020,"20 Upstate WIB",W
+45000025,"25 Upper Savannah WIB",W
+45000045,"45 Pee Dee WIB",W
+45000050,"50 Lower Savannah WIB",W
+45000060,"60 Catawba WIB",W
+45000065,"65 Santee-Lynches WIB",W
+45000085,"85 Waccamaw WIB",W
+45000095,"95 Trident WIB",W
+45000105,"05 Midlands WIB",W
+45000110,"10 Lowcountry WIB",W
+46396600,"Rapid City MSA WIB",W
+46436200,"Sioux Falls MSA WIB",W
+46460001,"Central Area WIB",W
+46460002,"East Area WIB",W
+46460003,"West Area WIB",W
+48000001,"01 Panhandle WDA",W
+48000002,"02 South Plains WDA",W
+48000003,"03 North Texas WDA",W
+48000004,"04 North Central WDA",W
+48000005,"05 Tarrant County WDA",W
+48000006,"06 Dallas WDA",W
+48000007,"07 North East WDA",W
+48000008,"08 East Texas WDA",W
+48000009,"09 West Central WDA",W
+48000010,"10 Upper Rio Grande WDA",W
+48000011,"11 Permian Basin WDA",W
+48000012,"12 Concho Valley WDA",W
+48000013,"13 Heart of Texas WDA",W
+48000014,"14 Capital Area WDA",W
+48000015,"15 Rural Capital WDA",W
+48000016,"16 Brazos Valley WDA",W
+48000017,"17 Deep East Texas WDA",W
+48000018,"18 South East Texas WDA",W
+48000019,"19 Golden Crescent WDA",W
+48000020,"20 Alamo WDA",W
+48000021,"21 South Texas WDA",W
+48000022,"22 Coastal Bend WDA",W
+48000023,"23 Lower Rio Grande WDA",W
+48000024,"24 Cameron County WDA",W
+48000025,"25 Texoma WDA",W
+48000026,"26 Central Texas WDA",W
+48000027,"27 Middle Rio Grande WDA",W
+48000028,"28 Gulf Coast WDA",W
+49490001,"01 Bear River WIB",W
+49490002,"02 Wasatch Front North WIB",W
+49490003,"03 Wasatch Front South WIB",W
+49490004,"04 Mountainland WIB",W
+49490005,"05 Uintah Basin WIB",W
+49490006,"06 Southeast WIB",W
+49490007,"07 Southwest WIB",W
+49490008,"08 Central WIB",W
+50000001,"01 Addison County Business Education WIB",W
+50000002,"02 Bennington County School and Workforce WIB",W
+50000003,"03 Bradford Area WIB",W
+50000004,"04 Central Vermont WIB",W
+50000005,"05 Connecticut River Valley WIB",W
+50000006,"06 Franklin / Grand Isle WIB",W
+50000007,"07 Lake Champlain Regional WIB",W
+50000008,"08 Lamoille Valley WIB",W
+50000009,"09 Northeast Kingdom WIB",W
+50000011,"11 Rutland Region Educational WIB",W
+50000012,"12 Upper Valley Commerce and Education WIB",W
+50000013,"13 Windham WIB",W
+50000999,"99 Unspecified WIB",W
+51000441,"Southwestern Virginia LWIA I",W
+51000442,"New River/Mt. Rogers LWIA II",W
+51000443,"Western Virginia LWIA III",W
+51000444,"Shenandoah Valley LWIA IV",W
+51000446,"Piedmont Workforce Network LWIA VI",W
+51000447,"Region 2000/Central VA LWIA VII",W
+51000448,"South Central LWIA VIII",W
+51000449,"Capital Region Workforce Partnership LWIA IX",W
+51000451,"Northern Virginia LWIA XI",W
+51000452,"Alexandria/Arlington LWIA XII",W
+51000453,"Bay Consortium LWIA XIII",W
+51000454,"Greater Peninsula LWIA XIV",W
+51000455,"Crater Area LWIA XV",W
+51000456,"Hampton Roads LWIA XVI",W
+51000457,"West Piedmont LWIA XVII",W
+53000001,"01 Olympic WIB",W
+53000002,"02 Pacific Mountain WIB",W
+53000003,"03 Northwest Washington WIB",W
+53000004,"04 Snohomish County WIB",W
+53000005,"05 Seattle/King County WIB",W
+53000006,"06 Tacoma/Pierce County WIB",W
+53000007,"07 Southwest Washington WIB",W
+53000008,"08 North Central WIB",W
+53000009,"09 Central Washington WIB",W
+53000010,"10 Eastern Washington WIB",W
+53000011,"11 Benton-Franklin WIB",W
+53000012,"12 Spokane WIB",W
+55550015,"015 Milwaukee WDA",W
+55550030,"030 Southeast WDA",W
+55550040,"040 Northwest WDA",W
+55550045,"045 Washington-Ozaukee-Waukesha WDA",W
+55550065,"065 West Central WDA",W
+55550085,"085 Western WDA",W
+55550090,"090 Fox Valley WDA",W
+55550095,"095 Bay Area WDA",W
+55550100,"100 North Central WDA",W
+55550105,"105 South Central WDA",W
+55550110,"110 Southwest WDA",W
+56000001,"01 Wyoming WIB",W

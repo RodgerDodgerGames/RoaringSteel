@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no' />
+    <style>
+    body {
+        margin: 0;
+        padding: 0;
+    }
+
+    #map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+    }
+
+    /* override leaflet tooltip defaults*/
+    div.town-tooltip {
+        background: none;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        /* and some styling as well*/
+        color: white;
+        text-shadow: 0px 0px 3px #000, -1px -1px #000, 1px 1px #000;
+    }
+    </style>
+</head>
+
+<body>
+    <div id='map'></div>
+    <link rel="stylesheet" href="leaflet/leaflet.css" />
+
+    <script src="leaflet/leaflet-src.js"></script>
+
+    <script src="https://unpkg.com/esri-leaflet@2.1.1/dist/esri-leaflet.js"></script>
+
+    <script src="https://d3js.org/d3-collection.v1.min.js"></script>
+    <script src="https://d3js.org/d3-dispatch.v1.min.js"></script>
+    <script src="https://d3js.org/d3-dsv.v1.min.js"></script>
+    <script src="https://d3js.org/d3-request.v1.min.js"></script>
+    <script src="https://d3js.org/d3-queue.v3.min.js"></script>
+
+    <!-- <script src="settings.js"></script> -->
+    <script src="cityCommodity.js"></script>
+    <script src="main.js"></script>
+</body>
+
+</html>

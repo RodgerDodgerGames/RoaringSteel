@@ -47,10 +47,10 @@ L.esri.FeatureLayer.CityCommodity = L.esri.FeatureLayer.extend({
         */
 
         // first, get the town data into lists
-        this._getTownsLayerLists();
+        // this._getTownsLayerLists();
 
         // second, compare with the census geographies
-        this._townCensusIntersect();
+        this._townCensusIntersect.call(this);
 
         // var urlParams = {
         //         key : key,
@@ -77,18 +77,44 @@ L.esri.FeatureLayer.CityCommodity = L.esri.FeatureLayer.extend({
 
     // find intersection between census geography and towns
     _townCensusIntersect : function() {
-        this._townsInter = [];
-        // loop through ansicode list
-        for (var n=0; n<this.townNames.length; n++) {
+        // TODO: figure out how to do this in one iteration rather than two
+        var keep = [];
+        // loop through town features
+        this.eachActiveFeature( function(layer) {
             // loop through census geogs
             for (var g=0; g<this._geographies.length; g++) {
-                // check for match
-                if (this._geographies[g].label.indexOf(this.townNames[n]) > -1) {
-                    this._townsInter.push(this.townNames[n]);
+                // check for correct geo level
+                if (this._geographies[g].geo_level != 'M') {
+                    continue;
+                }
+
+                // split label into city[0] and state[1]
+                var labelArray = this._geographies[g].label.split(', ');
+
+                // some towns straddle two states
+                var state;
+                if (labelArray[1].indexOf('part') > -1) {
+                    state = labelArray[1].split(' part')[0].slice(-2);
+                } else {
+                    state = labelArray[1];
+                }
+
+                // keep track of features that match
+                if (labelArray[0] == layer.feature.properties.NAME && state == layer.feature.properties.STATE) {
+                    console.log(labelArray[0], labelArray[1]);
+                    keep.push(layer.feature.properties.OBJECTID);
+                    continue;
                 }
             }
-        }
-        console.log(this._townsInter);
+        }, this);
+
+        // remove everything that doesn't match
+        this.eachFeature( function(layer) {
+            if (keep.indexOf(layer.feature.properties.OBJECTID) == -1) {
+                layer.remove();
+            }
+        });
+        console.log(keep);
     },
 
     // get town data into lists

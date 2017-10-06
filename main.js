@@ -27,7 +27,7 @@ function init() {
         map = new L.Map('map', {
             layers: [Esri_NatGeoWorldMap],
             center: new L.LatLng(46.92260021203586, -92.50556945800781),
-            zoom: 8
+            zoom: 7
         });
         // load layers
         // costLayers = loadLayers(map),
@@ -47,12 +47,12 @@ function init() {
             className: 'town-tooltip'
         },
         townFields = [
-            "ANSICODE",
+            // "ANSICODE",
             "COUNTY",
             "COUNTYFIPS",
             "FEATURE",
             "FEATURE2",
-            "GNIS_ID",
+            // "GNIS_ID",
             // "LATITUDE",
             // "LONGITUDE",
             "NAME",
@@ -163,8 +163,7 @@ function init() {
             //     }, townTooltipOptions);
             // },
         })
-            .addTo(map)
-            .on('load');
+            .addTo(map);
 
         // land cover raster
         // var landCover = L.esri.dynamicMapLayer({

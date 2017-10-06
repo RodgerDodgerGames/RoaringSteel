@@ -1,6 +1,6 @@
 // cityCommodity.js
 
-L.esri.FeatureLayer.CityCommodity = L.esri.FeatureLayer.extend({
+L.GeoJSON.CityCommodity = L.GeoJSON.extend({
 
     // initialize city commodities
     initialize : function(options) {
@@ -24,15 +24,16 @@ L.esri.FeatureLayer.CityCommodity = L.esri.FeatureLayer.extend({
             .defer(d3.csv, this._geographyListingURL)
             .awaitAll(this._censusTableUploadHandler.bind(this));
 
-        L.esri.FeatureLayer.prototype.initialize.call(this, options);
+        L.GeoJSON.prototype.initialize.call(this, options);
     },
 
     onAdd: function(map) {
-        L.esri.FeatureLayer.prototype.onAdd.call(this, map)
+        L.GeoJSON.prototype.onAdd.call(this, map);
+        // this._restOfInit();
     },
 
     onRemove: function(map) {
-        L.esri.FeatureLayer.prototype.onRemove.call(this, map)
+        L.GeoJSON.prototype.onRemove.call(this, map)
     },
 
     _restOfInit : function() {
@@ -76,11 +77,15 @@ L.esri.FeatureLayer.CityCommodity = L.esri.FeatureLayer.extend({
     },
 
     // find intersection between census geography and towns
+    // essentially, cull town layer down to those that we can find
+    // industry data for
+    // initially just use those towns listed (with geo_level=M)
+    // later on consider including county seats if the towns are too sparse
     _townCensusIntersect : function() {
         // TODO: figure out how to do this in one iteration rather than two
         var keep = [];
         // loop through town features
-        this.eachActiveFeature( function(layer) {
+        this.eachLayer( function(layer) {
             // loop through census geogs
             for (var g=0; g<this._geographies.length; g++) {
                 // check for correct geo level
@@ -109,12 +114,62 @@ L.esri.FeatureLayer.CityCommodity = L.esri.FeatureLayer.extend({
         }, this);
 
         // remove everything that doesn't match
-        this.eachFeature( function(layer) {
+        this.eachLayer( function(layer) {
             if (keep.indexOf(layer.feature.properties.OBJECTID) == -1) {
-                layer.remove();
+                this.removeLayer(layer);
             }
+        }, this);
+
+        // put towns into categories
+        this._categorizeTowns();
+    },
+
+    // put towns into categories: small, medium, large
+    // initially based on population
+    // but ensure even distribution
+    //  - this is more important for large and medium towns
+    _categorizeTowns: function() {
+        // reduce towns to array of ID and population
+        var popArray = [];
+        this.eachLayer( function(layer) {
+            popArray.push([
+                layer.feature.properties.OBJECTID,
+                layer.feature.properties.POP_2010]);
         });
-        console.log(keep);
+
+        // use d3 quantiles to categorize towns by population
+        var quantiles = d3.scaleQuantile();
+        quantiles
+            .domain( popArray.map( function(d) { return d[1] }))
+            .range(['small', 'medium', 'large']);
+
+        console.log('quantiles', quantiles.quantiles());
+        console.log('popArray', popArray);
+
+        // now display towns again with icon based on category
+        // this._showTowns();
+    },
+
+    _showTowns: function() {
+        // towns icon
+        var townIcon = L.icon({
+                        iconUrl: 'town.png',
+                        iconSize: [36, 36],
+                        iconAnchor: [18, 18],
+                        // popupAnchor: [0, -11],
+                    }),
+        townTooltipOptions = {
+            direction: 'center',
+            offset: L.point(18,18),
+            permanent: true,
+            className: 'town-tooltip'
+        };
+        this.eachLayer( function(layer) {
+            layer.setOpacity(1);
+        })
+        .bindTooltip( function(layer) {
+            return layer.feature.properties['NAME'];
+        }, townTooltipOptions);
     },
 
     // get town data into lists
@@ -123,7 +178,7 @@ L.esri.FeatureLayer.CityCommodity = L.esri.FeatureLayer.extend({
         this._townCounties = [];
         this._townStates = [];
         // first get list of ansicodes, counties, and states
-        townsLayer.eachActiveFeature( function(layer) {
+        townsLayer.eachLayer( function(layer) {
             this.townNames.push(layer.feature.properties.NAME);
             this._townCounties.push(layer.feature.properties.COUNTYFIPS);
             this._townStates.push(layer.feature.properties.STATE_FIPS);
@@ -140,12 +195,16 @@ L.esri.FeatureLayer.CityCommodity = L.esri.FeatureLayer.extend({
 
         // once we have the tables
         // wait for the layer to load and then run the rest of the init
-        this.on('load', this._restOfInit);
+        if (map.hasLayer(this)) {
+            this._restOfInit();
+        } else {
+            this.on('add', this._restOfInit);
+        }
     }
 
 });
 
 // factory
-L.esri.featureLayer.cityCommodity = function(options) {
-    return new L.esri.FeatureLayer.CityCommodity(options);
+L.geoJSON.cityCommodity = function(options) {
+    return new L.GeoJSON.CityCommodity(options);
 };

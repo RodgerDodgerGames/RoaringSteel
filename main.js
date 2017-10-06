@@ -27,25 +27,13 @@ function init() {
         map = new L.Map('map', {
             layers: [Esri_NatGeoWorldMap],
             center: new L.LatLng(46.92260021203586, -92.50556945800781),
-            zoom: 7
+            zoom: 6
         });
         // load layers
         // costLayers = loadLayers(map),
 
         // load towns layer
-        // towns icon
-        var townIcon = L.icon({
-                        iconUrl: 'town.png',
-                        iconSize: [36, 36],
-                        iconAnchor: [18, 18],
-                        // popupAnchor: [0, -11],
-                    }),
-        townTooltipOptions = {
-            direction: 'center',
-            offset: L.point(18,18),
-            permanent: true,
-            className: 'town-tooltip'
-        },
+
         townFields = [
             // "ANSICODE",
             "COUNTY",
@@ -60,23 +48,51 @@ function init() {
             "POP_2010",
             "STATE",
             "STATE_FIPS"
-        ];
+        ],
 
-
+// https://maps.bts.dot.gov/services/rest/services/NTAD/Populated_Places/MapServer/0/query?returnGeometry=true&where=1%3D1&outSr=4326&outFields=COUNTY%2CCOUNTYFIPS%2CFEATURE%2CFEATURE2%2CNAME%2COBJECTID%2CPOP_2010%2CSTATE%2CSTATE_FIPS&inSr=4326&geometry=%7B%22xmin%22%3A-101.25%2C%22ymin%22%3A48.922499263758255%2C%22xmax%22%3A-90%2C%22ymax%22%3A55.7765730186677%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&geometryPrecision=1&f=geojson
         // towns feature layer
-        townsLayer = new L.esri.featureLayer.cityCommodity({
-            url: 'https://maps.bts.dot.gov/services/rest/services/NTAD/Populated_Places/MapServer/0',
-            fields: townFields,
-            useCors: false,
-            // pointToLayer: function(geojson, latlng) {
-            //     return L.marker(latlng, {
-            //         icon: townIcon
-            //     }).bindTooltip( function(layer) {
-            //         return layer.feature.properties['NAME'];
-            //     }, townTooltipOptions);
-            // },
+
+        // load towns as snapshot
+        // ref: https://esri.github.io/esri-leaflet/examples/feature-layer-snapshot.html
+        // grab the towns within the map bounds
+        townsURL = 'https://maps.bts.dot.gov/services/rest/services/NTAD/Populated_Places/MapServer/0';
+        L.esri.query({
+          url: townsURL,
+          useCors: false
         })
-            .addTo(map);
+            .within(map.getBounds())
+            .fields(townFields)
+            .precision(2)
+            .run(function(error, townFeatures){
+                townsLayer = L.geoJSON.cityCommodity(townFeatures, {
+                    pointToLayer: function(geojson, latlng) {
+                        return L.marker(latlng, {
+                            opacity: 0
+                        });
+                    }
+                })
+                .addTo(map);
+            });
+        // townsLayer = new L.esri.featureLayer.cityCommodity({
+        //     url: 'https://maps.bts.dot.gov/services/rest/services/NTAD/Populated_Places/MapServer/0',
+        //     fields: townFields,
+        //     useCors: false,
+        //     precision: 1,
+        //     pointToLayer: function(geojson, latlng) {
+        //         return L.marker(latlng, {
+        //             opacity: 0
+        //         });
+        //     },
+        //     // pointToLayer: function(geojson, latlng) {
+        //     //     return L.marker(latlng, {
+        //     //         icon: townIcon
+        //     //     }).bindTooltip( function(layer) {
+        //     //         return layer.feature.properties['NAME'];
+        //     //     }, townTooltipOptions);
+        //     // },
+        // })
+        //     .addTo(map);
             // .on('load', function() {
             //     // initialize city commodities
             //     cities = new cityCommodity();

@@ -64,7 +64,7 @@ function init() {
 
 
         // towns feature layer
-        townsLayer = L.esri.featureLayer({
+        townsLayer = new L.esri.featureLayer.cityCommodity({
             url: 'https://maps.bts.dot.gov/services/rest/services/NTAD/Populated_Places/MapServer/0',
             fields: townFields,
             useCors: false,
@@ -76,11 +76,11 @@ function init() {
             //     }, townTooltipOptions);
             // },
         })
-            .addTo(map)
-            .on('load', function() {
-                // initialize city commodities
-                cities = new cityCommodity();
-            });
+            .addTo(map);
+            // .on('load', function() {
+            //     // initialize city commodities
+            //     cities = new cityCommodity();
+            // });
 
 
         // add virtual grid layer
@@ -181,4 +181,3 @@ function init() {
 
     }
 }
-

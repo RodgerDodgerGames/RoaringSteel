@@ -1,11 +1,9 @@
 // cityCommodity.js
 
-var CityCommodity = L.Class.extend({
-
-
+L.esri.FeatureLayer.CityCommodity = L.esri.FeatureLayer.extend({
 
     // initialize city commodities
-    initialize : function() {
+    initialize : function(options) {
 
         // census tables to assist with employment queries
         this._industries = [];
@@ -26,7 +24,15 @@ var CityCommodity = L.Class.extend({
             .defer(d3.csv, this._geographyListingURL)
             .awaitAll(this._censusTableUploadHandler.bind(this));
 
+        L.esri.FeatureLayer.prototype.initialize.call(this, options);
+    },
 
+    onAdd: function(map) {
+        L.esri.FeatureLayer.prototype.onAdd.call(this, map)
+    },
+
+    onRemove: function(map) {
+        L.esri.FeatureLayer.prototype.onRemove.call(this, map)
     },
 
     _restOfInit : function() {
@@ -106,13 +112,14 @@ var CityCommodity = L.Class.extend({
         this._industries = results[0];
         this._geographies = results[1];
 
-        // once we have the tables run the rest of init
-        this._restOfInit();
+        // once we have the tables
+        // wait for the layer to load and then run the rest of the init
+        this.on('load', this._restOfInit);
     }
 
 });
 
 // factory
-function cityCommodity() {
-    return new CityCommodity();
-}
+L.esri.featureLayer.cityCommodity = function(options) {
+    return new L.esri.FeatureLayer.CityCommodity(options);
+};

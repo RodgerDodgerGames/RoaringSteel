@@ -17,63 +17,62 @@ function init() {
         //     ext: 'png'
         // }),
 
+        // load towns layer
+        var loadTownLayer = function(evt) {
+            var townFields = [
+                // "ANSICODE",
+                "COUNTY",
+                "COUNTYFIPS",
+                // "FEATURE",
+                // "FEATURE2",
+                // "GNIS_ID",
+                // "LATITUDE",
+                // "LONGITUDE",
+                "NAME",
+                "OBJECTID",
+                "POP_2010",
+                "STATE",
+                "STATE_FIPS"
+            ],
+
+            // load towns as snapshot
+            // ref: https://esri.github.io/esri-leaflet/examples/feature-layer-snapshot.html
+            // grab the towns within the map bounds
+            townsURL = 'https://maps.bts.dot.gov/services/rest/services/NTAD/Populated_Places/MapServer/0';
+            L.esri.query({
+              url: townsURL,
+              useCors: false
+            })
+                .within(evt.target.getBounds())
+                .fields(townFields)
+                .precision(2)
+                .run(function(error, townFeatures){
+                    townsLayer = L.geoJSON.cityCommodity(townFeatures, {
+                        pointToLayer: function(geojson, latlng) {
+                            return L.marker(latlng, {
+                                opacity: 0
+                            });
+                        }
+                    })
+                    .addTo(evt.target);
+                });
+        };
+
+        map = new L.Map('map')
+            .on('load', loadTownLayer)
+            .setView([38.487994609214795, -107.22656250000001], 7);
+
+
         var Esri_NatGeoWorldMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}', {
             attribution: 'Tiles &copy; Esri &mdash; National Geographic, Esri, DeLorme, NAVTEQ, UNEP-WCMC, USGS, NASA, ESA, METI, NRCAN, GEBCO, NOAA, iPC',
             maxZoom: 16
-        });
+        }).addTo(map);
 
 
 
-        map = new L.Map('map', {
-            layers: [Esri_NatGeoWorldMap],
-            center: new L.LatLng(46.92260021203586, -92.50556945800781),
-            zoom: 6
-        });
         // load layers
         // costLayers = loadLayers(map),
 
-        // load towns layer
-
-        townFields = [
-            // "ANSICODE",
-            "COUNTY",
-            "COUNTYFIPS",
-            "FEATURE",
-            "FEATURE2",
-            // "GNIS_ID",
-            // "LATITUDE",
-            // "LONGITUDE",
-            "NAME",
-            "OBJECTID",
-            "POP_2010",
-            "STATE",
-            "STATE_FIPS"
-        ],
-
-// https://maps.bts.dot.gov/services/rest/services/NTAD/Populated_Places/MapServer/0/query?returnGeometry=true&where=1%3D1&outSr=4326&outFields=COUNTY%2CCOUNTYFIPS%2CFEATURE%2CFEATURE2%2CNAME%2COBJECTID%2CPOP_2010%2CSTATE%2CSTATE_FIPS&inSr=4326&geometry=%7B%22xmin%22%3A-101.25%2C%22ymin%22%3A48.922499263758255%2C%22xmax%22%3A-90%2C%22ymax%22%3A55.7765730186677%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&geometryPrecision=1&f=geojson
-        // towns feature layer
-
-        // load towns as snapshot
-        // ref: https://esri.github.io/esri-leaflet/examples/feature-layer-snapshot.html
-        // grab the towns within the map bounds
-        townsURL = 'https://maps.bts.dot.gov/services/rest/services/NTAD/Populated_Places/MapServer/0';
-        L.esri.query({
-          url: townsURL,
-          useCors: false
-        })
-            .within(map.getBounds())
-            .fields(townFields)
-            .precision(2)
-            .run(function(error, townFeatures){
-                townsLayer = L.geoJSON.cityCommodity(townFeatures, {
-                    pointToLayer: function(geojson, latlng) {
-                        return L.marker(latlng, {
-                            opacity: 0
-                        });
-                    }
-                })
-                .addTo(map);
-            });
         // townsLayer = new L.esri.featureLayer.cityCommodity({
         //     url: 'https://maps.bts.dot.gov/services/rest/services/NTAD/Populated_Places/MapServer/0',
         //     fields: townFields,

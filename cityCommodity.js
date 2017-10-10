@@ -104,9 +104,13 @@ L.GeoJSON.CityCommodity = L.GeoJSON.extend({
                     state = labelArray[1];
                 }
 
+                if (layer.feature.properties.NAME == 'Duluth') {
+                    console.log(layer, labelArray[0], state);
+                }
+
                 // keep track of features that match
                 if (labelArray[0] == layer.feature.properties.NAME && state == layer.feature.properties.STATE) {
-                    console.log(labelArray[0], labelArray[1]);
+                    // console.log(labelArray[0], labelArray[1]);
                     keep.push(layer.feature.properties.OBJECTID);
                     continue;
                 }
@@ -133,43 +137,70 @@ L.GeoJSON.CityCommodity = L.GeoJSON.extend({
         var popArray = [];
         this.eachLayer( function(layer) {
             popArray.push([
-                layer.feature.properties.OBJECTID,
                 layer.feature.properties.POP_2010]);
         });
 
-        // use d3 quantiles to categorize towns by population
-        var quantiles = d3.scaleQuantile();
-        quantiles
-            .domain( popArray.map( function(d) { return d[1] }))
-            .range(['small', 'medium', 'large']);
+        // assign category to towns
+        // run through d3.quantiles
+        // small < 0.75 > medium < 0.9 > large
+        this.eachLayer( function(layer) {
+            var pop = layer.feature.properties.POP_2010;
 
-        console.log('quantiles', quantiles.quantiles());
-        console.log('popArray', popArray);
+            // small
+            if (pop < d3.quantile(popArray, 0.75)) {
+                layer._category = 'small';
+            }
+
+            // medium
+            else if (pop >= d3.quantile(popArray, 0.75) && pop < d3.quantile(popArray, 0.9)) {
+                layer._category = 'medium';
+            }
+
+            // large
+            else {
+                layer._category = 'large';
+            }
+        });
+
+
 
         // now display towns again with icon based on category
-        // this._showTowns();
+        this._showTowns(popArray);
     },
 
-    _showTowns: function() {
-        // towns icon
-        var townIcon = L.icon({
-                        iconUrl: 'town.png',
-                        iconSize: [36, 36],
-                        iconAnchor: [18, 18],
-                        // popupAnchor: [0, -11],
-                    }),
-        townTooltipOptions = {
-            direction: 'center',
-            offset: L.point(18,18),
-            permanent: true,
-            className: 'town-tooltip'
-        };
+    _showTowns: function(popArray) {
+
         this.eachLayer( function(layer) {
-            layer.setOpacity(1);
+            var townTooltipOptions = {
+                direction: 'center',
+                offset: L.point(18,18),
+                permanent: true,
+                className: 'town-tooltip'
+            };
+
+
+            // TODO: create and assign icons based on category
+            // small, medium, large
+            var iconSize = {
+                'small' : 12,
+                'medium' : 24,
+                'large' : 36
+                }[layer._category],
+                // towns icon
+                townIcon = L.icon({
+                    iconUrl: 'town.png',
+                    iconSize: [iconSize, iconSize],
+                    iconAnchor: [iconSize/2, iconSize/2],
+                    // popupAnchor: [0, -11],
+                });
+            layer
+                .setIcon(townIcon)
+                .bindTooltip( function(layer) {
+                    return layer.feature.properties['NAME'];
+                }, townTooltipOptions)
+                .openTooltip()
+                .setOpacity(1);
         })
-        .bindTooltip( function(layer) {
-            return layer.feature.properties['NAME'];
-        }, townTooltipOptions);
     },
 
     // get town data into lists

@@ -47,32 +47,32 @@ L.GeoJSON.CityCommodity = L.GeoJSON.extend({
         within the county
         */
 
-        // first, get the town data into lists
-        // this._getTownsLayerLists();
-
-        // second, compare with the census geographies
+        // compare with the census geographies
         this._townCensusIntersect.call(this);
 
-        // var urlParams = {
-        //         key : key,
-        //         get : "EmpTotal,industry",
-        //         for : "county:003",
-        //         in : "state:27",
-        //         time : "2016",
-        //         industry : "0000"
-        //     },
-        //     url = baseurl + L.Util.getParamString(urlParams);
+        /*
+        Next, we need to find the top industries for our culled list of towns.
+        We call this here since it may take a while to run and return all
+        these requests.
+        Top industries are determined based on employment counts and earnings.
+        Record the top three for each town since we may need to go to backups; we want to avoid a situation where there is a clump of towns that all supply the same thing.
+        called with this._assignIndustry
+        */
 
-        // var url = "http://api.census.gov/data/timeseries/qwi/sa?get=year&for=state:27&time=2010&key=36628d51ad86d97e94ecd9677ce9e0bd46a3e8f3";
-        // var url = "https://api.census.gov/data/timeseries/qwi/sa?get=year,agegrp,quarter&for=county:195&in=state:02&time=2010-Q1";
-        // console.log(url);
-        // d3.json(url)
-        //     .get(getQWIHandler);
+        /*
+        Concurrently, we can categorize the towns.
+        This is based on their population.
+        Categorize them into small, medium, and large.
+        Use d3.quantiles as such small < 0.75 > medium < 0.9 > large
+        called with this._categorizeTowns
+        */
 
-        function getQWIHandler(error, results) {
-            if (error) throw error;
-            console.log(results);
-        }
+        /*
+        Then, show the town layer.
+        Symbolize based on category size.
+        called with this._showTowns
+        */
+
 
     },
 
@@ -111,6 +111,8 @@ L.GeoJSON.CityCommodity = L.GeoJSON.extend({
                 // keep track of features that match
                 if (labelArray[0] == layer.feature.properties.NAME && state == layer.feature.properties.STATE) {
                     // console.log(labelArray[0], labelArray[1]);
+                    // add geography code
+                    layer._censusGeographyCode = this._geographies[g].geography;
                     keep.push(layer.feature.properties.OBJECTID);
                     continue;
                 }
@@ -162,14 +164,70 @@ L.GeoJSON.CityCommodity = L.GeoJSON.extend({
             }
         });
 
-
+        // assign industries to towns
+        this._assignIndustry();
 
         // now display towns again with icon based on category
         this._showTowns(popArray);
     },
 
-    _showTowns: function(popArray) {
+    // assign industry to town
+    _assignIndustry: function() {
+        var industryList = _setIndustryList();
 
+        // loop through layers and find top industries
+        this.eachLayer( function(layer) {
+            var urlParams = {
+                    key : this._key,
+                    get : "EmpS,EarnBeg",
+                    for : _getFor(layer),
+                    in : _getIn(layer),
+                    time : "2016"
+                },
+                url = this._baseurl + L.Util.getParamString(urlParams) + industryList;
+
+            // var url = "http://api.census.gov/data/timeseries/qwi/sa?get=year&for=state:27&time=2010&key=36628d51ad86d97e94ecd9677ce9e0bd46a3e8f3";
+            // var url = "https://api.census.gov/data/timeseries/qwi/sa?get=year,agegrp,quarter&for=county:195&in=state:02&time=2010-Q1";
+            console.log(url);
+            d3.json(url)
+                .get(_getQWIHandler);
+
+            function _getQWIHandler(error, results) {
+                if (error) throw error;
+                console.log(results);
+            }
+
+            // set "for" value for request
+            function _getFor(layer) {
+                return "metropolitan+statistical+area/micropolitan+statistical+area:" + layer._censusGeographyCode;
+            }
+
+            // set "in" value for request
+            function _getIn(layer) {
+                return "state:" + layer.feature.properties.STATE_FIPS;
+            }
+
+            // set industry list for requests
+            function _setIndustryList() {
+                var indString = "&",
+                    template = "industry=%ind%&";
+                // loop through industries
+                for (var i=0; i<this._industries; i++) {
+                    // add to list if it's a four number industry
+                    // (ie. most specific)
+                    if (this._industries[i].industry.length == 4) {
+                        indString += template.replace('%ind%', this._industries[i].industry);
+                    }
+                }
+                // return string, but remove last "&"" beforehand
+                return indString.slice(0,-1);
+            }
+        });
+
+    },
+
+    // show town icons once all data has been added to layer
+    _showTowns: function(popArray) {
         this.eachLayer( function(layer) {
             var townTooltipOptions = {
                 direction: 'center',
@@ -182,8 +240,8 @@ L.GeoJSON.CityCommodity = L.GeoJSON.extend({
             // TODO: create and assign icons based on category
             // small, medium, large
             var iconSize = {
-                'small' : 12,
-                'medium' : 24,
+                'small' : 18,
+                'medium' : 26,
                 'large' : 36
                 }[layer._category],
                 // towns icon

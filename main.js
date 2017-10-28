@@ -19,43 +19,44 @@ function init() {
 
         // load towns layer
         var loadTownLayer = function(evt) {
-            var townFields = [
-                // "ANSICODE",
-                "COUNTY",
-                "COUNTYFIPS",
-                // "FEATURE",
-                // "FEATURE2",
-                // "GNIS_ID",
-                // "LATITUDE",
-                // "LONGITUDE",
-                "NAME",
-                "OBJECTID",
-                "POP_2010",
-                "STATE",
-                "STATE_FIPS"
-            ],
+            // var townFields = [
+            //     // "ANSICODE",
+            //     "COUNTY",
+            //     "COUNTYFIPS",
+            //     // "FEATURE",
+            //     // "FEATURE2",
+            //     // "GNIS_ID",
+            //     // "LATITUDE",
+            //     // "LONGITUDE",
+            //     "NAME",
+            //     "OBJECTID",
+            //     "POP_2010",
+            //     "STATE",
+            //     "STATE_FIPS"
+            // ],
 
-            // load towns as snapshot
-            // ref: https://esri.github.io/esri-leaflet/examples/feature-layer-snapshot.html
-            // grab the towns within the map bounds
-            townsURL = 'https://maps.bts.dot.gov/services/rest/services/NTAD/Populated_Places/MapServer/0';
-            L.esri.query({
-              url: townsURL,
-              useCors: false
-            })
-                .within(evt.target.getBounds())
-                .fields(townFields)
-                .precision(2)
-                .run(function(error, townFeatures){
-                    townsLayer = L.geoJSON.cityCommodity(townFeatures, {
-                        pointToLayer: function(geojson, latlng) {
-                            return L.marker(latlng, {
-                                opacity: 0
-                            });
-                        }
-                    })
-                    .addTo(evt.target);
-                });
+            // // load towns as snapshot
+            // // ref: https://esri.github.io/esri-leaflet/examples/feature-layer-snapshot.html
+            // // grab the towns within the map bounds
+            // townsURL = 'https://maps.bts.dot.gov/services/rest/services/NTAD/Populated_Places/MapServer/0';
+            // L.esri.query({
+            //   url: townsURL,
+            //   useCors: false
+            // })
+            //     .within(evt.target.getBounds())
+            //     .fields(townFields)
+            //     .precision(2)
+            //     .run(function(error, townFeatures){
+            //         townsLayer = L.geoJSON.cityCommodity(townFeatures, {
+            //             pointToLayer: function(geojson, latlng) {
+            //                 return L.marker(latlng, {
+            //                     opacity: 0
+            //                 });
+            //             }
+            //         })
+            //         .addTo(evt.target);
+            //     });
+            var cityData = new L.cityCommodity();
         };
 
         map = new L.Map('map')

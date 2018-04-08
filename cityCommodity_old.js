@@ -32,7 +32,6 @@ L.CityCommodity = L.Class.extend({
     },
 
     _restOfInit : function() {
-        console.log('starting rest of init');
 
         /*
         Essentially, we are trying to create a list of towns that intersect
@@ -134,15 +133,8 @@ L.CityCommodity = L.Class.extend({
         // 1. get place
         // 2. get total industry
         // 3. get top three industries
-        d3.queue()
-            // get industry
-            .defer(this._getIndustry, k, ['00'])
-            .await(this._getIndustryHandler)
-        // .defer(this._getTotalIndustry, k)
-
-
-        // var tot = this._getTotalIndustry(k, this._getTotalIndustryHandler);
-        // console.log(tot);
+        var tot = this._getTotalIndustry(k, this._getTotalIndustryHandler);
+        console.log(tot);
 
     },
 
@@ -150,10 +142,6 @@ L.CityCommodity = L.Class.extend({
     _getTotalIndustry : function(town) {
         console.log('total industry for', town.NAME);
         return this._getIndustry(town, ['00'], this._getTotalIndustryHandler);
-    },
-
-    _getIndustryHandler : function(results) {
-        console.log('_getIndustryHandler', results);
     },
 
 
@@ -168,17 +156,11 @@ L.CityCommodity = L.Class.extend({
     // send request for pop place from each QWI geography
     // later on consider including county seats if the towns are too sparse
     _townCensusIntersect : function() {
-        console.log('starting town census intersect');
-
-        var q = d3.queue();
 
         // loop through census geogs
         for (var g=0; g<this._geographies.length; g++) {
 
-            // some logical logging
-            if ((this._geographies.length*0.1) % g == 0) {
-                console.log((g/this._geographies.length)*100 + '% complete');
-            }
+            // console.log('Working on', this._geographies[g].label, '...');
 
             // state fips is first two digits of geography
             var state = this._geographies[g].geography.slice(0,2);
@@ -375,12 +357,10 @@ L.CityCommodity = L.Class.extend({
 
         // first result is industry
         this._industries = results[0];
-        console.log('got industry list', this._industries.length);
         // this._geographies = results[1];
 
         // filter geographies down to micro/metro stat areas
         this._geographies = _filterGeographies(results[1]);
-        console.log('got geography list', this._geographies.length);
 
         // once we have the tables
         // wait for the layer to load and then run the rest of the init

@@ -1,46 +1,64 @@
 // cityCommodity.js
 
-L.CityCommodity = L.Class.extend({
+L.CityCommodity = L.FeatureGroup.extend({
+
+    // set options
+    // maybe move this somewhere else later
+    options : {
+        townTooltipOptions : {
+            direction: 'center',
+            offset: L.point(18,18),
+            permanent: true,
+            className: 'town-tooltip'
+        },
+        markerOptions : {
+            riseOnHover : true
+        },
+        townData : undefined
+    },
 
     // initialize city commodities
-    initialize : function(townData, options) {
+    initialize : function(options) {
 
-        // set options
-        // maybe move this somewhere else later
-        this.options = {
-            townTooltipOptions : {
-                direction: 'center',
-                offset: L.point(18,18),
-                permanent: true,
-                className: 'town-tooltip'
-            },
-            markerOptions : {
-                riseOnHover : true
-            }
-        };
-
-        // get towns data
-        this._allTowns = townData;
-
-        // 1. create town layer
-        this.townLayer = this._createTownLayer();
+        // initialize options
+        L.setOptions(this, options);
 
 
+        L.FeatureGroup.prototype.initialize.call(this, options);
+    },
+
+// Adding parent functions
+    onAdd: function(map) {
+        L.FeatureGroup.prototype.onAdd.call(this, map);
+    },
+
+    onRemove: function(map) {
+        L.FeatureGroup.prototype.onRemove.call(this, map);
+    },
+
+    addLayer: function (layer) {
+        L.LayerGroup.prototype.addLayer.call(this, layer);
+    },
+
+    removeLayer: function (layer) {
+        L.LayerGroup.prototype.removeLayer.call(this, layer);
     },
 
     _createTownLayer : function() {
 
-        // 1. create town feature group
-        var townLayer = _createFeatureGroup();
+        // 1. add markers to feature group
+        _createFeatureGroup.call(this);
 
         // 2. classify towns
-        _classifyTowns();
+        _classifyTowns.call(this);
 
         // 3. configure layer
-        _configureTownLayer();
+        _configureTownLayer.call(this);
 
+
+        // add layers that intersect the map to feature group
         function _createFeatureGroup() {
-            var featureGroup = new L.featureGroup();
+            // var featureGroup = new L.featureGroup();
 
             // Loop over all towns and create marker for those that are within
             // the map bounds
@@ -49,75 +67,89 @@ L.CityCommodity = L.Class.extend({
                 var tempLatLng = L.latLng(this._allTowns[i]['LATITUDE'], this._allTowns[i]['LONGITUDE']);
                 // check if within map bounds
                 if (map.getBounds().contains(tempLatLng)) {
-                    featureGroup.addLayer(L.marker(tempLatLng), this.options.markerOptions);
+                    console.log(this._allTowns[i].NAME, this._allTowns[i].STATE_FIPS, tempLatLng);
+                    var marker = L.marker(tempLatLng, this.options.markerOptions);
+                    marker.properties = this._allTowns[i];
+                    console.log(marker);
+                    this.addLayer(marker);
                 }
             }
-            return featureGroup;
         }
 
-        // 2. Configure layer
-        featureGroup.eachLayer( function(layer) {
+        function _classifyTowns() {
+            // reduce towns to array of total employment and population
+            var popArray = this.getLayers().map( function(layer) {
+                return parseFloat(layer.properties.POP_2010) +
+                    layer.properties.industry.total;
+            });
+            // sort array smallest to largest for use with d3.quantile
+            popArray = popArray.sort(d3.ascending);
 
-            // TODO: create and assign icons based on category
-            // small, medium, large
-            var iconSize = {
-                'small' : 18,
-                'medium' : 26,
-                'large' : 36
-                }[layer._category],
-                // towns icon
-                townIcon = L.icon({
+            // assign category to towns
+            // run through d3.quantiles
+            // small < 0.75 > medium < 0.9 > large
+            this.eachLayer( function(layer) {
+                var popEmp = parseFloat(layer.properties.POP_2010) +
+                    layer.properties.industry.total;
+
+                // small
+                if (popEmp < d3.quantile(popArray, 0.75)) {
+                    layer._category = 'small';
+                }
+
+                // medium
+                else if (popEmp >= d3.quantile(popArray, 0.75) && popEmp < d3.quantile(popArray, 0.9)) {
+                    layer._category = 'medium';
+                }
+
+                // large
+                else {
+                    layer._category = 'large';
+                }
+            });
+
+            //TODO -  now make sure they have a roughly even distribution
+
+        }
+
+
+        // 2. Configure layer
+        function _configureTownLayer() {
+            var townTooltipOptions = this.options.townTooltipOptions;
+            this.eachLayer( function(layer) {
+
+                // small, medium, large
+                var iconSize = {
+                    'small' : 16,
+                    'medium' : 24,
+                    'large' : 30
+                    }[layer._category];
+                    // towns icon
+                var townIcon = L.icon({
                     iconUrl: 'town.png',
                     iconSize: [iconSize, iconSize],
                     iconAnchor: [iconSize/2, iconSize/2],
                     // popupAnchor: [0, -11],
                 });
-            layer
-                .setIcon(townIcon)
-                .bindTooltip( function(layer) {
-                    return layer.feature.properties['NAME'];
-                }, townTooltipOptions)
-                .openTooltip()
-                .setOpacity(1);
-        })
-    },
-
-    _classifyTowns : function() {
-        // classify towns into small, medium, or large
-        // first run based on population/employment
-        // then proximity
-        // reduce towns to array of ID and population
-        var popArray = [];
-        this.eachLayer( function(layer) {
-            popArray.push([
-                layer.feature.properties.POP_2010]);
-        });
-
-        // assign category to towns
-        // run through d3.quantiles
-        // small < 0.75 > medium < 0.9 > large
-        this.eachLayer( function(layer) {
-            var pop = layer.feature.properties.POP_2010;
-
-            // small
-            if (pop < d3.quantile(popArray, 0.75)) {
-                layer._category = 'small';
-            }
-
-            // medium
-            else if (pop >= d3.quantile(popArray, 0.75) && pop < d3.quantile(popArray, 0.9)) {
-                layer._category = 'medium';
-            }
-
-            // large
-            else {
-                layer._category = 'large';
-            }
-        });
-
-        // now display towns again with icon based on category
-        this._showTowns(popArray);
+                layer
+                    .setIcon(townIcon)
+                    .bindTooltip(function(layer) {
+                        return layer.properties['NAME'];
+                    }, townTooltipOptions)
+                    .openTooltip()
+                    .setOpacity(1);
+            });
+        }
     }
+
+});
+
+L.FeatureGroup.addInitHook(function() {
+    // get towns data
+    this._allTowns = this.options.townData;
+
+    // 1. create town layer
+    this._createTownLayer();
 
 });
 

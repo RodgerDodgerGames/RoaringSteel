@@ -56,10 +56,10 @@ function init() {
             //         })
             //         .addTo(evt.target);
             //     });
-            var townLayer;
             d3.json('towns.json', function(error, json) {
                 if (error) throw error;
-                townLayer = new L.cityCommodity(json);
+                townsLayer = new L.cityCommodity({townData: json});
+                townsLayer.addTo(map);
             });
 
         };

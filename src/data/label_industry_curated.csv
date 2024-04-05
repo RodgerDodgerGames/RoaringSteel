@@ -1,0 +1,98 @@
+industry,label,ind_level
+1111,"Oilseed and Grain Farming",4
+1112,"Vegetable and Melon Farming",4
+1113,"Fruit and Tree Nut Farming",4
+1114,"Greenhouse, Nursery, and Floriculture Production",4
+1121,"Cattle Ranching and Farming",4
+1122,"Hog and Pig Farming",4
+1123,"Poultry and Egg Production",4
+1124,"Sheep and Goat Farming",4
+113,"Forestry and Logging",3
+114,"Fishing, Hunting and Trapping",3
+211,"Oil and Gas Extraction",3
+2121,"Coal Mining",4
+2122,"Metal Ore Mining",4
+2123,"Nonmetallic Mineral Mining and Quarrying",4
+23,"Construction",S
+3111,"Animal Food Manufacturing",4
+3112,"Grain and Oilseed Milling",4
+3113,"Sugar and Confectionery Product Manufacturing",4
+3114,"Fruit and Vegetable Preserving and Specialty Food Manufacturing",4
+3115,"Dairy Product Manufacturing",4
+3116,"Animal Slaughtering and Processing",4
+3117,"Seafood Product Preparation and Packaging",4
+3118,"Bakeries and Tortilla Manufacturing",4
+3121,"Beverage Manufacturing",4
+3122,"Tobacco Manufacturing",4
+313,"Textile Mills",3
+314,"Textile Product Mills",3
+315,"Apparel Manufacturing",3
+3161,"Leather and Hide Tanning and Finishing",4
+3162,"Footwear Manufacturing",4
+321,"Wood Product Manufacturing",3
+322,"Paper Manufacturing",3
+324,"Petroleum and Coal Products Manufacturing",3
+3251,"Basic Chemical Manufacturing",4
+3252,"Resin, Synthetic Rubber, and Artificial and Synthetic Fibers and Filaments Manufacturing",4
+3253,"Pesticide, Fertilizer, and Other Agricultural Chemical Manufacturing",4
+3254,"Pharmaceutical and Medicine Manufacturing",4
+3255,"Paint, Coating, and Adhesive Manufacturing",4
+3256,"Soap, Cleaning Compound, and Toilet Preparation Manufacturing",4
+326,"Plastics and Rubber Products Manufacturing",3
+3271,"Clay Product and Refractory Manufacturing",4
+3272,"Glass and Glass Product Manufacturing",4
+3273,"Cement and Concrete Product Manufacturing",4
+3274,"Lime and Gypsum Product Manufacturing",4
+3311,"Iron and Steel Mills and Ferroalloy Manufacturing",4
+3312,"Steel Product Manufacturing from Purchased Steel",4
+3313,"Alumina and Aluminum Production and Processing",4
+3314,"Nonferrous Metal (except Aluminum) Production and Processing",4
+3315,"Foundries",4
+3321,"Forging and Stamping",4
+3322,"Cutlery and Handtool Manufacturing",4
+3323,"Architectural and Structural Metals Manufacturing",4
+3324,"Boiler, Tank, and Shipping Container Manufacturing",4
+3325,"Hardware Manufacturing",4
+3326,"Spring and Wire Product Manufacturing",4
+3327,"Machine Shops; Turned Product; and Screw, Nut, and Bolt Manufacturing",4
+3328,"Coating, Engraving, Heat Treating, and Allied Activities",4
+3331,"Agriculture, Construction, and Mining Machinery Manufacturing",4
+3332,"Industrial Machinery Manufacturing",4
+3333,"Commercial and Service Industry Machinery Manufacturing",4
+3334,"Ventilation, Heating, Air-Conditioning, and Commercial Refrigeration Equipment Manufacturing",4
+3335,"Metalworking Machinery Manufacturing",4
+3336,"Engine, Turbine, and Power Transmission Equipment Manufacturing",4
+3339,"Other General Purpose Machinery Manufacturing",4
+3341,"Computer and Peripheral Equipment Manufacturing",4
+3342,"Communications Equipment Manufacturing",4
+3343,"Audio and Video Equipment Manufacturing",4
+3344,"Semiconductor and Other Electronic Component Manufacturing",4
+3345,"Navigational, Measuring, Electromedical, and Control Instruments Manufacturing",4
+3346,"Manufacturing and Reproducing Magnetic and Optical Media",4
+3351,"Electric Lighting Equipment Manufacturing",4
+3352,"Household Appliance Manufacturing",4
+3353,"Electrical Equipment Manufacturing",4
+3361,"Motor Vehicle Manufacturing",4
+3362,"Motor Vehicle Body and Trailer Manufacturing",4
+3363,"Motor Vehicle Parts Manufacturing",4
+3364,"Aerospace Product and Parts Manufacturing",4
+3365,"Railroad Rolling Stock Manufacturing",4
+3366,"Ship and Boat Building",4
+337,"Furniture and Related Product Manufacturing",3
+3391,"Medical Equipment and Supplies Manufacturing",4
+444,"Building Material and Garden Equipment and Supplies Dealers",3
+4441,"Building Material and Supplies Dealers",4
+481,"Air Transportation",3
+482,"Rail Transportation",3
+483,"Water Transportation",3
+484,"Truck Transportation",3
+485,"Transit and Ground Passenger Transportation",3
+486,"Pipeline Transportation",3
+487,"Scenic and Sightseeing Transportation",3
+488,"Support Activities for Transportation",3
+491,"Postal Service",3
+492,"Couriers and Messengers",3
+493,"Warehousing and Storage",3
+513,"Publishing Industries",3
+5131,"Newspaper, Periodical, Book, and Directory Publishers",4
+562,"Waste Management and Remediation Services",3

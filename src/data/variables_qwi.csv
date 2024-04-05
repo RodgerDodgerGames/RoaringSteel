@@ -1,0 +1,33 @@
+Indicator Variable,Alternate Name,Status Flag,Indicator Name,Description,Units,Concept,Base
+Emp,B,sEmp,Beginning-of-Quarter Employment,Estimate of the total number of jobs on the first day of the reference quarter,Count,Employment,1
+EmpEnd,E,sEmpEnd,End-of-Quarter Employment,Estimate of the number of jobs on the last day of the quarter,Count,Employment,1
+EmpS,F,sEmpS,Full-Quarter Employment (Stable),Estimate of stable jobs - the number of jobs that are held on both the first and last day of the quarter with the same employer,Count,Employment,1
+EmpTotal,M,sEmpTotal,Employment - Reference Quarter,Estimated count of people employed in a firm at any time during the quarter,Count,Employment,1
+EmpSpv,Fpv,sEmpSpv,Full-Quarter Employment in the Previous Quarter,Estimate of stable jobs in the quarter before the reference quarter,Count,Employment,1
+HirA,A,sHirA,Hires (All Accessions),Estimated number of workers who started a new job in the specified quarter,Count,Hire,1
+HirN,H,sHirN,New Hires,Estimated number of workers who started a new job excluding recall hires,Count,Hire,1
+HirR,R,sHirR,Recall Hires,Estimated number of workers who returned to the same employer where they had worked within the previous year,Count,Hire,1
+Sep,S,sSep,Separations (All),Estimated number of workers whose job with a given employer ended in the specified quarter,Count,Separation,1
+HirAEnd,CA,sHirAEnd,End-of-Quarter Hires,"Estimated number of workers who started a new job in the specified quarter, which continued into next quarter",Count,Hire,1
+SepBeg,CS,sSepBeg,Beginning-of-Quarter Separations,Estimated number of workers whose job in the previous quarter continued and ended in the given quarter,Count,Separation,1
+HirAEndRepl,EI,sHirAEndRepl,Replacement Hires,Hires into continuous quarter employment in excess of job creation,Count,Hire,1
+HirAEndR,CAR,sHirAEndR,End-of-Quarter Hiring Rate,Hires as a percent of average employment,Rate,Hire,(Emp + EmpEnd)/2
+SepBegR,CSR,sSepBegR,Beginning-of-Quarter Separation Rate,Separations as a percent of average employment,Rate,Separation,(Emp + EmpEnd)/2
+HirAEndReplR,EIR,sHirAEndReplR,Replacement Hiring Rate,Replacement hires as a percent of the average of beginning- and end-of-quarter employment,Rate,Hire,(Emp + EmpEnd)/2
+HirAS,FA,sHirAS,Hires (All Hires into Full-Quarter Employment),Estimated number of workers that started a job that lasted at least one full quarter with a given employer,Count,Hire,1
+HirNS,FH,sHirNS,New Hires (New Hires into Full-Quarter Employment),Estimated number of workers who started a job that they had not held within the past year and the job turned into a job that lasted at least a full quarter with a given employer,Count,Hire,1
+SepS,FS,sSepS,Separations (Flows out of Full-Quarter Employment),Estimated number of workers who had a job for at least a full quarter and then the job ended,Count,Separation,1
+SepSnx,FSnx,sSepSnx,Separations in the Next Quarter (Flows out of Full-Quarter Employment),Estimated number of workers in the next quarter who had a job for at least a full quarter and then the job ended,Count,Separation,1
+TurnOvrS,FT,sTurnOvrS,Turnover (Stable),The rate at which stable jobs begin and end,Rate,Turnover,2*EmpS
+FrmJbGn,JC,sFrmJbGn,Firm Job Gains (Job Creation),Estimated number of jobs gained at firms throughout the quarter,Count,Job Flows,1
+FrmJbLs,JD,sFrmJbLs,Firm Job Loss (Job Destruction),Estimated number of jobs lost at firms throughout the quarter,Count,Job Flows,1
+FrmJbC,JF,sFrmJbC,Firm Job Change (Net Change),Difference between firm job gain and firm job loss,Count,Job Flows,1
+FrmJbGnS,FJC,sFrmJbGnS,Firm Job Gains (Stable),Estimated number of full-quarter jobs gained at firms,Count,Job Flows,1
+FrmJbLsS,FJD,sFrmJbLsS,Firm Job Loss (Stable),Estimated number of full-quarter jobs lost at firms,Count,Job Flows,1
+FrmJbCS,FJF,sFrmJbCS,Firm Job Change (Stable; Net Change),Net growth in jobs that last a full quarter,Count,Job Flows,1
+EarnS,ZW3,sEarnS,Average Monthly Earnings (Full-Quarter Employment),Average monthly earnings of employees with stable jobs,Dollars,Earnings,EmpS
+EarnBeg,ZW2B,sEarnBeg,Average Monthly Earnings (Beginning-of-Quarter Employment),Average monthly earnings of employees who worked on the first day of the reference quarter,Dollars,Earnings,Emp
+EarnHirAS,ZWFA,sEarnHirAS,Average Monthly Earnings (All Hires into Full-Quarter Employment),Average monthly earnings for workers who started a job that turned into a job lasting a full quarter,Dollars,Earnings,HirAS
+EarnHirNS,ZWFH,sEarnHirNS,Average Monthly Earnings (New Hires into Full-Quarter Employment),Average monthly earnings of newly stable employees,Dollars,Earnings,HirNS
+EarnSepS,ZWFS,sEarnSepS,Average Monthly Earnings (Flows out of Full-Quarter Employment),Average monthly earnings of separations from full-quarter status at an establishment,Dollars,Earnings,SepSnx
+Payroll,W1,sPayroll,Total Quarterly Payroll,Total quarterly payroll for all jobs,Dollars,Earnings,1

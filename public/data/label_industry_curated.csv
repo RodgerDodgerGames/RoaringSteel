@@ -1,4 +1,4 @@
-industry,label,ind_level
+naics_code,label,ind_level
 1111,"Oilseed and Grain Farming",4
 1112,"Vegetable and Melon Farming",4
 1113,"Fruit and Tree Nut Farming",4

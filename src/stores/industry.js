@@ -6,21 +6,26 @@ import Papa from 'papaparse'
 // path to industry CSV file
 const csvFile = '/data/label_industry_curated_test.csv'
 
-export const useStore = defineStore('qwiStore', () => {
+export const useIndustryStore = defineStore('qwiStore', () => {
   // STATE
-  const avgEmployment = ref([])
+
+  // employment data
+  const employmentData = ref([])
+  // industry data
+  const industries = ref([])
 
   // ACTIONS
-  // industry.js
+
+  // fetch industry data and QWI data for each industry
   async function useIndustryData(stateFipsCode = '27') {
     console.log('useIndustryData called with stateFipsCode:', stateFipsCode) // Log when the function is called
 
     // load the industry data from the CSV file
-    const industryData = await loadCSV(csvFile)
-    console.log('Loaded industry data:', industryData) // Log the loaded industry data
+    industries.value = await loadCSV(csvFile)
+    console.log('Loaded industry data:', industries.value) // Log the loaded industry data
 
     // iterate over each industry and fetch the QWI data
-    for (const industry of industryData) {
+    for (const industry of industries.value) {
       console.log('Fetching QWI data for industry:', industry) // Log the industry being processed
 
       // fetch the QWI data for the industry
@@ -33,10 +38,10 @@ export const useStore = defineStore('qwiStore', () => {
           console.log('Fetched QWI data:', data.value) // Log the fetched QWI data
 
           // calculate the average employment for the industry
-          avgEmployment.value.push({
+          employmentData.value.push({
             industry: industry.naics_code,
-            label: industry.label,
-            averageEmployment: calculateAverageEmployment(data.value) // Push the calculated average employment directly to the array
+            // format => {msa_code: average employment}
+            meanEmp: calculateAverageEmployment(data.value, industry) // Push the calculated average employment directly to the array
           })
         }
       } catch (error) {
@@ -45,11 +50,14 @@ export const useStore = defineStore('qwiStore', () => {
     }
 
     // Log the average employment data
-    console.log('Average employment data:', avgEmployment.value)
+    console.log('Average employment data:', industries.value)
   }
 
   return {
-    avgEmployment,
+    // STATE
+    employmentData,
+    industries,
+    // ACTIONS
     useIndustryData
     // calculateAverageEmployment
   }

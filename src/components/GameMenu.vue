@@ -10,9 +10,9 @@
 <script setup>
 import { ref } from 'vue'
 import StateMenu from './StateMenu.vue'
-import { useStore } from '../stores/industry'
+import { useTownsStore } from '@/stores/towns'
 
-const store = useStore()
+const townsStore = useTownsStore()
 const selectedState = ref(null)
 
 // Function to handle the 'state-selected' event
@@ -24,7 +24,7 @@ function handleStateSelected(state) {
 async function handlePlayClick() {
   if (selectedState.value) {
     // Call the 'useIndustryData' method from the store with the selected state's fips code
-    await store.useIndustryData(selectedState.value.fips)
+    await townsStore.setupTowns(selectedState.value.fips)
   }
 }
 </script>

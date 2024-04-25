@@ -13,6 +13,8 @@ export const useIndustryStore = defineStore('qwiStore', () => {
   const employmentData = ref([])
   // industry data
   const industries = ref([])
+  // MSAs
+  const MSAs = ref([])
 
   // ACTIONS
 
@@ -57,6 +59,7 @@ export const useIndustryStore = defineStore('qwiStore', () => {
     // STATE
     employmentData,
     industries,
+    MSAs,
     // ACTIONS
     useIndustryData
     // calculateAverageEmployment
@@ -91,6 +94,12 @@ export const useIndustryStore = defineStore('qwiStore', () => {
   function calculateAverageEmployment(data) {
     const employment = data.reduce((acc, row) => {
       const msaCode = row.msa_code
+
+      // add msacode to MSAs if it doesn't exist
+      if (!MSAs.value.includes(msaCode)) {
+        MSAs.value.push(msaCode)
+      }
+
       // if row.Emp is null count it as zero
       const emp = parseInt(row.Emp) || 0
 

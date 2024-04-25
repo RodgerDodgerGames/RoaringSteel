@@ -1,7 +1,8 @@
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { defineStore, storeToRefs } from 'pinia'
 import { useIndustryStore } from './industry'
 import useCensus from '../composables/useCensus'
+import getMSALatLon from '../composables/useTigerWeb'
 
 export const useTownsStore = defineStore('towns', () => {
   // load industry store
@@ -15,17 +16,9 @@ export const useTownsStore = defineStore('towns', () => {
   const selectedState = ref('')
 
   // industry data
-  const { employmentData } = storeToRefs(industryStore)
+  const { MSAs } = storeToRefs(industryStore)
 
   // GETTERS
-
-  // get the list of MSAs from the industry data
-  const MSAs = computed(() =>
-    employmentData.value.map((industry) => {
-      // industry.meanEmp is an object with MSA codes as keys
-      return Object.keys(industry.meanEmp)
-    })
-  )
 
   // ACTIONS
 
@@ -36,6 +29,13 @@ export const useTownsStore = defineStore('towns', () => {
 
     // first fetch the industry data
     await industryStore.useIndustryData(stateFipsCode)
+
+    // iterate over MSAs and fetch the lat/lon data
+    for (const msaCode of MSAs.value) {
+      console.log('Fetching lat/lon data for MSA:', msaCode)
+      const { centroidLongitude, centroidLatitude } = await getMSALatLon(msaCode)
+      console.log('Lat/Lon data fetched:', centroidLongitude, centroidLatitude)
+    }
 
     // then fetch the population data
     const { populationData, fetchPopulationData } = useCensus(stateFipsCode)

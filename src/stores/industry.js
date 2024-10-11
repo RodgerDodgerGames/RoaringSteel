@@ -52,6 +52,9 @@ export const useIndustryStore = defineStore('qwiStore', () => {
       }
     }
 
+    // Calculate and assign proportions
+    calculateAndAssignProportions()
+
     // Log the average employment data
     console.log('Average employment data:', employmentData.value)
   }
@@ -119,5 +122,30 @@ export const useIndustryStore = defineStore('qwiStore', () => {
       acc[msaCode] = employment[msaCode].total / employment[msaCode].count
       return acc
     }, {})
+  }
+
+  // Helper function to calculate and assign proportions
+  function calculateAndAssignProportions() {
+    // Calculate the total employment for each industry
+    const industryTotals = employmentData.value.map((industry) => {
+      const totalEmployment = Object.values(industry.meanEmp).reduce((sum, emp) => sum + emp, 0)
+      return {
+        industry: industry.industry,
+        totalEmployment
+      }
+    })
+
+    // Calculate the total employment across all industries
+    const totalEmployment = industryTotals.reduce(
+      (sum, industry) => sum + industry.totalEmployment,
+      0
+    )
+
+    // Assign the proportion for each industry
+    employmentData.value.forEach((industry) => {
+      const industryTotal = industryTotals.find((i) => i.industry === industry.industry)
+      // cap proportion at 0.3
+      industry.proportion = Math.min(industryTotal.totalEmployment / totalEmployment, 0.3)
+    })
   }
 })

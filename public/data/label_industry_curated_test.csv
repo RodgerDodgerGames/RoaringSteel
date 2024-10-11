@@ -2,3 +2,9 @@ naics_code,label,ind_level
 113,"Forestry and Logging",3
 114,"Fishing, Hunting and Trapping",3
 211,"Oil and Gas Extraction",3
+2121,"Coal Mining",4
+2122,"Metal Ore Mining",4
+2123,"Nonmetallic Mineral Mining and Quarrying",4
+23,"Construction",S
+1111,"Oilseed and Grain Farming",4
+1112,"Vegetable and Melon Farming",4

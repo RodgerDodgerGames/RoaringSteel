@@ -52,9 +52,6 @@ export const useIndustryStore = defineStore('qwiStore', () => {
       }
     }
 
-    // calculate the z-scores for each MSA in each industry
-    calculateZScores()
-
     // Log the average employment data
     console.log('Average employment data:', employmentData.value)
   }
@@ -122,30 +119,5 @@ export const useIndustryStore = defineStore('qwiStore', () => {
       acc[msaCode] = employment[msaCode].total / employment[msaCode].count
       return acc
     }, {})
-  }
-
-  // calculate the z-scores for each MSA in each industry
-  function calculateZScores() {
-    for (const industry of employmentData.value) {
-      // get sum of employment for this industry
-      const total = Object.values(industry.meanEmp).reduce((acc, emp) => acc + emp, 0)
-      // calculate mean
-      const mean = total / Object.values(industry.meanEmp).length
-      // calculate standard deviation
-      const stdDev = Math.sqrt(
-        Object.values(industry.meanEmp).reduce((acc, emp) => acc + Math.pow(emp - mean, 2), 0) /
-          mean
-      )
-
-      // calculate z score for each town
-      const zEmp = {}
-      for (const msa in industry.meanEmp) {
-        const emp = industry.meanEmp[msa]
-        zEmp[msa] = (emp - mean) / stdDev
-      }
-
-      // add zEmp to industry
-      industry.zEmp = zEmp
-    } // calculate the z-scores for each industry
   }
 })

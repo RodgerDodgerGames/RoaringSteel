@@ -5,14 +5,9 @@ import useCensus from '../composables/useCensus'
 import getMSALatLon from '../composables/useTigerWeb'
 
 // CONSTANTS
-
-// tourism threshold - indicated by population z-score
 const tourismThreshold = 0.1
-// no industry threshold - indicated by percent of towns
 const noIndustryThreshold = 0.1
-// max number of industries per town
 const maxIndustries = 3
-// town classification thresholds
 const classifyThresholds = {
   small: 0.45,
   medium: 0.35,
@@ -20,40 +15,84 @@ const classifyThresholds = {
 }
 
 // STORE
+/**
+ * Store for managing towns data.
+ *
+ * @typedef {Object} Town
+ * @property {string} msa - The MSA code of the town.
+ * @property {string} name - The name of the town.
+ * @property {string} stateCode - The state code of the town.
+ * @property {number} population - The population of the town.
+ * @property {number} lon - The longitude of the town.
+ * @property {number} lat - The latitude of the town.
+ * @property {Array<Object>} industries - The industries present in the town.
+ * @property {string} size - The size category of the town (small, medium, large).
+ *
+ * @typedef {Object} Industry
+ * @property {string} name - The name of the industry.
+ * @property {number} industry - The industry code.
+ * @property {Object} meanEmp - The mean employment data for the industry.
+ * @property {number} proportion - The proportion of employment for the industry.
+ *
+ * @typedef {Object} PopulationData
+ * @property {string} msa_code - The MSA code.
+ * @property {string} name - The name of the town.
+ * @property {string} state_code - The state code.
+ * @property {string} population - The population of the town.
+ *
+ * @typedef {Object} MaxTownsPerIndustry
+ * @property {number} industry - The industry code.
+ * @property {number} maxTowns - The maximum number of towns for the industry.
+ *
+ * @typedef {Object} TownSizes
+ * @property {number} numSmall - The number of small towns.
+ * @property {number} numMedium - The number of medium towns.
+ *
+ * @returns {Object} The towns store.
+ * @returns {Ref<Array<Town>>} towns - The list of towns.
+ * @returns {Function} setupTowns - Function to setup towns for the selected state.
+ */
 export const useTownsStore = defineStore('towns', () => {
-  // load industry store
   const industryStore = useIndustryStore()
 
   // STATE
-
-  // town data
   const towns = ref([])
-  // selected state
   const selectedState = ref('')
-
-  // industry data
   const { MSAs } = storeToRefs(industryStore)
-
-  // GETTERS
 
   // ACTIONS
 
+  // Setup towns for the selected state
   async function setupTowns(stateFipsCode) {
-    // save the selected state
     selectedState.value = stateFipsCode
     console.log('Selected state:', stateFipsCode)
 
-    // first fetch the industry data
+    // Load test data if the state is Idaho (16 is the FIPS code for Idaho)
+    if (stateFipsCode === '16') {
+      try {
+        const response = await fetch('/data/idaho_towns.json')
+        if (!response.ok) {
+          throw new Error('Network response was not ok')
+        }
+        const idahoTowns = await response.json()
+        towns.value = idahoTowns
+        console.log('Loaded test data for Idaho:', towns.value)
+        return
+      } catch (error) {
+        console.error('Failed to load test data:', error)
+      }
+    }
+
+    // Fetch industry data for the selected state
     await industryStore.useIndustryData(stateFipsCode)
     console.log('Industry data fetched:', industryStore.employmentData)
 
-    // then fetch the population data
+    // Fetch population data for the selected state
     const { populationData, fetchPopulationData } = useCensus(stateFipsCode)
     await fetchPopulationData()
     console.log('Population data fetched:', populationData.value)
 
-    // iterate over MSAs and assemble all data together into towns:
-    // population, industry (employment), and lat/lon
+    // Fetch latitude and longitude data for each MSA and populate towns
     for (const msaCode of MSAs.value) {
       console.log('Fetching lat/lon data for MSA:', msaCode)
       const { centroidLongitude, centroidLatitude } = await getMSALatLon(msaCode)
@@ -63,7 +102,6 @@ export const useTownsStore = defineStore('towns', () => {
 
       towns.value.push({
         msa: msaCode,
-        // parse out name, just grab everything before the comma and space ", "
         name: popData.name.split(', ')[0],
         stateCode: popData.state_code,
         population: parseFloat(popData.population),
@@ -73,151 +111,123 @@ export const useTownsStore = defineStore('towns', () => {
       })
     }
 
+    // Assign tourism, industries, and sizes to towns
     assignTowns()
     console.log('Towns after assignment:', towns.value)
   }
 
   // HELPERS
 
-  // this function will assign each town with at least one industry, maybe more
-  // based on its population and the average employment data for each industry
+  // Assign tourism, industries, and sizes to towns
   function assignTowns() {
     console.log('Assigning towns...')
-
-    // first assign tourism to towns
     assignTourism()
-
-    // then go through industries and assign them to towns
     assignIndustries()
-
-    // finally assign sizes to towns
     assignSizes()
   }
 
-  // the top n percent of towns by population will be assigned tourism
-  // based on the tourism threshold
+  // Assign tourism industry to top towns by population
   function assignTourism() {
     console.log('Assigning tourism to towns...')
-
-    // sort towns by population
-    towns.value.sort((a, b) => b.population - a.population)
-    console.log('Towns sorted by population:', towns.value)
-
-    // calculate the number of towns that will be assigned tourism
+    sortTownsByPopulation()
     const numTourismTowns = Math.floor(tourismThreshold * towns.value.length)
     console.log('Number of towns assigned tourism:', numTourismTowns)
 
-    // assign tourism to the top n towns
     for (let i = 0; i < numTourismTowns; i++) {
-      towns.value[i].industries.push({
-        name: 'Tourism',
-        industry: 9999
-      })
-      console.log(`Assigned tourism to town: ${towns.value[i].msa}`)
+      towns.value[i].industries.push({ name: 'Tourism', industry: 9999 })
+      console.log(`Assigned tourism to town: ${towns.value[i].name}`)
     }
   }
 
-  // calculate the number of towns without an industry
+  // Count towns without an industry
   function townsWithoutIndustry() {
     const count = towns.value.filter((town) => town.industries.length === 0).length
     console.log('Number of towns without an industry:', count)
     return count
   }
 
-  // calculate max number of towns for each industry
+  // Calculate the maximum number of towns per industry
   function calcMaxTownsPerIndustry() {
-    // Calculate the maximum number of towns for each industry
-    const maxTowns = industryStore.employmentData.map((industry) => {
-      return {
-        industry: industry.industry,
-        maxTowns: Math.ceil(towns.value.length * industry.proportion)
-      }
-    })
+    const maxTowns = industryStore.employmentData.map((industry) => ({
+      industry: industry.industry,
+      maxTowns: Math.ceil(towns.value.length * industry.proportion)
+    }))
     console.log('Max towns per industry:', maxTowns)
     return maxTowns
   }
 
-  // assign industries to towns based on employment data
+  // Assign industries to towns
   function assignIndustries() {
     console.log('Assigning industries to towns...')
-
-    // calculate the maximum number of towns for each industry
     const maxTownsPerIndustry = calcMaxTownsPerIndustry()
-
-    // Track the number of towns assigned to each industry
-    // initialize each industry to zero
+    // Initialize industry assignment count with zeroes
     const industryAssignmentCount = industryStore.employmentData.reduce((acc, industry) => {
       acc[industry.industry] = 0
       return acc
     }, {})
 
-    // while the number of towns without an industry is greater than the threshold
-    // assign industries to towns
+    // Assign industries to towns until the threshold is met
     while (townsWithoutIndustry() > noIndustryThreshold * towns.value.length) {
-      // iterate over industries in employment data
+      const totalAssignments = Object.values(industryAssignmentCount).reduce(
+        (acc, count) => acc + count,
+        0
+      )
+      // using maxTownsPerIndustry, find the total number of towns that should be assigned an industry
+      const totalIndustries = maxTownsPerIndustry.reduce(
+        (acc, industry) => acc + industry.maxTowns,
+        0
+      )
+      // check if we have assigned all of the industries
+      if (totalAssignments >= totalIndustries) break
+
       for (const industry of industryStore.employmentData) {
         console.log(`Assigning industry: ${industry.industry}`)
-
-        // create array of mean employment values sorted descending
         const sortedEmp = Object.values(industry.meanEmp).sort((a, b) => b - a)
 
-        // iterate over sorted employment values
         for (const emp of sortedEmp) {
-          // find the town with the highest employment that hasn't been assigned this industry
-          const town = towns.value.find(
-            (town) =>
-              // town doesn't already have this industry
-              !town.industries.some((ind) => ind.industry === industry.industry) &&
-              // town's z-score matches the industry's z-score
-              industry.meanEmp[town.msa] === emp &&
-              // town hasn't exceeded the max number of industries per town
-              town.industries.length < maxIndustries &&
-              // Industry hasn't exceeded the max number of towns
-              industryAssignmentCount[industry.industry] <
-                maxTownsPerIndustry.find((i) => i.industry === industry.industry).maxTowns
+          const town = findTownForIndustry(
+            industry,
+            emp,
+            maxTownsPerIndustry,
+            industryAssignmentCount
           )
-
-          // if a town is found, assign the industry to the town
           if (town) {
-            town.industries.push({
-              name: industry.name,
-              industry: industry.industry
-            })
+            town.industries.push({ name: industry.name, industry: industry.industry })
             console.log(`Assigned industry ${industry.industry} to town ${town.msa}`)
-
-            // Increment the assignment count for the industry
             industryAssignmentCount[industry.industry]++
-            // Break if the industry has reached its max number of towns
             if (
               industryAssignmentCount[industry.industry] >=
               maxTownsPerIndustry.find((i) => i.industry === industry.industry).maxTowns
-            ) {
+            )
               break
-            }
           }
         }
       }
     }
   }
 
-  // using classification thresholds, classify towns into small, medium, and large
-  // based on their population
+  function findTownForIndustry(industry, emp, maxTownsPerIndustry, industryAssignmentCount) {
+    // Find a town that matches the criteria for assigning an industry
+    return towns.value.find(
+      (town) =>
+        !town.industries.some((ind) => ind.industry === industry.industry) &&
+        industry.meanEmp[town.msa] === emp &&
+        town.industries.length < maxIndustries &&
+        industryAssignmentCount[industry.industry] <
+          maxTownsPerIndustry.find((i) => i.industry === industry.industry).maxTowns
+    )
+  }
+
   function assignSizes() {
     console.log('Assigning sizes to towns based on population...')
-
-    // sort towns by population
-    towns.value.sort((a, b) => b.population - a.population)
-    console.log('Towns sorted by population:', towns.value)
-
-    // calculate the number of towns that will be assigned each size
-    const totalTowns = towns.value.length
-    const numSmall = Math.ceil(classifyThresholds.small * totalTowns)
-    const numMedium = Math.ceil(classifyThresholds.medium * totalTowns)
+    // sort towns by population in ascending order
+    sortTownsByPopulation(false)
+    const { numSmall, numMedium } = calculateTownSizes()
     console.log(
-      `Total towns: ${totalTowns}, Small: ${numSmall}, Medium: ${numMedium}, Large: ${totalTowns - numSmall - numMedium}`
+      `Total towns: ${towns.value.length}, Small: ${numSmall}, Medium: ${numMedium}, Large: ${towns.value.length - numSmall - numMedium}`
     )
 
-    // assign sizes to towns
+    // Assign size categories to towns based on population
     towns.value.forEach((town, index) => {
       if (index < numSmall) {
         town.size = 'small'
@@ -234,10 +244,27 @@ export const useTownsStore = defineStore('towns', () => {
     console.log('Towns classified:', towns.value)
   }
 
+  // Sort towns by population, in descending order by default
+  function sortTownsByPopulation(desc = true) {
+    // Sort towns by population in the specified order
+    if (desc !== true) {
+      towns.value.sort((a, b) => a.population - b.population)
+    } else {
+      towns.value.sort((a, b) => b.population - a.population)
+    }
+    console.log(`Towns sorted by population`, towns.value)
+  }
+
+  function calculateTownSizes() {
+    // Calculate the number of small, medium, and large towns
+    const totalTowns = towns.value.length
+    const numSmall = Math.ceil(classifyThresholds.small * totalTowns)
+    const numMedium = Math.ceil(classifyThresholds.medium * totalTowns)
+    return { numSmall, numMedium }
+  }
+
   return {
-    // STATE
     towns,
-    // ACTIONS
     setupTowns
   }
 })

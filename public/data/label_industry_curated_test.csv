@@ -5,6 +5,9 @@ naics_code,label,ind_level
 2121,"Coal Mining",4
 2122,"Metal Ore Mining",4
 2123,"Nonmetallic Mineral Mining and Quarrying",4
-23,"Construction",S
 1111,"Oilseed and Grain Farming",4
 1112,"Vegetable and Melon Farming",4
+322,"Paper Manufacturing",3
+326,"Plastics and Rubber Products Manufacturing",3
+3271,"Clay Product and Refractory Manufacturing",4
+491,"Postal Service",3

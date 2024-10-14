@@ -39,9 +39,18 @@ export const useIndustryStore = defineStore('qwiStore', () => {
         } else {
           console.log('Fetched QWI data:', data.value) // Log the fetched QWI data
 
+          // check if all of the data is either null or zero
+          // if so, skip this industry
+          const allZero = data.value.every((row) => row.Emp === null || row.Emp === 0)
+          if (allZero) {
+            console.log('All zero data for industry:', industry) // Log that all data is zero
+            continue
+          }
+
           // calculate the average employment for the industry
           employmentData.value.push({
             industry: industry.naics_code,
+            level: industry.ind_level,
             // format => {msa_code: average employment}
             // Push the calculated average employment directly to the array
             meanEmp: calculateAverageEmployment(data.value, industry)

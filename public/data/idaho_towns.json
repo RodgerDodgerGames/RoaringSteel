@@ -1,0 +1,245 @@
+[
+    {
+        "msa": "27220",
+        "name": "Jackson",
+        "stateCode": "16",
+        "population": 11813,
+        "lon": -110.426087,
+        "lat": 44.048662,
+        "industries": [],
+        "size": "small"
+    },
+    {
+        "msa": "30860",
+        "name": "Logan",
+        "stateCode": "16",
+        "population": 14376,
+        "lon": -111.7874375,
+        "lat": 41.8890205,
+        "industries": [],
+        "size": "small"
+    },
+    {
+        "msa": "25200",
+        "name": "Hailey",
+        "stateCode": "16",
+        "population": 25381,
+        "lon": -114.1973396,
+        "lat": 43.3254856,
+        "industries": [],
+        "size": "small"
+    },
+    {
+        "msa": "36620",
+        "name": "Ontario",
+        "stateCode": "16",
+        "population": 25571,
+        "lon": -117.619933,
+        "lat": 43.2258691,
+        "industries": [],
+        "size": "small"
+    },
+    {
+        "msa": "34300",
+        "name": "Mountain Home",
+        "stateCode": "16",
+        "population": 28752,
+        "lon": -115.471205,
+        "lat": 43.3946984,
+        "industries": [],
+        "size": "small"
+    },
+    {
+        "msa": "34140",
+        "name": "Moscow",
+        "stateCode": "16",
+        "population": 39872,
+        "lon": -116.7309737,
+        "lat": 46.8189202,
+        "industries": [
+            {
+                "industry": 113
+            },
+            {
+                "industry": 326
+            }
+        ],
+        "size": "small"
+    },
+    {
+        "msa": "30300",
+        "name": "Lewiston",
+        "stateCode": "16",
+        "population": 42200,
+        "lon": -116.9250166,
+        "lat": 46.2516957,
+        "industries": [
+            {
+                "industry": 322
+            }
+        ],
+        "size": "small"
+    },
+    {
+        "msa": "15420",
+        "name": "Burley",
+        "stateCode": "16",
+        "population": 46485,
+        "lon": -113.6424237,
+        "lat": 42.3691987,
+        "industries": [
+            {
+                "industry": 1111
+            },
+            {
+                "industry": 1112
+            },
+            {
+                "industry": 326
+            }
+        ],
+        "size": "small"
+    },
+    {
+        "msa": "41760",
+        "name": "Sandpoint",
+        "stateCode": "16",
+        "population": 47976,
+        "lon": -116.6274498,
+        "lat": 48.3246343,
+        "industries": [
+            {
+                "industry": 113
+            },
+            {
+                "industry": 2123
+            },
+            {
+                "industry": 3271
+            }
+        ],
+        "size": "medium"
+    },
+    {
+        "msa": "13940",
+        "name": "Blackfoot",
+        "stateCode": "16",
+        "population": 48253,
+        "lon": -112.3992058,
+        "lat": 43.2163568,
+        "industries": [
+            {
+                "industry": 1112
+            }
+        ],
+        "size": "medium"
+    },
+    {
+        "msa": "39940",
+        "name": "Rexburg",
+        "stateCode": "16",
+        "population": 66006,
+        "lon": -111.5081067,
+        "lat": 44.1427534,
+        "industries": [
+            {
+                "industry": 1112
+            },
+            {
+                "industry": 491
+            }
+        ],
+        "size": "medium"
+    },
+    {
+        "msa": "38540",
+        "name": "Pocatello",
+        "stateCode": "16",
+        "population": 95352,
+        "lon": -112.2289819,
+        "lat": 42.6929211,
+        "industries": [],
+        "size": "medium"
+    },
+    {
+        "msa": "46300",
+        "name": "Twin Falls",
+        "stateCode": "16",
+        "population": 115066,
+        "lon": -114.5687294,
+        "lat": 42.4403972,
+        "industries": [
+            {
+                "industry": 1111
+            },
+            {
+                "industry": 1112
+            },
+            {
+                "industry": 322
+            }
+        ],
+        "size": "medium"
+    },
+    {
+        "msa": "26820",
+        "name": "Idaho Falls",
+        "stateCode": "16",
+        "population": 158478,
+        "lon": -112.4209193,
+        "lat": 43.6204231,
+        "industries": [
+            {
+                "industry": 1112
+            },
+            {
+                "industry": 322
+            },
+            {
+                "industry": 326
+            }
+        ],
+        "size": "medium"
+    },
+    {
+        "msa": "17660",
+        "name": "Coeur d'Alene",
+        "stateCode": "16",
+        "population": 173396,
+        "lon": -116.6959192,
+        "lat": 47.6759569,
+        "industries": [
+            {
+                "industry": 114
+            },
+            {
+                "industry": 322
+            },
+            {
+                "industry": 326
+            }
+        ],
+        "size": "large"
+    },
+    {
+        "msa": "14260",
+        "name": "Boise City",
+        "stateCode": "16",
+        "population": 771602,
+        "lon": -116.1419089,
+        "lat": 43.0066485,
+        "industries": [
+            {
+                "name": "Tourism",
+                "industry": 9999
+            },
+            {
+                "industry": 211
+            },
+            {
+                "industry": 2122
+            }
+        ],
+        "size": "large"
+    }
+]

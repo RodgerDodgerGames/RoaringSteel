@@ -1,9 +1,8 @@
-<!-- FILEPATH: /Users/reggie/Documents/working/roaring-steel/src/components/GameMenu.vue -->
 <template>
   <div>
-    <!-- StateMenu component emits 'state-selected' event -->
     <StateMenu @state-selected="handleStateSelected" />
     <button @click="handlePlayClick">Play</button>
+    <MainMap v-if="townsStore.towns.length > 0" :towns="townsStore.towns" />
   </div>
 </template>
 
@@ -11,6 +10,7 @@
 import { ref } from 'vue'
 import StateMenu from './StateMenu.vue'
 import { useTownsStore } from '@/stores/towns'
+import MainMap from './MainMap.vue'
 
 const townsStore = useTownsStore()
 const selectedState = ref(null)

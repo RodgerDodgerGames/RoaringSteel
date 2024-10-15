@@ -47,8 +47,9 @@ export function useMap() {
       layout: {
         'text-field': ['get', 'name'], // Use the 'name' property for labels
         'text-variable-anchor': ['top', 'bottom', 'left', 'right'], // Let MapLibre adjust the label position
-        'text-radial-offset': 0.5, // Offset the label from the marker
-        'text-justify': 'auto' // Automatically justify text
+        'text-radial-offset': getIconSize(['get', 'size']) / 13, // Offset the label from the marker
+        'text-justify': 'auto', // Automatically justify text
+        'text-size': getIconSize(['get', 'size']) / 1.4
       },
       paint: {
         'text-color': '#000',
@@ -111,12 +112,12 @@ function getIconUrl(size) {
 function getIconSize(size) {
   switch (size) {
     case 'small':
-      return 20
+      return 16
     case 'medium':
-      return 30
+      return 24
     case 'large':
-      return 40
+      return 32
     default:
-      return 20
+      return 16
   }
 }

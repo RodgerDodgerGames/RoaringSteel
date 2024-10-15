@@ -31,8 +31,11 @@ export function useMap() {
       const el = document.createElement('div')
       el.className = 'marker'
       el.style.backgroundImage = `url(${getIconUrl(marker.properties.size)})`
-      el.style.width = '30px'
-      el.style.height = '30px'
+
+      // Set the size of the marker based on the town size
+      const size = getIconSize(marker.properties.size)
+      el.style.width = `${size}px`
+      el.style.height = `${size}px`
       el.style.backgroundSize = '100%'
 
       el.addEventListener('click', () => {
@@ -67,6 +70,19 @@ export function useMap() {
         return new URL('@/assets/icons/towns/large.png', import.meta.url).href
       default:
         return new URL('@/assets/icons/towns/small.png', import.meta.url).href
+    }
+  }
+
+  function getIconSize(size) {
+    switch (size) {
+      case 'small':
+        return 20
+      case 'medium':
+        return 30
+      case 'large':
+        return 40
+      default:
+        return 20
     }
   }
 

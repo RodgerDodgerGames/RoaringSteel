@@ -1,4 +1,5 @@
 @import './base.css';
+@import './map.css';
 
 #app {
   max-width: 1280px;

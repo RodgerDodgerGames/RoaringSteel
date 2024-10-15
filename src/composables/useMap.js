@@ -1,4 +1,3 @@
-// src/composables/useMap.js
 import maplibregl from 'maplibre-gl'
 
 export function useMap() {
@@ -25,6 +24,39 @@ export function useMap() {
 
     console.log('GeoJSON data prepared:', geojson)
 
+    // Paths to your icons
+    const iconPaths = {
+      'small-town-icon': new URL('@/assets/icons/towns/small.png', import.meta.url).href,
+      'medium-town-icon': new URL('@/assets/icons/towns/medium.png', import.meta.url).href,
+      'large-town-icon': new URL('@/assets/icons/towns/large.png', import.meta.url).href
+    }
+
+    console.log('Resolved icon paths:', iconPaths)
+
+    // Add the towns source
+    map.addSource('towns', {
+      type: 'geojson',
+      data: geojson
+    })
+
+    // Add the towns layer after the images are loaded
+    map.addLayer({
+      id: 'towns-layer',
+      type: 'symbol',
+      source: 'towns',
+      layout: {
+        'text-field': ['get', 'name'], // Use the 'name' property for labels
+        'text-variable-anchor': ['top', 'bottom', 'left', 'right'], // Let MapLibre adjust the label position
+        'text-radial-offset': 0.5, // Offset the label from the marker
+        'text-justify': 'auto' // Automatically justify text
+      },
+      paint: {
+        'text-color': '#000',
+        'text-halo-color': '#fff',
+        'text-halo-width': 2
+      }
+    })
+
     // Add markers to map
     geojson.features.forEach((marker) => {
       // Create a DOM element for the marker
@@ -49,9 +81,7 @@ export function useMap() {
     // Zoom to the extent of the points
     const coordinates = geojson.features.map((feature) => feature.geometry.coordinates)
     const bounds = coordinates.reduce(
-      (bounds, coord) => {
-        return bounds.extend(coord)
-      },
+      (bounds, coord) => bounds.extend(coord),
       new maplibregl.LngLatBounds(coordinates[0], coordinates[0])
     )
 
@@ -60,33 +90,33 @@ export function useMap() {
     })
   }
 
-  function getIconUrl(size) {
-    switch (size) {
-      case 'small':
-        return new URL('@/assets/icons/towns/small.png', import.meta.url).href
-      case 'medium':
-        return new URL('@/assets/icons/towns/medium.png', import.meta.url).href
-      case 'large':
-        return new URL('@/assets/icons/towns/large.png', import.meta.url).href
-      default:
-        return new URL('@/assets/icons/towns/small.png', import.meta.url).href
-    }
-  }
-
-  function getIconSize(size) {
-    switch (size) {
-      case 'small':
-        return 20
-      case 'medium':
-        return 30
-      case 'large':
-        return 40
-      default:
-        return 20
-    }
-  }
-
   return {
     addTownsToMap
+  }
+}
+
+function getIconUrl(size) {
+  switch (size) {
+    case 'small':
+      return new URL('@/assets/icons/towns/small.png', import.meta.url).href
+    case 'medium':
+      return new URL('@/assets/icons/towns/medium.png', import.meta.url).href
+    case 'large':
+      return new URL('@/assets/icons/towns/large.png', import.meta.url).href
+    default:
+      return new URL('@/assets/icons/towns/small.png', import.meta.url).href
+  }
+}
+
+function getIconSize(size) {
+  switch (size) {
+    case 'small':
+      return 20
+    case 'medium':
+      return 30
+    case 'large':
+      return 40
+    default:
+      return 20
   }
 }

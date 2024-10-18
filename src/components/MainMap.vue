@@ -1,12 +1,17 @@
 <template>
-  <div ref="mapContainer" class="map-container"></div>
+  <div>
+    <DrawButton />
+    <div ref="mapContainer" class="map-container"></div>
+  </div>
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from 'vue'
-import maplibregl from 'maplibre-gl'
-import 'maplibre-gl/dist/maplibre-gl.css'
+import { onMounted, ref, provide } from 'vue'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import { useMap } from '@/composables/useMap'
+import { useDrawing } from '@/composables/useDrawing'
+import DrawButton from '@/components/DrawButton.vue'
 
 const props = defineProps({
   towns: {
@@ -16,33 +21,34 @@ const props = defineProps({
 })
 
 const mapContainer = ref(null)
-let map
+const map = ref(null)
 
 const { addTownsToMap } = useMap()
+const { initializeDrawing, toggleControls } = useDrawing(map)
+
+// Provide the toggleControls function to the DrawButton component
+provide('toggleControls', toggleControls)
 
 onMounted(() => {
-  map = new maplibregl.Map({
-    container: mapContainer.value,
-    style: 'https://demotiles.maplibre.org/style.json',
-    center: [-100, 40], // Initial center of the map
-    zoom: 3 // Initial zoom level
-  })
+  // Initialize the Leaflet map
+  map.value = L.map(mapContainer.value).setView([40, -100], 3) // Set center and zoom
 
-  map.on('load', () => {
-    addTownsToMap(map, props.towns)
-  })
-})
+  // Add a basemap tile layer (you can use any provider, here is OpenStreetMap)
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map.value)
 
-watch(props.towns, (newTowns) => {
-  if (map) {
-    addTownsToMap(map, newTowns)
-  }
+  // Call the function to add towns to the map
+  addTownsToMap(map.value, props.towns)
+
+  // Initialize drawing functionality
+  initializeDrawing()
 })
 </script>
 
-<style scoped>
+<style>
 .map-container {
+  height: 100vh;
   width: 100%;
-  height: 500px;
 }
 </style>

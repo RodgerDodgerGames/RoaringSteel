@@ -1,15 +1,10 @@
-<template>
-  <div>
-    <DrawButton />
-    <div ref="mapContainer" class="map-container"></div>
-  </div>
-</template>
+<!-- Main map -->
 
 <script setup>
 import { onMounted, ref, provide } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { useMap } from '@/composables/map/useTowns'
+import { useTowns } from '@/composables/map/useTowns'
 import { useDrawing } from '@/composables/map/useDrawing'
 import DrawButton from '@/components/DrawButton.vue'
 
@@ -23,7 +18,7 @@ const props = defineProps({
 const mapContainer = ref(null)
 const map = ref(null)
 
-const { addTownsToMap } = useMap()
+const { addTownsToMap, townsLayer } = useTowns()
 const { initializeDrawing, toggleControls, controlsVisible, drawingActive } = useDrawing(map)
 
 // Provide the toggleControls function and controlsVisible ref to the DrawButton component
@@ -40,13 +35,22 @@ onMounted(() => {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map.value)
 
-  // Call the function to add towns to the map
-  addTownsToMap(map.value, props.towns)
+  if (map.value) {
+    // Call the function to add towns to the map only if map is initialized
+    addTownsToMap(map, props.towns)
 
-  // Initialize drawing functionality
-  initializeDrawing()
+    // Initialize drawing functionality
+    initializeDrawing(townsLayer)
+  }
 })
 </script>
+
+<template>
+  <div>
+    <DrawButton @toggle-drawing="toggleControls" :controls-visible="controlsVisible" />
+    <div ref="mapContainer" class="map-container"></div>
+  </div>
+</template>
 
 <style>
 .map-container {

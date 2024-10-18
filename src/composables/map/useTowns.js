@@ -1,13 +1,17 @@
-import { ref } from 'vue'
-import L from 'leaflet'
+import { ref, onUnmounted } from 'vue'
+import * as L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import '@geoman-io/leaflet-geoman-free'
+import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 
-export function useMap() {
-  const townsLayer = ref(null) // Use ref to store the layer reference reactively
+export function useTowns() {
+  const townsLayer = ref(null)
 
-  function addTownsToMap(map, towns) {
-    // Remove existing towns layer if it exists
-    if (townsLayer.value) {
-      map.removeLayer(townsLayer.value)
+  const addTownsToMap = (map, towns) => {
+    if (!map || !map.value) {
+      // Check if map is available and initialized
+      console.error('Map instance is not available')
+      return
     }
 
     const geojson = {
@@ -48,7 +52,7 @@ export function useMap() {
 
         return marker
       }
-    }).addTo(map)
+    }).addTo(map.value)
 
     // Zoom to the extent of the points
     const bounds = L.latLngBounds(
@@ -57,39 +61,45 @@ export function useMap() {
       })
     )
 
-    map.fitBounds(bounds, {
+    map.value.fitBounds(bounds, {
       padding: [20, 20]
     })
   }
 
+  const getIconUrl = (size) => {
+    switch (size) {
+      case 'small':
+        return new URL('@/assets/icons/towns/small.png', import.meta.url).href
+      case 'medium':
+        return new URL('@/assets/icons/towns/medium.png', import.meta.url).href
+      case 'large':
+        return new URL('@/assets/icons/towns/large.png', import.meta.url).href
+      default:
+        return new URL('@/assets/icons/towns/small.png', import.meta.url).href
+    }
+  }
+
+  const getIconSize = (size) => {
+    switch (size) {
+      case 'small':
+        return 20
+      case 'medium':
+        return 30
+      case 'large':
+        return 40
+      default:
+        return 20
+    }
+  }
+
+  onUnmounted(() => {
+    if (townsLayer.value) {
+      townsLayer.value.clearLayers()
+    }
+  })
+
   return {
-    addTownsToMap,
-    townsLayer // Return the ref if you need to track it in other components
-  }
-}
-
-function getIconUrl(size) {
-  switch (size) {
-    case 'small':
-      return new URL('@/assets/icons/towns/small.png', import.meta.url).href
-    case 'medium':
-      return new URL('@/assets/icons/towns/medium.png', import.meta.url).href
-    case 'large':
-      return new URL('@/assets/icons/towns/large.png', import.meta.url).href
-    default:
-      return new URL('@/assets/icons/towns/small.png', import.meta.url).href
-  }
-}
-
-function getIconSize(size) {
-  switch (size) {
-    case 'small':
-      return 16
-    case 'medium':
-      return 24
-    case 'large':
-      return 32
-    default:
-      return 16
+    townsLayer,
+    addTownsToMap
   }
 }

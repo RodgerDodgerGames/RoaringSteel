@@ -7,7 +7,7 @@ export function useDrawing(map) {
   const controlsVisible = ref(false)
   const drawingActive = ref(false)
 
-  const initializeDrawing = () => {
+  const initializeDrawing = (townsLayer) => {
     if (!map.value) {
       console.error('Map instance is not available')
       return
@@ -45,9 +45,15 @@ export function useDrawing(map) {
       drawingActive.value = false
     })
 
-    // Enable drawing mode when a marker is clicked
-    map.value.on('pm:globaleditmodetoggled', (e) => {
-      console.log('Edit mode toggled', e)
+    // Enable drawing mode when a marker is clicked, but only if drawing is already active
+    townsLayer.value.eachLayer((layer) => {
+      layer.on('click', (e) => {
+        // Only allow drawing if the drawing controls are visible and drawingActive is true
+        if (controlsVisible.value && drawingActive.value) {
+          // Start drawing a line from the marker's location
+          map.value.pm.Draw.Line._createVertex(e.latlng)
+        }
+      })
     })
 
     map.value.on('pm:create', (e) => {

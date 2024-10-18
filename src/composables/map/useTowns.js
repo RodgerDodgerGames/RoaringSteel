@@ -46,11 +46,6 @@ export function useMap() {
           offset: [0, -getIconSize(size) / 2] // Offset so it appears above the marker
         })
 
-        // Add a click event for each marker
-        marker.on('click', () => {
-          window.alert(feature.properties.name)
-        })
-
         return marker
       }
     }).addTo(map)

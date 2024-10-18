@@ -1,5 +1,5 @@
 import { nextTick } from 'vue'
-import useQWI from '@/composables/useQWI.js'
+import useQWI from '@/composables/setup/useQWI.js'
 import { expect, test } from 'vitest'
 
 // useQWI.spec.ts

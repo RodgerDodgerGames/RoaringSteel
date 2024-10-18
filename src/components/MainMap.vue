@@ -9,8 +9,8 @@
 import { onMounted, ref, provide } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { useMap } from '@/composables/useMap'
-import { useDrawing } from '@/composables/useDrawing'
+import { useMap } from '@/composables/map/useTowns'
+import { useDrawing } from '@/composables/map/useDrawing'
 import DrawButton from '@/components/DrawButton.vue'
 
 const props = defineProps({
@@ -24,10 +24,12 @@ const mapContainer = ref(null)
 const map = ref(null)
 
 const { addTownsToMap } = useMap()
-const { initializeDrawing, toggleControls } = useDrawing(map)
+const { initializeDrawing, toggleControls, controlsVisible, drawingActive } = useDrawing(map)
 
-// Provide the toggleControls function to the DrawButton component
+// Provide the toggleControls function and controlsVisible ref to the DrawButton component
 provide('toggleControls', toggleControls)
+provide('controlsVisible', controlsVisible)
+provide('drawingActive', drawingActive)
 
 onMounted(() => {
   // Initialize the Leaflet map

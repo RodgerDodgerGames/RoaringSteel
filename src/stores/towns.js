@@ -1,8 +1,8 @@
 import { ref } from 'vue'
 import { defineStore, storeToRefs } from 'pinia'
 import { useIndustryStore } from './industry'
-import useCensus from '../composables/useCensus'
-import getMSALatLon from '../composables/useTigerWeb'
+import useCensus from '../composables/setup/useCensus'
+import getMSALatLon from '../composables/setup/useTigerWeb'
 
 // CONSTANTS
 const tourismThreshold = 0.1

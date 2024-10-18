@@ -5,6 +5,7 @@ import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 
 export function useDrawing(map) {
   const controlsVisible = ref(false)
+  const drawingActive = ref(false)
 
   const initializeDrawing = () => {
     if (!map.value) {
@@ -28,6 +29,21 @@ export function useDrawing(map) {
 
     // Hide controls initially
     map.value.pm.toggleControls()
+
+    // Enable snapping
+    map.value.pm.setGlobalOptions({
+      snappable: true,
+      snapDistance: 20
+    })
+
+    // Track drawing state
+    map.value.on('pm:drawstart', () => {
+      drawingActive.value = true
+    })
+
+    map.value.on('pm:drawend', () => {
+      drawingActive.value = false
+    })
 
     // Enable drawing mode when a marker is clicked
     map.value.on('pm:globaleditmodetoggled', (e) => {
@@ -55,6 +71,7 @@ export function useDrawing(map) {
   return {
     initializeDrawing,
     toggleControls,
-    controlsVisible
+    controlsVisible,
+    drawingActive
   }
 }

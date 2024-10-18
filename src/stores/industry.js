@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import useQWI from '../composables/useQWI'
+import useQWI from '../composables/setup/useQWI'
 import Papa from 'papaparse'
 
 // path to industry CSV file

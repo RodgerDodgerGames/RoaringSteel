@@ -1,11 +1,9 @@
-<!-- Main map -->
-
 <script setup>
-import { onMounted, ref, provide } from 'vue'
+import { onMounted, ref } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useTowns } from '@/composables/map/useTowns'
-import { useDrawing } from '@/composables/map/useDrawing'
+import { useTrack } from '@/composables/map/useTrack' // Import the updated useTrack
 import DrawButton from '@/components/DrawButton.vue'
 
 const props = defineProps({
@@ -19,35 +17,30 @@ const mapContainer = ref(null)
 const map = ref(null)
 
 const { addTownsToMap, townsLayer } = useTowns()
-const { initializeDrawing, toggleControls, controlsVisible, drawingActive } = useDrawing(map)
-
-// Provide the toggleControls function and controlsVisible ref to the DrawButton component
-provide('toggleControls', toggleControls)
-provide('controlsVisible', controlsVisible)
-provide('drawingActive', drawingActive)
+const { initializeTracking, toggleControls, controlsVisible, drawingActive } = useTrack(map)
 
 onMounted(() => {
-  // Initialize the Leaflet map
-  map.value = L.map(mapContainer.value).setView([40, -100], 3) // Set center and zoom
+  map.value = L.map(mapContainer.value).setView([40, -100], 3)
 
-  // Add a basemap tile layer (you can use any provider, here is OpenStreetMap)
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map.value)
 
   if (map.value) {
-    // Call the function to add towns to the map only if map is initialized
     addTownsToMap(map, props.towns)
-
-    // Initialize drawing functionality
-    initializeDrawing(townsLayer)
+    initializeTracking(townsLayer)
   }
 })
 </script>
 
 <template>
   <div>
-    <DrawButton @toggle-drawing="toggleControls" :controls-visible="controlsVisible" />
+    <!-- Pass the necessary props to DrawButton -->
+    <DrawButton
+      :controls-visible="controlsVisible"
+      :drawing-active="drawingActive"
+      @toggle-drawing="toggleControls"
+    />
     <div ref="mapContainer" class="map-container"></div>
   </div>
 </template>

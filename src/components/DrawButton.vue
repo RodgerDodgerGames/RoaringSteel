@@ -1,29 +1,32 @@
+<script setup>
+import { ref, watch } from 'vue'
+
+const props = defineProps({
+  controlsVisible: Boolean // Receive visibility of the controls as a prop
+})
+
+const buttonText = ref('DRAW')
+
+// Watch for changes in the `controlsVisible` prop and update the button text accordingly
+watch(
+  () => props.controlsVisible,
+  (newVal) => {
+    buttonText.value = newVal ? 'SAVE' : 'DRAW'
+  }
+)
+
+// Emit the toggle event to the parent when the button is clicked
+const emit = defineEmits(['toggle-drawing'])
+const toggleControls = () => {
+  emit('toggle-drawing')
+}
+</script>
+
 <template>
   <button :class="{ save: controlsVisible, draw: !controlsVisible }" @click="toggleControls">
     {{ buttonText }}
   </button>
 </template>
-
-<script setup>
-import { inject, ref, watch } from 'vue'
-
-const toggleControls = inject('toggleControls')
-const controlsVisible = inject('controlsVisible', ref(false))
-
-if (!toggleControls) {
-  console.error('toggleControls function is not provided')
-}
-
-if (!controlsVisible) {
-  console.error('controlsVisible ref is not provided')
-}
-
-const buttonText = ref('DRAW')
-
-watch(controlsVisible, (newVal) => {
-  buttonText.value = newVal ? 'SAVE' : 'DRAW'
-})
-</script>
 
 <style scoped>
 button {

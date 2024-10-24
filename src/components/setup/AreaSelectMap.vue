@@ -7,7 +7,6 @@ import { onMounted, ref } from 'vue'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
-// Props to handle GeoJSON and click events
 const props = defineProps({
   onStateClick: Function
 })
@@ -23,7 +22,7 @@ onMounted(() => {
   }).addTo(map)
 
   // Load GeoJSON (replace with your path)
-  fetch('/src/assets/us-states.geojson')
+  fetch('/data/us-states.geojson')
     .then((res) => res.json())
     .then((data) => {
       L.geoJSON(data, {
@@ -34,9 +33,16 @@ onMounted(() => {
           fillOpacity: 0.2
         }),
         onEachFeature: (feature, layer) => {
+          // Bind hover tooltip to show state name
+          layer.bindTooltip(feature.properties.NAME, {
+            permanent: false, // only show on hover
+            direction: 'top',
+            className: 'state-tooltip' // for custom styling if needed
+          })
+
+          // Click event: Notify parent of the selected state
           layer.on('click', () => {
-            // Emit state name back to the parent
-            props.onStateClick(feature.properties.name)
+            props.onStateClick(feature.properties.NAME)
           })
         }
       }).addTo(map)
@@ -48,5 +54,12 @@ onMounted(() => {
 .map-container {
   height: 500px;
   width: 100%;
+}
+
+.state-tooltip {
+  font-weight: bold;
+  background: #fff;
+  border: 1px solid #ddd;
+  padding: 4px;
 }
 </style>

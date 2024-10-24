@@ -27,9 +27,9 @@ onMounted(() => {
     .then((data) => {
       L.geoJSON(data, {
         style: () => ({
-          color: '#3388ff',
+          color: '#000',
           weight: 2,
-          fillColor: '#3388ff',
+          fillColor: '#000',
           fillOpacity: 0.2
         }),
         onEachFeature: (feature, layer) => {

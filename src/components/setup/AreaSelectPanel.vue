@@ -1,23 +1,22 @@
 <template>
-  <div class="bottom-panel">
-    <h3>Selected State:</h3>
-    <p v-if="state">{{ state }}</p>
-    <p v-else>No state selected yet</p>
+  <div class="block">
+    <p>{{ msg }}</p>
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 // Props to receive the selected state
 const props = defineProps({
   state: String
 })
+
+const msg = computed(() => {
+  if (props.state) {
+    return `Selected: ${props.state}`
+  }
+  return 'No state selected yet'
+})
 </script>
 
-<style scoped>
-.bottom-panel {
-  padding: 16px;
-  text-align: center;
-  background-color: #f8f8f8;
-  border-top: 1px solid #ddd;
-}
-</style>
+<style scoped></style>

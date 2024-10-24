@@ -12,29 +12,18 @@ const handleStateClick = (stateName) => {
 </script>
 
 <template>
-  <div class="map-page">
-    <AreaSelectMap @onStateClick="handleStateClick" />
-    <AreaSelectPanel :state="selectedState" />
+  <div class="container">
+    <div class="fixed-grid has-1-cols">
+      <div class="grid">
+        <div class="cell">
+          <AreaSelectPanel :state="selectedState" />
+        </div>
+        <div class="cell">
+          <AreaSelectMap :onStateClick="handleStateClick" />
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
-<style scoped>
-.map-page {
-  display: flex;
-  flex-direction: column; /* Stack map and panel vertically */
-  height: 100vh; /* Full viewport height */
-}
-
-.map-container {
-  flex: 1; /* Map takes up most of the space */
-}
-
-.bottom-panel {
-  height: 150px;
-  background-color: #f8f8f8;
-  border-top: 1px solid #ddd;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-</style>
+<style scoped></style>

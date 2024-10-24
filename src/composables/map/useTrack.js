@@ -1,8 +1,12 @@
-import { useCostCalculator } from './useTrackCost'
-import { ref } from 'vue'
+import { ref, onUnmounted } from 'vue'
+import * as L from 'leaflet'
+import '@geoman-io/leaflet-geoman-free'
+import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 import * as turf from '@turf/turf'
 
-export function useTrack(map, townsLayer) {
+import { useCostCalculator } from './useTrackCost'
+
+export function useTrack(map) {
   const { queryLandCoverAPI, queryElevationAPI, calculateCost } = useCostCalculator()
 
   const currentPath = ref([]) // Store the current path being drawn
@@ -16,6 +20,7 @@ export function useTrack(map, townsLayer) {
   // Toggle the visibility of the drawing controls
   const toggleControls = () => {
     controlsVisible.value = !controlsVisible.value
+    map.value.pm.toggleControls()
     if (controlsVisible.value) {
       console.log('Drawing tools are now visible')
     } else {
@@ -23,15 +28,10 @@ export function useTrack(map, townsLayer) {
     }
   }
 
-  // Enable drawing mode when a marker is clicked, but only if drawing is already active
-  townsLayer.value.eachLayer((layer) => {
-    layer.on('click', (e) => {
-      // Only allow drawing if the drawing controls are visible and drawingActive is true
-      if (controlsVisible.value && drawingActive.value) {
-        // Start drawing a line from the marker's location
-        map.value.pm.Draw.Line._createVertex(e.latlng)
-      }
-    })
+  onUnmounted(() => {
+    if (map.value) {
+      map.value.pm.removeControls()
+    }
   })
 
   // Function to calculate distance between two points
@@ -60,9 +60,10 @@ export function useTrack(map, townsLayer) {
     console.log(`Cost updated to: ${currentCost.value}`)
   }
 
-  const initializeTracking = () => {
-    if (!map.value) {
-      console.error('Map instance is not available')
+  const initializeTracking = (townsLayer) => {
+    if (!townsLayer || !townsLayer.value) {
+      // Check if townsLayer is available and initialized
+      console.error('Towns layer is not available')
       return
     }
 
@@ -80,9 +81,18 @@ export function useTrack(map, townsLayer) {
       removalMode: true
     })
 
-    // Start drawing event
-    map.value.on('pm:drawstart', (e) => {
-      if (e.shape === 'Line') {
+    // Hide controls initially
+    map.value.pm.toggleControls()
+
+    // Enable snapping
+    map.value.pm.setGlobalOptions({
+      snappable: true,
+      snapDistance: 20
+    })
+
+    // Track the start of drawing and attach vertex listeners to the working layer
+    map.value.on('pm:drawstart', ({ workingLayer }) => {
+      if (workingLayer && workingLayer.pm._shape === 'Line') {
         drawingActive.value = true // Mark drawing as active
         currentPath.value = [] // Reset the path
         currentCost.value = 0 // Reset the cost
@@ -95,38 +105,25 @@ export function useTrack(map, townsLayer) {
         })
 
         console.log('Starting new path, cost reset to 0')
-      }
-    })
 
-    // Event for adding a vertex
-    map.value.on('pm:vertexadded', (e) => {
-      if (e.shape === 'Line') {
-        const latlng = e.marker.getLatLng()
-        const [lon, lat] = [latlng.lng, latlng.lat]
+        // Track movement of the hint marker
+        const hintMarker = map.value.pm.Draw.Line._hintMarker
+        if (hintMarker) {
+          hintMarker.on('move', async (e) => {
+            const latlng = e.latlng
+            const [lon, lat] = [latlng.lng, latlng.lat]
 
-        currentPath.value.push([lon, lat])
+            // Add current position of hint marker to the path
+            const lastPoint = currentPath.value[currentPath.value.length - 1] || [lon, lat]
+            const distanceMoved = calculateDistance(lastPoint, [lon, lat])
+            console.log('Moving hint marker', distanceMoved)
 
-        if (!lastSampledPoint) {
-          lastSampledPoint = [lon, lat] // Set first sampled point
-        }
-      }
-    })
-
-    // Handle dragging the line or vertices
-    map.value.on('pm:drag', async (e) => {
-      if (drawingActive.value && currentPath.value.length > 1) {
-        const newPath = e.layer.getLatLngs().map((latlng) => [latlng.lng, latlng.lat])
-
-        currentPath.value = newPath // Update path with new position
-
-        // Calculate the distance from the last sampled point to the current point
-        const lastPoint = newPath[newPath.length - 1]
-        const distanceMoved = calculateDistance(lastSampledPoint, lastPoint)
-
-        // If the distance exceeds 1 km, update the cost
-        if (distanceMoved >= 1) {
-          await updateCost()
-          totalDistance = 0 // Reset the distance tracker
+            // Update path if moved > 1 km
+            if (distanceMoved >= 1) {
+              currentPath.value.push([lon, lat])
+              await updateCost()
+            }
+          })
         }
       }
     })
@@ -151,7 +148,22 @@ export function useTrack(map, townsLayer) {
         }
       }
     })
-  }
+
+    // Enable drawing mode when a marker is clicked, but only if drawing is already active
+    townsLayer.value.eachLayer((layer) => {
+      layer.on('click', (e) => {
+        // Only allow drawing if the drawing controls are visible and drawingActive is true
+        if (controlsVisible.value && drawingActive.value) {
+          // Start drawing a line from the marker's location
+          map.value.pm.Draw.Line._createVertex(e.latlng)
+        }
+      })
+    })
+
+    map.value.on('pm:create', (e) => {
+      console.log('Layer created', e)
+    })
+  } // end of initializeTracking
 
   return {
     initializeTracking,

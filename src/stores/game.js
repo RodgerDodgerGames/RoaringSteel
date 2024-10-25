@@ -14,6 +14,7 @@ export const useGameStore = defineStore('gameStore', () => {
 
   // set new state
   const setState = (newState) => {
+    console.log('setting new state', newState)
     state.value = newState
   }
 

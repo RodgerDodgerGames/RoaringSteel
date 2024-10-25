@@ -11,14 +11,14 @@
 import { computed } from 'vue'
 // Props to receive the selected state
 const props = defineProps({
-  state: String
+  state: Object
 })
 // define emits
 const emit = defineEmits(['play-game'])
 
 const msg = computed(() => {
   if (props.state) {
-    return `Selected state: ${props.state}`
+    return `Selected state: ${props.state.properties.NAME}`
   }
   return 'No state selected yet'
 })

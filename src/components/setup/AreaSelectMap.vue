@@ -42,7 +42,7 @@ onMounted(() => {
 
           // Click event: Notify parent of the selected state
           layer.on('click', () => {
-            props.onStateClick(feature.properties.NAME)
+            props.onStateClick(feature)
           })
         }
       }).addTo(map)

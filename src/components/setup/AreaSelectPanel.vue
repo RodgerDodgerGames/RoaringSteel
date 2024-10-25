@@ -1,6 +1,9 @@
 <template>
-  <div class="block">
-    <p>{{ msg }}</p>
+  <div class="level">
+    <p>Where would you like to play?</p>
+    <!-- make message class danger if no state is selected -->
+    <p :class="{ 'has-text-info': props.state, 'has-text-danger': !props.state }">{{ msg }}</p>
+    <button class="button is-primary" @click="emit('play-game')">Play Game</button>
   </div>
 </template>
 
@@ -10,10 +13,12 @@ import { computed } from 'vue'
 const props = defineProps({
   state: String
 })
+// define emits
+const emit = defineEmits(['play-game'])
 
 const msg = computed(() => {
   if (props.state) {
-    return `Selected: ${props.state}`
+    return `Selected state: ${props.state}`
   }
   return 'No state selected yet'
 })

@@ -1,14 +1,17 @@
 <script setup>
-import { ref } from 'vue'
 import AreaSelectMap from '@/components/setup/AreaSelectMap.vue'
 import AreaSelectPanel from '@/components/setup/AreaSelectPanel.vue'
+import { useGameStore } from '@/stores/game'
 
-const selectedState = ref('')
+const gameStore = useGameStore()
 
 // Handle state selection from the map
 const handleStateClick = (stateName) => {
-  selectedState.value = stateName
+  gameStore.setState(stateName)
 }
+
+// Handle play game button click
+const handlePlayGameClick = () => {}
 </script>
 
 <template>
@@ -16,7 +19,7 @@ const handleStateClick = (stateName) => {
     <div class="fixed-grid has-1-cols">
       <div class="grid">
         <div class="cell">
-          <AreaSelectPanel :state="selectedState" />
+          <AreaSelectPanel :state="gameStore.state" @play-game="handlePlayGameClick" />
         </div>
         <div class="cell">
           <AreaSelectMap :onStateClick="handleStateClick" />

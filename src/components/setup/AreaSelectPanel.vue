@@ -3,7 +3,9 @@
     <p>Where would you like to play?</p>
     <!-- make message class danger if no state is selected -->
     <p :class="{ 'has-text-info': props.state, 'has-text-danger': !props.state }">{{ msg }}</p>
-    <button class="button is-primary" @click="emit('play-game')">Play Game</button>
+    <button class="button is-primary" @click="emit('play-game')" :disabled="!props.state">
+      Play Game
+    </button>
   </div>
 </template>
 

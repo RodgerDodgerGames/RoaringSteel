@@ -83,6 +83,22 @@ export const useTownsStore = defineStore('towns', () => {
       }
     }
 
+    // Load test data if the state is Massachusetts (25 is the FIPS code)
+    else if (stateFipsCode === '25') {
+      try {
+        const response = await fetch('/data/mass_towns.json')
+        if (!response.ok) {
+          throw new Error('Network response was not ok')
+        }
+        const massTowns = await response.json()
+        towns.value = massTowns
+        console.log('Loaded test data for Idaho:', towns.value)
+        return
+      } catch (error) {
+        console.error('Failed to load test data:', error)
+      }
+    }
+
     // Fetch industry data for the selected state
     await industryStore.useIndustryData(stateFipsCode)
     console.log('Industry data fetched:', industryStore.employmentData)

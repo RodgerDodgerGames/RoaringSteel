@@ -1,0 +1,110 @@
+[
+    {
+      "msa": "47240",
+      "name": "Vineyard Haven",
+      "stateCode": "25",
+      "population": 20543,
+      "lon": -70.7014995,
+      "lat": 41.3809696,
+      "industries": [],
+      "size": "small"
+    },
+    {
+      "msa": "38340",
+      "name": "Pittsfield",
+      "stateCode": "25",
+      "population": 128763,
+      "lon": -73.2179276,
+      "lat": 42.371493,
+      "industries": [],
+      "size": "small"
+    },
+    {
+      "msa": "12700",
+      "name": "Barnstable Town",
+      "stateCode": "25",
+      "population": 229436,
+      "lon": -70.1648227,
+      "lat": 41.7061233,
+      "industries": [
+        {
+          "industry": 3271
+        }
+      ],
+      "size": "small"
+    },
+    {
+      "msa": "39300",
+      "name": "Providence-Warwick",
+      "stateCode": "25",
+      "population": 576699,
+      "lon": -71.2866874,
+      "lat": 41.7068397,
+      "industries": [
+        {
+          "industry": 114
+        },
+        {
+          "industry": 322
+        },
+        {
+          "industry": 326
+        }
+      ],
+      "size": "small"
+    },
+    {
+      "msa": "44140",
+      "name": "Springfield",
+      "stateCode": "25",
+      "population": 689486,
+      "lon": -72.6356476,
+      "lat": 42.1361975,
+      "industries": [
+        {
+          "industry": 326
+        }
+      ],
+      "size": "medium"
+    },
+    {
+      "msa": "49340",
+      "name": "Worcester",
+      "stateCode": "25",
+      "population": 858898,
+      "lon": -71.940282,
+      "lat": 42.3116934,
+      "industries": [
+        {
+          "industry": 113
+        },
+        {
+          "industry": 2123
+        },
+        {
+          "industry": 322
+        }
+      ],
+      "size": "medium"
+    },
+    {
+      "msa": "14460",
+      "name": "Boston-Cambridge-Newton",
+      "stateCode": "25",
+      "population": 4466315,
+      "lon": -71.0219925,
+      "lat": 42.517606,
+      "industries": [
+        {
+          "industry": 1111
+        },
+        {
+          "industry": 1112
+        },
+        {
+          "industry": 326
+        }
+      ],
+      "size": "medium"
+    }
+  ]

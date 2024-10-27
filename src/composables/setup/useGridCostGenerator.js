@@ -4,6 +4,7 @@
 import { ref } from 'vue'
 import { useElevationAPI } from './useElevationAPI'
 import { useLandCoverAPI } from './useLandCoverAPI'
+import { metersToLatitudeDegrees, metersToLongitudeDegrees } from './useMapSupport'
 
 export function useGridCostGenerator() {
   const grid = ref([])
@@ -14,16 +15,27 @@ export function useGridCostGenerator() {
   async function generateGrid(bounds, cellSize) {
     console.log('Generating grid...')
 
-    const rows = Math.floor((bounds.maxLat - bounds.minLat) / cellSize)
-    const cols = Math.floor((bounds.maxLng - bounds.minLng) / cellSize)
+    // cell size is in meters so convert to degrees
+    // find mean latitude
+    // bounds is in [minX, minY, maxX, maxY]
+    const meanLat = (bounds[3] + bounds[1]) / 2
+    const lngCellSize = metersToLongitudeDegrees(cellSize, meanLat)
+    const latCellSize = metersToLatitudeDegrees(cellSize)
+
+    const rows = Math.floor((bounds[3] - bounds[1]) / latCellSize)
+    const cols = Math.floor((bounds[2] - bounds[0]) / lngCellSize)
     const locations = []
+
+    console.log(`Grid bounds: ${bounds[0]}, ${bounds[1]}, ${bounds[2]}, ${bounds[3]}`)
+    console.log(`Grid dimensions: ${rows} rows x ${cols} cols`)
+    console.log(`Grid cell size: ${cellSize} meters`)
 
     // Loop through the grid and prepare location data for elevation and land cover
     for (let i = 0; i < rows; i++) {
       for (let j = 0; j < cols; j++) {
         const centroid = {
-          lat: bounds.minLat + (i + 0.5) * cellSize,
-          lng: bounds.minLng + (j + 0.5) * cellSize
+          lat: bounds[1] + (i + 0.5) * latCellSize,
+          lng: bounds[0] + (j + 0.5) * lngCellSize
         }
         locations.push(centroid)
 

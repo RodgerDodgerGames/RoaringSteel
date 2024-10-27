@@ -1,6 +1,6 @@
 // Land Cover API
 
-export function useLandCoverApi() {
+export function useLandCoverAPI() {
   const landCoverApiUrl = 'https://www.mrlc.gov/geoserver/mrlc_display/NLCD_2021_Land_Cover_L48/wms'
 
   /**

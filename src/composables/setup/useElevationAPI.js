@@ -1,6 +1,6 @@
 // Elevation API
 
-export function useElevationApi() {
+export function useElevationAPI() {
   const apiUrl = 'https://api.open-elevation.com/api/v1/lookup'
 
   /**

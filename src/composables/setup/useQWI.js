@@ -64,6 +64,12 @@ export default function useQWI(state, industry) {
         throw new Error(errorMessage)
       }
 
+      // skip this industry if there is nothing to process from the server
+      // eg. 204 No Content
+      if (response.status === 204) {
+        return
+      }
+
       // If it was, parse the response as JSON
       console.log('Parsing response as JSON...')
       const jsonData = await response.json()

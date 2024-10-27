@@ -100,6 +100,11 @@ export const useTownsStore = defineStore('towns', () => {
 
       const popData = populationData.value.find((data) => data.msa_code === msaCode)
 
+      // if there is no population data for the MSA, skip it
+      if (!popData) {
+        continue
+      }
+
       towns.value.push({
         msa: msaCode,
         name: popData.name.split(', ')[0],

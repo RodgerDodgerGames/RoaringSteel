@@ -74,6 +74,9 @@ export function useGridCostGenerator() {
       const location = locations[index]
       const landCoverCost = await fetchLandCover(location)
 
+      // wait for a random amount of time to avoid overloading the API
+      await waitRandomly(200, 2000)
+
       grid.value[index].elevation = elevationResults[index].elevation
       grid.value[index].landCover = landCoverCost
 

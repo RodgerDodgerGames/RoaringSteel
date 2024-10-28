@@ -1,5 +1,7 @@
 // Elevation API
 
+import { waitRandomly } from '@/composables/utils'
+
 export function useElevationAPI() {
   const apiUrl = 'https://api.open-elevation.com/api/v1/lookup'
 
@@ -35,6 +37,10 @@ export function useElevationAPI() {
     for (let i = 0; i < locations.length; i += batchSize) {
       const batch = locations.slice(i, i + batchSize)
       console.log(`Fetching batch ${i / batchSize + 1}...`)
+
+      // Wait a random amount of time to avoid overloading the API
+      await waitRandomly(500, 5000)
+
       const batchResults = await fetchElevationBatch(batch)
       elevationResults.push(...batchResults) // Append batch results
     }

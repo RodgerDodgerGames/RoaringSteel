@@ -35,6 +35,7 @@ async function handlePlayGameClick() {
     const bounds = turf.bbox(state.value)
     const cellSize = 10000
     await generateGrid(bounds, cellSize)
+    console.log('Grid generated', grid.value, isGridGenerated.value)
   }
 }
 </script>

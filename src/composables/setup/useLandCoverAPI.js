@@ -1,7 +1,9 @@
 // Land Cover API
 
+import { nlcdCostMap } from '@/config/nlcd'
+
 export function useLandCoverAPI() {
-  const landCoverApiUrl = 'https://www.mrlc.gov/geoserver/mrlc_display/NLCD_2021_Land_Cover_L48/wms'
+  const landCoverApiUrl = 'https://www.mrlc.gov/geoserver/mrlc_display/NLCD_2021_Land_Cover_L48/ows'
 
   /**
    * Constructs the GetFeatureInfo URL to fetch land cover data for a given location.
@@ -22,7 +24,7 @@ export function useLandCoverAPI() {
       BBOX: `${bbox.minLng},${bbox.minLat},${bbox.maxLng},${bbox.maxLat}`,
       WIDTH: width,
       HEIGHT: height,
-      CRS: 'EPSG:4326',
+      CRS: 'CRS:84',
       I: x, // X pixel
       J: y, // Y pixel
       INFO_FORMAT: 'application/json' // Response in JSON format
@@ -57,7 +59,10 @@ export function useLandCoverAPI() {
       const response = await fetch(url)
       const data = await response.json()
       console.log('Received land cover data:', data)
-      return data // Return the land cover data
+      // convert to cost using class map
+      // just grab first feature
+      const cost = nlcdCostMap[data.features[0].properties['PALETTE_INDEX']]
+      return cost
     } catch (error) {
       console.error('Error fetching land cover data:', error)
       return null // Return null in case of error

@@ -55,13 +55,10 @@ export function useGridCostGenerator() {
     // Fetch land cover data for each grid cell
     for (let index = 0; index < locations.length; index++) {
       const location = locations[index]
-      const landCoverData = await fetchLandCover(location)
-
-      // Extract land cover value from the response
-      const landCoverValue = landCoverData.features[0]?.properties?.land_cover_value || 0
+      const landCoverCost = await fetchLandCover(location)
 
       grid.value[index].elevation = elevationResults[index].elevation
-      grid.value[index].landCover = landCoverValue
+      grid.value[index].landCover = landCoverCost
 
       console.log(
         `Assigned elevation ${grid.value[index].elevation} and land cover ${grid.value[index].landCover} to cell ${grid.value[index].id}`

@@ -1,0 +1,5164 @@
+[
+  {
+    "id": "0-0",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -73.44764290933573
+    },
+    "elevation": 118,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "0-1",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -73.32664472800718
+    },
+    "elevation": 104,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "0-2",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -73.20564654667862
+    },
+    "elevation": 148,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "0-3",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -73.08464836535008
+    },
+    "elevation": 1,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "0-4",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -72.96365018402152
+    },
+    "elevation": 29,
+    "landCover": 80,
+    "cost": null
+  },
+  {
+    "id": "0-5",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -72.84265200269297
+    },
+    "elevation": 15,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "0-6",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -72.72165382136441
+    },
+    "elevation": 60,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "0-7",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -72.60065564003585
+    },
+    "elevation": 8,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "0-8",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -72.47965745870731
+    },
+    "elevation": 2,
+    "landCover": 45,
+    "cost": null
+  },
+  {
+    "id": "0-9",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -72.35865927737875
+    },
+    "elevation": 2,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "0-10",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -72.2376610960502
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "0-11",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -72.11666291472164
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "0-12",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -71.9956647333931
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "0-13",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -71.87466655206454
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "0-14",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -71.753668370736
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "0-15",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -71.63267018940743
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "0-16",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -71.51167200807889
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "0-17",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -71.39067382675033
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "0-18",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -71.26967564542178
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "0-19",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -71.14867746409323
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "0-20",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -71.02767928276467
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "0-21",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -70.90668110143612
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "0-22",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -70.78568292010756
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "0-23",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -70.66468473877902
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "0-24",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -70.54368655745046
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "0-25",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -70.42268837612191
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "0-26",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -70.30169019479335
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "0-27",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -70.1806920134648
+    },
+    "elevation": -2,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "0-28",
+    "centroid": {
+      "lat": 41.28287955874955,
+      "lng": -70.05969383213625
+    },
+    "elevation": 20,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "1-0",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -73.44764290933573
+    },
+    "elevation": 198,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "1-1",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -73.32664472800718
+    },
+    "elevation": 182,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "1-2",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -73.20564654667862
+    },
+    "elevation": 122,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "1-3",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -73.08464836535008
+    },
+    "elevation": 23,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "1-4",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -72.96365018402152
+    },
+    "elevation": 90,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "1-5",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -72.84265200269297
+    },
+    "elevation": 41,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "1-6",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -72.72165382136441
+    },
+    "elevation": 105,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "1-7",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -72.60065564003585
+    },
+    "elevation": 106,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "1-8",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -72.47965745870731
+    },
+    "elevation": 72,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "1-9",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -72.35865927737875
+    },
+    "elevation": 21,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "1-10",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -72.2376610960502
+    },
+    "elevation": 105,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "1-11",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -72.11666291472164
+    },
+    "elevation": 38,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "1-12",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -71.9956647333931
+    },
+    "elevation": 60,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "1-13",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -71.87466655206454
+    },
+    "elevation": 37,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "1-14",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -71.753668370736
+    },
+    "elevation": 48,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "1-15",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -71.63267018940743
+    },
+    "elevation": 7,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "1-16",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -71.51167200807889
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "1-17",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -71.39067382675033
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "1-18",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -71.26967564542178
+    },
+    "elevation": -20,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "1-19",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -71.14867746409323
+    },
+    "elevation": -20,
+    "cost": null
+  },
+  {
+    "id": "1-20",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -71.02767928276467
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "1-21",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -70.90668110143612
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "1-22",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -70.78568292010756
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "1-23",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -70.66468473877902
+    },
+    "elevation": -1,
+    "landCover": 7,
+    "cost": null
+  },
+  {
+    "id": "1-24",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -70.54368655745046
+    },
+    "elevation": 5,
+    "landCover": 7,
+    "cost": null
+  },
+  {
+    "id": "1-25",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -70.42268837612191
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "1-26",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -70.30169019479335
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "1-27",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -70.1806920134648
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "1-28",
+    "centroid": {
+      "lat": 41.37271067624865,
+      "lng": -70.05969383213625
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "2-0",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -73.44764290933573
+    },
+    "elevation": 131,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "2-1",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -73.32664472800718
+    },
+    "elevation": 96,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "2-2",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -73.20564654667862
+    },
+    "elevation": 174,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "2-3",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -73.08464836535008
+    },
+    "elevation": 212,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "2-4",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -72.96365018402152
+    },
+    "elevation": 203,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "2-5",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -72.84265200269297
+    },
+    "elevation": 105,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "2-6",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -72.72165382136441
+    },
+    "elevation": 127,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "2-7",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -72.60065564003585
+    },
+    "elevation": 138,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "2-8",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -72.47965745870731
+    },
+    "elevation": 62,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "2-9",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -72.35865927737875
+    },
+    "elevation": 183,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "2-10",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -72.2376610960502
+    },
+    "elevation": 168,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "2-11",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -72.11666291472164
+    },
+    "elevation": 27,
+    "landCover": 15,
+    "cost": null
+  },
+  {
+    "id": "2-12",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -71.9956647333931
+    },
+    "elevation": 68,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "2-13",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -71.87466655206454
+    },
+    "elevation": 122,
+    "landCover": 15,
+    "cost": null
+  },
+  {
+    "id": "2-14",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -71.753668370736
+    },
+    "elevation": 72,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "2-15",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -71.63267018940743
+    },
+    "elevation": 58,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "2-16",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -71.51167200807889
+    },
+    "elevation": 38,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "2-17",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -71.39067382675033
+    },
+    "elevation": -17,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "2-18",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -71.26967564542178
+    },
+    "elevation": -20,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "2-19",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -71.14867746409323
+    },
+    "elevation": -20,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "2-20",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -71.02767928276467
+    },
+    "elevation": -20,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "2-21",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -70.90668110143612
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "2-22",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -70.78568292010756
+    },
+    "elevation": 25,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "2-23",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -70.66468473877902
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "2-24",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -70.54368655745046
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "2-25",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -70.42268837612191
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "2-26",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -70.30169019479335
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "2-27",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -70.1806920134648
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "2-28",
+    "centroid": {
+      "lat": 41.462541793747754,
+      "lng": -70.05969383213625
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "3-0",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -73.44764290933573
+    },
+    "elevation": 149,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "3-1",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -73.32664472800718
+    },
+    "elevation": 121,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "3-2",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -73.20564654667862
+    },
+    "elevation": 95,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "3-3",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -73.08464836535008
+    },
+    "elevation": 201,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "3-4",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -72.96365018402152
+    },
+    "elevation": 196,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "3-5",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -72.84265200269297
+    },
+    "elevation": 132,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "3-6",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -72.72165382136441
+    },
+    "elevation": 117,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "3-7",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -72.60065564003585
+    },
+    "elevation": 132,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "3-8",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -72.47965745870731
+    },
+    "elevation": 117,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "3-9",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -72.35865927737875
+    },
+    "elevation": 148,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "3-10",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -72.2376610960502
+    },
+    "elevation": 134,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "3-11",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -72.11666291472164
+    },
+    "elevation": 40,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "3-12",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -71.9956647333931
+    },
+    "elevation": 73,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "3-13",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -71.87466655206454
+    },
+    "elevation": 75,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "3-14",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -71.753668370736
+    },
+    "elevation": 111,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "3-15",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -71.63267018940743
+    },
+    "elevation": 148,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "3-16",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -71.51167200807889
+    },
+    "elevation": 26,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "3-17",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -71.39067382675033
+    },
+    "elevation": -20,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "3-18",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -71.26967564542178
+    },
+    "elevation": 31,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "3-19",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -71.14867746409323
+    },
+    "elevation": 4,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "3-20",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -71.02767928276467
+    },
+    "elevation": 7,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "3-21",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -70.90668110143612
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "3-22",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -70.78568292010756
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "3-23",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -70.66468473877902
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "3-24",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -70.54368655745046
+    },
+    "elevation": 1,
+    "landCover": 3,
+    "cost": null
+  },
+  {
+    "id": "3-25",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -70.42268837612191
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "3-26",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -70.30169019479335
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "3-27",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -70.1806920134648
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "3-28",
+    "centroid": {
+      "lat": 41.552372911246856,
+      "lng": -70.05969383213625
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "4-0",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -73.44764290933573
+    },
+    "elevation": 212,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "4-1",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -73.32664472800718
+    },
+    "elevation": 215,
+    "landCover": 15,
+    "cost": null
+  },
+  {
+    "id": "4-2",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -73.20564654667862
+    },
+    "elevation": 282,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "4-3",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -73.08464836535008
+    },
+    "elevation": 149,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "4-4",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -72.96365018402152
+    },
+    "elevation": 294,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "4-5",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -72.84265200269297
+    },
+    "elevation": 168,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "4-6",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -72.72165382136441
+    },
+    "elevation": 13,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "4-7",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -72.60065564003585
+    },
+    "elevation": 80,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "4-8",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -72.47965745870731
+    },
+    "elevation": 143,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "4-9",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -72.35865927737875
+    },
+    "elevation": 150,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "4-10",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -72.2376610960502
+    },
+    "elevation": 108,
+    "landCover": 15,
+    "cost": null
+  },
+  {
+    "id": "4-11",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -72.11666291472164
+    },
+    "elevation": 82,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "4-12",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -71.9956647333931
+    },
+    "elevation": 68,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "4-13",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -71.87466655206454
+    },
+    "elevation": 138,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "4-14",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -71.753668370736
+    },
+    "elevation": 141,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "4-15",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -71.63267018940743
+    },
+    "elevation": 145,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "4-16",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -71.51167200807889
+    },
+    "elevation": 50,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "4-17",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -71.39067382675033
+    },
+    "elevation": -20,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "4-18",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -71.26967564542178
+    },
+    "elevation": -20,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "4-19",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -71.14867746409323
+    },
+    "elevation": 43,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "4-20",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -71.02767928276467
+    },
+    "elevation": 6,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "4-21",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -70.90668110143612
+    },
+    "elevation": -17,
+    "landCover": 80,
+    "cost": null
+  },
+  {
+    "id": "4-22",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -70.78568292010756
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "4-23",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -70.66468473877902
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "4-24",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -70.54368655745046
+    },
+    "elevation": 36,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "4-25",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -70.42268837612191
+    },
+    "elevation": 18,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "4-26",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -70.30169019479335
+    },
+    "elevation": 10,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "4-27",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -70.1806920134648
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "4-28",
+    "centroid": {
+      "lat": 41.64220402874596,
+      "lng": -70.05969383213625
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "5-0",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -73.44764290933573
+    },
+    "elevation": 224,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "5-1",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -73.32664472800718
+    },
+    "elevation": 384,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "5-2",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -73.20564654667862
+    },
+    "elevation": 281,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "5-3",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -73.08464836535008
+    },
+    "elevation": 233,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "5-4",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -72.96365018402152
+    },
+    "elevation": 217,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "5-5",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -72.84265200269297
+    },
+    "elevation": 51,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "5-6",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -72.72165382136441
+    },
+    "elevation": 21,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "5-7",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -72.60065564003585
+    },
+    "elevation": 29,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "5-8",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -72.47965745870731
+    },
+    "elevation": 187,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "5-9",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -72.35865927737875
+    },
+    "elevation": 98,
+    "landCover": 7,
+    "cost": null
+  },
+  {
+    "id": "5-10",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -72.2376610960502
+    },
+    "elevation": 95,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "5-11",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -72.11666291472164
+    },
+    "elevation": 157,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "5-12",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -71.9956647333931
+    },
+    "elevation": 106,
+    "landCover": 15,
+    "cost": null
+  },
+  {
+    "id": "5-13",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -71.87466655206454
+    },
+    "elevation": 99,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "5-14",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -71.753668370736
+    },
+    "elevation": 137,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "5-15",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -71.63267018940743
+    },
+    "elevation": 82,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "5-16",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -71.51167200807889
+    },
+    "elevation": 59,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "5-17",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -71.39067382675033
+    },
+    "elevation": -16,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "5-18",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -71.26967564542178
+    },
+    "elevation": -13,
+    "landCover": 80,
+    "cost": null
+  },
+  {
+    "id": "5-19",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -71.14867746409323
+    },
+    "elevation": -19,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "5-20",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -71.02767928276467
+    },
+    "elevation": 37,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "5-21",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -70.90668110143612
+    },
+    "elevation": 2,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "5-22",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -70.78568292010756
+    },
+    "elevation": 4,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "5-23",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -70.66468473877902
+    },
+    "elevation": 8,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "5-24",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -70.54368655745046
+    },
+    "elevation": 66,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "5-25",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -70.42268837612191
+    },
+    "elevation": 3,
+    "landCover": 45,
+    "cost": null
+  },
+  {
+    "id": "5-26",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -70.30169019479335
+    },
+    "elevation": 4,
+    "landCover": 45,
+    "cost": null
+  },
+  {
+    "id": "5-27",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -70.1806920134648
+    },
+    "elevation": 42,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "5-28",
+    "centroid": {
+      "lat": 41.73203514624506,
+      "lng": -70.05969383213625
+    },
+    "elevation": 22,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "6-0",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -73.44764290933573
+    },
+    "elevation": 387,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "6-1",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -73.32664472800718
+    },
+    "elevation": 342,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "6-2",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -73.20564654667862
+    },
+    "elevation": 359,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "6-3",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -73.08464836535008
+    },
+    "elevation": 319,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "6-4",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -72.96365018402152
+    },
+    "elevation": 204,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "6-5",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -72.84265200269297
+    },
+    "elevation": 108,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "6-6",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -72.72165382136441
+    },
+    "elevation": 31,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "6-7",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -72.60065564003585
+    },
+    "elevation": 29,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "6-8",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -72.47965745870731
+    },
+    "elevation": 103,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "6-9",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -72.35865927737875
+    },
+    "elevation": 176,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "6-10",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -72.2376610960502
+    },
+    "elevation": 128,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "6-11",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -72.11666291472164
+    },
+    "elevation": 201,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "6-12",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -71.9956647333931
+    },
+    "elevation": 133,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "6-13",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -71.87466655206454
+    },
+    "elevation": 97,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "6-14",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -71.753668370736
+    },
+    "elevation": 192,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "6-15",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -71.63267018940743
+    },
+    "elevation": 150,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "6-16",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -71.51167200807889
+    },
+    "elevation": 48,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "6-17",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -71.39067382675033
+    },
+    "elevation": -15,
+    "landCover": 80,
+    "cost": null
+  },
+  {
+    "id": "6-18",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -71.26967564542178
+    },
+    "elevation": -6,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "6-19",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -71.14867746409323
+    },
+    "elevation": 2,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "6-20",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -71.02767928276467
+    },
+    "elevation": -6,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "6-21",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -70.90668110143612
+    },
+    "elevation": 0,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "6-22",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -70.78568292010756
+    },
+    "elevation": 26,
+    "landCover": 20,
+    "cost": null
+  },
+  {
+    "id": "6-23",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -70.66468473877902
+    },
+    "elevation": 40,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "6-24",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -70.54368655745046
+    },
+    "elevation": 0,
+    "landCover": 3,
+    "cost": null
+  },
+  {
+    "id": "6-25",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -70.42268837612191
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "6-26",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -70.30169019479335
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "6-27",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -70.1806920134648
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "6-28",
+    "centroid": {
+      "lat": 41.82186626374416,
+      "lng": -70.05969383213625
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "7-0",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -73.44764290933573
+    },
+    "elevation": 240,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "7-1",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -73.32664472800718
+    },
+    "elevation": 344,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "7-2",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -73.20564654667862
+    },
+    "elevation": 428,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "7-3",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -73.08464836535008
+    },
+    "elevation": 312,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "7-4",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -72.96365018402152
+    },
+    "elevation": 217,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "7-5",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -72.84265200269297
+    },
+    "elevation": 98,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "7-6",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -72.72165382136441
+    },
+    "elevation": 53,
+    "landCover": 80,
+    "cost": null
+  },
+  {
+    "id": "7-7",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -72.60065564003585
+    },
+    "elevation": 30,
+    "landCover": 15,
+    "cost": null
+  },
+  {
+    "id": "7-8",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -72.47965745870731
+    },
+    "elevation": 80,
+    "landCover": 20,
+    "cost": null
+  },
+  {
+    "id": "7-9",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -72.35865927737875
+    },
+    "elevation": 232,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "7-10",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -72.2376610960502
+    },
+    "elevation": 213,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "7-11",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -72.11666291472164
+    },
+    "elevation": 200,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "7-12",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -71.9956647333931
+    },
+    "elevation": 214,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "7-13",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -71.87466655206454
+    },
+    "elevation": 127,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "7-14",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -71.753668370736
+    },
+    "elevation": 216,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "7-15",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -71.63267018940743
+    },
+    "elevation": 158,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "7-16",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -71.51167200807889
+    },
+    "elevation": 111,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "7-17",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -71.39067382675033
+    },
+    "elevation": 13,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "7-18",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -71.26967564542178
+    },
+    "elevation": 26,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "7-19",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -71.14867746409323
+    },
+    "elevation": 0,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "7-20",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -71.02767928276467
+    },
+    "elevation": -12,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "7-21",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -70.90668110143612
+    },
+    "elevation": 26,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "7-22",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -70.78568292010756
+    },
+    "elevation": 48,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "7-23",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -70.66468473877902
+    },
+    "elevation": 28,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "7-24",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -70.54368655745046
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "7-25",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -70.42268837612191
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "7-26",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -70.30169019479335
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "7-27",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -70.1806920134648
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "7-28",
+    "centroid": {
+      "lat": 41.91169738124326,
+      "lng": -70.05969383213625
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "8-0",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -73.44764290933573
+    },
+    "elevation": 432,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "8-1",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -73.32664472800718
+    },
+    "elevation": 265,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "8-2",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -73.20564654667862
+    },
+    "elevation": 437,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "8-3",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -73.08464836535008
+    },
+    "elevation": 307,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "8-4",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -72.96365018402152
+    },
+    "elevation": 318,
+    "landCover": 7,
+    "cost": null
+  },
+  {
+    "id": "8-5",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -72.84265200269297
+    },
+    "elevation": 141,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "8-6",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -72.72165382136441
+    },
+    "elevation": 83,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "8-7",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -72.60065564003585
+    },
+    "elevation": 30,
+    "landCover": 80,
+    "cost": null
+  },
+  {
+    "id": "8-8",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -72.47965745870731
+    },
+    "elevation": 84,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "8-9",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -72.35865927737875
+    },
+    "elevation": 284,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "8-10",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -72.2376610960502
+    },
+    "elevation": 305,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "8-11",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -72.11666291472164
+    },
+    "elevation": 271,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "8-12",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -71.9956647333931
+    },
+    "elevation": 147,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "8-13",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -71.87466655206454
+    },
+    "elevation": 158,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "8-14",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -71.753668370736
+    },
+    "elevation": 190,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "8-15",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -71.63267018940743
+    },
+    "elevation": 110,
+    "landCover": 15,
+    "cost": null
+  },
+  {
+    "id": "8-16",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -71.51167200807889
+    },
+    "elevation": 51,
+    "landCover": 80,
+    "cost": null
+  },
+  {
+    "id": "8-17",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -71.39067382675033
+    },
+    "elevation": 78,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "8-18",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -71.26967564542178
+    },
+    "elevation": 25,
+    "landCover": 80,
+    "cost": null
+  },
+  {
+    "id": "8-19",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -71.14867746409323
+    },
+    "elevation": 11,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "8-20",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -71.02767928276467
+    },
+    "elevation": 18,
+    "landCover": 20,
+    "cost": null
+  },
+  {
+    "id": "8-21",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -70.90668110143612
+    },
+    "elevation": 15,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "8-22",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -70.78568292010756
+    },
+    "elevation": 20,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "8-23",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -70.66468473877902
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "8-24",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -70.54368655745046
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "8-25",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -70.42268837612191
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "8-26",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -70.30169019479335
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "8-27",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -70.1806920134648
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "8-28",
+    "centroid": {
+      "lat": 42.00152849874236,
+      "lng": -70.05969383213625
+    },
+    "elevation": 37,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "9-0",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -73.44764290933573
+    },
+    "elevation": 497,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "9-1",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -73.32664472800718
+    },
+    "elevation": 205,
+    "landCover": 15,
+    "cost": null
+  },
+  {
+    "id": "9-2",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -73.20564654667862
+    },
+    "elevation": 484,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "9-3",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -73.08464836535008
+    },
+    "elevation": 256,
+    "landCover": 15,
+    "cost": null
+  },
+  {
+    "id": "9-4",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -72.96365018402152
+    },
+    "elevation": 404,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "9-5",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -72.84265200269297
+    },
+    "elevation": 244,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "9-6",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -72.72165382136441
+    },
+    "elevation": 58,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "9-7",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -72.60065564003585
+    },
+    "elevation": 23,
+    "landCover": 80,
+    "cost": null
+  },
+  {
+    "id": "9-8",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -72.47965745870731
+    },
+    "elevation": 73,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "9-9",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -72.35865927737875
+    },
+    "elevation": 279,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "9-10",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -72.2376610960502
+    },
+    "elevation": 340,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "9-11",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -72.11666291472164
+    },
+    "elevation": 291,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "9-12",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -71.9956647333931
+    },
+    "elevation": 204,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "9-13",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -71.87466655206454
+    },
+    "elevation": 142,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "9-14",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -71.753668370736
+    },
+    "elevation": 143,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "9-15",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -71.63267018940743
+    },
+    "elevation": 95,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "9-16",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -71.51167200807889
+    },
+    "elevation": 71,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "9-17",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -71.39067382675033
+    },
+    "elevation": 89,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "9-18",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -71.26967564542178
+    },
+    "elevation": 104,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "9-19",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -71.14867746409323
+    },
+    "elevation": 111,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "9-20",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -71.02767928276467
+    },
+    "elevation": 55,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "9-21",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -70.90668110143612
+    },
+    "elevation": 59,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "9-22",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -70.78568292010756
+    },
+    "elevation": 7,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "9-23",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -70.66468473877902
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "9-24",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -70.54368655745046
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "9-25",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -70.42268837612191
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "9-26",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -70.30169019479335
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "9-27",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -70.1806920134648
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "9-28",
+    "centroid": {
+      "lat": 42.09135961624146,
+      "lng": -70.05969383213625
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "10-0",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -73.44764290933573
+    },
+    "elevation": 286,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "10-1",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -73.32664472800718
+    },
+    "elevation": 332,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "10-2",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -73.20564654667862
+    },
+    "elevation": 433,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "10-3",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -73.08464836535008
+    },
+    "elevation": 395,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "10-4",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -72.96365018402152
+    },
+    "elevation": 360,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "10-5",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -72.84265200269297
+    },
+    "elevation": 78,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "10-6",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -72.72165382136441
+    },
+    "elevation": 82,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "10-7",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -72.60065564003585
+    },
+    "elevation": 50,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "10-8",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -72.47965745870731
+    },
+    "elevation": 68,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "10-9",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -72.35865927737875
+    },
+    "elevation": 96,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "10-10",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -72.2376610960502
+    },
+    "elevation": 204,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "10-11",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -72.11666291472164
+    },
+    "elevation": 272,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "10-12",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -71.9956647333931
+    },
+    "elevation": 245,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "10-13",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -71.87466655206454
+    },
+    "elevation": 194,
+    "landCover": 45,
+    "cost": null
+  },
+  {
+    "id": "10-14",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -71.753668370736
+    },
+    "elevation": 158,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "10-15",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -71.63267018940743
+    },
+    "elevation": 112,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "10-16",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -71.51167200807889
+    },
+    "elevation": 119,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "10-17",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -71.39067382675033
+    },
+    "elevation": 49,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "10-18",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -71.26967564542178
+    },
+    "elevation": 80,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "10-19",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -71.14867746409323
+    },
+    "elevation": 52,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "10-20",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -71.02767928276467
+    },
+    "elevation": 45,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "10-21",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -70.90668110143612
+    },
+    "elevation": 50,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "10-22",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -70.78568292010756
+    },
+    "elevation": 48,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "10-23",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -70.66468473877902
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "10-24",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -70.54368655745046
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "10-25",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -70.42268837612191
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "10-26",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -70.30169019479335
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "10-27",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -70.1806920134648
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "10-28",
+    "centroid": {
+      "lat": 42.181190733740564,
+      "lng": -70.05969383213625
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "11-0",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -73.44764290933573
+    },
+    "elevation": 488,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "11-1",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -73.32664472800718
+    },
+    "elevation": 256,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "11-2",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -73.20564654667862
+    },
+    "elevation": 478,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "11-3",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -73.08464836535008
+    },
+    "elevation": 530,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "11-4",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -72.96365018402152
+    },
+    "elevation": 189,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "11-5",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -72.84265200269297
+    },
+    "elevation": 340,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "11-6",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -72.72165382136441
+    },
+    "elevation": 105,
+    "landCover": 15,
+    "cost": null
+  },
+  {
+    "id": "11-7",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -72.60065564003585
+    },
+    "elevation": 44,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "11-8",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -72.47965745870731
+    },
+    "elevation": 99,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "11-9",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -72.35865927737875
+    },
+    "elevation": 173,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "11-10",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -72.2376610960502
+    },
+    "elevation": 171,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "11-11",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -72.11666291472164
+    },
+    "elevation": 271,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "11-12",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -71.9956647333931
+    },
+    "elevation": 244,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "11-13",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -71.87466655206454
+    },
+    "elevation": 303,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "11-14",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -71.753668370736
+    },
+    "elevation": 118,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "11-15",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -71.63267018940743
+    },
+    "elevation": 89,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "11-16",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -71.51167200807889
+    },
+    "elevation": 83,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "11-17",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -71.39067382675033
+    },
+    "elevation": 52,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "11-18",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -71.26967564542178
+    },
+    "elevation": 51,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "11-19",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -71.14867746409323
+    },
+    "elevation": 78,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "11-20",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -71.02767928276467
+    },
+    "elevation": 6,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "11-21",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -70.90668110143612
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "11-22",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -70.78568292010756
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "11-23",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -70.66468473877902
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "11-24",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -70.54368655745046
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "11-25",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -70.42268837612191
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "11-26",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -70.30169019479335
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "11-27",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -70.1806920134648
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "11-28",
+    "centroid": {
+      "lat": 42.27102185123967,
+      "lng": -70.05969383213625
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "12-0",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -73.44764290933573
+    },
+    "elevation": 419,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "12-1",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -73.32664472800718
+    },
+    "elevation": 502,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "12-2",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -73.20564654667862
+    },
+    "elevation": 573,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "12-3",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -73.08464836535008
+    },
+    "elevation": 531,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "12-4",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -72.96365018402152
+    },
+    "elevation": 290,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "12-5",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -72.84265200269297
+    },
+    "elevation": 361,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "12-6",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -72.72165382136441
+    },
+    "elevation": 188,
+    "landCover": 7,
+    "cost": null
+  },
+  {
+    "id": "12-7",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -72.60065564003585
+    },
+    "elevation": 38,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "12-8",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -72.47965745870731
+    },
+    "elevation": 97,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "12-9",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -72.35865927737875
+    },
+    "elevation": 159,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "12-10",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -72.2376610960502
+    },
+    "elevation": 181,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "12-11",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -72.11666291472164
+    },
+    "elevation": 238,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "12-12",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -71.9956647333931
+    },
+    "elevation": 278,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "12-13",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -71.87466655206454
+    },
+    "elevation": 233,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "12-14",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -71.753668370736
+    },
+    "elevation": 120,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "12-15",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -71.63267018940743
+    },
+    "elevation": 76,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "12-16",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -71.51167200807889
+    },
+    "elevation": 106,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "12-17",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -71.39067382675033
+    },
+    "elevation": 35,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "12-18",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -71.26967564542178
+    },
+    "elevation": 22,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "12-19",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -71.14867746409323
+    },
+    "elevation": 6,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "12-20",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -71.02767928276467
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "12-21",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -70.90668110143612
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "12-22",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -70.78568292010756
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "12-23",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -70.66468473877902
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "12-24",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -70.54368655745046
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "12-25",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -70.42268837612191
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "12-26",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -70.30169019479335
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "12-27",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -70.1806920134648
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "12-28",
+    "centroid": {
+      "lat": 42.36085296873877,
+      "lng": -70.05969383213625
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "13-0",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -73.44764290933573
+    },
+    "elevation": 431,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "13-1",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -73.32664472800718
+    },
+    "elevation": 362,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "13-2",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -73.20564654667862
+    },
+    "elevation": 303,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "13-3",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -73.08464836535008
+    },
+    "elevation": 486,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "13-4",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -72.96365018402152
+    },
+    "elevation": 502,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "13-5",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -72.84265200269297
+    },
+    "elevation": 401,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "13-6",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -72.72165382136441
+    },
+    "elevation": 352,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "13-7",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -72.60065564003585
+    },
+    "elevation": 44,
+    "landCover": 20,
+    "cost": null
+  },
+  {
+    "id": "13-8",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -72.47965745870731
+    },
+    "elevation": 189,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "13-9",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -72.35865927737875
+    },
+    "elevation": 272,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "13-10",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -72.2376610960502
+    },
+    "elevation": 270,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "13-11",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -72.11666291472164
+    },
+    "elevation": 342,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "13-12",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -71.9956647333931
+    },
+    "elevation": 257,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "13-13",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -71.87466655206454
+    },
+    "elevation": 320,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "13-14",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -71.753668370736
+    },
+    "elevation": 152,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "13-15",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -71.63267018940743
+    },
+    "elevation": 116,
+    "landCover": 80,
+    "cost": null
+  },
+  {
+    "id": "13-16",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -71.51167200807889
+    },
+    "elevation": 96,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "13-17",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -71.39067382675033
+    },
+    "elevation": 52,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "13-18",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -71.26967564542178
+    },
+    "elevation": 76,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "13-19",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -71.14867746409323
+    },
+    "elevation": 23,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "13-20",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -71.02767928276467
+    },
+    "elevation": 39,
+    "landCover": 3,
+    "cost": null
+  },
+  {
+    "id": "13-21",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -70.90668110143612
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "13-22",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -70.78568292010756
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "13-23",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -70.66468473877902
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "13-24",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -70.54368655745046
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "13-25",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -70.42268837612191
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "13-26",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -70.30169019479335
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "13-27",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -70.1806920134648
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "13-28",
+    "centroid": {
+      "lat": 42.45068408623787,
+      "lng": -70.05969383213625
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "14-0",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -73.44764290933573
+    },
+    "elevation": 441,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "14-1",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -73.32664472800718
+    },
+    "elevation": 310,
+    "landCover": 15,
+    "cost": null
+  },
+  {
+    "id": "14-2",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -73.20564654667862
+    },
+    "elevation": 468,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "14-3",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -73.08464836535008
+    },
+    "elevation": 618,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "14-4",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -72.96365018402152
+    },
+    "elevation": 543,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "14-5",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -72.84265200269297
+    },
+    "elevation": 529,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "14-6",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -72.72165382136441
+    },
+    "elevation": 210,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "14-7",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -72.60065564003585
+    },
+    "elevation": 71,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "14-8",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -72.47965745870731
+    },
+    "elevation": 369,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "14-9",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -72.35865927737875
+    },
+    "elevation": 339,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "14-10",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -72.2376610960502
+    },
+    "elevation": 239,
+    "landCover": 7,
+    "cost": null
+  },
+  {
+    "id": "14-11",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -72.11666291472164
+    },
+    "elevation": 342,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "14-12",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -71.9956647333931
+    },
+    "elevation": 309,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "14-13",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -71.87466655206454
+    },
+    "elevation": 280,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "14-14",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -71.753668370736
+    },
+    "elevation": 106,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "14-15",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -71.63267018940743
+    },
+    "elevation": 86,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "14-16",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -71.51167200807889
+    },
+    "elevation": 87,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "14-17",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -71.39067382675033
+    },
+    "elevation": 105,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "14-18",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -71.26967564542178
+    },
+    "elevation": 88,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "14-19",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -71.14867746409323
+    },
+    "elevation": 31,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "14-20",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -71.02767928276467
+    },
+    "elevation": 40,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "14-21",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -70.90668110143612
+    },
+    "elevation": 7,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "14-22",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -70.78568292010756
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "14-23",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -70.66468473877902
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "14-24",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -70.54368655745046
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "14-25",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -70.42268837612191
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "14-26",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -70.30169019479335
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "14-27",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -70.1806920134648
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "14-28",
+    "centroid": {
+      "lat": 42.54051520373697,
+      "lng": -70.05969383213625
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "15-0",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -73.44764290933573
+    },
+    "elevation": 528,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "15-1",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -73.32664472800718
+    },
+    "elevation": 671,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "15-2",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -73.20564654667862
+    },
+    "elevation": 458,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "15-3",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -73.08464836535008
+    },
+    "elevation": 529,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "15-4",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -72.96365018402152
+    },
+    "elevation": 504,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "15-5",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -72.84265200269297
+    },
+    "elevation": 236,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "15-6",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -72.72165382136441
+    },
+    "elevation": 328,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "15-7",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -72.60065564003585
+    },
+    "elevation": 98,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "15-8",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -72.47965745870731
+    },
+    "elevation": 67,
+    "landCover": 20,
+    "cost": null
+  },
+  {
+    "id": "15-9",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -72.35865927737875
+    },
+    "elevation": 228,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "15-10",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -72.2376610960502
+    },
+    "elevation": 217,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "15-11",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -72.11666291472164
+    },
+    "elevation": 255,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "15-12",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -71.9956647333931
+    },
+    "elevation": 341,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "15-13",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -71.87466655206454
+    },
+    "elevation": 330,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "15-14",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -71.753668370736
+    },
+    "elevation": 205,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "15-15",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -71.63267018940743
+    },
+    "elevation": 145,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "15-16",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -71.51167200807889
+    },
+    "elevation": 94,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "15-17",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -71.39067382675033
+    },
+    "elevation": 39,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "15-18",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -71.26967564542178
+    },
+    "elevation": 41,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "15-19",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -71.14867746409323
+    },
+    "elevation": 44,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "15-20",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -71.02767928276467
+    },
+    "elevation": 35,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "15-21",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -70.90668110143612
+    },
+    "elevation": 10,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "15-22",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -70.78568292010756
+    },
+    "elevation": 15,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "15-23",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -70.66468473877902
+    },
+    "elevation": 40,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "15-24",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -70.54368655745046
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "15-25",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -70.42268837612191
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "15-26",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -70.30169019479335
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "15-27",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -70.1806920134648
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "15-28",
+    "centroid": {
+      "lat": 42.630346321236075,
+      "lng": -70.05969383213625
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "16-0",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -73.44764290933573
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "16-1",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -73.32664472800718
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "16-2",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -73.20564654667862
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "16-3",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -73.08464836535008
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "16-4",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -72.96365018402152
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "16-5",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -72.84265200269297
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "16-6",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -72.72165382136441
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "16-7",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -72.60065564003585
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "16-8",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -72.47965745870731
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "16-9",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -72.35865927737875
+    },
+    "elevation": 0,
+    "landCover": 15,
+    "cost": null
+  },
+  {
+    "id": "16-10",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -72.2376610960502
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "16-11",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -72.11666291472164
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "16-12",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -71.9956647333931
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "16-13",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -71.87466655206454
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "16-14",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -71.753668370736
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "16-15",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -71.63267018940743
+    },
+    "elevation": 0,
+    "landCover": 45,
+    "cost": null
+  },
+  {
+    "id": "16-16",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -71.51167200807889
+    },
+    "elevation": 0,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "16-17",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -71.39067382675033
+    },
+    "elevation": 0,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "16-18",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -71.26967564542178
+    },
+    "elevation": 0,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "16-19",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -71.14867746409323
+    },
+    "elevation": 0,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "16-20",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -71.02767928276467
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "16-21",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -70.90668110143612
+    },
+    "elevation": 0,
+    "landCover": 80,
+    "cost": null
+  },
+  {
+    "id": "16-22",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -70.78568292010756
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "16-23",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -70.66468473877902
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "16-24",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -70.54368655745046
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "16-25",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -70.42268837612191
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "16-26",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -70.30169019479335
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "16-27",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -70.1806920134648
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "16-28",
+    "centroid": {
+      "lat": 42.72017743873518,
+      "lng": -70.05969383213625
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "17-0",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -73.44764290933573
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "17-1",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -73.32664472800718
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "17-2",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -73.20564654667862
+    },
+    "elevation": 0,
+    "landCover": 50,
+    "cost": null
+  },
+  {
+    "id": "17-3",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -73.08464836535008
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "17-4",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -72.96365018402152
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "17-5",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -72.84265200269297
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "17-6",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -72.72165382136441
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "17-7",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -72.60065564003585
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "17-8",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -72.47965745870731
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "17-9",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -72.35865927737875
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "17-10",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -72.2376610960502
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "17-11",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -72.11666291472164
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "17-12",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -71.9956647333931
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "17-13",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -71.87466655206454
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "17-14",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -71.753668370736
+    },
+    "elevation": 0,
+    "landCover": 10,
+    "cost": null
+  },
+  {
+    "id": "17-15",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -71.63267018940743
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "17-16",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -71.51167200807889
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "17-17",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -71.39067382675033
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "17-18",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -71.26967564542178
+    },
+    "elevation": 0,
+    "landCover": 65,
+    "cost": null
+  },
+  {
+    "id": "17-19",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -71.14867746409323
+    },
+    "elevation": 0,
+    "landCover": 3,
+    "cost": null
+  },
+  {
+    "id": "17-20",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -71.02767928276467
+    },
+    "elevation": 0,
+    "landCover": 15,
+    "cost": null
+  },
+  {
+    "id": "17-21",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -70.90668110143612
+    },
+    "elevation": 0,
+    "landCover": 35,
+    "cost": null
+  },
+  {
+    "id": "17-22",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -70.78568292010756
+    },
+    "elevation": 0,
+    "landCover": 999,
+    "cost": null
+  },
+  {
+    "id": "17-23",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -70.66468473877902
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "17-24",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -70.54368655745046
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "17-25",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -70.42268837612191
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "17-26",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -70.30169019479335
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "17-27",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -70.1806920134648
+    },
+    "elevation": 0,
+    "cost": null
+  },
+  {
+    "id": "17-28",
+    "centroid": {
+      "lat": 42.81000855623428,
+      "lng": -70.05969383213625
+    },
+    "elevation": 0,
+    "cost": null
+  }
+]

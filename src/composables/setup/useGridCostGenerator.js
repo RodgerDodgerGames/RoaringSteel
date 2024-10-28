@@ -15,6 +15,23 @@ export function useGridCostGenerator() {
   async function generateGrid(bounds, cellSize) {
     console.log('Generating grid...')
 
+    // if mass_grid.json exists, use it
+    // it is in public/data/mass_grid.json
+    // try {
+    //   const response = await fetch('/data/mass_grid.json')
+    //   if (!response.ok) {
+    //     throw new Error('Network response was not ok')
+    //   }
+    //   const massGrid = await response.json()
+    //   grid.value = massGrid
+    //   console.log('Loaded test data for Massachusetts:', grid.value)
+    //   focalOpElevation(grid)
+    //   isGridGenerated.value = true
+    //   console.log('Grid generation with elevation and land cover complete.')
+    // } catch (error) {
+    //   console.error('Failed to load test data:', error)
+    // }
+
     // cell size is in meters so convert to degrees
     // find mean latitude
     // bounds is in [minX, minY, maxX, maxY]

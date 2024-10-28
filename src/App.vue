@@ -6,22 +6,29 @@ import * as turf from '@turf/turf'
 
 // import components
 import AreaSelect from '@/views/AreaSelect.vue'
+import GameView from './views/GameView.vue'
 
 // import stores
 import { useGameStore } from '@/stores/game'
 import { useTownsStore } from '@/stores/towns'
+import { useGridStore } from '@/stores/grid'
 
 // setup stores
 const townsStore = useTownsStore()
 const gameStore = useGameStore()
+const gridStore = useGridStore()
 
 // import composables
-import { useGridCostGenerator } from '@/composables/setup/useGridCostGenerator'
 
 // STATE
 
-// setup refs
+// which view should be shown
+const currentView = ref('areaSelect')
+
+// state where game is being played
 const { state } = storeToRefs(gameStore)
+
+// METHODS
 
 // Handle play game button click
 async function handlePlayGameClick() {
@@ -30,12 +37,12 @@ async function handlePlayGameClick() {
     // run setup towns after the state is selected
     await townsStore.setupTowns(state.value.properties.STATE)
     // run cost grid setup
-    const { grid, isGridGenerated, generateGrid } = useGridCostGenerator()
     // generate grid using the selected state bounds
     const bounds = turf.bbox(state.value)
     const cellSize = 10000
-    await generateGrid(bounds, cellSize)
-    console.log('Grid generated', grid.value, isGridGenerated.value)
+    await gridStore.generateGrid(bounds, cellSize)
+    // once grid is generated, set view to game
+    currentView.value = 'game'
   }
 }
 </script>
@@ -45,7 +52,8 @@ async function handlePlayGameClick() {
     <!-- Main Content Section -->
     <section class="section">
       <div class="container">
-        <AreaSelect @play-game="handlePlayGameClick" />
+        <AreaSelect v-if="currentView === 'areaSelect'" @play-game="handlePlayGameClick" />
+        <GameView v-if="currentView === 'game'" />
       </div>
     </section>
   </div>

@@ -4,27 +4,27 @@
 
 export const nlcdCostMap = {
   // Water and Ice/Snow
-  11: 999, // Open Water
-  12: 999, // Perennial Ice/Snow
+  11: 9990, // Open Water
+  12: 9990, // Perennial Ice/Snow
   // Developed Areas
-  21: 35, // Developed, Open Space
-  22: 50, // Developed, Low Intensity
-  23: 65, // Developed, Medium Intensity
-  24: 80, // Developed, High Intensity
+  21: 350, // Developed, Open Space
+  22: 500, // Developed, Low Intensity
+  23: 650, // Developed, Medium Intensity
+  24: 800, // Developed, High Intensity
   // Barren Land
-  31: 3, // Barren Land (Rock/Sand/Clay)
+  31: 30, // Barren Land (Rock/Sand/Clay)
   // Forest
-  41: 35, // Deciduous Forest
-  42: 35, // Evergreen Forest
-  43: 35, // Mixed Forest
+  41: 350, // Deciduous Forest
+  42: 350, // Evergreen Forest
+  43: 350, // Mixed Forest
   // Shrubland
-  52: 10, // Shrub/Scrub
+  52: 100, // Shrub/Scrub
   // Agriculture
-  81: 15, // Pasture/Hay
-  82: 20, // Cultivated Crops
+  81: 150, // Pasture/Hay
+  82: 200, // Cultivated Crops
   // Grasslands
-  71: 7, // Grassland/Herbaceous
+  71: 70, // Grassland/Herbaceous
   // Wetlands
-  90: 50, // Woody Wetlands
-  95: 45 // Emergent Herbaceous Wetlands
+  90: 500, // Woody Wetlands
+  95: 450 // Emergent Herbaceous Wetlands
 }

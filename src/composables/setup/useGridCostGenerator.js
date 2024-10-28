@@ -5,6 +5,7 @@ import { ref } from 'vue'
 import { useElevationAPI } from './useElevationAPI'
 import { useLandCoverAPI } from './useLandCoverAPI'
 import { metersToLatitudeDegrees, metersToLongitudeDegrees } from './useMapSupport'
+import { waitRandomly } from '@/composables/utils'
 
 export function useGridCostGenerator() {
   const grid = ref([])
@@ -67,10 +68,18 @@ export function useGridCostGenerator() {
     }
 
     // Fetch elevation for all locations
-    const elevationResults = await fetchElevationsInBatches(locations, 100)
+    const elevationResults = await fetchElevationsInBatches(locations, 10)
 
     // Fetch land cover data for each grid cell
     for (let index = 0; index < locations.length; index++) {
+      // if the elevation for a location is null or zero
+      // set both elevation and land cover to null
+      if (!elevationResults[index] || elevationResults[index].elevation === 0) {
+        grid.value[index].elevation = null
+        grid.value[index].landCover = null
+        continue
+      }
+
       const location = locations[index]
       const landCoverCost = await fetchLandCover(location)
 
@@ -85,13 +94,66 @@ export function useGridCostGenerator() {
       )
     }
 
+    // calculate total cost for grid
+    focalOpElevation(grid)
+
+    // remove all cells with null cost
+    grid.value = grid.value.filter((cell) => cell.cost !== null)
+
     isGridGenerated.value = true
     console.log('Grid generation with elevation and land cover complete.')
+    console.log('Grid:', grid.value)
   }
 
   return {
     grid,
     isGridGenerated,
     generateGrid
+  }
+
+  // run a focal operation over the elevation values in the grid cells
+  // use a 3x3 neighborhood
+  // combine output with land cover to get total cost for each cell
+  function focalOpElevation(grid) {
+    // Parse the flat grid to map each cell by its `id` for quick lookups
+    const cellMap = grid.value.reduce((map, cell) => {
+      map[cell.id] = cell
+      return map
+    }, {})
+
+    // Iterate over each cell in the grid
+    grid.value.forEach((cell) => {
+      // if the landcover or elevation value is null
+      // set the cost to null and continue
+      if (!cell.landCover || !cell.elevation) {
+        cell.cost = null
+        return
+      }
+
+      const [row, col] = cell.id.split('-').map(Number) // Get row and col from id
+      let elevationCost = 0
+
+      // Check neighbors in a 3x3 window
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue // Skip the target cell itself
+
+          const neighborId = `${row + dr}-${col + dc}`
+          const neighborCell = cellMap[neighborId]
+
+          if (neighborCell) {
+            // Calculate elevation difference with the neighboring cell
+            elevationCost += Math.abs(cell.elevation - neighborCell.elevation)
+          }
+        }
+      }
+
+      // Calculate total cost and update the cell directly
+      cell.cost = elevationCost + cell.landCover
+
+      console.log(
+        `Calculated cost for cell ${cell.id}: landcover ${cell.landCover}, elevation ${elevationCost}`
+      )
+    })
   }
 }

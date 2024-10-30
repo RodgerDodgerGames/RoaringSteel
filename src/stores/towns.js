@@ -1,5 +1,12 @@
+// towns.js
+// store for loading, managing, and classifying towns data
+
+// IMPORTS
 import { ref } from 'vue'
 import { defineStore, storeToRefs } from 'pinia'
+
+// composables
+import { useLocalStorage } from '@vueuse/core'
 import { useIndustryStore } from './industry'
 import useCensus from '../composables/setup/useCensus'
 import getMSALatLon from '../composables/setup/useTigerWeb'
@@ -15,43 +22,6 @@ const classifyThresholds = {
 }
 
 // STORE
-/**
- * Store for managing towns data.
- *
- * @typedef {Object} Town
- * @property {string} msa - The MSA code of the town.
- * @property {string} name - The name of the town.
- * @property {string} stateCode - The state code of the town.
- * @property {number} population - The population of the town.
- * @property {number} lon - The longitude of the town.
- * @property {number} lat - The latitude of the town.
- * @property {Array<Object>} industries - The industries present in the town.
- * @property {string} size - The size category of the town (small, medium, large).
- *
- * @typedef {Object} Industry
- * @property {string} name - The name of the industry.
- * @property {number} industry - The industry code.
- * @property {Object} meanEmp - The mean employment data for the industry.
- * @property {number} proportion - The proportion of employment for the industry.
- *
- * @typedef {Object} PopulationData
- * @property {string} msa_code - The MSA code.
- * @property {string} name - The name of the town.
- * @property {string} state_code - The state code.
- * @property {string} population - The population of the town.
- *
- * @typedef {Object} MaxTownsPerIndustry
- * @property {number} industry - The industry code.
- * @property {number} maxTowns - The maximum number of towns for the industry.
- *
- * @typedef {Object} TownSizes
- * @property {number} numSmall - The number of small towns.
- * @property {number} numMedium - The number of medium towns.
- *
- * @returns {Object} The towns store.
- * @returns {Ref<Array<Town>>} towns - The list of towns.
- * @returns {Function} setupTowns - Function to setup towns for the selected state.
- */
 export const useTownsStore = defineStore('towns', () => {
   const industryStore = useIndustryStore()
 
@@ -67,36 +37,14 @@ export const useTownsStore = defineStore('towns', () => {
     selectedState.value = stateFipsCode
     console.log('Selected state:', stateFipsCode)
 
-    // Load test data if the state is Idaho (16 is the FIPS code for Idaho)
-    if (stateFipsCode === '16') {
-      try {
-        const response = await fetch('/data/idaho_towns.json')
-        if (!response.ok) {
-          throw new Error('Network response was not ok')
-        }
-        const idahoTowns = await response.json()
-        towns.value = idahoTowns
-        console.log('Loaded test data for Idaho:', towns.value)
-        return
-      } catch (error) {
-        console.error('Failed to load test data:', error)
-      }
-    }
+    // Use `localStorage` key for caching each state's towns data
+    const cachedTowns = useLocalStorage(`towns_${stateFipsCode}`, [])
 
-    // Load test data if the state is Massachusetts (25 is the FIPS code)
-    else if (stateFipsCode === '25') {
-      try {
-        const response = await fetch('/data/mass_towns.json')
-        if (!response.ok) {
-          throw new Error('Network response was not ok')
-        }
-        const massTowns = await response.json()
-        towns.value = massTowns
-        console.log('Loaded test data for Idaho:', towns.value)
-        return
-      } catch (error) {
-        console.error('Failed to load test data:', error)
-      }
+    // Load cached data if available
+    if (cachedTowns.value.length > 0) {
+      towns.value = cachedTowns.value
+      console.log(`Loaded cached towns data for state ${stateFipsCode}:`, towns.value)
+      return
     }
 
     // Fetch industry data for the selected state
@@ -135,6 +83,10 @@ export const useTownsStore = defineStore('towns', () => {
     // Assign tourism, industries, and sizes to towns
     assignTowns()
     console.log('Towns after assignment:', towns.value)
+
+    // Cache the towns data in localStorage
+    cachedTowns.value = towns.value
+    console.log(`Cached towns data for state ${stateFipsCode}:`, towns.value)
   }
 
   // HELPERS

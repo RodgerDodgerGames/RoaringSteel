@@ -3,6 +3,9 @@
 
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+
+// composables
+import { useLocalStorage } from '@vueuse/core'
 import { useElevationAPI } from '../composables/setup/useElevationAPI'
 import { useLandCoverAPI } from '../composables/setup/useLandCoverAPI'
 import {
@@ -12,101 +15,90 @@ import {
 import { waitRandomly } from '@/composables/utils'
 
 export const useGridStore = defineStore('gridStore', () => {
-  const grid = ref([])
-  const isGridGenerated = ref(false)
+  // `useLocalStorage` automatically binds `grid` to `localStorage`
+  const grid = useLocalStorage('cachedGrid', [])
+  // check if grid already exists in cache
+  const isGridGenerated = ref(grid.value.length > 0)
+
   const { fetchElevationsInBatches } = useElevationAPI()
   const { fetchLandCover } = useLandCoverAPI()
 
   async function generateGrid(bounds, cellSize) {
     console.log('Generating grid...')
 
-    // if mass_grid.json exists, use it
-    // it is in public/data/mass_grid.json
-    try {
-      const response = await fetch('/data/mass_grid.json')
-      if (!response.ok) {
-        throw new Error('Network response was not ok')
-      }
-      const massGrid = await response.json()
-      grid.value = massGrid
-      console.log('Loaded test data for Massachusetts:', grid.value)
-      // remove all grid cells where either elevation or land cover is null or zero
-      grid.value = grid.value.filter((cell) => cell.elevation && cell.landCover)
-      focalOpElevation(grid)
-      isGridGenerated.value = true
-      console.log('Grid generation with elevation and land cover complete.')
-      console.log('Grid:', grid.value)
-    } catch (error) {
-      console.error('Failed to load test data:', error)
+    // check if grid already exists in cache
+    if (isGridGenerated.value) {
+      console.log('Using cached grid data.')
+      return
     }
 
-    // // cell size is in meters so convert to degrees
-    // // find mean latitude
-    // // bounds is in [minX, minY, maxX, maxY]
-    // const meanLat = (bounds[3] + bounds[1]) / 2
-    // const lngCellSize = metersToLongitudeDegrees(cellSize, meanLat)
-    // const latCellSize = metersToLatitudeDegrees(cellSize)
+    // cell size is in meters so convert to degrees
+    // find mean latitude
+    // bounds is in [minX, minY, maxX, maxY]
+    const meanLat = (bounds[3] + bounds[1]) / 2
+    const lngCellSize = metersToLongitudeDegrees(cellSize, meanLat)
+    const latCellSize = metersToLatitudeDegrees(cellSize)
 
-    // const rows = Math.floor((bounds[3] - bounds[1]) / latCellSize)
-    // const cols = Math.floor((bounds[2] - bounds[0]) / lngCellSize)
-    // const locations = []
+    const rows = Math.floor((bounds[3] - bounds[1]) / latCellSize)
+    const cols = Math.floor((bounds[2] - bounds[0]) / lngCellSize)
+    const locations = []
 
-    // console.log(`Grid bounds: ${bounds[0]}, ${bounds[1]}, ${bounds[2]}, ${bounds[3]}`)
-    // console.log(`Grid dimensions: ${rows} rows x ${cols} cols`)
-    // console.log(`Grid cell size: ${cellSize} meters`)
+    console.log(`Grid bounds: ${bounds[0]}, ${bounds[1]}, ${bounds[2]}, ${bounds[3]}`)
+    console.log(`Grid dimensions: ${rows} rows x ${cols} cols`)
+    console.log(`Grid cell size: ${cellSize} meters`)
 
-    // // Loop through the grid and prepare location data for elevation and land cover
-    // for (let i = 0; i < rows; i++) {
-    //   for (let j = 0; j < cols; j++) {
-    //     const centroid = {
-    //       lat: bounds[1] + (i + 0.5) * latCellSize,
-    //       lng: bounds[0] + (j + 0.5) * lngCellSize
-    //     }
-    //     locations.push(centroid)
+    // Loop through the grid and prepare location data for elevation and land cover
+    for (let i = 0; i < rows; i++) {
+      for (let j = 0; j < cols; j++) {
+        const centroid = {
+          lat: bounds[1] + (i + 0.5) * latCellSize,
+          lng: bounds[0] + (j + 0.5) * lngCellSize
+        }
+        locations.push(centroid)
 
-    //     grid.value.push({
-    //       id: `${i}-${j}`,
-    //       centroid,
-    //       elevation: null, // To be filled later
-    //       landCover: null, // To be filled later
-    //       cost: null // To be calculated
-    //     })
-    //   }
-    // }
+        grid.value.push({
+          id: `${i}-${j}`,
+          centroid,
+          elevation: null, // To be filled later
+          landCover: null, // To be filled later
+          cost: null // To be calculated
+        })
+      }
+    }
 
-    // // Fetch elevation for all locations
-    // const elevationResults = await fetchElevationsInBatches(locations, 10)
+    // Fetch elevation for all locations
+    const elevationResults = await fetchElevationsInBatches(locations, 10)
 
-    // // Fetch land cover data for each grid cell
-    // for (let index = 0; index < locations.length; index++) {
-    // if the elevation for a location is null or zero, skip it
-    // if (!elevationResults[index] || elevationResults[index].elevation === 0) {
-    //   continue
-    // }
+    // Fetch land cover data for each grid cell
+    for (let index = 0; index < locations.length; index++) {
+      // if the elevation for a location is null or zero, skip it
+      if (!elevationResults[index] || elevationResults[index].elevation === 0) {
+        continue
+      }
 
-    //   const location = locations[index]
-    //   const landCoverCost = await fetchLandCover(location)
+      const location = locations[index]
+      const landCoverCost = await fetchLandCover(location)
 
-    //   // wait for a random amount of time to avoid overloading the API
-    //   await waitRandomly(200, 2000)
+      // wait for a random amount of time to avoid overloading the API
+      await waitRandomly(200, 2000)
 
-    //   grid.value[index].elevation = elevationResults[index].elevation
-    //   grid.value[index].landCover = landCoverCost
+      grid.value[index].elevation = elevationResults[index].elevation
+      grid.value[index].landCover = landCoverCost
 
-    //   console.log(
-    //     `Assigned elevation ${grid.value[index].elevation} and land cover ${grid.value[index].landCover} to cell ${grid.value[index].id}`
-    //   )
-    // }
+      console.log(
+        `Assigned elevation ${grid.value[index].elevation} and land cover ${grid.value[index].landCover} to cell ${grid.value[index].id}`
+      )
+    }
 
     // remove all grid cells where either elevation or land cover is null or zero
-    // grid.value = grid.value.filter((cell) => cell.elevation && cell.landCover)
+    grid.value = grid.value.filter((cell) => cell.elevation && cell.landCover)
 
-    // // calculate total cost for grid
-    // focalOpElevation(grid)
+    // calculate total cost for grid
+    focalOpElevation(grid)
 
-    // isGridGenerated.value = true
-    // console.log('Grid generation with elevation and land cover complete.')
-    // console.log('Grid:', grid.value)
+    isGridGenerated.value = true
+    console.log('Grid generation with elevation and land cover complete.')
+    console.log('Grid:', grid.value)
   }
 
   return {

@@ -1,17 +1,22 @@
 <script setup>
+// IMPORTS
+import { storeToRefs } from 'pinia'
 import { onMounted, ref } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+// composables
 import { useTowns } from '@/composables/map/useTowns'
-import { useTrack } from '@/composables/map/useTrack' // Import the updated useTrack
+import { useTrack } from '@/composables/map/useTrack'
+// components
 import DrawButton from '@/components/DrawButton.vue'
+// stores
+import { useTownsStore } from '@/stores/towns'
 
-const props = defineProps({
-  towns: {
-    type: Array,
-    required: true
-  }
-})
+// STATE
+
+// get towns from store
+const townsStore = useTownsStore()
+const { towns } = storeToRefs(townsStore)
 
 const mapContainer = ref(null)
 const map = ref(null)
@@ -27,7 +32,7 @@ onMounted(() => {
   }).addTo(map.value)
 
   if (map.value) {
-    addTownsToMap(map, props.towns)
+    addTownsToMap(map, towns)
     initializeTracking(townsLayer)
   }
 })

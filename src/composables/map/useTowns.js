@@ -16,7 +16,7 @@ export function useTowns() {
 
     const geojson = {
       type: 'FeatureCollection',
-      features: towns.map((town) => {
+      features: towns.value.map((town) => {
         const { lon, lat, ...properties } = town
         return {
           type: 'Feature',

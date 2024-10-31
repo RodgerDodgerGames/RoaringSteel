@@ -7,8 +7,6 @@ import 'leaflet/dist/leaflet.css'
 // composables
 import { useTowns } from '@/composables/map/useTowns'
 import { useTrack } from '@/composables/map/useTrack'
-// components
-import DrawButton from '@/components/DrawButton.vue'
 // stores
 import { useTownsStore } from '@/stores/towns'
 

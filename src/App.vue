@@ -51,10 +51,8 @@ async function handlePlayGameClick() {
   <div id="app">
     <!-- Main Content Section -->
     <section class="section">
-      <div class="container">
-        <AreaSelect v-if="currentView === 'areaSelect'" @play-game="handlePlayGameClick" />
-        <GameView v-if="currentView === 'game'" />
-      </div>
+      <AreaSelect v-if="currentView === 'areaSelect'" @play-game="handlePlayGameClick" />
+      <GameView v-if="currentView === 'game'" />
     </section>
   </div>
 </template>

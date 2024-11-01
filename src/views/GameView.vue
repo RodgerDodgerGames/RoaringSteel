@@ -4,6 +4,10 @@
 // import components
 import DrawButtons from '@/components/map/DrawButtons.vue'
 import MainMap from '@/components/map/MainMap.vue'
+// import game store
+import { useGameStore } from '@/stores/game'
+
+const gameStore = useGameStore()
 </script>
 
 <template>
@@ -25,7 +29,12 @@ import MainMap from '@/components/map/MainMap.vue'
             <a class="panel-tab">Tab 2</a>
           </div>
           <div class="panel-block">
-            <DrawButtons />
+            <!-- show draw buttons when map is available -->
+            <DrawButtons
+              v-if="gameStore.townsLayer"
+              :map="gameStore.mainMap"
+              :towns="gameStore.townsLayer"
+            />
           </div>
         </div>
       </div>

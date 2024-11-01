@@ -10,6 +10,12 @@ export const useGameStore = defineStore('gameStore', () => {
   // selected states (from area select)
   const state = ref(null)
 
+  // main leaflet map
+  const mainMap = ref(null)
+
+  // townsLayer
+  const townsLayer = ref(null)
+
   // ACTIONS
 
   // set new state
@@ -18,10 +24,24 @@ export const useGameStore = defineStore('gameStore', () => {
     state.value = newState
   }
 
+  // set main map
+  const setMainMap = (newMainMap) => {
+    mainMap.value = newMainMap
+  }
+
+  // set towns layer
+  const setTownsLayer = (newTownsLayer) => {
+    townsLayer.value = newTownsLayer
+  }
+
   return {
     // STATE
     state,
+    mainMap,
+    townsLayer,
     // ACTIONS
-    setState
+    setState,
+    setMainMap,
+    setTownsLayer
   }
 })

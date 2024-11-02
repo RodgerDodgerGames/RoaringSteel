@@ -188,6 +188,7 @@ const validateStartPoint = (latlng) => {
 </script>
 
 <template>
+  <div class="panel-block">
   <div class="buttons">
     <button class="button is-primary" @click="onDrawButtonClicked">{{ drawButtonMessage }}</button>
     <button class="button is-danger" @click="enableRemoveMode">Remove</button>

@@ -28,14 +28,13 @@ const gameStore = useGameStore()
             <a class="panel-tab is-active">Tab 1</a>
             <a class="panel-tab">Tab 2</a>
           </div>
-          <div class="panel-block">
-            <!-- show draw buttons when map is available -->
-            <DrawButtons
-              v-if="gameStore.townsLayer"
-              :map="gameStore.mainMap"
-              :towns="gameStore.townsLayer"
-            />
-          </div>
+
+          <!-- show draw buttons when map is available -->
+          <DrawButtons
+            v-if="gameStore.townsLayer"
+            :map="gameStore.mainMap"
+            :towns="gameStore.townsLayer"
+          />
         </div>
       </div>
     </div>

@@ -23,6 +23,7 @@ const runningCostTotal = ref(0)
 const currentGridCellId = ref(null)
 const drawingActive = ref(false)
 const hintMarkerMoveHandler = ref(null)
+const workingLayer = ref(null)
 
 // COMPUTED
 
@@ -77,28 +78,43 @@ onMounted(() => {
   })
 
   // Set up event listener for line drawing
-  props.map.value.on('pm:drawstart', ({ workingLayer }) => {
+  props.map.value.on('pm:drawstart', ({ workingLayer: layer }) => {
+    workingLayer.value = layer // Set the current drawing layer
+    let firstVertexAdded = false // Flag to track the first vertex validation
+
+    // Reset tracking variables
     currentGridCellId.value = null
-    runningCostTotal.value = 0 // Reset cost at start of new line
+    runningCostTotal.value = 0
     drawingActive.value = true
 
-    // Listen for the first vertex added to enable hint marker tracking
-    workingLayer.on('pm:vertexadded', ({ latlng }) => {
-      if (!hintMarkerMoveHandler.value) {
-        const hintMarker = props.map.value.pm.Draw.Line._hintMarker
-        if (hintMarker) {
-          hintMarkerMoveHandler.value = (e) => {
-            const latlng = e.latlng
-            const cell = getGridCellByLatLng(latlng)
+    // Attach event to check the first vertex location
+    workingLayer.value.on('pm:vertexadded', ({ latlng }) => {
+      if (!firstVertexAdded) {
+        // Validate the starting point only for the first vertex
+        if (!validateStartPoint(latlng)) {
+          // Invalid starting point: cancel drawing
+          props.map.value.pm.disableDraw('Line')
+          alert('You must start your line at an existing track endpoint or town marker.')
+          workingLayer.value = null
+        } else {
+          // Start tracking hint marker movement only if start is valid
+          const hintMarker = props.map.value.pm.Draw.Line._hintMarker
+          if (hintMarker && !hintMarkerMoveHandler.value) {
+            hintMarkerMoveHandler.value = (e) => {
+              const latlng = e.latlng
+              const cell = getGridCellByLatLng(latlng)
 
-            if (cell && cell.id !== currentGridCellId.value) {
-              currentGridCellId.value = cell.id
-              if (cell.cost !== null) {
-                runningCostTotal.value += cell.cost
+              if (cell && cell.id !== currentGridCellId.value) {
+                currentGridCellId.value = cell.id
+                console.log(`new cell: ${cell.id}, elev: ${cell.elevation}, lc: ${cell.landCover}`)
+                if (cell.cost !== null) {
+                  runningCostTotal.value += cell.cost
+                }
               }
             }
+            hintMarker.on('move', hintMarkerMoveHandler.value)
           }
-          hintMarker.on('move', hintMarkerMoveHandler.value)
+          firstVertexAdded = true // Mark the first vertex as validated
         }
       }
     })
@@ -106,8 +122,11 @@ onMounted(() => {
 
   props.map.value.on('pm:create', (e) => {
     drawingActive.value = false
+    if (e.layer && e.layer.pm._shape === 'Line') {
+      existingLineLayer.value.push(e.layer)
+    }
 
-    // Remove the hint marker move handler when drawing is finished
+    // Remove hint marker event listener and clear workingLayer
     if (hintMarkerMoveHandler.value) {
       const hintMarker = props.map.value.pm.Draw.Line._hintMarker
       if (hintMarker) {
@@ -115,6 +134,7 @@ onMounted(() => {
       }
       hintMarkerMoveHandler.value = null
     }
+    workingLayer.value = null
   })
 })
 
@@ -126,28 +146,11 @@ const startDrawingLine = () => {
   })
 }
 
-// Validate if line starts at a marker or endpoint
-const validateStartPoint = (lineLayer) => {
-  const startLatLng = lineLayer.getLatLngs()[0]
-
-  const isStartingAtMarker = props.towns
-    .getLayers()
-    .some((marker) => marker.getLatLng().equals(startLatLng))
-
-  const isStartingAtLineEnd = existingLineLayer.value.some((line) => {
-    const linePoints = line.getLatLngs()
-    return (
-      linePoints[0].equals(startLatLng) || linePoints[linePoints.length - 1].equals(startLatLng)
-    )
-  })
-
-  return isStartingAtMarker || isStartingAtLineEnd
-}
-
 // Cancel drawing mode
 const cancelDrawing = () => {
   props.map.value.pm.disableDraw('Line')
   drawingActive.value = false
+  workingLayer.value = null
 }
 
 // Enable removal mode
@@ -162,6 +165,21 @@ const enableEditing = () => {
       layer.pm.toggleEdit()
     }
   })
+}
+
+const validateStartPoint = (latlng) => {
+  // Check if the starting point is a town marker
+  const isStartingAtMarker = props.towns.value
+    .getLayers()
+    .some((marker) => marker.getLatLng().equals(latlng))
+
+  // Check if the starting point is an endpoint of any existing line
+  const isStartingAtLineEnd = existingLineLayer.value.some((line) => {
+    const linePoints = line.getLatLngs()
+    return linePoints[0].equals(latlng) || linePoints[linePoints.length - 1].equals(latlng)
+  })
+
+  return isStartingAtMarker || isStartingAtLineEnd
 }
 </script>
 

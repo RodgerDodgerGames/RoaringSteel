@@ -14,12 +14,12 @@ const gameStore = useGameStore()
   <div class="container is-fluid">
     <div class="columns">
       <!-- Main Map -->
-      <div class="column is-four-fifths">
+      <div class="column is-three-quarters">
         <MainMap />
       </div>
 
       <!-- Side Panel -->
-      <div class="column">
+      <div class="column is-one-quarter">
         <div class="panel">
           <div class="panel-heading">
             <p class="panel-title">Side Panel</p>

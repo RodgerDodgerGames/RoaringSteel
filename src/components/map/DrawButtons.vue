@@ -2,6 +2,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useGridStore } from '@/stores/grid'
+import { formatCurrency } from '@/composables/utils'
 
 const props = defineProps({
   map: {
@@ -109,6 +110,9 @@ onMounted(() => {
                 console.log(`new cell: ${cell.id}, elev: ${cell.elevation}, lc: ${cell.landCover}`)
                 if (cell.cost !== null) {
                   runningCostTotal.value += cell.cost
+
+                  // Update hintMarker tooltip to show the current running cost
+                  hintMarker.setTooltipContent(`Cost: ${formatCurrency(runningCostTotal.value)}`)
                 }
               }
             }
@@ -188,7 +192,27 @@ const validateStartPoint = (latlng) => {
     <button class="button is-primary" @click="onDrawButtonClicked">{{ drawButtonMessage }}</button>
     <button class="button is-danger" @click="enableRemoveMode">Remove</button>
     <button class="button is-info" @click="enableEditing">Edit</button>
-    <div>Running Cost Total: {{ runningCostTotal }}</div>
+    </div>
+  </div>
+  <!-- Itemized Costs List -->
+  <div class="panel-block">
+    <div class="mt-2">
+      <div
+        v-for="(cost, index) in itemizedCosts"
+        :key="index"
+        class="is-flex is-justify-content-space-between"
+      >
+        <span>Section {{ index + 1 }}</span>
+        <span>{{ formatCurrency(cost) }}</span>
+      </div>
+      <!-- Divider line for visual separation -->
+      <hr class="mt-3 mb-3" />
+      <!-- Total Cost at the Bottom -->
+      <div class="is-flex is-justify-content-space-between has-text-weight-bold">
+        <span>Total Cost: </span>
+        <span> {{ formatCurrency(totalCost) }}</span>
+      </div>
+    </div>
   </div>
 </template>
 

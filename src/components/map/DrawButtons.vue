@@ -20,7 +20,9 @@ const gridStore = useGridStore()
 const { grid } = storeToRefs(gridStore)
 
 const existingLineLayer = ref([])
-const runningCostTotal = ref(0)
+const itemizedCosts = ref([]) // List of costs for each completed section
+const runningCostTotal = ref(0) // Running cost for the current line being drawn
+
 const currentGridCellId = ref(null)
 const drawingActive = ref(false)
 const hintMarkerMoveHandler = ref(null)
@@ -28,10 +30,8 @@ const workingLayer = ref(null)
 
 // COMPUTED
 
-// Compute the grid data as a dictionary for faster lookups by `id`
-const gridCellsById = computed(() => {
-  return Object.fromEntries(grid.value.map((cell) => [cell.id, cell]))
-})
+// Compute the total cost of the completed line
+const totalCost = computed(() => itemizedCosts.value.reduce((acc, cost) => acc + cost, 0))
 
 // draw button message
 const drawButtonMessage = computed(() => (drawingActive.value ? 'Cancel' : 'Draw'))
@@ -82,23 +82,25 @@ onMounted(() => {
   props.map.value.on('pm:drawstart', ({ workingLayer: layer }) => {
     workingLayer.value = layer // Set the current drawing layer
     let firstVertexAdded = false // Flag to track the first vertex validation
+    let previousVertex = null // Track the last vertex position to calculate section cost
 
     // Reset tracking variables
     currentGridCellId.value = null
-    runningCostTotal.value = 0
     drawingActive.value = true
+    runningCostTotal.value = 0 // Reset running cost for the new line
+    itemizedCosts.value = [] // Clear itemized costs for each new line
 
     // Attach event to check the first vertex location
     workingLayer.value.on('pm:vertexadded', ({ latlng }) => {
       if (!firstVertexAdded) {
         // Validate the starting point only for the first vertex
         if (!validateStartPoint(latlng)) {
-          // Invalid starting point: cancel drawing
-          props.map.value.pm.disableDraw('Line')
+          cancelDrawing()
           alert('You must start your line at an existing track endpoint or town marker.')
-          workingLayer.value = null
         } else {
-          // Start tracking hint marker movement only if start is valid
+          // Set previousVertex to the first valid vertex
+          previousVertex = latlng
+
           const hintMarker = props.map.value.pm.Draw.Line._hintMarker
           if (hintMarker && !hintMarkerMoveHandler.value) {
             hintMarkerMoveHandler.value = (e) => {
@@ -107,7 +109,6 @@ onMounted(() => {
 
               if (cell && cell.id !== currentGridCellId.value) {
                 currentGridCellId.value = cell.id
-                console.log(`new cell: ${cell.id}, elev: ${cell.elevation}, lc: ${cell.landCover}`)
                 if (cell.cost !== null) {
                   runningCostTotal.value += cell.cost
 
@@ -120,6 +121,17 @@ onMounted(() => {
           }
           firstVertexAdded = true // Mark the first vertex as validated
         }
+      } else {
+        // Calculate section cost from previous vertex to the current vertex
+        const cell = getGridCellByLatLng(latlng)
+        if (previousVertex && cell && cell.cost !== null) {
+          const sectionCost = cell.cost
+          itemizedCosts.value.push(sectionCost) // Add section cost to itemized costs
+          runningCostTotal.value += sectionCost // Update running total for the tooltip
+        }
+
+        // Update previous vertex to the current one for the next segment
+        previousVertex = latlng
       }
     })
   })
@@ -128,6 +140,9 @@ onMounted(() => {
     drawingActive.value = false
     if (e.layer && e.layer.pm._shape === 'Line') {
       existingLineLayer.value.push(e.layer)
+
+      // Reset running cost and previous vertex for the next line
+      runningCostTotal.value = 0
     }
 
     // Remove hint marker event listener and clear workingLayer
@@ -189,10 +204,12 @@ const validateStartPoint = (latlng) => {
 
 <template>
   <div class="panel-block">
-  <div class="buttons">
-    <button class="button is-primary" @click="onDrawButtonClicked">{{ drawButtonMessage }}</button>
-    <button class="button is-danger" @click="enableRemoveMode">Remove</button>
-    <button class="button is-info" @click="enableEditing">Edit</button>
+    <div class="buttons">
+      <button class="button is-primary" @click="onDrawButtonClicked">
+        {{ drawButtonMessage }}
+      </button>
+      <button class="button is-danger" @click="enableRemoveMode">Remove</button>
+      <button class="button is-info" @click="enableEditing">Edit</button>
     </div>
   </div>
   <!-- Itemized Costs List -->

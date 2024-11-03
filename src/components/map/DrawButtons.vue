@@ -1,9 +1,10 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useGridStore } from '@/stores/grid'
 import { formatCurrency } from '@/composables/utils'
 
+// Props for map and towns objects
 const props = defineProps({
   map: {
     type: Object,
@@ -15,61 +16,76 @@ const props = defineProps({
   }
 })
 
-// get grid data from store
+// Store references for reactive state and grid data
 const gridStore = useGridStore()
 const { grid } = storeToRefs(gridStore)
 
-const existingLineLayer = ref([])
-const itemizedCosts = ref([]) // List of costs for each completed section
-const runningCostTotal = ref(0) // Running cost for the current line being drawn
-
-const currentGridCellId = ref(null)
+// Reactive state variables
 const drawingActive = ref(false)
-const hintMarkerMoveHandler = ref(null)
+const currentGridCellId = ref(null)
+const existingLineLayer = ref([])
+const itemizedCosts = ref([]) // Cost for each line section
+const runningCost = ref(0) // Running cost of the line being drawn
 const workingLayer = ref(null)
+const hintMarkerMoveHandler = ref(null)
 
-// COMPUTED
-
-// Compute the total cost of the completed line
+// Computed properties for total cost and draw button text
 const totalCost = computed(() => itemizedCosts.value.reduce((acc, cost) => acc + cost, 0))
-
-// draw button message
 const drawButtonMessage = computed(() => (drawingActive.value ? 'Cancel' : 'Draw'))
 
-// EVENT LISTENERS
+// ================== EVENT HANDLERS ==================
 
-// draw button clicked
+// Toggle draw mode
 function onDrawButtonClicked() {
-  // if drawing is active, cancel
-  if (drawingActive.value) {
-    cancelDrawing()
-  }
-
-  // if it's not active, start drawing
-  else {
-    startDrawingLine()
-  }
+  drawingActive.value ? cancelDrawing() : startDrawingLine()
 }
 
-// Helper to find the closest grid cell based on lat/lng
-const getGridCellByLatLng = (latlng) => {
-  let closestCell = null
-  let minDistance = Infinity
-
-  grid.value.forEach((cell) => {
-    const dist = props.map.value.distance(latlng, L.latLng(cell.centroid.lat, cell.centroid.lng))
-    if (dist < minDistance) {
-      minDistance = dist
-      closestCell = cell
-    }
-  })
-
-  return closestCell
-}
-
-// Initialize drawing controls and event listeners on mounted
+// Initialize town markers and map events on mount
 onMounted(() => {
-  // Set up town markers for line drawing
+  initializeTownMarkers()
+  initializeMapEvents()
+})
+
+// ================== DRAWING CONTROL FUNCTIONS ==================
+
+// Start drawing mode for creating lines
+function startDrawingLine() {
+  props.map.value.pm.enableDraw('Line', { snappable: true, snapDistance: 20 })
+  drawingActive.value = true
+  resetLineTracking()
+}
+
+// Cancel drawing mode and reset state
+function cancelDrawing() {
+  props.map.value.pm.disableDraw('Line')
+  drawingActive.value = false
+  workingLayer.value = null
+}
+
+// ================== COST CALCULATION ==================
+
+// Track running cost and update tooltip
+function updateRunningCostTooltip(latlng, hintMarker) {
+  const cell = getGridCellByLatLng(latlng)
+  if (cell && cell.id !== currentGridCellId.value && cell.cost !== null) {
+    currentGridCellId.value = cell.id
+    runningCost.value += cell.cost
+    hintMarker.setTooltipContent(`Cost: ${formatCurrency(runningCost.value)}`)
+  }
+}
+
+// Calculate cost for each line segment
+function calculateSegmentCost() {
+  // add the running cost to the list of itemized costs
+  itemizedCosts.value.push(runningCost.value)
+  // reset the running cost
+  runningCost.value = 0
+}
+
+// ================== MAP & MARKER SETUP ==================
+
+// Attach click events to town markers for line start validation
+function initializeTownMarkers() {
   props.towns.value.eachLayer((layer) => {
     layer.on('click', (e) => {
       if (drawingActive.value) {
@@ -77,128 +93,126 @@ onMounted(() => {
       }
     })
   })
+}
 
-  // Set up event listener for line drawing
+// Initialize drawing events on the map
+function initializeMapEvents() {
   props.map.value.on('pm:drawstart', ({ workingLayer: layer }) => {
-    workingLayer.value = layer // Set the current drawing layer
-    let firstVertexAdded = false // Flag to track the first vertex validation
-    let previousVertex = null // Track the last vertex position to calculate section cost
+    workingLayer.value = layer
+    setupDrawingEvents()
+  })
 
-    // Reset tracking variables
-    currentGridCellId.value = null
-    drawingActive.value = true
-    runningCostTotal.value = 0 // Reset running cost for the new line
-    itemizedCosts.value = [] // Clear itemized costs for each new line
+  props.map.value.on('pm:create', finalizeDrawing)
+}
 
-    // Attach event to check the first vertex location
-    workingLayer.value.on('pm:vertexadded', ({ latlng }) => {
-      if (!firstVertexAdded) {
-        // Validate the starting point only for the first vertex
-        if (!validateStartPoint(latlng)) {
-          cancelDrawing()
-          alert('You must start your line at an existing track endpoint or town marker.')
-        } else {
-          // Set previousVertex to the first valid vertex
-          previousVertex = latlng
+// Set up vertex addition and hint marker events during drawing
+// This function is called whenever a vertex is added to a line
+// during drawing. It is responsible for:
+// 1. Validating the starting point of the line
+// 2. Adding the hint marker that shows the running cost of the line
+// 3. Calculating the cost of each segment of the line
+function setupDrawingEvents() {
+  // Flag to track whether the first vertex has been added
+  let firstVertexAdded = false
+  // Store the previous vertex for calculating segment costs
+  let previousVertex = null
 
-          const hintMarker = props.map.value.pm.Draw.Line._hintMarker
-          if (hintMarker && !hintMarkerMoveHandler.value) {
-            hintMarkerMoveHandler.value = (e) => {
-              const latlng = e.latlng
-              const cell = getGridCellByLatLng(latlng)
-
-              if (cell && cell.id !== currentGridCellId.value) {
-                currentGridCellId.value = cell.id
-                if (cell.cost !== null) {
-                  runningCostTotal.value += cell.cost
-
-                  // Update hintMarker tooltip to show the current running cost
-                  hintMarker.setTooltipContent(`Cost: ${formatCurrency(runningCostTotal.value)}`)
-                }
-              }
-            }
-            hintMarker.on('move', hintMarkerMoveHandler.value)
-          }
-          firstVertexAdded = true // Mark the first vertex as validated
-        }
+  // Event handler for when a vertex is added
+  workingLayer.value.on('pm:vertexadded', ({ latlng }) => {
+    // If the first vertex, validate that it is a town or endpoint
+    if (!firstVertexAdded) {
+      // If the first vertex is invalid, cancel drawing
+      if (!validateStartPoint(latlng)) {
+        cancelDrawing()
+        alert('Start the line at a town marker or an existing endpoint.')
       } else {
-        // Calculate section cost from previous vertex to the current vertex
-        const cell = getGridCellByLatLng(latlng)
-        if (previousVertex && cell && cell.cost !== null) {
-          const sectionCost = cell.cost
-          itemizedCosts.value.push(sectionCost) // Add section cost to itemized costs
-          runningCostTotal.value += sectionCost // Update running total for the tooltip
-        }
-
-        // Update previous vertex to the current one for the next segment
+        // Otherwise, store the vertex and add the hint marker
         previousVertex = latlng
+        firstVertexAdded = true
+        addHintMarkerMoveHandler()
       }
-    })
-  })
-
-  props.map.value.on('pm:create', (e) => {
-    drawingActive.value = false
-    if (e.layer && e.layer.pm._shape === 'Line') {
-      existingLineLayer.value.push(e.layer)
-
-      // Reset running cost and previous vertex for the next line
-      runningCostTotal.value = 0
+    } else {
+      // For each subsequent vertex, calculate the cost of the segment
+      calculateSegmentCost(previousVertex, latlng)
+      // Update the previous vertex for the next segment
+      previousVertex = latlng
     }
-
-    // Remove hint marker event listener and clear workingLayer
-    if (hintMarkerMoveHandler.value) {
-      const hintMarker = props.map.value.pm.Draw.Line._hintMarker
-      if (hintMarker) {
-        hintMarker.off('move', hintMarkerMoveHandler.value)
-      }
-      hintMarkerMoveHandler.value = null
-    }
-    workingLayer.value = null
-  })
-})
-
-// Start drawing line with cost calculation
-const startDrawingLine = () => {
-  props.map.value.pm.enableDraw('Line', {
-    snappable: true,
-    snapDistance: 20
   })
 }
 
-// Cancel drawing mode
-const cancelDrawing = () => {
-  props.map.value.pm.disableDraw('Line')
+// Finalize drawing by clearing temporary variables and saving the layer
+function finalizeDrawing(e) {
   drawingActive.value = false
+  if (e.layer?.pm?._shape === 'Line') {
+    existingLineLayer.value.push(e.layer)
+  }
+  resetHintMarkerMoveHandler()
   workingLayer.value = null
 }
 
-// Enable removal mode
-const enableRemoveMode = () => {
-  props.map.value.pm.toggleGlobalRemovalMode()
+// Add event handler to update running cost on hint marker movement
+function addHintMarkerMoveHandler() {
+  const hintMarker = props.map.value.pm.Draw.Line._hintMarker
+  if (hintMarker && !hintMarkerMoveHandler.value) {
+    hintMarkerMoveHandler.value = (e) => updateRunningCostTooltip(e.latlng, hintMarker)
+    hintMarker.on('move', hintMarkerMoveHandler.value)
+  }
 }
 
-// Enable edit mode
-const enableEditing = () => {
-  props.map.value.eachLayer((layer) => {
-    if (layer.pm && layer.pm.toggleEdit) {
-      layer.pm.toggleEdit()
+// Remove hint marker movement handler after drawing completion
+function resetHintMarkerMoveHandler() {
+  const hintMarker = props.map.value.pm.Draw.Line._hintMarker
+  if (hintMarker && hintMarkerMoveHandler.value) {
+    hintMarker.off('move', hintMarkerMoveHandler.value)
+    hintMarkerMoveHandler.value = null
+  }
+}
+
+// ================== UTILITIES ==================
+
+// Find the closest grid cell based on a lat/lng position
+function getGridCellByLatLng(latlng) {
+  let closestCell = null
+  let minDistance = Infinity
+  grid.value.forEach((cell) => {
+    const dist = props.map.value.distance(latlng, L.latLng(cell.centroid.lat, cell.centroid.lng))
+    if (dist < minDistance) {
+      minDistance = dist
+      closestCell = cell
     }
   })
+  return closestCell
 }
 
-const validateStartPoint = (latlng) => {
-  // Check if the starting point is a town marker
-  const isStartingAtMarker = props.towns.value
+// Reset line-related tracking variables
+function resetLineTracking() {
+  currentGridCellId.value = null
+  runningCost.value = 0
+  itemizedCosts.value = []
+}
+
+// Validate if the starting point is on a town marker or line endpoint
+function validateStartPoint(latlng) {
+  const isAtTownMarker = props.towns.value
     .getLayers()
     .some((marker) => marker.getLatLng().equals(latlng))
-
-  // Check if the starting point is an endpoint of any existing line
-  const isStartingAtLineEnd = existingLineLayer.value.some((line) => {
+  const isAtLineEnd = existingLineLayer.value.some((line) => {
     const linePoints = line.getLatLngs()
     return linePoints[0].equals(latlng) || linePoints[linePoints.length - 1].equals(latlng)
   })
+  return isAtTownMarker || isAtLineEnd
+}
 
-  return isStartingAtMarker || isStartingAtLineEnd
+// Enable map's global removal mode
+function enableRemoveMode() {
+  props.map.value.pm.toggleGlobalRemovalMode()
+}
+
+// Enable edit mode on existing layers
+function enableEditing() {
+  props.map.value.eachLayer((layer) => {
+    if (layer.pm?.toggleEdit) layer.pm.toggleEdit()
+  })
 }
 </script>
 
@@ -212,8 +226,7 @@ const validateStartPoint = (latlng) => {
       <button class="button is-info" @click="enableEditing">Edit</button>
     </div>
   </div>
-  <!-- Itemized Costs List -->
-  <div class="panel-block">
+  <div class="panel-block" v-if="itemizedCosts.length">
     <div class="mt-2">
       <div
         v-for="(cost, index) in itemizedCosts"
@@ -223,12 +236,9 @@ const validateStartPoint = (latlng) => {
         <span>Section {{ index + 1 }}</span>
         <span>{{ formatCurrency(cost) }}</span>
       </div>
-      <!-- Divider line for visual separation -->
       <hr class="mt-3 mb-3" />
-      <!-- Total Cost at the Bottom -->
       <div class="is-flex is-justify-content-space-between has-text-weight-bold">
-        <span>Total Cost: </span>
-        <span> {{ formatCurrency(totalCost) }}</span>
+        Total Cost: {{ formatCurrency(totalCost) }}
       </div>
     </div>
   </div>

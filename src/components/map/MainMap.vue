@@ -57,4 +57,14 @@ onMounted(() => {
   height: 100vh;
   width: 100%;
 }
+
+.town-tooltip {
+  background: none !important; /* Removes background */
+  border: none !important; /* Removes border */
+  box-shadow: none !important; /* Removes shadow */
+  padding: 0 !important; /* Removes padding */
+  font-size: 12px;
+  font-weight: bold;
+  text-shadow: 0px 0px 3px #ffffff;
+}
 </style>

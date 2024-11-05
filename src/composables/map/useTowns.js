@@ -44,10 +44,11 @@ export function useTowns() {
         const marker = L.marker(latlng, { icon: icon })
 
         // Bind a tooltip to display the town's name
-        marker.bindTooltip(feature.properties.name, {
-          permanent: false, // Make the tooltip always visible
-          direction: 'top', // Position the tooltip above the marker
-          offset: [0, -getIconSize(size) / 2] // Offset so it appears above the marker
+        marker.bindTooltip(feature.properties.name.split('-')[0], {
+          permanent: true, // Make the tooltip always visible
+          direction: 'center',
+          className: 'town-tooltip',
+          offset: [0, 20]
         })
 
         return marker

@@ -71,7 +71,9 @@ export const useTownsStore = defineStore('towns', () => {
 
       towns.value.push({
         msa: msaCode,
-        name: popData.name.split(', ')[0],
+        fullName: popData.name.split(', ')[0],
+        // just grab the first name for the short name
+        name: popData.name.split(', ')[0].split('-')[0],
         stateCode: popData.state_code,
         population: parseFloat(popData.population),
         lon: parseFloat(centroidLongitude),

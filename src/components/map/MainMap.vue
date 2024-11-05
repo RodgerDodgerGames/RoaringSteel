@@ -29,9 +29,13 @@ onMounted(() => {
   // add map to store
   gameStore.setMainMap(map)
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map.value)
+  L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Physical_Map/MapServer/tile/{z}/{y}/{x}',
+    {
+      attribution: 'Tiles &copy; Esri &mdash; Source: US National Park Service',
+      maxZoom: 8
+    }
+  ).addTo(map.value)
 
   if (map.value) {
     // add towns to map

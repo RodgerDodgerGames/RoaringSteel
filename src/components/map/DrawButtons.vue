@@ -23,7 +23,7 @@ const { grid } = storeToRefs(gridStore)
 // Reactive state variables
 const drawingActive = ref(false)
 const currentGridCellId = ref(null)
-const existingLineLayer = ref([])
+const existingLineLayers = ref([])
 const itemizedCosts = ref([]) // Cost for each line section
 const runningCost = ref(0) // Running cost of the line being drawn
 const workingLayer = ref(null)
@@ -118,24 +118,24 @@ function setupDrawingEvents() {
   let previousVertex = null
 
   // Event handler for when a vertex is added
-  workingLayer.value.on('pm:vertexadded', ({ latlng }) => {
+  workingLayer.value.on('pm:vertexadded', (evt) => {
     // If the first vertex, validate that it is a town or endpoint
     if (!firstVertexAdded) {
       // If the first vertex is invalid, cancel drawing
-      if (!validateStartPoint(latlng)) {
+      if (!validateStartPoint(evt.latlng)) {
         cancelDrawing()
         alert('Start the line at a town marker or an existing endpoint.')
       } else {
         // Otherwise, store the vertex and add the hint marker
-        previousVertex = latlng
+        previousVertex = evt.latlng
         firstVertexAdded = true
         addHintMarkerMoveHandler()
       }
     } else {
       // For each subsequent vertex, calculate the cost of the segment
-      calculateSegmentCost(previousVertex, latlng)
+      calculateSegmentCost()
       // Update the previous vertex for the next segment
-      previousVertex = latlng
+      previousVertex = evt.latlng
     }
   })
 }
@@ -144,7 +144,7 @@ function setupDrawingEvents() {
 function finalizeDrawing(e) {
   drawingActive.value = false
   if (e.layer?.pm?._shape === 'Line') {
-    existingLineLayer.value.push(e.layer)
+    existingLineLayers.value.push(e.layer)
   }
   resetHintMarkerMoveHandler()
   workingLayer.value = null
@@ -196,7 +196,7 @@ function validateStartPoint(latlng) {
   const isAtTownMarker = props.towns.value
     .getLayers()
     .some((marker) => marker.getLatLng().equals(latlng))
-  const isAtLineEnd = existingLineLayer.value.some((line) => {
+  const isAtLineEnd = existingLineLayers.value.some((line) => {
     const linePoints = line.getLatLngs()
     return linePoints[0].equals(latlng) || linePoints[linePoints.length - 1].equals(latlng)
   })

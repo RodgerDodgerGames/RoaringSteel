@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import useQWI from '../composables/setup/useQWI'
 import Papa from 'papaparse'
+import { useLocalStorage } from '@vueuse/core'
 
 // path to industry CSV file
 const csvFile = '/data/label_industry_curated_test.csv'
@@ -21,6 +22,19 @@ export const useIndustryStore = defineStore('qwiStore', () => {
   // fetch industry data and QWI data for each industry
   async function useIndustryData(stateFipsCode = '27') {
     console.log('useIndustryData called with stateFipsCode:', stateFipsCode) // Log when the function is called
+
+    // Use `localStorage` key for caching each state's industry data
+    const cachedIndustries = useLocalStorage(`industries_${stateFipsCode}`, [])
+    const cachedEmploymentData = useLocalStorage(`employmentData_${stateFipsCode}`, [])
+    const cachedMSAs = useLocalStorage(`MSAs_${stateFipsCode}`, [])
+
+    // Load cached data if available
+    if (cachedEmploymentData.value.length > 0) {
+      industries.value = cachedIndustries.value
+      employmentData.value = cachedEmploymentData.value
+      MSAs.value = cachedMSAs.value
+      return
+    }
 
     // load the industry data from the CSV file
     industries.value = await loadCSV(csvFile)
@@ -66,6 +80,11 @@ export const useIndustryStore = defineStore('qwiStore', () => {
 
     // Log the average employment data
     console.log('Average employment data:', employmentData.value)
+
+    // cache data in local storage
+    cachedIndustries.value = industries.value
+    cachedEmploymentData.value = employmentData.value
+    cachedMSAs.value = MSAs.value
   }
 
   return {

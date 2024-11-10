@@ -16,22 +16,30 @@ export const useGameStore = defineStore('gameStore', () => {
   // townsLayer
   const townsLayer = ref(null)
 
+  // game turn
+  const turn = ref(0)
+
   // ACTIONS
 
   // set new state
-  const setState = (newState) => {
+  function setState(newState) {
     console.log('setting new state', newState)
     state.value = newState
   }
 
   // set main map
-  const setMainMap = (newMainMap) => {
+  function setMainMap(newMainMap) {
     mainMap.value = newMainMap
   }
 
   // set towns layer
-  const setTownsLayer = (newTownsLayer) => {
+  function setTownsLayer(newTownsLayer) {
     townsLayer.value = newTownsLayer
+  }
+
+  // advance the game turn
+  function advanceTurn() {
+    turn.value++
   }
 
   return {
@@ -42,6 +50,7 @@ export const useGameStore = defineStore('gameStore', () => {
     // ACTIONS
     setState,
     setMainMap,
-    setTownsLayer
+    setTownsLayer,
+    advanceTurn
   }
 })

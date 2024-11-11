@@ -172,8 +172,8 @@ export const useIndustryStore = defineStore('qwiStore', () => {
     // Assign the proportion for each industry
     employmentData.value.forEach((industry) => {
       const industryTotal = industryTotals.find((i) => i.industry === industry.industry)
-      // cap proportion at 0.3
-      industry.proportion = Math.min(industryTotal.totalEmployment / totalEmployment, 0.3)
+      // cap proportion at 0.2
+      industry.proportion = Math.min(industryTotal.totalEmployment / totalEmployment, 0.2)
     })
   }
 })

@@ -12,14 +12,12 @@ import useCensus from '../composables/setup/useCensus'
 import getMSALatLon from '../composables/setup/useTigerWeb'
 
 // CONSTANTS
-const tourismThreshold = 0.1
-const noIndustryThreshold = 0.1
+// town size classes
+const sizeClasses = ['small', 'medium', 'large']
+// percent of towns that an industry can have assigned to them
+const maxTownsForIndustry = 0.2
+// maximum number of industries per town
 const maxIndustries = 3
-const classifyThresholds = {
-  small: 0.45,
-  medium: 0.35,
-  large: 0.2
-}
 
 // STORE
 export const useTownsStore = defineStore('towns', () => {
@@ -96,36 +94,28 @@ export const useTownsStore = defineStore('towns', () => {
   // Assign tourism, industries, and sizes to towns
   function assignTowns() {
     console.log('Assigning towns...')
+    // group towns by population
+    towns.value = naturalBreaks(towns.value, 'population', sizeClasses)
+    console.log('Towns grouped by population:', towns.value)
     assignTourism()
     assignIndustries()
-    assignSizes()
   }
 
-  // Assign tourism industry to top towns by population
+  // Assign tourism industry to all towns with the largest class size
   function assignTourism() {
     console.log('Assigning tourism to towns...')
-    sortTownsByPopulation()
-    const numTourismTowns = Math.floor(tourismThreshold * towns.value.length)
-    console.log('Number of towns assigned tourism:', numTourismTowns)
-
-    for (let i = 0; i < numTourismTowns; i++) {
-      towns.value[i].industries.push({ name: 'Tourism', industry: 9999 })
-      console.log(`Assigned tourism to town: ${towns.value[i].name}`)
-    }
-  }
-
-  // Count towns without an industry
-  function townsWithoutIndustry() {
-    const count = towns.value.filter((town) => town.industries.length === 0).length
-    console.log('Number of towns without an industry:', count)
-    return count
+    towns.value.forEach((town) => {
+      if (town.size === 'large') {
+        town.industries.push({ name: 'Tourism', industry: 9999 })
+      }
+    })
   }
 
   // Calculate the maximum number of towns per industry
   function calcMaxTownsPerIndustry() {
     const maxTowns = industryStore.employmentData.map((industry) => ({
       industry: industry.industry,
-      maxTowns: Math.ceil(towns.value.length * industry.proportion)
+      maxTowns: Math.floor(towns.value.length * industry.proportion) || 1
     }))
     console.log('Max towns per industry:', maxTowns)
     return maxTowns
@@ -133,109 +123,142 @@ export const useTownsStore = defineStore('towns', () => {
 
   // Assign industries to towns
   function assignIndustries() {
-    console.log('Assigning industries to towns...')
+    console.log('Starting industry assignment to towns...')
+
+    // Enrich employment data with industry labels
+    const enrichedEmploymentData = enrichEmploymentData(
+      industryStore.employmentData,
+      industryStore.industries
+    )
+
+    // Step 1: Calculate the maximum number of towns each industry can be assigned to
     const maxTownsPerIndustry = calcMaxTownsPerIndustry()
-    // Initialize industry assignment count with zeroes
-    const industryAssignmentCount = industryStore.employmentData.reduce((acc, industry) => {
-      acc[industry.industry] = 0
-      return acc
-    }, {})
 
-    // Assign industries to towns until the threshold is met
-    while (townsWithoutIndustry() > noIndustryThreshold * towns.value.length) {
-      const totalAssignments = Object.values(industryAssignmentCount).reduce(
-        (acc, count) => acc + count,
-        0
-      )
-      // using maxTownsPerIndustry, find the total number of towns that should be assigned an industry
-      const totalIndustries = maxTownsPerIndustry.reduce(
-        (acc, industry) => acc + industry.maxTowns,
-        0
-      )
-      // check if we have assigned all of the industries
-      if (totalAssignments >= totalIndustries) break
+    // Track assignments for each industry
+    const industryAssignmentCounts = new Map(maxTownsPerIndustry.map((ind) => [ind.industry, 0]))
 
-      for (const industry of industryStore.employmentData) {
-        console.log(`Assigning industry: ${industry.industry}`)
-        const sortedEmp = Object.values(industry.meanEmp).sort((a, b) => b - a)
+    // Step 2: Loop through each industry, applying natural breaks to the normalized employment data
+    for (const industry of enrichedEmploymentData) {
+      const { industry: industryId, label, meanEmp } = industry
+      console.log(`\nAssigning industry: ${label} (ID: ${industryId})`)
 
-        for (const emp of sortedEmp) {
-          const town = findTownForIndustry(
-            industry,
-            emp,
-            maxTownsPerIndustry,
-            industryAssignmentCount
-          )
-          if (town) {
-            town.industries.push({ name: industry.name, industry: industry.industry })
-            console.log(`Assigned industry ${industry.industry} to town ${town.msa}`)
-            industryAssignmentCount[industry.industry]++
-            if (
-              industryAssignmentCount[industry.industry] >=
-              maxTownsPerIndustry.find((i) => i.industry === industry.industry).maxTowns
+      // Get the maximum number of towns allowed for this industry
+      const maxAllowed = maxTownsPerIndustry.find((ind) => ind.industry === industryId).maxTowns
+      // Prepare an array of towns with normalized employment data (employment density)
+      const townsWithEmploymentDensity = towns.value
+        .map((town) => ({
+          ...town,
+          // Normalize by dividing employment by town's population
+          employmentDensity: meanEmp[town.msa] ? meanEmp[town.msa] / town.population : 0
+        }))
+        .filter((town) => town.employmentDensity > 0) // Consider only towns with employment in this industry
+
+      // Apply natural breaks to group towns by employment density for this industry
+      const groupedTowns = naturalBreaks(townsWithEmploymentDensity, 'employmentDensity', [
+        'low',
+        'medium',
+        'high'
+      ])
+      const highDensityTowns = groupedTowns.filter((town) => town.size === 'high')
+      console.log(`Top towns: ${highDensityTowns.map((town) => town.name)}`)
+
+      // Assign industry to towns in the 'high' density group first
+      let assignments = 0
+      for (const town of highDensityTowns) {
+        const assignedCount = industryAssignmentCounts.get(industryId) || 0
+
+        // no checks for max allowed per town or per industry, just assign to town
+        town.industries.push({ name: label, industry: industryId })
+        industryAssignmentCounts.set(industryId, assignedCount + 1)
+        assignments++
+        console.log(`Assigned ${label} to ${town.name} based on high employment density`)
+      }
+
+      // Step 3: If industry hasn't reached max allowed, assign to 'medium' group next
+      if (assignments < maxTownsPerIndustry.find((ind) => ind.industry === industryId).maxTowns) {
+        const mediumDensityTowns = groupedTowns.filter((town) => town.size === 'medium')
+        // sort medium towns by employment density
+        mediumDensityTowns.sort((a, b) => b.employmentDensity - a.employmentDensity)
+        console.log(`Medium density towns: ${mediumDensityTowns.map((town) => town.name)}`)
+
+        for (const town of mediumDensityTowns) {
+          if (
+            industryAssignmentCounts.get(industryId) < maxAllowed &&
+            town.industries.length < maxIndustries
+          ) {
+            town.industries.push({ name: label, industry: industryId })
+            industryAssignmentCounts.set(
+              industryId,
+              (industryAssignmentCounts.get(industryId) || 0) + 1
             )
-              break
+            assignments++
+            console.log(`Assigned ${label} to ${town.fullName} from medium density groups`)
           }
+          if (assignments >= maxAllowed) break
         }
       }
+
+      console.log(
+        `Final assignments for industry ${label}:`,
+        industryAssignmentCounts.get(industryId)
+      )
     }
+
+    console.log('Final industry assignments for all towns:', towns.value)
   }
 
-  function findTownForIndustry(industry, emp, maxTownsPerIndustry, industryAssignmentCount) {
-    // Find a town that matches the criteria for assigning an industry
-    return towns.value.find(
-      (town) =>
-        !town.industries.some((ind) => ind.industry === industry.industry) &&
-        industry.meanEmp[town.msa] === emp &&
-        town.industries.length < maxIndustries &&
-        industryAssignmentCount[industry.industry] <
-          maxTownsPerIndustry.find((i) => i.industry === industry.industry).maxTowns
-    )
+  function enrichEmploymentData(employmentData, industries) {
+    const industryMap = new Map(industries.map((ind) => [ind.naics_code, ind.label]))
+    return employmentData.map((data) => ({
+      ...data,
+      label: industryMap.get(data.industry) || 'Unknown Industry' // Default label if not found
+    }))
   }
 
-  function assignSizes() {
-    console.log('Assigning sizes to towns based on population...')
-    // sort towns by population in ascending order
-    sortTownsByPopulation(false)
-    const { numSmall, numMedium } = calculateTownSizes()
-    console.log(
-      `Total towns: ${towns.value.length}, Small: ${numSmall}, Medium: ${numMedium}, Large: ${towns.value.length - numSmall - numMedium}`
-    )
+  /**
+   * Classifies data into groups based on the largest breaks between values, adding a "size" property.
+   *
+   * @param {Array} data - Array of objects to classify.
+   * @param {String} property - The numeric property to base classifications on.
+   * @param {Array} sizeClasses - Array of size classes (e.g., ['small', 'medium', 'large']).
+   * @returns {Array} - Original array with updated objects, each containing a "size" property.
+   */
+  function naturalBreaks(data, property, sizeClasses) {
+    const numClasses = sizeClasses.length
 
-    // Assign size categories to towns based on population
-    towns.value.forEach((town, index) => {
-      if (index < numSmall) {
-        town.size = 'small'
-        console.log(`Assigned size 'small' to town ${town.msa}`)
-      } else if (index < numSmall + numMedium) {
-        town.size = 'medium'
-        console.log(`Assigned size 'medium' to town ${town.msa}`)
-      } else {
-        town.size = 'large'
-        console.log(`Assigned size 'large' to town ${town.msa}`)
-      }
+    // Sort data based on the property
+    const sortedData = [...data].sort((a, b) => a[property] - b[property])
+
+    // Calculate gaps between consecutive values
+    const gaps = sortedData.map((item, index) => {
+      if (index === 0) return 0 // No gap for the first item
+      return sortedData[index][property] - sortedData[index - 1][property]
     })
 
-    console.log('Towns classified:', towns.value)
-  }
+    // Find the largest gaps to determine class breaks
+    const largestGaps = [...gaps]
+      .map((gap, index) => ({ gap, index }))
+      .sort((a, b) => b.gap - a.gap)
+      .slice(0, numClasses - 1) // Get indices for the largest gaps
+      .map((g) => g.index)
+      .sort((a, b) => a - b) // Sort the indices in ascending order
 
-  // Sort towns by population, in descending order by default
-  function sortTownsByPopulation(desc = true) {
-    // Sort towns by population in the specified order
-    if (desc !== true) {
-      towns.value.sort((a, b) => a.population - b.population)
-    } else {
-      towns.value.sort((a, b) => b.population - a.population)
+    // Use gap indices to classify data into classes and label them with sizeClasses
+    let startIdx = 0
+    for (let i = 0; i < largestGaps.length; i++) {
+      const endIdx = largestGaps[i]
+      for (let j = startIdx; j < endIdx; j++) {
+        sortedData[j].size = sizeClasses[i]
+      }
+      startIdx = endIdx
     }
-    console.log(`Towns sorted by population`, towns.value)
-  }
 
-  function calculateTownSizes() {
-    // Calculate the number of small, medium, and large towns
-    const totalTowns = towns.value.length
-    const numSmall = Math.ceil(classifyThresholds.small * totalTowns)
-    const numMedium = Math.ceil(classifyThresholds.medium * totalTowns)
-    return { numSmall, numMedium }
+    // Label the remaining data with the last size class
+    for (let j = startIdx; j < sortedData.length; j++) {
+      sortedData[j].size = sizeClasses[sizeClasses.length - 1]
+    }
+
+    return sortedData
   }
 
   return {

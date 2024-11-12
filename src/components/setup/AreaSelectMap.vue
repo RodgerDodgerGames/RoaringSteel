@@ -7,11 +7,11 @@ import { onMounted, ref } from 'vue'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
-const props = defineProps({
-  onStateClick: Function
-})
+// define emit
+const emit = defineEmits(['state-click'])
 
 const mapContainer = ref(null)
+let selectedLayer = null // Track the currently highlighted layer
 
 onMounted(() => {
   const map = L.map(mapContainer.value).setView([37.8, -96], 4)
@@ -35,19 +35,49 @@ onMounted(() => {
         onEachFeature: (feature, layer) => {
           // Bind hover tooltip to show state name
           layer.bindTooltip(feature.properties.NAME, {
-            permanent: false, // only show on hover
+            permanent: false,
             direction: 'top',
-            className: 'state-tooltip' // for custom styling if needed
+            className: 'state-tooltip'
           })
 
-          // Click event: Notify parent of the selected state
+          // Click event: Highlight selected layer and emit event to parent
           layer.on('click', () => {
-            props.onStateClick(feature)
+            highlightFeature(layer) // Highlight the selected layer
+            stateClickHandler(feature) // Handle click event
           })
         }
       }).addTo(map)
     })
 })
+
+// Function to highlight the selected layer
+function highlightFeature(layer) {
+  // Reset style of previously selected layer
+  if (selectedLayer) {
+    selectedLayer.setStyle({
+      color: '#000',
+      weight: 2,
+      fillColor: '#000',
+      fillOpacity: 0.2
+    })
+  }
+
+  // Style the newly selected layer
+  layer.setStyle({
+    color: '#00f',
+    weight: 3,
+    fillColor: '#00f',
+    fillOpacity: 0.5
+  })
+
+  selectedLayer = layer // Update the selected layer reference
+}
+
+// Handle state click event and emit to parent
+function stateClickHandler(selectedState) {
+  console.log('Selected state:', selectedState.properties.NAME)
+  emit('state-click', selectedState)
+}
 </script>
 
 <style scoped>

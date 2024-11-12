@@ -25,7 +25,7 @@ const handleStateClick = (selectedState) => {
           <AreaSelectPanel :state="gameStore.state" @play-game="emit('play-game')" />
         </div>
         <div class="cell">
-          <AreaSelectMap :onStateClick="handleStateClick" />
+          <AreaSelectMap @state-click="handleStateClick" />
         </div>
       </div>
     </div>

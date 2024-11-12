@@ -28,12 +28,21 @@ const itemizedCosts = ref([]) // Cost for each line section
 const runningCost = ref(0) // Running cost of the line being drawn
 const workingLayer = ref(null)
 const hintMarkerMoveHandler = ref(null)
+const cursorAllowed = ref(false) // NEW: Track if cursor is over an eligible start point
 
 // Computed properties for total cost and draw button text
 const totalCost = computed(() => itemizedCosts.value.reduce((acc, cost) => acc + cost, 0))
 const drawButtonMessage = computed(() => (drawingActive.value ? 'Save' : 'Draw'))
 
 // ================== EVENT HANDLERS ==================
+
+// Initialize town markers and map events on mount
+onMounted(() => {
+  initializeTownMarkers()
+  initializeMapEvents()
+  setupCursorValidation()
+  setGeomanOptions()
+})
 
 // Toggle draw mode
 function onDrawButtonClicked() {
@@ -52,17 +61,11 @@ function enableEditing() {
   })
 }
 
-// Initialize town markers and map events on mount
-onMounted(() => {
-  initializeTownMarkers()
-  initializeMapEvents()
-})
-
 // ================== DRAWING CONTROL FUNCTIONS ==================
 
 // Start drawing mode for creating lines
 function startDrawingLine() {
-  props.map.value.pm.enableDraw('Line', { snappable: true, snapDistance: 20 })
+  props.map.value.pm.enableDraw('Line')
   drawingActive.value = true
   resetLineTracking()
 }
@@ -213,6 +216,53 @@ function validateStartPoint(latlng) {
     return linePoints[0].equals(latlng) || linePoints[linePoints.length - 1].equals(latlng)
   })
   return isAtTownMarker || isAtLineEnd
+}
+
+function setupCursorValidation() {
+  props.map.value.on('mousemove', (e) => {
+    // check if drawing is active first
+    if (!drawingActive.value) return
+    if (validateStartPoint(e.latlng)) {
+      cursorAllowed.value = true
+      props.map.value.getContainer().style.cursor = 'default' // or another allowed cursor icon
+    } else {
+      cursorAllowed.value = false
+      props.map.value.getContainer().style.cursor = 'not-allowed'
+    }
+  })
+}
+
+function setGeomanOptions() {
+  // Set default tooltip text for drawing
+  props.map.value.pm.setLang('en', {
+    tooltips: {
+      placeMarker: 'Place your marker here!',
+      firstVertex: 'Track must start in a town or on existing track',
+      continueLine: '',
+      finishLine: 'Click to finish the track'
+    }
+  })
+
+  const drawOptions = {
+    snappable: true,
+    snapDistance: 50,
+    // requireSnapToFinish: true,
+    // cursorMarker: false
+    markerStyle: {
+      // Default style for markers
+      draggable: true,
+      color: 'red'
+    },
+    pathOptions: {
+      // Default style for lines and polygons
+      color: 'blue',
+      fillColor: 'blue',
+      fillOpacity: 0.4,
+      weight: 3
+    }
+  }
+
+  props.map.value.pm.setGlobalOptions(drawOptions)
 }
 </script>
 

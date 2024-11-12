@@ -15,19 +15,21 @@ import {
 import { waitRandomly } from '@/composables/utils'
 
 export const useGridStore = defineStore('gridStore', () => {
-  // `useLocalStorage` automatically binds `grid` to `localStorage`
-  const grid = useLocalStorage('cachedGrid', [])
-  // check if grid already exists in cache
-  const isGridGenerated = ref(grid.value.length > 0)
-
+  const grid = ref([])
+  const isGridGenerated = ref(false)
   const { fetchElevationsInBatches } = useElevationAPI()
   const { fetchLandCover } = useLandCoverAPI()
 
-  async function generateGrid(bounds, cellSize) {
+  async function generateGrid(stateFipsCode, bounds, cellSize) {
     console.log('Generating grid...')
 
+    // `useLocalStorage` automatically binds `grid` to `localStorage`
+    const cachedGrid = useLocalStorage(`cachedGrid_${stateFipsCode}`, [])
+
     // check if grid already exists in cache
-    if (isGridGenerated.value) {
+    if (cachedGrid.value.length > 0) {
+      grid.value = cachedGrid.value
+      isGridGenerated.value = true
       console.log('Using cached grid data.')
       return
     }
@@ -95,6 +97,9 @@ export const useGridStore = defineStore('gridStore', () => {
 
     // calculate total cost for grid
     focalOpElevation(grid)
+
+    // save grid to cache
+    cachedGrid.value = grid.value
 
     isGridGenerated.value = true
     console.log('Grid generation with elevation and land cover complete.')

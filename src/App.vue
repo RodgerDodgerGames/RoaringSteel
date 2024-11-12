@@ -13,6 +13,9 @@ import { useGameStore } from '@/stores/game'
 import { useTownsStore } from '@/stores/towns'
 import { useGridStore } from '@/stores/grid'
 
+// import config
+import { gridConfig } from '@/config/grid'
+
 // setup stores
 const townsStore = useTownsStore()
 const gameStore = useGameStore()
@@ -39,8 +42,7 @@ async function handlePlayGameClick() {
     // run cost grid setup
     // generate grid using the selected state bounds
     const bounds = turf.bbox(state.value)
-    const cellSize = 10000
-    await gridStore.generateGrid(bounds, cellSize)
+    await gridStore.generateGrid(state.value.properties.STATE, bounds, gridConfig.cellSize)
     // once grid is generated, set view to game
     currentView.value = 'game'
   }

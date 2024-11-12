@@ -31,13 +31,25 @@ const hintMarkerMoveHandler = ref(null)
 
 // Computed properties for total cost and draw button text
 const totalCost = computed(() => itemizedCosts.value.reduce((acc, cost) => acc + cost, 0))
-const drawButtonMessage = computed(() => (drawingActive.value ? 'Cancel' : 'Draw'))
+const drawButtonMessage = computed(() => (drawingActive.value ? 'Save' : 'Draw'))
 
 // ================== EVENT HANDLERS ==================
 
 // Toggle draw mode
 function onDrawButtonClicked() {
   drawingActive.value ? cancelDrawing() : startDrawingLine()
+}
+
+// Enable map's global removal mode
+function enableRemoveMode() {
+  props.map.value.pm.toggleGlobalRemovalMode()
+}
+
+// Enable edit mode on existing layers
+function enableEditing() {
+  props.map.value.eachLayer((layer) => {
+    if (layer.pm?.toggleEdit) layer.pm.toggleEdit()
+  })
 }
 
 // Initialize town markers and map events on mount
@@ -202,24 +214,15 @@ function validateStartPoint(latlng) {
   })
   return isAtTownMarker || isAtLineEnd
 }
-
-// Enable map's global removal mode
-function enableRemoveMode() {
-  props.map.value.pm.toggleGlobalRemovalMode()
-}
-
-// Enable edit mode on existing layers
-function enableEditing() {
-  props.map.value.eachLayer((layer) => {
-    if (layer.pm?.toggleEdit) layer.pm.toggleEdit()
-  })
-}
 </script>
 
 <template>
   <div class="panel-block">
     <div class="buttons">
-      <button class="button is-primary" @click="onDrawButtonClicked">
+      <button
+        :class="[drawingActive ? 'is-success' : 'is-primary', 'button']"
+        @click="onDrawButtonClicked"
+      >
         {{ drawButtonMessage }}
       </button>
       <button class="button is-danger" @click="enableRemoveMode">Remove</button>

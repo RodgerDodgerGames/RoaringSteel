@@ -3,6 +3,7 @@
 // Organizes and manages all drawing-related logic, including setup, drawing controls, cost calculations, and utility functions.
 
 import { ref, computed, onMounted } from 'vue'
+import { useDebounceFn } from '@vueuse/core'
 
 /**
  * Main composable function to handle map drawing logic
@@ -15,12 +16,16 @@ import { ref, computed, onMounted } from 'vue'
 export default function useBuildTrack(props, grid, drawingActive, formatCurrency) {
   // ================== STATE VARIABLES ==================
 
-  const itemizedCosts = ref([])            // Array to store individual segment costs
-  const runningCost = ref(0)               // Accumulator for the ongoing segment cost
-  const workingLayer = ref(null)           // Reference to the currently drawn line layer
-  const hintMarkerMoveHandler = ref(null)  // Handler for hint marker movement
-  const existingLineLayers = ref([])       // Store for completed line layers
-  const currentGridCellId = ref(null)      // ID of the current grid cell for cost tracking
+  const itemizedCosts = ref([]) // Array to store individual segment costs
+  const runningCost = ref(0) // Accumulator for the ongoing segment cost
+  const workingLayer = ref(null) // Reference to the currently drawn line layer
+  const hintMarkerMoveHandler = ref(null) // Handler for hint marker movement
+  const existingLineLayers = ref([]) // Store for completed line layers
+  const currentGridCellId = ref(null) // ID of the current grid cell for cost tracking
+
+  // Caching town marker positions and endpoints for faster validation
+  const townMarkerPositions = ref([])
+  const lineEndpoints = ref([])
 
   // ================== COMPUTED PROPERTIES ==================
 
@@ -33,10 +38,11 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
    * onMounted hook: Initializes map and marker events and sets default options.
    */
   onMounted(() => {
-    initializeTownMarkers()   // Set up events for clickable town markers
-    initializeMapEvents()     // Set up general drawing events on the map
-    setupCursorValidation()   // Enable cursor validation during drawing
-    setGeomanOptions()        // Configure Geoman drawing tool options
+    initializeTownMarkers() // Set up events for clickable town markers
+    initializeMapEvents() // Set up general drawing events on the map
+    setupCursorValidation() // Enable cursor validation during drawing
+    setGeomanOptions() // Configure Geoman drawing tool options
+    initializeCaches() // Initialize town marker and line endpoint caches
   })
 
   // ================== PUBLIC FUNCTIONS (EXPOSED) ==================
@@ -59,7 +65,7 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
    * Enables edit mode for modifying existing lines.
    */
   function enableEditing() {
-    props.map.value.eachLayer(layer => {
+    props.map.value.eachLayer((layer) => {
       if (layer.pm?.toggleEdit) layer.pm.toggleEdit()
     })
   }
@@ -99,8 +105,8 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
    * This allows starting a line from specific points (e.g., town markers).
    */
   function initializeTownMarkers() {
-    props.towns.value.eachLayer(layer => {
-      layer.on('click', e => {
+    props.towns.value.eachLayer((layer) => {
+      layer.on('click', (e) => {
         if (drawingActive.value) {
           props.map.value.pm.Draw.Line._createVertex(e.latlng)
         }
@@ -119,6 +125,17 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
     props.map.value.on('pm:create', finalizeDrawing)
   }
 
+  function initializeCaches() {
+    // Cache town marker positions
+    townMarkerPositions.value = props.towns.value.getLayers().map((marker) => marker.getLatLng())
+
+    // Cache initial line endpoints (assuming some existing lines)
+    existingLineLayers.value.forEach((line) => {
+      const linePoints = line.getLatLngs()
+      lineEndpoints.value.push(linePoints[0], linePoints[linePoints.length - 1])
+    })
+  }
+
   // ================== DRAWING EVENT HANDLERS ==================
 
   /**
@@ -126,11 +143,11 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
    * This is activated whenever a line drawing starts.
    */
   function setupDrawingEvents() {
-    let firstVertexAdded = false          // Track if the first vertex has been added
-    let previousVertex = null             // Store the last vertex for distance calculations
+    let firstVertexAdded = false // Track if the first vertex has been added
+    let previousVertex = null // Store the last vertex for distance calculations
 
     // Event triggered when a vertex is added to the line
-    workingLayer.value.on('pm:vertexadded', evt => {
+    workingLayer.value.on('pm:vertexadded', (evt) => {
       if (!firstVertexAdded) {
         // Ensure the starting point is valid; otherwise, cancel drawing
         if (!validateStartPoint(evt.latlng)) {
@@ -139,7 +156,7 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
         } else {
           previousVertex = evt.latlng
           firstVertexAdded = true
-          addHintMarkerMoveHandler()   // Add movement handler for cost tooltip
+          addHintMarkerMoveHandler() // Add movement handler for cost tooltip
         }
       } else {
         // Calculate cost for each segment as a new vertex is added
@@ -157,6 +174,7 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
     drawingActive.value = false
     if (e.layer?.pm?._shape === 'Line') {
       existingLineLayers.value.push(e.layer)
+      updateLineEndpoints(e.layer)
     }
     resetHintMarkerMoveHandler()
     workingLayer.value = null
@@ -170,7 +188,10 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
   function addHintMarkerMoveHandler() {
     const hintMarker = props.map.value.pm.Draw.Line._hintMarker
     if (hintMarker && !hintMarkerMoveHandler.value) {
-      hintMarkerMoveHandler.value = e => updateRunningCostTooltip(e.latlng, hintMarker)
+      hintMarkerMoveHandler.value = useDebounceFn(
+        (e) => updateRunningCostTooltip(e.latlng, hintMarker),
+        100
+      ) // Throttle to reduce lag
       hintMarker.on('move', hintMarkerMoveHandler.value)
     }
   }
@@ -211,7 +232,7 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
   function getGridCellByLatLng(latlng) {
     let closestCell = null
     let minDistance = Infinity
-    grid.value.forEach(cell => {
+    grid.value.forEach((cell) => {
       const dist = props.map.value.distance(latlng, L.latLng(cell.centroid.lat, cell.centroid.lng))
       if (dist < minDistance) {
         minDistance = dist
@@ -231,19 +252,15 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
     itemizedCosts.value = []
   }
 
-  /**
-   * Validates that the starting point is on a town marker or existing line endpoint.
-   * Prevents drawing from invalid starting points.
-   * @param {Object} latlng - Latitude and longitude of the starting point
-   * @returns {boolean} - True if the starting point is valid, false otherwise
-   */
   function validateStartPoint(latlng) {
-    const isAtTownMarker = props.towns.value.getLayers().some(marker => marker.getLatLng().equals(latlng))
-    const isAtLineEnd = existingLineLayers.value.some(line => {
-      const linePoints = line.getLatLngs()
-      return linePoints[0].equals(latlng) || linePoints[linePoints.length - 1].equals(latlng)
-    })
-    return isAtTownMarker || isAtLineEnd
+    const isNearTownMarker = townMarkerPositions.value.some((markerPos) => markerPos.equals(latlng))
+    const isNearLineEnd = lineEndpoints.value.some((endPoint) => endPoint.equals(latlng))
+    return isNearTownMarker || isNearLineEnd
+  }
+
+  function updateLineEndpoints(lineLayer) {
+    const linePoints = lineLayer.getLatLngs()
+    lineEndpoints.value.push(linePoints[0], linePoints[linePoints.length - 1])
   }
 
   // ================== MAP OPTIONS & CURSOR SETUP ==================
@@ -252,12 +269,14 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
    * Sets up cursor styles based on the validity of points during line drawing.
    */
   function setupCursorValidation() {
-    props.map.value.on('mousemove', e => {
-      if (!drawingActive.value) return
-      if (validateStartPoint(e.latlng)) {
-        props.map.value.getContainer().style.cursor = 'default'
-      } else {
-        props.map.value.getContainer().style.cursor = 'not-allowed'
+    const debouncedCursorValidation = useDebounceFn((latlng) => {
+      const cursorStyle = validateStartPoint(latlng) ? 'default' : 'not-allowed'
+      props.map.value.getContainer().style.cursor = cursorStyle
+    }, 50) // Adjust debounce delay as needed
+
+    props.map.value.on('mousemove', (e) => {
+      if (drawingActive.value) {
+        debouncedCursorValidation(e.latlng)
       }
     })
   }

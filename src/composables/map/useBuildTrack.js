@@ -9,11 +9,11 @@ import { useDebounceFn } from '@vueuse/core'
  * Main composable function to handle map drawing logic
  * @param {Object} props - The component props (map, towns)
  * @param {Object} grid - Reactive grid data for cell-based calculations
- * @param {Ref} drawingActive - Ref indicating if drawing mode is active
+ * @param {Ref} isDrawingActive - Ref indicating if drawing mode is active
  * @param {Function} formatCurrency - Utility function to format currency values
  * @returns {Object} - Exposes reactive state, computed properties, and functions for map drawing
  */
-export default function useBuildTrack(props, grid, drawingActive, formatCurrency) {
+export default function useBuildTrack(props, grid, isDrawingActive, formatCurrency) {
   // ================== STATE VARIABLES ==================
 
   const itemizedCosts = ref([]) // Array to store individual segment costs
@@ -22,6 +22,7 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
   const hintMarkerMoveHandler = ref(null) // Handler for hint marker movement
   const existingLineLayers = ref([]) // Store for completed line layers
   const currentGridCellId = ref(null) // ID of the current grid cell for cost tracking
+  const isFirstVertexAdded = ref(false) // Flag to track if the first vertex has been added
 
   // Caching town marker positions and endpoints for faster validation
   const townMarkerPositions = ref([])
@@ -30,7 +31,7 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
   // ================== COMPUTED PROPERTIES ==================
 
   const totalCost = computed(() => itemizedCosts.value.reduce((acc, cost) => acc + cost, 0))
-  const drawButtonMessage = computed(() => (drawingActive.value ? 'Save' : 'Draw'))
+  const drawButtonMessage = computed(() => (isDrawingActive.value ? 'Save' : 'Draw'))
 
   // ================== INITIAL SETUP ==================
 
@@ -51,7 +52,7 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
    * Toggles drawing mode on button click.
    */
   function onDrawButtonClicked() {
-    drawingActive.value ? cancelDrawing() : startDrawingLine()
+    isDrawingActive.value ? cancelDrawing() : startDrawingLine()
   }
 
   /**
@@ -77,7 +78,7 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
    */
   function startDrawingLine() {
     props.map.value.pm.enableDraw('Line')
-    drawingActive.value = true
+    isDrawingActive.value = true
     resetLineTracking()
   }
 
@@ -86,7 +87,7 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
    */
   function cancelDrawing() {
     props.map.value.pm.disableDraw('Line')
-    drawingActive.value = false
+    isDrawingActive.value = false
     workingLayer.value = null
   }
 
@@ -107,7 +108,7 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
   function initializeTownMarkers() {
     props.towns.value.eachLayer((layer) => {
       layer.on('click', (e) => {
-        if (drawingActive.value) {
+        if (isDrawingActive.value) {
           props.map.value.pm.Draw.Line._createVertex(e.latlng)
         }
       })
@@ -143,19 +144,22 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
    * This is activated whenever a line drawing starts.
    */
   function setupDrawingEvents() {
-    let firstVertexAdded = false // Track if the first vertex has been added
     let previousVertex = null // Store the last vertex for distance calculations
+    // set (or reset) the first vertex added flag
+    isFirstVertexAdded.value = false
 
     // Event triggered when a vertex is added to the line
     workingLayer.value.on('pm:vertexadded', (evt) => {
-      if (!firstVertexAdded) {
+      if (!isFirstVertexAdded.value) {
         // Ensure the starting point is valid; otherwise, cancel drawing
         if (!validateStartPoint(evt.latlng)) {
+          // cancel drawing and restarting again prevents the first vertex
+          // from being added (or just removes it)
           cancelDrawing()
-          alert('Start the line at a town marker or an existing endpoint.')
+          startDrawingLine()
         } else {
           previousVertex = evt.latlng
-          firstVertexAdded = true
+          isFirstVertexAdded.value = true
           addHintMarkerMoveHandler() // Add movement handler for cost tooltip
         }
       } else {
@@ -171,7 +175,7 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
    * @param {Object} e - Event object from Geoman with the created layer
    */
   function finalizeDrawing(e) {
-    drawingActive.value = false
+    isDrawingActive.value = false
     if (e.layer?.pm?._shape === 'Line') {
       existingLineLayers.value.push(e.layer)
       updateLineEndpoints(e.layer)
@@ -275,7 +279,8 @@ export default function useBuildTrack(props, grid, drawingActive, formatCurrency
     }, 50) // Adjust debounce delay as needed
 
     props.map.value.on('mousemove', (e) => {
-      if (drawingActive.value) {
+      // only update cursor when drawing is active but first vertex has not been added
+      if (isDrawingActive.value && !isFirstVertexAdded.value) {
         debouncedCursorValidation(e.latlng)
       }
     })

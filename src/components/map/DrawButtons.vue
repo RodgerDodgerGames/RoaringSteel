@@ -23,7 +23,7 @@ const gridStore = useGridStore()
 const { grid } = storeToRefs(gridStore)
 
 // Setup state and computed properties
-const drawingActive = ref(false)
+const isDrawingActive = ref(false)
 const {
   itemizedCosts,
   totalCost,
@@ -31,14 +31,14 @@ const {
   onDrawButtonClicked,
   enableRemoveMode,
   enableEditing
-} = useBuildTrack(props, grid, drawingActive, formatCurrency)
+} = useBuildTrack(props, grid, isDrawingActive, formatCurrency)
 </script>
 
 <template>
   <div class="panel-block">
     <div class="buttons">
       <button
-        :class="[drawingActive ? 'is-success' : 'is-primary', 'button']"
+        :class="[isDrawingActive ? 'is-success' : 'is-primary', 'button']"
         @click="onDrawButtonClicked"
       >
         {{ drawButtonMessage }}
@@ -66,9 +66,9 @@ const {
 </template>
 
 <style scoped>
-.buttons {
+/* .buttons {
   display: flex;
   gap: 0.5rem;
   margin-top: 1rem;
-}
+} */
 </style>

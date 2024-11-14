@@ -7,7 +7,7 @@ import { useGameStore } from '@/stores/game'
 const gameStore = useGameStore()
 
 // Track the active tab
-const activeTab = ref(null)
+const activeTab = ref('Home')
 
 // Function to change active tab
 const setActiveTab = (tab) => {

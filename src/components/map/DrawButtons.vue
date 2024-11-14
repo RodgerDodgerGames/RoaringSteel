@@ -27,27 +27,42 @@ const isDrawingActive = ref(false)
 const {
   itemizedCosts,
   totalCost,
-  drawButtonMessage,
-  onDrawButtonClicked,
+  hasTrackBeenDrawn,
+  startDrawingLine,
   enableRemoveMode,
+  cancelDrawing,
   enableEditing
 } = useBuildTrack(props, grid, isDrawingActive, formatCurrency)
 </script>
 
 <template>
-  <div class="panel-block">
-    <div class="buttons">
-      <button
-        :class="[isDrawingActive ? 'is-success' : 'is-primary', 'button']"
-        @click="onDrawButtonClicked"
-      >
-        {{ drawButtonMessage }}
-      </button>
+  <h4 class="title is-4">Building</h4>
+  <!-- draw and cancel buttons -->
+  <div class="block">
+    <!-- draw button -->
+    <button v-if="!isDrawingActive" class="button is-primary" @click="startDrawingLine">
+      Start Building
+    </button>
+
+    <!-- save and cancel buttons -->
+    <button v-else class="button is-danger" @click="cancelDrawing">Stop Building</button>
+  </div>
+
+  <!-- edit and remove buttons -->
+  <div class="block">
+    <div v-if="hasTrackBeenDrawn" class="buttons">
       <button class="button is-danger" @click="enableRemoveMode">Remove</button>
+      -OR-
       <button class="button is-info" @click="enableEditing">Edit</button>
+      <div class="is-size-5">sections of track you have built this turn</div>
     </div>
   </div>
-  <div class="panel-block" v-if="itemizedCosts.length">
+
+  <hr class="my-3" />
+
+  <!-- itemized costs and total cost -->
+  <div class="block" v-if="itemizedCosts.length">
+    <h4 class="title is-4">Track Costs</h4>
     <div class="mt-2">
       <div
         v-for="(cost, index) in itemizedCosts"
@@ -65,10 +80,4 @@ const {
   </div>
 </template>
 
-<style scoped>
-/* .buttons {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 1rem;
-} */
-</style>
+<style scoped></style>

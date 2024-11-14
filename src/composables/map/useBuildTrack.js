@@ -30,8 +30,10 @@ export default function useBuildTrack(props, grid, isDrawingActive, formatCurren
 
   // ================== COMPUTED PROPERTIES ==================
 
+  // total cost for all track segments
   const totalCost = computed(() => itemizedCosts.value.reduce((acc, cost) => acc + cost, 0))
-  const drawButtonMessage = computed(() => (isDrawingActive.value ? 'Save' : 'Draw'))
+  // has any track been drawn
+  const hasTrackBeenDrawn = computed(() => existingLineLayers.value.length > 0)
 
   // ================== INITIAL SETUP ==================
 
@@ -47,13 +49,6 @@ export default function useBuildTrack(props, grid, isDrawingActive, formatCurren
   })
 
   // ================== PUBLIC FUNCTIONS (EXPOSED) ==================
-
-  /**
-   * Toggles drawing mode on button click.
-   */
-  function onDrawButtonClicked() {
-    isDrawingActive.value ? cancelDrawing() : startDrawingLine()
-  }
 
   /**
    * Enables removal mode for deleting map elements.
@@ -312,9 +307,10 @@ export default function useBuildTrack(props, grid, isDrawingActive, formatCurren
   return {
     itemizedCosts,
     totalCost,
-    drawButtonMessage,
-    onDrawButtonClicked,
+    hasTrackBeenDrawn,
+    startDrawingLine,
     enableRemoveMode,
-    enableEditing
+    enableEditing,
+    cancelDrawing
   }
 }

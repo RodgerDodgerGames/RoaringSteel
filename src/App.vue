@@ -12,6 +12,7 @@ import GameView from './views/GameView.vue'
 import { useGameStore } from '@/stores/game'
 import { useTownsStore } from '@/stores/towns'
 import { useGridStore } from '@/stores/grid'
+import { useDemandCardsStore } from '@/stores/demandCards'
 
 // import config
 import { gridConfig } from '@/config/grid'
@@ -20,6 +21,7 @@ import { gridConfig } from '@/config/grid'
 const townsStore = useTownsStore()
 const gameStore = useGameStore()
 const gridStore = useGridStore()
+const demandCardsStore = useDemandCardsStore()
 
 // import composables
 
@@ -39,6 +41,8 @@ async function handlePlayGameClick() {
   if (state.value) {
     // run setup towns after the state is selected
     await townsStore.setupTowns(state.value.properties.STATE)
+    // generate demand cards
+    demandCardsStore.generateDemandCards()
     // run cost grid setup
     // generate grid using the selected state bounds
     const bounds = turf.bbox(state.value)

@@ -5,6 +5,7 @@
 
 import MainMap from '@/components/map/MainMap.vue'
 import GameSidePanel from '@/components/panel/GameSidePanel.vue'
+import BottomPanel from '@/components/demands/BottomPanel.vue'
 </script>
 
 <template>
@@ -19,6 +20,8 @@ import GameSidePanel from '@/components/panel/GameSidePanel.vue'
       <GameSidePanel />
     </div>
   </div>
+
+  <BottomPanel />
 </template>
 
 <style scoped></style>

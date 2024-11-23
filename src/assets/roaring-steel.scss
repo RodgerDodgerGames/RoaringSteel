@@ -1,0 +1,28 @@
+// Set your brand colors
+$purple: #8a4d76;
+$pink: #fa7c91;
+$brown: #757763;
+$beige-light: #d0d1cd;
+$beige-lighter: #eff0eb;
+
+// Path to Bulma's sass folder
+@use "bulma/sass" with (
+  $grey-dark: $brown,
+  $grey-light: $beige-light,
+  $primary: $purple,
+  $link: $pink,
+  $control-border-width: 2px,
+  $input-shadow: none,
+  // Override Bulma's secondary font
+  $family-secondary: 'Eutemia, serif',
+  $family-sans-serif: 'Roboto, sans-serif'
+);
+
+// define font for Euitima I
+@font-face {
+    font-family: 'Eutemia';
+    src: url('./fonts/eutemia-i/Eutemia.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+  }
+@import url('https://fonts.googleapis.com/css2?family=Fredericka+the+Great&display=swap');

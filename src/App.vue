@@ -7,6 +7,7 @@ import * as turf from '@turf/turf'
 // import components
 import AreaSelect from '@/views/AreaSelect.vue'
 import GameView from './views/GameView.vue'
+import NavHeader from './components/NavHeader.vue'
 
 // import stores
 import { useGameStore } from '@/stores/game'
@@ -55,6 +56,8 @@ async function handlePlayGameClick() {
 
 <template>
   <div id="app">
+    <!-- Header Section -->
+    <NavHeader />
     <!-- Main Content Section -->
     <section class="section">
       <AreaSelect v-if="currentView === 'areaSelect'" @play-game="handlePlayGameClick" />

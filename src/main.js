@@ -1,11 +1,14 @@
-import './assets/main.scss'
+// main.js
+// main entry point
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 
-// Import Bulma CSS
-import 'bulma/css/bulma.css'
+// customized version of bulma
+import './assets/roaring-steel.css'
+// custom styles
+import './assets/main.scss'
 
 const app = createApp(App)
 

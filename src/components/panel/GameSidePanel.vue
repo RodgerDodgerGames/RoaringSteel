@@ -39,8 +39,9 @@ const setActiveTab = (tab) => {
       Would you like to
       <button @click="setActiveTab('Build')" class="button mx-2">Build</button> track?
     </div>
+    <p class="has-text-centered">- OR -</p>
     <div class="block is-flex is-align-items-center mt-2">
-      Or <button @click="setActiveTab('Upgrade')" class="button mx-2">Upgrade</button> your train?
+      <button @click="setActiveTab('Upgrade')" class="button mr-2">Upgrade</button> your train?
     </div>
   </div>
 

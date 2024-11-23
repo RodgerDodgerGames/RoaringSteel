@@ -1,3 +1,15 @@
 // Customize Bulma variables here before importing Bulma
 $primary: #00d1b2;
 $family-sans-serif: 'Roboto', sans-serif;
+
+// define font for Euitima I
+@font-face {
+    font-family: 'Eutemia';
+    src: url('@/assets/fonts/eutemia-i/Eutemia.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+  }
+  
+// Override Bulma's secondary font
+$family-secondary: 'Eutemia', serif; // Use your custom font
+  

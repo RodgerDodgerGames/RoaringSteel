@@ -31,23 +31,23 @@ const demandCardsStore = useDemandCardsStore()
 // which view should be shown
 const currentView = ref('areaSelect')
 
-// state where game is being played
-const { state } = storeToRefs(gameStore)
+// region where game is being played
+const { region } = storeToRefs(gameStore)
 
 // METHODS
 
 // Handle play game button click
 async function handlePlayGameClick() {
-  console.log('handlePlayGameClick', state.value)
-  if (state.value) {
-    // run setup towns after the state is selected
-    await townsStore.setupTowns(state.value.properties.STATE)
+  console.log('handlePlayGameClick', region.value)
+  if (region.value) {
+    // run setup towns after the region is selected
+    await townsStore.setupTowns(region.value.properties.STATE)
     // generate demand cards
     demandCardsStore.generateDemandCards()
     // run cost grid setup
-    // generate grid using the selected state bounds
-    const bounds = turf.bbox(state.value)
-    await gridStore.generateGrid(state.value.properties.STATE, bounds, gridConfig.cellSize)
+    // generate grid using the selected region bounds
+    const bounds = turf.bbox(region.value)
+    await gridStore.generateGrid(region.value.properties.STATE, bounds, gridConfig.cellSize)
     // once grid is generated, set view to game
     currentView.value = 'game'
   }

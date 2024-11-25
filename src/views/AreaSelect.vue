@@ -13,7 +13,7 @@ const emit = defineEmits(['play-game'])
 
 // Handle state selection from the map
 const handleStateClick = (selectedState) => {
-  gameStore.setState(selectedState)
+  gameStore.setRegion(selectedState)
 }
 </script>
 
@@ -22,7 +22,7 @@ const handleStateClick = (selectedState) => {
     <div class="fixed-grid has-1-cols">
       <div class="grid">
         <div class="cell">
-          <AreaSelectPanel :state="gameStore.state" @play-game="emit('play-game')" />
+          <AreaSelectPanel :region="gameStore.region" @play-game="emit('play-game')" />
         </div>
         <div class="cell">
           <AreaSelectMap @state-click="handleStateClick" />

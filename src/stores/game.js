@@ -8,13 +8,7 @@ export const useGameStore = defineStore('gameStore', () => {
   // STATE
 
   // selected states (from area select)
-  const state = ref(null)
-
-  // main leaflet map
-  const mainMap = ref(null)
-
-  // townsLayer
-  const townsLayer = ref(null)
+  const region = ref(null)
 
   // game turn
   const turn = ref(0)
@@ -22,19 +16,9 @@ export const useGameStore = defineStore('gameStore', () => {
   // ACTIONS
 
   // set new state
-  function setState(newState) {
-    console.log('setting new state', newState)
-    state.value = newState
-  }
-
-  // set main map
-  function setMainMap(newMainMap) {
-    mainMap.value = newMainMap
-  }
-
-  // set towns layer
-  function setTownsLayer(newTownsLayer) {
-    townsLayer.value = newTownsLayer
+  function setRegion(newRegion) {
+    console.log('setting new region', newRegion)
+    region.value = newRegion
   }
 
   // advance the game turn
@@ -44,13 +28,9 @@ export const useGameStore = defineStore('gameStore', () => {
 
   return {
     // STATE
-    state,
-    mainMap,
-    townsLayer,
+    region,
     // ACTIONS
-    setState,
-    setMainMap,
-    setTownsLayer,
+    setRegion,
     advanceTurn
   }
 })

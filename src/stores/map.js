@@ -3,13 +3,21 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useMapStore = defineStore('map', () => {
-  // State
+  ///////////////////////////////////////////////////////////////
+  // STATE
+
+  // map stuff
   const map = ref(null)
-  const mapZoom = ref(null)
-  const mapCenter = ref([])
+  const mapZoom = ref(3)
+  const mapCenter = ref([40, -100])
+  const townsLayer = ref(null)
+
+  // drawing
   const isDrawingActive = ref(false)
 
-  // Actions
+  ///////////////////////////////////////////////////////////////
+  // ACTIONS
+
   const setMap = (newMap) => {
     map.value = newMap
   }
@@ -26,14 +34,23 @@ export const useMapStore = defineStore('map', () => {
     isDrawingActive.value = status
   }
 
+  // update towns layer
+  const setTownsLayer = (newTownsLayer) => {
+    townsLayer.value = newTownsLayer
+  }
+
   return {
+    // state
     map,
     mapZoom,
     mapCenter,
+    townsLayer,
     isDrawingActive,
+    // actions
     setMap,
     setMapZoom,
     setMapCenter,
-    setIsDrawingActive
+    setIsDrawingActive,
+    setTownsLayer
   }
 })

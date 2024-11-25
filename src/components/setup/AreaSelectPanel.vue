@@ -1,9 +1,9 @@
 <template>
   <div class="level">
     <p>Where would you like to play?</p>
-    <!-- make message class danger if no state is selected -->
-    <p :class="{ 'has-text-info': props.state, 'has-text-danger': !props.state }">{{ msg }}</p>
-    <button class="button is-primary" @click="emit('play-game')" :disabled="!props.state">
+    <!-- make message class danger if no region is selected -->
+    <p :class="{ 'has-text-info': props.region, 'has-text-danger': !props.region }">{{ msg }}</p>
+    <button class="button is-primary" @click="emit('play-game')" :disabled="!props.region">
       Play Game
     </button>
   </div>
@@ -11,18 +11,18 @@
 
 <script setup>
 import { computed } from 'vue'
-// Props to receive the selected state
+// Props to receive the selected region
 const props = defineProps({
-  state: Object
+  region: Object
 })
 // define emits
 const emit = defineEmits(['play-game'])
 
 const msg = computed(() => {
-  if (props.state) {
-    return `Selected state: ${props.state.properties.NAME}`
+  if (props.region) {
+    return `Selected region: ${props.region.properties.NAME}`
   }
-  return 'No state selected yet'
+  return 'No region selected yet'
 })
 </script>
 

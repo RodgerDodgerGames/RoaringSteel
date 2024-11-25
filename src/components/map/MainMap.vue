@@ -9,11 +9,9 @@ import 'leaflet/dist/leaflet.css'
 import { useTowns } from '@/composables/map/useTowns'
 // stores
 import { useTownsStore } from '@/stores/towns'
-import { useGameStore } from '@/stores/game'
 import { useMapStore } from '@/stores/map'
 
 // setup stores
-const gameStore = useGameStore()
 const townsStore = useTownsStore()
 const mapStore = useMapStore()
 // get towns from store
@@ -37,7 +35,7 @@ onMounted(() => {
     // add towns to map
     addTownsToMap(map, towns)
     // add townsLayer to store
-    gameStore.setTownsLayer(townsLayer)
+    mapStore.setTownsLayer(townsLayer)
   }
 })
 

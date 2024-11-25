@@ -145,27 +145,31 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    */
   function setupDrawingEvents() {
     let previousVertex = null // Store the last vertex for distance calculations
-    // set (or reset) the first vertex added flag
-    isFirstVertexAdded.value = false
+    isFirstVertexAdded.value = false // Reset flag for the first vertex
 
-    // Event triggered when a vertex is added to the line
     workingLayer.value.on('pm:vertexadded', (evt) => {
+      const addedVertex = evt.latlng // Get the position of the added vertex
+
       if (!isFirstVertexAdded.value) {
-        // Ensure the starting point is valid; otherwise, cancel drawing
-        if (!validateStartPoint(evt.latlng)) {
-          // cancel drawing and restarting again prevents the first vertex
-          // from being added (or just removes it)
-          cancelDrawing()
+        if (!validateStartPoint(addedVertex)) {
+          cancelDrawing() // Cancel if the start point is invalid
           startDrawingLine()
         } else {
-          previousVertex = evt.latlng
+          previousVertex = addedVertex
           isFirstVertexAdded.value = true
           addHintMarkerMoveHandler() // Add movement handler for cost tooltip
         }
       } else {
-        // Calculate cost for each segment as a new vertex is added
+        // Calculate cost for the current segment
         calculateSegmentCost()
-        previousVertex = evt.latlng
+        previousVertex = addedVertex
+
+        // Check if the added vertex is on a town marker
+        const isOnTown = townMarkerPositions.value.some((townPos) => townPos.equals(addedVertex))
+        // if so, then finish the drawing
+        if (isOnTown) {
+          props.map.pm.Draw.Line._finishShape()
+        }
       }
     })
   }

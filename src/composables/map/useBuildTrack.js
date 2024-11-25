@@ -4,16 +4,17 @@
 
 import { ref, computed, onMounted } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
+import { storeToRefs } from 'pinia'
+import { useMapStore } from '@/stores/map'
 
 /**
  * Main composable function to handle map drawing logic
  * @param {Object} props - The component props (map, towns)
  * @param {Object} grid - Reactive grid data for cell-based calculations
- * @param {Ref} isDrawingActive - Ref indicating if drawing mode is active
  * @param {Function} formatCurrency - Utility function to format currency values
  * @returns {Object} - Exposes reactive state, computed properties, and functions for map drawing
  */
-export default function useBuildTrack(props, grid, isDrawingActive, formatCurrency) {
+export default function useBuildTrack(props, grid, formatCurrency) {
   // ================== STATE VARIABLES ==================
 
   const itemizedCosts = ref([]) // Array to store individual segment costs
@@ -27,6 +28,10 @@ export default function useBuildTrack(props, grid, isDrawingActive, formatCurren
   // Caching town marker positions and endpoints for faster validation
   const townMarkerPositions = ref([])
   const lineEndpoints = ref([])
+
+  // get access to isDrawingActive from map store
+  const mapStore = useMapStore()
+  const { isDrawingActive } = storeToRefs(mapStore)
 
   // ================== COMPUTED PROPERTIES ==================
 
@@ -73,7 +78,7 @@ export default function useBuildTrack(props, grid, isDrawingActive, formatCurren
    */
   function startDrawingLine() {
     props.map.value.pm.enableDraw('Line')
-    isDrawingActive.value = true
+    mapStore.setIsDrawingActive(true)
     resetLineTracking()
   }
 
@@ -82,7 +87,7 @@ export default function useBuildTrack(props, grid, isDrawingActive, formatCurren
    */
   function cancelDrawing() {
     props.map.value.pm.disableDraw('Line')
-    isDrawingActive.value = false
+    mapStore.setIsDrawingActive(false)
     workingLayer.value = null
   }
 
@@ -170,7 +175,7 @@ export default function useBuildTrack(props, grid, isDrawingActive, formatCurren
    * @param {Object} e - Event object from Geoman with the created layer
    */
   function finalizeDrawing(e) {
-    isDrawingActive.value = false
+    mapStore.setIsDrawingActive(false)
     if (e.layer?.pm?._shape === 'Line') {
       existingLineLayers.value.push(e.layer)
       updateLineEndpoints(e.layer)

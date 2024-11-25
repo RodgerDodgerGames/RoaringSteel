@@ -4,8 +4,15 @@ import 'leaflet/dist/leaflet.css'
 import '@geoman-io/leaflet-geoman-free'
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 
+import { storeToRefs } from 'pinia'
+import { useMapStore } from '@/stores/map'
+
 export function useTowns() {
   const townsLayer = ref(null)
+
+  // get access to isDrawingActive from map store
+  const mapStore = useMapStore()
+  const { isDrawingActive } = storeToRefs(mapStore)
 
   const addTownsToMap = (map, towns) => {
     if (!map || !map.value) {
@@ -53,6 +60,9 @@ export function useTowns() {
 
         // Add a click event handler to display town information
         marker.on('click', () => {
+          // exit early if drawing is active
+          if (isDrawingActive.value) return
+
           // popup options
           const options = {
             className: 'town-popup'

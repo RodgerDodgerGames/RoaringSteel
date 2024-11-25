@@ -1,7 +1,7 @@
 <!-- DrawButtons.vue -->
 <script setup>
-import { ref } from 'vue'
 import { useGridStore } from '@/stores/grid'
+import { useMapStore } from '@/stores/map'
 import { storeToRefs } from 'pinia'
 import { formatCurrency } from '@/composables/utils'
 import useBuildTrack from '@/composables/map/useBuildTrack' // Import the composable
@@ -22,8 +22,11 @@ const props = defineProps({
 const gridStore = useGridStore()
 const { grid } = storeToRefs(gridStore)
 
+// get isDrawingActive from map store
+const mapStore = useMapStore()
+const { isDrawingActive } = storeToRefs(mapStore)
+
 // Setup state and computed properties
-const isDrawingActive = ref(false)
 const {
   itemizedCosts,
   totalCost,
@@ -32,7 +35,7 @@ const {
   enableRemoveMode,
   cancelDrawing,
   enableEditing
-} = useBuildTrack(props, grid, isDrawingActive, formatCurrency)
+} = useBuildTrack(props, grid, formatCurrency)
 </script>
 
 <template>

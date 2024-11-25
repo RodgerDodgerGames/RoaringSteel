@@ -34,7 +34,6 @@ defineProps({
   background: #f8f8f8; /* Light gray background */
   padding: 10px;
   box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
-  font-family: Arial, sans-serif;
   text-align: center;
 }
 

@@ -1,3 +1,7 @@
+/////////////////////////////////////////////////////////////
+/// 1. Define Custom Variables
+/////////////////////////////////////////////////////////////
+
 // Set your brand colors
 $purple: #8a4d76;
 $pink: #fa7c91;
@@ -5,24 +9,87 @@ $brown: #757763;
 $beige-light: #d0d1cd;
 $beige-lighter: #eff0eb;
 
+/////////////////////////////////////////////////////////////
+/// 2. Import Bulma and Override Variables
+/////////////////////////////////////////////////////////////
+
 // Path to Bulma's sass folder
 @use "bulma/sass" with (
   $grey-dark: $brown,
   $grey-light: $beige-light,
   $primary: $purple,
   $link: $pink,
-  $control-border-width: 2px,
-  $input-shadow: none,
-  // Override Bulma's secondary font
+  // Override Bulma's fonts
+  $family-primary: '"Averia Serif Libre", serif',
   $family-secondary: 'Eutemia, serif',
-  $family-sans-serif: 'Roboto, sans-serif'
+  $family-sans-serif: 'Roboto, sans-serif',
+  // Override font sizes
+  $size-1: 3.25rem,
+  $size-2: 2.5rem,
+  $size-3: 2rem,
+  $size-4: 1.5rem,
+  $size-5: 1.25rem,
+  $size-6: 1rem,
+  $size-7: 0.75rem
 );
 
-// define font for Euitima I
+/////////////////////////////////////////////////////////////
+/// 3. Import Fonts
+/////////////////////////////////////////////////////////////
+
+// Define font for Eutemia I
 @font-face {
-    font-family: 'Eutemia';
-    src: url('./fonts/eutemia-i/Eutemia.ttf') format('truetype');
-    font-weight: normal;
-    font-style: normal;
-  }
-@import url('https://fonts.googleapis.com/css2?family=Fredericka+the+Great&display=swap');
+  font-family: 'Eutemia';
+  src: url('./fonts/eutemia-i/Eutemia.ttf');
+}
+
+// Define font for Saddlebag
+@font-face {
+  font-family: 'Saddlebag';
+  src: url('./fonts/saddlebag/Saddlebag.ttf');
+}
+
+// Import Google fonts
+@import url('https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Fredericka+the+Great&family=Stint+Ultra+Condensed&display=swap');
+
+/////////////////////////////////////////////////////////////
+/// 4. Additional Root Customizations
+/////////////////////////////////////////////////////////////
+
+:root {
+  --bulma-body-background-color: var(--bulma-scheme-main);
+  --bulma-body-size: 1em;
+  --bulma-body-min-width: 300px;
+  --bulma-body-rendering: optimizeLegibility;
+  --bulma-body-family: var(--bulma-family-primary);
+  --bulma-body-overflow-x: hidden;
+  --bulma-body-overflow-y: scroll;
+  --bulma-body-color: var(--bulma-text);
+  --bulma-body-font-size: 1rem;
+  --bulma-body-weight: var(--bulma-weight-normal);
+  --bulma-body-line-height: 1.5;
+  --bulma-code-family: var(--bulma-family-code);
+  --bulma-code-padding: 0.25em 0.5em 0.25em;
+  --bulma-code-weight: normal;
+  --bulma-code-size: 0.875em;
+  --bulma-small-font-size: 0.875em;
+  --bulma-hr-background-color: var(--bulma-background);
+  --bulma-hr-height: 2px;
+  --bulma-hr-margin: 1.5rem 0;
+  --bulma-strong-color: var(--bulma-text-strong);
+  --bulma-strong-weight: var(--bulma-weight-semibold);
+  --bulma-pre-font-size: 0.875em;
+  --bulma-pre-padding: 1.25rem 1.5rem;
+  --bulma-pre-code-font-size: 1em;
+}
+
+/////////////////////////////////////////////////////////////
+/// 5. Custom Styling
+/////////////////////////////////////////////////////////////
+
+// Add any additional custom styles below
+body {
+  font-family: var(--bulma-body-family);
+  font-size: var(--bulma-body-font-size);
+  line-height: var(--bulma-body-line-height);
+}

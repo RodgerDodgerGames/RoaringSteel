@@ -1,14 +1,14 @@
 @charset "UTF-8";
 /* Bulma Utilities */
-@import url("https://fonts.googleapis.com/css2?family=Fredericka+the+Great&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Fredericka+the+Great&family=Stint+Ultra+Condensed&display=swap");
 :root {
   --bulma-control-radius: var(--bulma-radius);
   --bulma-control-radius-small: var(--bulma-radius-small);
-  --bulma-control-border-width: 2px;
+  --bulma-control-border-width: 1px;
   --bulma-control-height: 2.5em;
   --bulma-control-line-height: 1.5;
-  --bulma-control-padding-vertical: calc(0.5em - 2px);
-  --bulma-control-padding-horizontal: calc(0.75em - 2px);
+  --bulma-control-padding-vertical: calc(0.5em - 1px);
+  --bulma-control-padding-horizontal: calc(0.75em - 1px);
   --bulma-control-size: var(--bulma-size-normal);
   --bulma-control-focus-shadow-l: 50%;
 }
@@ -47,8 +47,8 @@
   --bulma-scheme-invert-ter-l: 14%;
   --bulma-scheme-invert-bis-l: 7%;
   --bulma-scheme-invert-l: 4%;
-  --bulma-family-primary: Roboto, sans-serif;
-  --bulma-family-secondary: "Fredericka the Great", serif;
+  --bulma-family-primary: "Averia Serif Libre", serif;
+  --bulma-family-secondary: Eutemia, serif;
   --bulma-family-code: Inconsolata, Hack, SF Mono, Roboto Mono, Source Code Pro, Ubuntu Mono, monospace;
   --bulma-size-small: 0.75rem;
   --bulma-size-normal: 1rem;
@@ -872,7 +872,7 @@
   --bulma-shadow-h: 221deg;
   --bulma-shadow-s: 14%;
   --bulma-shadow-l: 4%;
-  --bulma-size-1: 3rem;
+  --bulma-size-1: 3.25rem;
   --bulma-size-2: 2.5rem;
   --bulma-size-3: 2rem;
   --bulma-size-4: 1.5rem;
@@ -948,8 +948,8 @@
     --bulma-scheme-invert-ter-l: 14%;
     --bulma-scheme-invert-bis-l: 7%;
     --bulma-scheme-invert-l: 4%;
-    --bulma-family-primary: Roboto, sans-serif;
-    --bulma-family-secondary: "Fredericka the Great", serif;
+    --bulma-family-primary: "Averia Serif Libre", serif;
+    --bulma-family-secondary: Eutemia, serif;
     --bulma-family-code: Inconsolata, Hack, SF Mono, Roboto Mono, Source Code Pro, Ubuntu Mono, monospace;
     --bulma-size-small: 0.75rem;
     --bulma-size-normal: 1rem;
@@ -1773,7 +1773,7 @@
     --bulma-shadow-h: 221deg;
     --bulma-shadow-s: 14%;
     --bulma-shadow-l: 4%;
-    --bulma-size-1: 3rem;
+    --bulma-size-1: 3.25rem;
     --bulma-size-2: 2.5rem;
     --bulma-size-3: 2rem;
     --bulma-size-4: 1.5rem;
@@ -1866,8 +1866,8 @@
   --bulma-scheme-invert-ter-l: 14%;
   --bulma-scheme-invert-bis-l: 7%;
   --bulma-scheme-invert-l: 4%;
-  --bulma-family-primary: Roboto, sans-serif;
-  --bulma-family-secondary: "Fredericka the Great", serif;
+  --bulma-family-primary: "Averia Serif Libre", serif;
+  --bulma-family-secondary: Eutemia, serif;
   --bulma-family-code: Inconsolata, Hack, SF Mono, Roboto Mono, Source Code Pro, Ubuntu Mono, monospace;
   --bulma-size-small: 0.75rem;
   --bulma-size-normal: 1rem;
@@ -2691,7 +2691,7 @@
   --bulma-shadow-h: 221deg;
   --bulma-shadow-s: 14%;
   --bulma-shadow-l: 4%;
-  --bulma-size-1: 3rem;
+  --bulma-size-1: 3.25rem;
   --bulma-size-2: 2.5rem;
   --bulma-size-3: 2rem;
   --bulma-size-4: 1.5rem;
@@ -5373,7 +5373,7 @@ button.tag:active,
   margin-bottom: 0;
 }
 .title.is-1 {
-  font-size: 3rem;
+  font-size: 3.25rem;
 }
 .title.is-2 {
   font-size: 2.5rem;
@@ -5408,7 +5408,7 @@ button.tag:active,
   margin-bottom: 0;
 }
 .subtitle.is-1 {
-  font-size: 3rem;
+  font-size: 3.25rem;
 }
 .subtitle.is-2 {
   font-size: 2.5rem;
@@ -5452,7 +5452,7 @@ button.tag:active,
   --bulma-input-background-l: var(--bulma-scheme-main-l);
   --bulma-input-background-l-delta: 0%;
   --bulma-input-height: var(--bulma-control-height);
-  --bulma-input-shadow: none;
+  --bulma-input-shadow: inset 0 0.0625em 0.125em hsla(var(--bulma-scheme-h), var(--bulma-scheme-s), var(--bulma-scheme-invert-l), 0.05);
   --bulma-input-placeholder-color: hsla(var(--bulma-text-h), var(--bulma-text-s), var(--bulma-text-strong-l), 0.3);
   --bulma-input-disabled-color: var(--bulma-text-weak);
   --bulma-input-disabled-background-color: var(--bulma-background);
@@ -5514,7 +5514,7 @@ button.tag:active,
 
 /* Bulma Form */
 .textarea, .input {
-  box-shadow: none;
+  box-shadow: inset 0 0.0625em 0.125em hsla(var(--bulma-scheme-h), var(--bulma-scheme-s), var(--bulma-scheme-invert-l), 0.05);
   max-width: 100%;
   width: 100%;
 }
@@ -5641,8 +5641,8 @@ button.tag:active,
 
 .input.is-rounded {
   border-radius: var(--bulma-radius-rounded);
-  padding-left: calc(calc(0.75em - 2px) + 0.375em);
-  padding-right: calc(calc(0.75em - 2px) + 0.375em);
+  padding-left: calc(calc(0.75em - 1px) + 0.375em);
+  padding-right: calc(calc(0.75em - 1px) + 0.375em);
 }
 .input.is-static {
   background-color: transparent;
@@ -20631,7 +20631,7 @@ has-background-danger.is-hoverable:active {
 }
 
 .is-size-1 {
-  font-size: 3rem !important;
+  font-size: 3.25rem !important;
 }
 
 .is-size-2 {
@@ -20660,7 +20660,7 @@ has-background-danger.is-hoverable:active {
 
 @media screen and (max-width: 768px) {
   .is-size-1-mobile {
-    font-size: 3rem !important;
+    font-size: 3.25rem !important;
   }
   .is-size-2-mobile {
     font-size: 2.5rem !important;
@@ -20683,7 +20683,7 @@ has-background-danger.is-hoverable:active {
 }
 @media screen and (min-width: 769px), print {
   .is-size-1-tablet {
-    font-size: 3rem !important;
+    font-size: 3.25rem !important;
   }
   .is-size-2-tablet {
     font-size: 2.5rem !important;
@@ -20706,7 +20706,7 @@ has-background-danger.is-hoverable:active {
 }
 @media screen and (max-width: 1023px) {
   .is-size-1-touch {
-    font-size: 3rem !important;
+    font-size: 3.25rem !important;
   }
   .is-size-2-touch {
     font-size: 2.5rem !important;
@@ -20729,7 +20729,7 @@ has-background-danger.is-hoverable:active {
 }
 @media screen and (min-width: 1024px) {
   .is-size-1-desktop {
-    font-size: 3rem !important;
+    font-size: 3.25rem !important;
   }
   .is-size-2-desktop {
     font-size: 2.5rem !important;
@@ -20752,7 +20752,7 @@ has-background-danger.is-hoverable:active {
 }
 @media screen and (min-width: 1216px) {
   .is-size-1-widescreen {
-    font-size: 3rem !important;
+    font-size: 3.25rem !important;
   }
   .is-size-2-widescreen {
     font-size: 2.5rem !important;
@@ -20775,7 +20775,7 @@ has-background-danger.is-hoverable:active {
 }
 @media screen and (min-width: 1408px) {
   .is-size-1-fullhd {
-    font-size: 3rem !important;
+    font-size: 3.25rem !important;
   }
   .is-size-2-fullhd {
     font-size: 2.5rem !important;
@@ -21033,11 +21033,11 @@ has-background-danger.is-hoverable:active {
 }
 
 .is-family-primary {
-  font-family: "Roboto, sans-serif" !important;
+  font-family: '"Averia Serif Libre", serif' !important;
 }
 
 .is-family-secondary {
-  font-family: '"Fredericka the Great", serif' !important;
+  font-family: "Eutemia, serif" !important;
 }
 
 .is-family-sans-serif {
@@ -21550,9 +21550,43 @@ has-background-danger.is-hoverable:active {
 
 @font-face {
   font-family: "Eutemia";
-  src: url("./fonts/eutemia-i/Eutemia.ttf") format("truetype");
-  font-weight: normal;
-  font-style: normal;
+  src: url("./fonts/eutemia-i/Eutemia.ttf");
+}
+@font-face {
+  font-family: "Saddlebag";
+  src: url("./fonts/saddlebag/Saddlebag.ttf");
+}
+:root {
+  --bulma-body-background-color: var(--bulma-scheme-main);
+  --bulma-body-size: 1em;
+  --bulma-body-min-width: 300px;
+  --bulma-body-rendering: optimizeLegibility;
+  --bulma-body-family: var(--bulma-family-primary);
+  --bulma-body-overflow-x: hidden;
+  --bulma-body-overflow-y: scroll;
+  --bulma-body-color: var(--bulma-text);
+  --bulma-body-font-size: 1rem;
+  --bulma-body-weight: var(--bulma-weight-normal);
+  --bulma-body-line-height: 1.5;
+  --bulma-code-family: var(--bulma-family-code);
+  --bulma-code-padding: 0.25em 0.5em 0.25em;
+  --bulma-code-weight: normal;
+  --bulma-code-size: 0.875em;
+  --bulma-small-font-size: 0.875em;
+  --bulma-hr-background-color: var(--bulma-background);
+  --bulma-hr-height: 2px;
+  --bulma-hr-margin: 1.5rem 0;
+  --bulma-strong-color: var(--bulma-text-strong);
+  --bulma-strong-weight: var(--bulma-weight-semibold);
+  --bulma-pre-font-size: 0.875em;
+  --bulma-pre-padding: 1.25rem 1.5rem;
+  --bulma-pre-code-font-size: 1em;
+}
+
+body {
+  font-family: var(--bulma-body-family);
+  font-size: var(--bulma-body-font-size);
+  line-height: var(--bulma-body-line-height);
 }
 
 /*# sourceMappingURL=roaring-steel.css.map */

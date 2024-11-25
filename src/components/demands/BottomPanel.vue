@@ -9,7 +9,6 @@
 
       <!-- Panel Content -->
       <div class="block has-text-centered p-2">
-        <h3 class="title is-3 has-text-black">Demand Cards</h3>
         <!-- testing out demand cards -->
         <DemandCard :cards="cards" />
       </div>
@@ -50,12 +49,13 @@ body {
   bottom: -100%; /* Initially hidden below the viewport */
   left: 0;
   width: 100%;
-  height: 50%; /* Adjust panel height */
+  height: 360px; /* Adjust panel height */
   background: #fff;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
   transition: bottom 0.3s ease; /* Smooth slide-up animation */
   z-index: 9999991100; /* Ensure it appears above other content */
   overflow: hidden;
+  padding: 0.5rem;
 }
 
 /* Make the panel slide up when active */
@@ -88,6 +88,6 @@ body {
 
 /* Move button to the top of the panel when active */
 .sliding-panel.is-active .toggle-button {
-  bottom: calc(50% + 1rem); /* Place it above the panel */
+  bottom: calc(360px + 0.5rem); /* Place it above the panel */
 }
 </style>

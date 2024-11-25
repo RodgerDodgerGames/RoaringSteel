@@ -59,14 +59,14 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    * Enables removal mode for deleting map elements.
    */
   function enableRemoveMode() {
-    props.map.value.pm.toggleGlobalRemovalMode()
+    props.map.pm.toggleGlobalRemovalMode()
   }
 
   /**
    * Enables edit mode for modifying existing lines.
    */
   function enableEditing() {
-    props.map.value.eachLayer((layer) => {
+    props.map.eachLayer((layer) => {
       if (layer.pm?.toggleEdit) layer.pm.toggleEdit()
     })
   }
@@ -77,7 +77,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    * Initiates line drawing mode on the map.
    */
   function startDrawingLine() {
-    props.map.value.pm.enableDraw('Line')
+    props.map.pm.enableDraw('Line')
     mapStore.setIsDrawingActive(true)
     resetLineTracking()
   }
@@ -86,7 +86,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    * Cancels line drawing mode and resets state.
    */
   function cancelDrawing() {
-    props.map.value.pm.disableDraw('Line')
+    props.map.pm.disableDraw('Line')
     mapStore.setIsDrawingActive(false)
     workingLayer.value = null
   }
@@ -109,7 +109,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     props.towns.value.eachLayer((layer) => {
       layer.on('click', (e) => {
         if (isDrawingActive.value) {
-          props.map.value.pm.Draw.Line._createVertex(e.latlng)
+          props.map.pm.Draw.Line._createVertex(e.latlng)
         }
       })
     })
@@ -119,11 +119,11 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    * Sets up map-wide drawing events, including starting and completing a line.
    */
   function initializeMapEvents() {
-    props.map.value.on('pm:drawstart', ({ workingLayer: layer }) => {
+    props.map.on('pm:drawstart', ({ workingLayer: layer }) => {
       workingLayer.value = layer
       setupDrawingEvents()
     })
-    props.map.value.on('pm:create', finalizeDrawing)
+    props.map.on('pm:create', finalizeDrawing)
   }
 
   function initializeCaches() {
@@ -190,7 +190,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    * Attaches a tooltip update handler to the hint marker to show running cost.
    */
   function addHintMarkerMoveHandler() {
-    const hintMarker = props.map.value.pm.Draw.Line._hintMarker
+    const hintMarker = props.map.pm.Draw.Line._hintMarker
     if (hintMarker && !hintMarkerMoveHandler.value) {
       hintMarkerMoveHandler.value = useDebounceFn(
         (e) => updateRunningCostTooltip(e.latlng, hintMarker),
@@ -204,7 +204,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    * Detaches the tooltip update handler from the hint marker after drawing completion.
    */
   function resetHintMarkerMoveHandler() {
-    const hintMarker = props.map.value.pm.Draw.Line._hintMarker
+    const hintMarker = props.map.pm.Draw.Line._hintMarker
     if (hintMarker && hintMarkerMoveHandler.value) {
       hintMarker.off('move', hintMarkerMoveHandler.value)
       hintMarkerMoveHandler.value = null
@@ -237,7 +237,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     let closestCell = null
     let minDistance = Infinity
     grid.value.forEach((cell) => {
-      const dist = props.map.value.distance(latlng, L.latLng(cell.centroid.lat, cell.centroid.lng))
+      const dist = props.map.distance(latlng, L.latLng(cell.centroid.lat, cell.centroid.lng))
       if (dist < minDistance) {
         minDistance = dist
         closestCell = cell
@@ -275,10 +275,10 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   function setupCursorValidation() {
     const debouncedCursorValidation = useDebounceFn((latlng) => {
       const cursorStyle = validateStartPoint(latlng) ? 'default' : 'not-allowed'
-      props.map.value.getContainer().style.cursor = cursorStyle
+      props.map.getContainer().style.cursor = cursorStyle
     }, 50) // Adjust debounce delay as needed
 
-    props.map.value.on('mousemove', (e) => {
+    props.map.on('mousemove', (e) => {
       // only update cursor when drawing is active but first vertex has not been added
       if (isDrawingActive.value && !isFirstVertexAdded.value) {
         debouncedCursorValidation(e.latlng)
@@ -290,7 +290,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    * Configures Geoman global drawing options, including tooltips and snapping behavior.
    */
   function setGeomanOptions() {
-    props.map.value.pm.setLang('en', {
+    props.map.pm.setLang('en', {
       tooltips: {
         placeMarker: 'Place your marker here!',
         firstVertex: 'Track must start in a town or on existing track',
@@ -299,7 +299,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
       }
     })
 
-    props.map.value.pm.setGlobalOptions({
+    props.map.pm.setGlobalOptions({
       snappable: true,
       snapDistance: 50,
       markerStyle: { draggable: true, color: 'red' },

@@ -1,10 +1,12 @@
 <script setup>
 import { ref } from 'vue'
+import { storeToRefs } from 'pinia'
 import DrawButtons from '@/components/map/DrawButtons.vue'
-import { useGameStore } from '@/stores/game'
+import { useMapStore } from '@/stores/map'
 
-// Import game store
-const gameStore = useGameStore()
+// Import map store
+const mapStore = useMapStore()
+const { map, townsLayer } = storeToRefs(mapStore)
 
 // Track the active tab
 const activeTab = ref('Home')
@@ -47,11 +49,7 @@ const setActiveTab = (tab) => {
 
   <!-- Build tab content -->
   <div v-if="activeTab === 'Build'">
-    <DrawButtons
-      v-if="gameStore.townsLayer"
-      :map="gameStore.mainMap"
-      :towns="gameStore.townsLayer"
-    />
+    <DrawButtons v-if="townsLayer && map" :map="map" :towns="townsLayer" />
   </div>
 
   <div v-if="activeTab === 'Upgrade'"></div>

@@ -72,8 +72,8 @@ body {
 /* Open/Close Button Styling */
 .toggle-button {
   position: fixed; /* Position relative to viewport */
-  left: 50%; /* Center horizontally */
-  transform: translateX(-50%);
+  left: 30%; /* Center horizontally */
+  transform: translateX(-30%);
   bottom: 0; /* Always at the bottom of the viewport */
   z-index: 9999991200; /* Ensure it is above the panel */
   background: #3273dc;

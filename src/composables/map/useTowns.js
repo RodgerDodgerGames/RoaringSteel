@@ -51,6 +51,27 @@ export function useTowns() {
           offset: [0, 20]
         })
 
+        // Add a click event handler to display town information
+        marker.on('click', () => {
+          // popup options
+          const options = {
+            className: 'town-popup'
+          }
+          // industry content
+          const indContent =
+            feature.properties.industries.length > 0
+              ? feature.properties.industries
+                  .map((industry) => `<li>${industry.name}</li>`)
+                  .join('')
+              : '<li>None</li>'
+          const townInfo = `<div class="has-text-centered mb-3">
+      <div class="title is-4 has-text-dark mb-2">${feature.properties.name}</div>
+      <span class="has-text-grey-dark">Size: ${feature.properties.size}</span></div>
+      <ul>Industries:${indContent}</ul>
+      `
+          L.popup(options).setLatLng(latlng).setContent(townInfo).openOn(map.value)
+        })
+
         return marker
       }
     }).addTo(map.value)
@@ -83,13 +104,11 @@ export function useTowns() {
   const getIconSize = (size) => {
     switch (size) {
       case 'small':
-        return 20
+        return 24
       case 'medium':
-        return 30
+        return 28
       case 'large':
-        return 40
-      default:
-        return 20
+        return 32
     }
   }
 

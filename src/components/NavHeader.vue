@@ -7,7 +7,7 @@
           <h1 class="title">Roaring Steel</h1>
         </a>
 
-        <a class="navbar-item ml-6">End Turn</a>
+        <a id="endTurnButton" class="navbar-item ml-6">End Turn</a>
       </slot>
       <!-- Burger Menu for Mobile -->
       <a
@@ -51,5 +51,12 @@ const toggleMenu = () => {
 <style scoped>
 .navbar-brand .title {
   font-family: 'Eutemia';
+}
+#endTurnButton {
+  border: solid 1px #fff;
+  border-radius: 6px;
+  height: 32px;
+  margin-top: 10px;
+  padding: 1rem;
 }
 </style>

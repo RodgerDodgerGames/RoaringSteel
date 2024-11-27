@@ -18,7 +18,7 @@ const handleStateClick = (selectedState) => {
 </script>
 
 <template>
-  <div class="container">
+  <div class="section">
     <div class="fixed-grid has-1-cols">
       <div class="grid">
         <div class="cell">

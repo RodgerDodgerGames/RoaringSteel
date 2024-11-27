@@ -63,11 +63,9 @@ async function handlePlayGameClick() {
 <template>
   <div id="app">
     <!-- Header Section -->
-    <NavHeader />
+    <NavHeader v-if="currentView === 'game'" />
     <!-- Main Content Section -->
-    <section class="section">
-      <component :is="viewComponents[currentView]" @play-game="handlePlayGameClick" />
-    </section>
+    <component :is="viewComponents[currentView]" @play-game="handlePlayGameClick" />
   </div>
 </template>
 

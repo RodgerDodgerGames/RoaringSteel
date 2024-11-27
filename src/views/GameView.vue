@@ -9,19 +9,21 @@ import BottomPanel from '@/components/demands/BottomPanel.vue'
 </script>
 
 <template>
-  <div class="columns">
-    <!-- Main Map -->
-    <div class="column is-two-thirds">
-      <MainMap />
+  <div class="section">
+    <div class="columns">
+      <!-- Main Map -->
+      <div class="column is-two-thirds">
+        <MainMap />
+      </div>
+
+      <!-- Side Panel -->
+      <div class="column is-one-third">
+        <GameSidePanel />
+      </div>
     </div>
 
-    <!-- Side Panel -->
-    <div class="column is-one-third">
-      <GameSidePanel />
-    </div>
+    <BottomPanel />
   </div>
-
-  <BottomPanel />
 </template>
 
 <style scoped></style>

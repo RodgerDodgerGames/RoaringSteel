@@ -5,8 +5,9 @@ import { storeToRefs } from 'pinia'
 import * as turf from '@turf/turf'
 
 // import components
-import AreaSelect from '@/views/AreaSelect.vue'
+import AreaSelectView from '@/views/AreaSelectView.vue'
 import GameView from './views/GameView.vue'
+import WelcomeView from './views/WelcomeView.vue'
 import NavHeader from './components/NavHeader.vue'
 
 // import stores
@@ -24,15 +25,20 @@ const gameStore = useGameStore()
 const gridStore = useGridStore()
 const demandCardsStore = useDemandCardsStore()
 
-// import composables
-
 // STATE
 
-// which view should be shown
-const currentView = ref('areaSelect')
+// which view should be shown (start with welcome)
+const currentView = ref('welcome')
 
 // region where game is being played
 const { region } = storeToRefs(gameStore)
+
+// View Map
+const viewComponents = {
+  welcome: WelcomeView,
+  areaSelect: AreaSelectView,
+  game: GameView
+}
 
 // METHODS
 
@@ -60,8 +66,7 @@ async function handlePlayGameClick() {
     <NavHeader />
     <!-- Main Content Section -->
     <section class="section">
-      <AreaSelect v-if="currentView === 'areaSelect'" @play-game="handlePlayGameClick" />
-      <GameView v-if="currentView === 'game'" />
+      <component :is="viewComponents[currentView]" @play-game="handlePlayGameClick" />
     </section>
   </div>
 </template>

@@ -4,6 +4,7 @@
 
 import { ref, computed, onMounted } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
+import 'leaflet-textpath'
 import { storeToRefs } from 'pinia'
 import { useMapStore } from '@/stores/map'
 
@@ -183,6 +184,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     if (e.layer?.pm?._shape === 'Line') {
       existingLineLayers.value.push(e.layer)
       updateLineEndpoints(e.layer)
+      styleTracks(e.layer)
     }
     resetHintMarkerMoveHandler()
     workingLayer.value = null
@@ -309,6 +311,129 @@ export default function useBuildTrack(props, grid, formatCurrency) {
       markerStyle: { draggable: true, color: 'red' },
       pathOptions: { color: 'blue', fillColor: 'blue', fillOpacity: 0.4, weight: 3 }
     })
+  }
+
+  // ================== TRACK STYLING ==================
+
+  // function to style layer like railroad tracks
+  function styleTracks(layer) {
+    if (layer?.pm?._shape != 'Line') return
+    const latlngs = layer.getLatLngs()
+
+    // Hide the original layer
+    layer.setStyle({
+      color: 'transparent', // Hide the original line
+      opacity: 0,
+      weight: 0
+    })
+
+    existingLineLayers.value.push(layer) // Store the original layer for reference
+
+    // Add rails using text
+    const railText = '-'
+    const tieText = '|    '
+    const options = {
+      repeat: true,
+      offset: 0, // Adjust text placement
+      attributes: { fill: 'black', 'font-size': '16px' }
+    }
+
+    // Apply text for rails
+    layer.setText(railText, { ...options, below: false })
+
+    // Optionally, add ties using another layer
+    const tieLayer = L.polyline(latlngs, { color: 'transparent' })
+    const tieOptions = {
+      ...options,
+      offset: -1.5,
+      attributes: { fill: 'black', 'font-size': '10px' }
+    }
+    tieLayer.setText(tieText, tieOptions)
+    tieLayer.addTo(props.map)
+  }
+
+  // function to add ties to railroad tracks
+  function addRailroadTies(map, latlngs, interval, tieLength) {
+    console.log('Adding ties to railroad tracks...')
+    console.log('latlngs:', latlngs)
+    console.log('interval:', interval)
+    console.log('tieLength:', tieLength)
+
+    for (let i = 1; i < latlngs.length; i++) {
+      const start = latlngs[i - 1]
+      const end = latlngs[i]
+
+      // Compute the number of ties based on segment length
+      const distance = map.distance(start, end)
+      const numTies = Math.floor(distance / interval)
+
+      console.log(`Segment from ${start} to ${end} is ${distance} meters, adding ${numTies} ties.`)
+
+      for (let j = 0; j < numTies; j++) {
+        const fraction = j / numTies
+        const midpoint = {
+          lat: start.lat + fraction * (end.lat - start.lat),
+          lng: start.lng + fraction * (end.lng - start.lng)
+        }
+
+        // Compute perpendicular tie positions
+        const angle = Math.atan2(end.lat - start.lat, end.lng - start.lng)
+        const tieOffsetLat = (tieLength * Math.cos(angle + Math.PI / 2)) / 2
+        const tieOffsetLng = (tieLength * Math.sin(angle + Math.PI / 2)) / 2
+
+        const tieCoords = [
+          { lat: midpoint.lat - tieOffsetLat, lng: midpoint.lng - tieOffsetLng },
+          { lat: midpoint.lat + tieOffsetLat, lng: midpoint.lng + tieOffsetLng }
+        ]
+
+        // Add tie to the map
+        L.polyline(tieCoords, {
+          color: 'brown',
+          weight: 2
+        }).addTo(map)
+      }
+    }
+  }
+
+  // function to create parallel rails
+  function createParallelLines(latlngs, offset) {
+    console.log('Creating parallel rails from latlngs:', latlngs)
+    console.log('Offset:', offset)
+
+    const leftRail = []
+    const rightRail = []
+
+    for (let i = 0; i < latlngs.length - 1; i++) {
+      const start = latlngs[i]
+      const end = latlngs[i + 1]
+
+      console.log('Segment from', start, 'to', end)
+
+      // Compute angle of the segment
+      const angle = Math.atan2(end.lat - start.lat, end.lng - start.lng)
+
+      console.log('Angle:', angle)
+
+      // Calculate offset positions
+      const offsetLat = offset * Math.cos(angle)
+      const offsetLng = offset * Math.sin(angle)
+
+      console.log('Offset positions:', offsetLat, offsetLng)
+
+      leftRail.push({ lat: start.lat + offsetLat, lng: start.lng - offsetLng })
+      rightRail.push({ lat: start.lat - offsetLat, lng: start.lng + offsetLng })
+
+      if (i === latlngs.length - 2) {
+        // Add the final points
+        leftRail.push({ lat: end.lat + offsetLat, lng: end.lng - offsetLng })
+        rightRail.push({ lat: end.lat - offsetLat, lng: end.lng + offsetLng })
+      }
+    }
+
+    console.log('Left rail:', leftRail)
+    console.log('Right rail:', rightRail)
+
+    return { leftRail, rightRail }
   }
 
   // ================== RETURN EXPOSED METHODS AND STATE ==================

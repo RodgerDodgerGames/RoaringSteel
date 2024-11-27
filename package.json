@@ -11,7 +11,7 @@
     "format": "prettier --write src/",
     "test": "vitest",
     "build-bulma": "sass --load-path=node_modules src/assets/roaring-steel.scss src/assets/roaring-steel.css",
-  "start": "npm run build-bulma -- --watch"
+    "start": "npm run build-bulma -- --watch"
   },
   "dependencies": {
     "@geoman-io/leaflet-geoman-free": "^2.17.0",
@@ -19,6 +19,7 @@
     "@vueuse/core": "^11.1.0",
     "bulma": "^1.0.2",
     "leaflet": "^1.9.4",
+    "leaflet-textpath": "^1.2.3",
     "papaparse": "^5.4.1",
     "pinia": "^2.1.7",
     "vue": "^3.4.21"

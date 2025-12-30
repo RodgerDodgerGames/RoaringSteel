@@ -1,16 +1,12 @@
 <!-- src/components/setup/PlayerSelect.vue -->
 <script setup>
 import { ref } from 'vue'
-import { usePlayerStore } from '@/stores/players'
 
 const players = ref([{ name: '', color: '#FF5733', showColorPicker: false }])
 
 // Notification state
 const notificationMessage = ref('')
 const showNotification = ref(false)
-
-// player store
-const playerStore = usePlayerStore()
 
 // Available colors for selection
 const availableColors = [
@@ -69,6 +65,31 @@ const selectColor = (player, color) => {
 // Validate if all player names are unique
 const isNameUnique = (index, name) => {
   return players.value.every((player, i) => i === index || player.name !== name)
+}
+
+// Emit events
+const emit = defineEmits(['done'])
+
+// Handle done button - validate before proceeding
+const handleDone = () => {
+  // Check if all names are filled
+  const hasEmptyName = players.value.some((player) => player.name.trim() === '')
+  if (hasEmptyName) {
+    notificationMessage.value = 'Please fill in all player names before proceeding!'
+    showNotification.value = true
+    return
+  }
+
+  // Check if all names are unique
+  const hasDuplicateNames = players.value.some((player, index) => !isNameUnique(index, player.name))
+  if (hasDuplicateNames) {
+    notificationMessage.value = 'All player names must be unique!'
+    showNotification.value = true
+    return
+  }
+
+  // All validations passed - emit done event with player data
+  emit('done', players.value)
 }
 </script>
 
@@ -150,7 +171,7 @@ const isNameUnique = (index, name) => {
 
       <!-- Done button -->
       <p class="control">
-        <button @click="emit('done')" class="button is-info">Done</button>
+        <button @click="handleDone" class="button is-info">Done</button>
       </p>
     </div>
   </div>

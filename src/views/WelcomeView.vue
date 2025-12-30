@@ -6,9 +6,13 @@
 <script setup>
 import { ref } from 'vue'
 import PlayerSelect from '@/components/setup/PlayerSelect.vue'
+import PlayerConfirm from '@/components/setup/PlayerConfirm.vue'
 
 // which pane should be shown
 const activePane = ref('gameButtons')
+
+// Store selected players for confirmation
+const selectedPlayers = ref([])
 
 function newGame() {
   console.log('new game clicked')
@@ -17,6 +21,24 @@ function newGame() {
 
 function loadGame() {
   console.log('load game clicked')
+}
+
+// Handle when player selection is done
+function handlePlayerSelectDone(players) {
+  selectedPlayers.value = players
+  activePane.value = 'playerConfirm'
+}
+
+// Handle going back from confirmation to player select
+function handleGoBack() {
+  activePane.value = 'playerSelect'
+}
+
+// Handle final confirmation
+function handleConfirmed() {
+  console.log('Players confirmed and saved to store!')
+  // TODO: Navigate to the game board or next step
+  // For now, just log success
 }
 </script>
 
@@ -39,7 +61,20 @@ function loadGame() {
         </div>
 
         <!-- Add player form -->
-        <PlayerSelect v-if="activePane === 'playerSelect'" />
+        <keep-alive>
+          <PlayerSelect
+            v-if="activePane === 'playerSelect'"
+            @done="handlePlayerSelectDone"
+          />
+        </keep-alive>
+
+        <!-- Player confirmation -->
+        <PlayerConfirm
+          v-if="activePane === 'playerConfirm'"
+          :players="selectedPlayers"
+          @back="handleGoBack"
+          @confirmed="handleConfirmed"
+        />
       </div>
     </div>
   </section>

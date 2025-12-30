@@ -31,6 +31,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
       name: player.name,
       cash: player.cash || 0,
       isTurn: false,
+      color: player.color,
       position: 0
     })
   }

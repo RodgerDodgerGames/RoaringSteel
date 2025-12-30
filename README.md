@@ -1,35 +1,52 @@
 # roaring-steel
 
-This template should help get you started developing with Vue 3 in Vite.
+This is a browser-based version of the legendary railroad building board game [Empire Builder](https://boardgamegeek.com/boardgame/168/empire-builder). Since this is the internet, this game will update the locations and commodities according to the latest available data from the US Census and the US Department of Labor. Play versus your friends or play solo against computer players. Either way, have fun building your railroad empire.
 
-## Recommended IDE Setup
+## Installation
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+Run `npm install roaring-steel`
 
-## Customize configuration
+## Architecture
 
-See [Vite Configuration Reference](https://vitejs.dev/config/).
+The app is built with [Vite](https://vitejs.dev/) and [Vue](https://vuejs.org/). [Bulma](https://bulma.io/) is used as a CSS framework.
 
-## Project Setup
+## File Summary
 
-```sh
-npm install
-```
+public/data
+- CSV files for generating commodities (industries)
+- CSV files for generating towns
+- GeoJSON files for generating towns
 
-### Compile and Hot-Reload for Development
+src/assets
+- icons/towns
+- fonts
+- images
 
-```sh
-npm run dev
-```
+src/components
+- vue components
 
-### Compile and Minify for Production
+src/stores
+- pinia stores
 
-```sh
-npm run build
-```
+src/composables
+- map/
+  - functional logic for map components
+- setup/
+  - functional logic for setup components
 
-### Lint with [ESLint](https://eslint.org/)
+src/config
+- configuration files, usually associated with composable activities
 
-```sh
-npm run lint
-```
+src/views
+- vue views
+
+top-level tools/configs
+- .env file
+- package.json
+- vite.config.js
+- .eslintrc.cjs
+- .prettierrc.json
+- jsconfig.json
+
+
+

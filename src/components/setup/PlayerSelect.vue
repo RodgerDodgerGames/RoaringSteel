@@ -141,18 +141,17 @@ const isNameUnique = (index, name) => {
       </form>
     </div>
 
-    <!-- Add Player Button -->
-    <div class="has-text-centered">
-      <button @click="addPlayer" class="button is-primary">Add Player</button>
-    </div>
+    <!-- bottom buttons -->
+    <div class="buttons is-centered">
+      <!-- Add Player Button -->
+      <p class="control">
+        <button @click="addPlayer" class="button is-primary">Add Player</button>
+      </p>
 
-    <!-- area select button -->
-    <div class="block">
-      When you are done with your player setup,
-      <button class="button is-info is-outlined mt-6" @click="newGame">
-        Create Game Geography
-      </button>
-      next.
+      <!-- Done button -->
+      <p class="control">
+        <button @click="emit('done')" class="button is-info">Done</button>
+      </p>
     </div>
   </div>
 </template>

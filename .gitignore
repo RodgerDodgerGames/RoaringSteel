@@ -10,6 +10,9 @@ lerna-debug.log*
 # ignore claude
 .claude/
 
+# ignore vite stuff
+.vite/
+
 node_modules
 .DS_Store
 dist

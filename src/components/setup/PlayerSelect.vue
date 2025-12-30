@@ -94,7 +94,7 @@ const handleDone = () => {
 </script>
 
 <template>
-  <div id="playerSelectContainer" class="container has-background-info-dark p-5 mt-4">
+  <div class="welcome-modal-container container has-background-info-dark p-5 mt-4">
     <h3 class="is-size-3 mb-2">Who is playing?</h3>
 
     <!-- Notification -->
@@ -108,8 +108,8 @@ const handleDone = () => {
       <form @submit.prevent>
         <!-- Player Name and Color Picker Row -->
         <div class="field">
-          <label class="label is-pulled-left mr-2">Player {{ index + 1 }}</label>
-          <div class="field is-grouped">
+          <div class="field is-grouped is-flex is-align-items-center">
+            <label class="label">Player {{ index + 1 }}</label>
             <!-- Player Name Input -->
             <div class="control is-expanded">
               <input
@@ -178,12 +178,6 @@ const handleDone = () => {
 </template>
 
 <style scoped>
-#playerSelectContainer {
-  max-width: 70%;
-  border-radius: 20px;
-  margin-top: 15vh;
-}
-
 .selected-color {
   width: 50px;
   height: 50px;

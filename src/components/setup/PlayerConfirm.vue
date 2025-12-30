@@ -45,7 +45,7 @@ function goBack() {
 </script>
 
 <template>
-  <div id="playerConfirmContainer" class="container has-background-info-dark p-5 mt-4">
+  <div class="welcome-modal-container container has-background-info-dark p-5 mt-4">
     <h3 class="is-size-3 mb-4">Confirm Players</h3>
 
     <!-- Player List -->
@@ -53,12 +53,12 @@ function goBack() {
       <div v-for="(player, index) in players" :key="index" class="mb-3">
         <div class="columns is-vcentered is-mobile">
           <div class="column is-narrow">
-            <span class="subtitle">Player {{ index + 1 }}:</span>
+            <span class="is-size-5">Player {{ index + 1 }}:</span>
           </div>
           <div class="column">
             <div class="card">
               <div class="card-content" :style="{ backgroundColor: player.color }">
-                <div class="title has-text-black">{{ player.name }}</div>
+                <div class="is-size-4 has-text-weight-bold has-text-black">{{ player.name }}</div>
               </div>
             </div>
           </div>
@@ -68,36 +68,14 @@ function goBack() {
 
     <!-- Action Buttons -->
     <div class="buttons is-centered">
-      <button @click="goBack" class="button is-warning">Go Back</button>
-      <button @click="confirmPlayers" class="button is-success">Continue</button>
+      <button @click="goBack" class="button is-warning is-light">Go Back</button>
+      <button @click="confirmPlayers" class="button is-primary">Continue</button>
     </div>
   </div>
 </template>
 
 <style scoped>
-#playerConfirmContainer {
-  max-width: 70%;
-  border-radius: 20px;
-  margin-top: 15vh;
-}
-
-.player-list {
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.player-card {
-  transition: transform 0.2s;
-}
-
-.player-card:hover {
-  transform: translateX(5px);
-}
-
-.player-color-indicator {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  border: 3px solid #fff;
+.card-content {
+  padding: 0.75rem;
 }
 </style>

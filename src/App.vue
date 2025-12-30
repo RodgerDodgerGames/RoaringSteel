@@ -42,6 +42,12 @@ const viewComponents = {
 
 // METHODS
 
+// Handle players confirmed event from WelcomeView
+function handlePlayersConfirmed() {
+  console.log('Players confirmed, navigating to area select')
+  currentView.value = 'areaSelect'
+}
+
 // Handle play game button click
 async function handlePlayGameClick() {
   console.log('handlePlayGameClick', region.value)
@@ -65,7 +71,11 @@ async function handlePlayGameClick() {
     <!-- Header Section -->
     <NavHeader v-if="currentView === 'game'" />
     <!-- Main Content Section -->
-    <component :is="viewComponents[currentView]" @play-game="handlePlayGameClick" />
+    <component
+      :is="viewComponents[currentView]"
+      @players-confirmed="handlePlayersConfirmed"
+      @play-game="handlePlayGameClick"
+    />
   </div>
 </template>
 

@@ -8,6 +8,9 @@ import { ref } from 'vue'
 import PlayerSelect from '@/components/setup/PlayerSelect.vue'
 import PlayerConfirm from '@/components/setup/PlayerConfirm.vue'
 
+// Define emits
+const emit = defineEmits(['players-confirmed'])
+
 // which pane should be shown
 const activePane = ref('gameButtons')
 
@@ -37,8 +40,8 @@ function handleGoBack() {
 // Handle final confirmation
 function handleConfirmed() {
   console.log('Players confirmed and saved to store!')
-  // TODO: Navigate to the game board or next step
-  // For now, just log success
+  // Navigate to area select view
+  emit('players-confirmed')
 }
 </script>
 
@@ -62,10 +65,7 @@ function handleConfirmed() {
 
         <!-- Add player form -->
         <keep-alive>
-          <PlayerSelect
-            v-if="activePane === 'playerSelect'"
-            @done="handlePlayerSelectDone"
-          />
+          <PlayerSelect v-if="activePane === 'playerSelect'" @done="handlePlayerSelectDone" />
         </keep-alive>
 
         <!-- Player confirmation -->

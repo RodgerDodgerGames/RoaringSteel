@@ -27,9 +27,9 @@ This analysis covers optimization opportunities, structural improvements, packag
 
 ### Issues & Recommendations
 
-#### Unused Dependencies (Remove)
-- `@geoman-io/leaflet-geoman-free@2.19.0` - Imported but never used in the codebase. Only referenced in `/src/composables/map/useTowns.js` but the drawing functionality is not implemented.
-- `leaflet-textpath@1.3.0` - Imported but appears unused. Only referenced in `/src/composables/map/useBuildTrack.js` which seems incomplete.
+#### Dependencies (All in Use)
+- `@geoman-io/leaflet-geoman-free@2.19.0` - Used in `useBuildTrack.js` for track drawing functionality via `map.pm.*` API (enableDraw, setGlobalOptions, etc.)
+- `leaflet-textpath@1.3.0` - Used in `useBuildTrack.js` for styling railroad tracks with text characters via `layer.setText()`
 
 #### Missing Dependencies (Add)
 - **TypeScript** - No type safety currently; would improve development experience significantly
@@ -456,7 +456,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
 
 | Category | Issue | Severity | Effort |
 |----------|-------|----------|--------|
-| Dependencies | Unused geoman, leaflet-textpath | Medium | Low |
+| Dependencies | ~~Unused geoman, leaflet-textpath~~ (corrected - both in use) | N/A | N/A |
 | Dependencies | No TypeScript | High | High |
 | Structure | Unused/incomplete files | Medium | Low |
 | Structure | Store not connected to UI | High | Medium |

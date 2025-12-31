@@ -29,6 +29,7 @@ export const useGameStore = defineStore('gameStore', () => {
   return {
     // STATE
     region,
+    turn,
     // ACTIONS
     setRegion,
     advanceTurn

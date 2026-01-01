@@ -1,3 +1,16 @@
+<!--
+  NavHeader.vue
+
+  Main navigation header with game title and menu controls.
+  Uses Bulma navbar with responsive burger menu for mobile.
+  Provides slots for left (branding) and right (navigation) content.
+
+  Features:
+  - Responsive burger menu toggle
+  - End Turn button
+  - Named slots for customization
+-->
+
 <template>
   <nav class="navbar is-primary" role="navigation" aria-label="main navigation">
     <div class="navbar-brand">

@@ -1,3 +1,14 @@
+<!--
+  AreaSelectPanel.vue
+
+  Control panel for the area selection screen. Displays the currently
+  selected region and provides a "Play Game" button to proceed.
+  Button is disabled until a region is selected.
+
+  @prop region - GeoJSON feature of the selected state
+  @emits play-game - Triggered when user clicks Play Game button
+-->
+
 <template>
   <div class="level">
     <p>Where would you like to play?</p>

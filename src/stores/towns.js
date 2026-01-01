@@ -1,22 +1,47 @@
-// towns.js
-// store for loading, managing, and classifying towns data
+/**
+ * Towns Store (towns.js)
+ *
+ * Manages town data for the game including loading, classification, and industry assignment.
+ * Towns are populated from Census MSA (Metropolitan Statistical Area) data and classified
+ * by population size using a natural breaks algorithm.
+ *
+ * Data Flow:
+ * 1. Fetch industry data from industryStore
+ * 2. Fetch population data from Census API
+ * 3. Fetch lat/lon coordinates for each MSA from TigerWeb
+ * 4. Classify towns by population (small/medium/large)
+ * 5. Assign industries based on employment density
+ *
+ * Town Object Structure:
+ * {
+ *   msa: string,           // MSA code (e.g., "33460")
+ *   fullName: string,      // Full MSA name (e.g., "Minneapolis-St. Paul-Bloomington")
+ *   name: string,          // Short name (e.g., "Minneapolis")
+ *   stateCode: string,     // State FIPS code
+ *   population: number,    // Population count
+ *   lon: number,           // Longitude coordinate
+ *   lat: number,           // Latitude coordinate
+ *   size: string,          // Size class: "small", "medium", or "large"
+ *   industries: Array      // Assigned industries [{name, industry}]
+ * }
+ *
+ * @module stores/towns
+ */
 
-// IMPORTS
 import { ref } from 'vue'
 import { defineStore, storeToRefs } from 'pinia'
-
-// composables
 import { useLocalStorage } from '@vueuse/core'
 import { useIndustryStore } from './industry'
 import useCensus from '../composables/setup/useCensus'
 import getMSALatLon from '../composables/setup/useTigerWeb'
 
-// CONSTANTS
-// town size classes
+/** Size classification labels for towns based on population */
 const sizeClasses = ['small', 'medium', 'large']
-// percent of towns that an industry can have assigned to them
+
+/** Maximum proportion of towns that can have any single industry (20%) */
 const maxTownsForIndustry = 0.2
-// maximum number of industries per town
+
+/** Maximum number of industries a single town can have */
 const maxIndustries = 3
 
 // STORE
@@ -30,7 +55,13 @@ export const useTownsStore = defineStore('towns', () => {
 
   // ACTIONS
 
-  // Setup towns for the selected state
+  /**
+   * Initializes towns for the selected state by fetching and processing MSA data.
+   * Uses localStorage caching to avoid redundant API calls.
+   *
+   * @param {string} stateFipsCode - Two-digit FIPS code for the state (e.g., "27" for Minnesota)
+   * @returns {Promise<void>}
+   */
   async function setupTowns(stateFipsCode) {
     selectedState.value = stateFipsCode
     console.log('Selected state:', stateFipsCode)
@@ -91,7 +122,10 @@ export const useTownsStore = defineStore('towns', () => {
 
   // HELPERS
 
-  // Assign tourism, industries, and sizes to towns
+  /**
+   * Orchestrates the town assignment process: classifies by population,
+   * assigns tourism to large towns, and distributes industries.
+   */
   function assignTowns() {
     console.log('Assigning towns...')
     // group towns by population
@@ -101,7 +135,10 @@ export const useTownsStore = defineStore('towns', () => {
     assignIndustries()
   }
 
-  // Assign tourism industry to all towns with the largest class size
+  /**
+   * Assigns the Tourism industry to all large towns.
+   * Tourism is a special industry that large population centers always have.
+   */
   function assignTourism() {
     console.log('Assigning tourism to towns...')
     towns.value.forEach((town) => {
@@ -111,7 +148,12 @@ export const useTownsStore = defineStore('towns', () => {
     })
   }
 
-  // Calculate the maximum number of towns per industry
+  /**
+   * Calculates the maximum number of towns each industry can be assigned to
+   * based on that industry's employment proportion.
+   *
+   * @returns {Array<{industry: number, maxTowns: number}>} Array of industry limits
+   */
   function calcMaxTownsPerIndustry() {
     const maxTowns = industryStore.employmentData.map((industry) => ({
       industry: industry.industry,
@@ -121,7 +163,18 @@ export const useTownsStore = defineStore('towns', () => {
     return maxTowns
   }
 
-  // Assign industries to towns
+  /**
+   * Assigns industries to towns based on employment density.
+   * Uses natural breaks to classify towns by employment density for each industry,
+   * then assigns to high-density towns first, then medium-density if slots remain.
+   *
+   * Algorithm:
+   * 1. For each industry, calculate employment density (employment / population)
+   * 2. Use natural breaks to classify towns into low/medium/high density
+   * 3. Assign industry to high-density towns first
+   * 4. Fill remaining slots with medium-density towns
+   * 5. Respect maxIndustries per town and maxTownsPerIndustry limits
+   */
   function assignIndustries() {
     console.log('Starting industry assignment to towns...')
 
@@ -207,6 +260,13 @@ export const useTownsStore = defineStore('towns', () => {
     console.log('Final industry assignments for all towns:', towns.value)
   }
 
+  /**
+   * Enriches employment data with human-readable industry labels.
+   *
+   * @param {Array} employmentData - Raw employment data from QWI
+   * @param {Array} industries - Industry definitions with naics_code and label
+   * @returns {Array} Employment data with added label field
+   */
   function enrichEmploymentData(employmentData, industries) {
     const industryMap = new Map(industries.map((ind) => [ind.naics_code, ind.label]))
     return employmentData.map((data) => ({
@@ -226,34 +286,38 @@ export const useTownsStore = defineStore('towns', () => {
   function naturalBreaks(data, property, sizeClasses) {
     const numClasses = sizeClasses.length
 
-    // Sort data based on the property
+    // Sort data ascending by the target property (e.g., population)
     const sortedData = [...data].sort((a, b) => a[property] - b[property])
 
-    // Calculate gaps between consecutive values
+    // Calculate the "gap" between each consecutive pair of values
+    // Larger gaps indicate natural breakpoints in the data distribution
     const gaps = sortedData.map((item, index) => {
-      if (index === 0) return 0 // No gap for the first item
+      if (index === 0) return 0
       return sortedData[index][property] - sortedData[index - 1][property]
     })
 
-    // Find the largest gaps to determine class breaks
+    // Find the N-1 largest gaps (where N = number of classes)
+    // These gaps become the boundaries between classes
+    // Example: 3 classes need 2 breakpoints (small|medium|large)
     const largestGaps = [...gaps]
       .map((gap, index) => ({ gap, index }))
       .sort((a, b) => b.gap - a.gap)
-      .slice(0, numClasses - 1) // Get indices for the largest gaps
+      .slice(0, numClasses - 1)
       .map((g) => g.index)
-      .sort((a, b) => a - b) // Sort the indices in ascending order
+      .sort((a, b) => a - b) // Re-sort by position for sequential processing
 
-    // Use gap indices to classify data into classes and label them with sizeClasses
+    // Assign class labels based on where items fall relative to breakpoints
     let startIdx = 0
     for (let i = 0; i < largestGaps.length; i++) {
       const endIdx = largestGaps[i]
+      // All items from startIdx to endIdx get the i-th class label
       for (let j = startIdx; j < endIdx; j++) {
         sortedData[j].size = sizeClasses[i]
       }
       startIdx = endIdx
     }
 
-    // Label the remaining data with the last size class
+    // Items after the last breakpoint get the final class label
     for (let j = startIdx; j < sortedData.length; j++) {
       sortedData[j].size = sizeClasses[sizeClasses.length - 1]
     }

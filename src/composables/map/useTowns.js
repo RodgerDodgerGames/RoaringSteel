@@ -1,3 +1,18 @@
+/**
+ * Towns Map Composable (useTowns.js)
+ *
+ * Handles rendering town markers on the Leaflet map.
+ * Creates GeoJSON layers from town data with size-based icons,
+ * tooltips showing town names, and popups showing industries.
+ *
+ * Icon sizes vary by town size class:
+ * - Small: 24px
+ * - Medium: 28px
+ * - Large: 32px
+ *
+ * @module composables/map/useTowns
+ */
+
 import { ref, onUnmounted } from 'vue'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -7,6 +22,11 @@ import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 import { storeToRefs } from 'pinia'
 import { useMapStore } from '@/stores/map'
 
+/**
+ * Composable for managing town markers on the map.
+ *
+ * @returns {Object} { townsLayer, addTownsToMap }
+ */
 export function useTowns() {
   const townsLayer = ref(null)
 
@@ -14,6 +34,12 @@ export function useTowns() {
   const mapStore = useMapStore()
   const { isDrawingActive } = storeToRefs(mapStore)
 
+  /**
+   * Adds town markers to the map and fits the view to show all towns.
+   *
+   * @param {Ref<Object>} map - Reactive reference to Leaflet map instance
+   * @param {Ref<Array>} towns - Reactive reference to array of town objects
+   */
   const addTownsToMap = (map, towns) => {
     if (!map || !map.value) {
       // Check if map is available and initialized
@@ -21,16 +47,19 @@ export function useTowns() {
       return
     }
 
+    // Convert town data to GeoJSON format for Leaflet
+    // Each town becomes a Point feature with its properties (name, size, industries)
     const geojson = {
       type: 'FeatureCollection',
       features: towns.value.map((town) => {
+        // Separate coordinates from other properties
         const { lon, lat, ...properties } = town
         return {
           type: 'Feature',
-          properties: properties,
+          properties: properties,  // name, size, industries, msa, etc.
           geometry: {
             type: 'Point',
-            coordinates: [lon, lat]
+            coordinates: [lon, lat]  // GeoJSON uses [lng, lat] order
           }
         }
       })
@@ -38,8 +67,9 @@ export function useTowns() {
 
     console.log('GeoJSON data prepared:', geojson)
 
-    // Add markers to map using Leaflet's L.geoJSON
+    // Create Leaflet layer from GeoJSON with custom marker rendering
     townsLayer.value = L.geoJSON(geojson, {
+      // pointToLayer is called for each Point feature to create its marker
       pointToLayer: (feature, latlng) => {
         const size = feature.properties.size
         const icon = L.icon({
@@ -98,6 +128,11 @@ export function useTowns() {
     })
   }
 
+  /**
+   * Returns the icon URL for a given town size class.
+   * @param {string} size - Town size: "small", "medium", or "large"
+   * @returns {string} URL to the icon image
+   */
   const getIconUrl = (size) => {
     switch (size) {
       case 'small':
@@ -111,6 +146,11 @@ export function useTowns() {
     }
   }
 
+  /**
+   * Returns the icon pixel size for a given town size class.
+   * @param {string} size - Town size: "small", "medium", or "large"
+   * @returns {number} Icon size in pixels
+   */
   const getIconSize = (size) => {
     switch (size) {
       case 'small':

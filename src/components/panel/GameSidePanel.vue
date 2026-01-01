@@ -1,3 +1,14 @@
+<!--
+  GameSidePanel.vue
+
+  Main game action panel with tabbed navigation. Provides access to:
+  - Home: Overview with quick actions
+  - Build: Railroad track building tools
+  - Upgrade: Train upgrade options (not yet implemented)
+
+  Uses Bulma tabs component for navigation between sections.
+-->
+
 <script setup>
 import { ref } from 'vue'
 import { storeToRefs } from 'pinia'

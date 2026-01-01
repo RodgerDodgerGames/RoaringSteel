@@ -1,4 +1,13 @@
-<!-- DrawButtons.vue -->
+<!--
+  DrawButtons.vue
+
+  Track building control panel with drawing tools and cost display.
+  Provides buttons to start/stop building, edit, and remove track.
+  Shows itemized costs for each track section and running total.
+
+  @prop map - Leaflet map instance
+  @prop towns - Towns layer for track connections
+-->
 <script setup>
 import { useGridStore } from '@/stores/grid'
 import { useMapStore } from '@/stores/map'

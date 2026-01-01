@@ -1,17 +1,29 @@
-<!-- src/components/map/MainMap.vue -->
+<!--
+  MainMap.vue
+
+  The primary game map component built on Leaflet. Displays:
+  - Stamen terrain background tiles
+  - Town markers with size-based icons
+  - Interactive popups for town information
+
+  Integrates with:
+  - mapStore: Stores map instance and view state
+  - townsStore: Provides town data for markers
+  - useTowns composable: Handles marker rendering
+
+  The map instance is made globally available via the map store
+  so other components (like useBuildTrack) can access it.
+-->
+
 <script setup>
-// IMPORTS
 import { storeToRefs } from 'pinia'
 import { onMounted, ref, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-// composables
 import { useTowns } from '@/composables/map/useTowns'
-// stores
 import { useTownsStore } from '@/stores/towns'
 import { useMapStore } from '@/stores/map'
 
-// setup stores
 const townsStore = useTownsStore()
 const mapStore = useMapStore()
 // get towns from store

@@ -1,25 +1,57 @@
+/**
+ * Industry Store (industry.js)
+ *
+ * Manages industry and employment data from the Census Bureau's QWI
+ * (Quarterly Workforce Indicators) API. This data is used to determine
+ * which industries should be assigned to which towns based on employment patterns.
+ *
+ * Data Flow:
+ * 1. Load industry definitions from CSV (NAICS codes and labels)
+ * 2. For each industry, fetch QWI employment data for the state
+ * 3. Calculate average employment per MSA
+ * 4. Calculate each industry's proportion of total employment
+ *
+ * Employment Data Structure:
+ * {
+ *   industry: number,      // NAICS code
+ *   level: number,         // Industry level (2-4 digit NAICS)
+ *   meanEmp: Object,       // {msa_code: average_employment}
+ *   proportion: number     // This industry's share of total employment (capped at 0.2)
+ * }
+ *
+ * @module stores/industry
+ */
+
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import useQWI from '../composables/setup/useQWI'
 import Papa from 'papaparse'
 import { useLocalStorage } from '@vueuse/core'
 
-// path to industry CSV file
+/** Path to curated industry definitions CSV */
 const csvFile = '/data/label_industry_curated_test.csv'
 
 export const useIndustryStore = defineStore('qwiStore', () => {
   // STATE
 
-  // employment data
+  /** Employment data by industry with MSA-level averages */
   const employmentData = ref([])
-  // industry data
+
+  /** Industry definitions loaded from CSV (naics_code, label, ind_level) */
   const industries = ref([])
-  // MSAs
+
+  /** List of MSA codes found in the employment data */
   const MSAs = ref([])
 
   // ACTIONS
 
-  // fetch industry data and QWI data for each industry
+  /**
+   * Fetches and processes industry employment data for a state.
+   * Uses localStorage caching to avoid redundant API calls.
+   *
+   * @param {string} stateFipsCode - Two-digit FIPS code (default: "27" for Minnesota)
+   * @returns {Promise<void>}
+   */
   async function useIndustryData(stateFipsCode = '27') {
     console.log('useIndustryData called with stateFipsCode:', stateFipsCode) // Log when the function is called
 
@@ -99,7 +131,12 @@ export const useIndustryStore = defineStore('qwiStore', () => {
 
   // HELPERS
 
-  // use papaparse to import CSV file
+  /**
+   * Loads and parses a CSV file using PapaParse.
+   *
+   * @param {string} file - Path to CSV file
+   * @returns {Promise<Array>} Parsed CSV data as array of objects
+   */
   async function loadCSV(file) {
     const response = await fetch(file)
     const csvData = await response.text()
@@ -120,9 +157,15 @@ export const useIndustryStore = defineStore('qwiStore', () => {
     })
   }
 
-  // calculate the average employment for each MSA
-  // format: {Emp: "128", industry: "113", msa_code: "14260", state: "16", time: "2019-Q1"}
-  // sum employment while grouping by msa_code
+  /**
+   * Calculates average employment per MSA from quarterly data.
+   * Groups employment records by MSA and computes the mean.
+   *
+   * Input format: {Emp: "128", industry: "113", msa_code: "14260", state: "16", time: "2019-Q1"}
+   *
+   * @param {Array} data - QWI data rows with Emp and msa_code fields
+   * @returns {Object} Map of msa_code to average employment
+   */
   function calculateAverageEmployment(data) {
     const employment = data.reduce((acc, row) => {
       const msaCode = row.msa_code
@@ -152,7 +195,11 @@ export const useIndustryStore = defineStore('qwiStore', () => {
     }, {})
   }
 
-  // Helper function to calculate and assign proportions
+  /**
+   * Calculates each industry's proportion of total employment.
+   * Proportions are capped at 0.2 (20%) to ensure industry diversity.
+   * Updates employmentData in place with proportion field.
+   */
   function calculateAndAssignProportions() {
     // Calculate the total employment for each industry
     const industryTotals = employmentData.value.map((industry) => {

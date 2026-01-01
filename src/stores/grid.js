@@ -1,10 +1,29 @@
-// grid cost generator store
-// generates grid of locations and calculates cost based on elevation and land cover
+/**
+ * Grid Store (grid.js)
+ *
+ * Generates and manages the hex grid overlay for the game map.
+ * Each grid cell contains terrain data that affects railroad building costs:
+ * - Elevation: Higher elevation differences = more expensive to build
+ * - Land Cover: Different terrain types have different building costs
+ *
+ * The grid is used during gameplay to calculate the cost of laying track
+ * across different terrain types. Costs are calculated using a focal
+ * operation that considers neighboring cell elevations.
+ *
+ * Grid Cell Structure:
+ * {
+ *   id: string,         // Grid position "row-col" (e.g., "5-12")
+ *   centroid: Object,   // {lat, lng} center coordinates
+ *   elevation: number,  // Elevation in meters
+ *   landCover: number,  // Land cover cost multiplier
+ *   cost: number        // Total building cost (elevation diff + land cover)
+ * }
+ *
+ * @module stores/grid
+ */
 
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-
-// composables
 import { useLocalStorage } from '@vueuse/core'
 import { useElevationAPI } from '../composables/setup/useElevationAPI'
 import { useLandCoverAPI } from '../composables/setup/useLandCoverAPI'
@@ -15,11 +34,25 @@ import {
 import { waitRandomly } from '@/composables/utils'
 
 export const useGridStore = defineStore('gridStore', () => {
+  /** Array of grid cells with terrain and cost data */
   const grid = ref([])
+
+  /** Flag indicating if grid generation is complete */
   const isGridGenerated = ref(false)
+
   const { fetchElevationsInBatches } = useElevationAPI()
   const { fetchLandCover } = useLandCoverAPI()
 
+  /**
+   * Generates a grid of cells covering the specified bounds.
+   * Fetches elevation and land cover data for each cell, then calculates costs.
+   * Uses localStorage caching to avoid redundant API calls.
+   *
+   * @param {string} stateFipsCode - State FIPS code for cache key
+   * @param {Array<number>} bounds - Bounding box [minLng, minLat, maxLng, maxLat]
+   * @param {number} cellSize - Grid cell size in meters
+   * @returns {Promise<void>}
+   */
   async function generateGrid(stateFipsCode, bounds, cellSize) {
     console.log('Generating grid...')
 
@@ -134,28 +167,28 @@ export const useGridStore = defineStore('gridStore', () => {
         return
       }
 
-      const [row, col] = cell.id.split('-').map(Number) // Get row and col from id
+      // Parse cell ID to get grid coordinates (format: "row-col")
+      const [row, col] = cell.id.split('-').map(Number)
       let elevationCost = 0
 
-      // Check neighbors in a 3x3 window
+      // Check all 8 neighbors in a 3x3 window around this cell
+      // dr/dc represent delta row/column (-1, 0, +1)
       for (let dr = -1; dr <= 1; dr++) {
         for (let dc = -1; dc <= 1; dc++) {
-          if (dr === 0 && dc === 0) continue // Skip the target cell itself
+          if (dr === 0 && dc === 0) continue // Skip the center cell (self)
 
-          // Get the id of the neighboring cell
           const neighborId = `${row + dr}-${col + dc}`
-
-          // Look up the neighboring cell in the cell map
           const neighborCell = cellMap[neighborId]
 
           if (neighborCell) {
-            // Calculate elevation difference with the neighboring cell
+            // Steeper elevation changes = higher building cost
+            // Sum up absolute elevation differences with all neighbors
             elevationCost += Math.abs(cell.elevation - neighborCell.elevation)
           }
         }
       }
 
-      // Calculate total cost and update the cell directly
+      // Total cost = terrain difficulty (land cover) + slope difficulty (elevation changes)
       cell.cost = elevationCost + cell.landCover
 
       console.log(

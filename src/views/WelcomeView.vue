@@ -1,14 +1,22 @@
-<!-- 
-  src/views/WelcomeView.vue 
-  The first page of the application
- -->
+<!--
+  WelcomeView.vue
+
+  The landing page and entry point for the game. Handles the initial
+  game setup flow including player selection and confirmation.
+
+  Flow:
+  1. gameButtons - New Game / Load Game options
+  2. playerSelect - Player name and color selection
+  3. playerConfirm - Review and confirm player selections
+
+  @emits players-confirmed - When players are confirmed and ready to proceed
+-->
 
 <script setup>
 import { ref } from 'vue'
 import PlayerSelect from '@/components/setup/PlayerSelect.vue'
 import PlayerConfirm from '@/components/setup/PlayerConfirm.vue'
 
-// Define emits
 const emit = defineEmits(['players-confirmed'])
 
 // which pane should be shown

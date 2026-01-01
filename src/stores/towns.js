@@ -53,6 +53,15 @@ export const useTownsStore = defineStore('towns', () => {
   const selectedState = ref('')
   const { MSAs } = storeToRefs(industryStore)
 
+  /** Loading state for industry data fetching */
+  const isLoadingIndustry = ref(false)
+
+  /** Loading state for population data fetching */
+  const isLoadingPopulation = ref(false)
+
+  /** Loading state for coordinate data fetching */
+  const isLoadingCoordinates = ref(false)
+
   // ACTIONS
 
   /**
@@ -77,39 +86,62 @@ export const useTownsStore = defineStore('towns', () => {
     }
 
     // Fetch industry data for the selected state
-    await industryStore.useIndustryData(stateFipsCode)
-    console.log('Industry data fetched:', industryStore.employmentData)
+    isLoadingIndustry.value = true
+    try {
+      await industryStore.useIndustryData(stateFipsCode)
+      console.log('Industry data fetched:', industryStore.employmentData)
+    } catch (e) {
+      console.error('Error fetching industry data:', e)
+      isLoadingIndustry.value = false
+      return
+    }
+    isLoadingIndustry.value = false
 
     // Fetch population data for the selected state
+    isLoadingPopulation.value = true
     const { populationData, fetchPopulationData } = useCensus(stateFipsCode)
-    await fetchPopulationData()
-    console.log('Population data fetched:', populationData.value)
+    try {
+      await fetchPopulationData()
+      console.log('Population data fetched:', populationData.value)
+    } catch (e) {
+      console.error('Error fetching population data:', e)
+      isLoadingPopulation.value = false
+      return
+    }
+    isLoadingPopulation.value = false
 
     // Fetch latitude and longitude data for each MSA and populate towns
+    isLoadingCoordinates.value = true
     for (const msaCode of MSAs.value) {
       console.log('Fetching lat/lon data for MSA:', msaCode)
-      const { centroidLongitude, centroidLatitude } = await getMSALatLon(msaCode)
-      console.log('Lat/Lon data fetched:', centroidLongitude, centroidLatitude)
+      try {
+        const { centroidLongitude, centroidLatitude } = await getMSALatLon(msaCode)
+        console.log('Lat/Lon data fetched:', centroidLongitude, centroidLatitude)
 
-      const popData = populationData.value.find((data) => data.msa_code === msaCode)
+        const popData = populationData.value.find((data) => data.msa_code === msaCode)
 
-      // if there is no population data for the MSA, skip it
-      if (!popData) {
-        continue
+        // if there is no population data for the MSA, skip it
+        if (!popData) {
+          continue
+        }
+
+        towns.value.push({
+          msa: msaCode,
+          fullName: popData.name.split(', ')[0],
+          // just grab the first name for the short name
+          name: popData.name.split(', ')[0].split('-')[0],
+          stateCode: popData.state_code,
+          population: parseFloat(popData.population),
+          lon: parseFloat(centroidLongitude),
+          lat: parseFloat(centroidLatitude),
+          industries: []
+        })
+      } catch (e) {
+        console.error(`Error fetching coordinates for MSA ${msaCode}:`, e)
+        // Continue to next MSA on error
       }
-
-      towns.value.push({
-        msa: msaCode,
-        fullName: popData.name.split(', ')[0],
-        // just grab the first name for the short name
-        name: popData.name.split(', ')[0].split('-')[0],
-        stateCode: popData.state_code,
-        population: parseFloat(popData.population),
-        lon: parseFloat(centroidLongitude),
-        lat: parseFloat(centroidLatitude),
-        industries: []
-      })
     }
+    isLoadingCoordinates.value = false
 
     // Assign tourism, industries, and sizes to towns
     assignTowns()
@@ -327,6 +359,9 @@ export const useTownsStore = defineStore('towns', () => {
 
   return {
     towns,
+    isLoadingIndustry,
+    isLoadingPopulation,
+    isLoadingCoordinates,
     setupTowns
   }
 })

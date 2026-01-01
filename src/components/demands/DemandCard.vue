@@ -1,3 +1,14 @@
+<!--
+  DemandCard.vue
+
+  Displays demand cards showing delivery contracts.
+  Each card shows destination, payoff amount, and required industry.
+  Multiple cards can be displayed in a horizontal row.
+
+  @prop cards - Array of card arrays, each containing demand objects
+                with destination, payoff, and industry fields
+-->
+
 <template>
   <div class="cards-container">
     <div class="demand-card" v-for="(card, cardIndex) in cards" :key="cardIndex">

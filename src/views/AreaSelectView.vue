@@ -1,17 +1,26 @@
+<!--
+  AreaSelectView.vue
+
+  Region selection screen where players choose the geographic area
+  for their game. Displays a clickable map of US states and a panel
+  showing the selected region.
+
+  @emits play-game - When the player confirms their region selection
+-->
+
 <script setup>
-// import components
 import AreaSelectMap from '@/components/setup/AreaSelectMap.vue'
 import AreaSelectPanel from '@/components/setup/AreaSelectPanel.vue'
-// import stores
 import { useGameStore } from '@/stores/game'
 
-// setup stores
 const gameStore = useGameStore()
-
-// list emits
 const emit = defineEmits(['play-game'])
 
-// Handle state selection from the map
+/**
+ * Handles state selection from the map component.
+ * Stores the selected region in the game store.
+ * @param {Object} selectedState - GeoJSON feature of the selected state
+ */
 const handleStateClick = (selectedState) => {
   gameStore.setRegion(selectedState)
 }

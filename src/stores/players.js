@@ -1,17 +1,30 @@
-// players store
-// keep track of player data like current turn, turn order, etc.
-// player names, cash,
+/**
+ * Player Store (players.js)
+ *
+ * Manages player data and turn order for the game.
+ * Handles player creation, updates, removal, and turn cycling.
+ *
+ * Player Object Structure:
+ * {
+ *   id: number,        // Unique player ID (1-indexed)
+ *   name: string,      // Player display name
+ *   cash: number,      // Current money (starts at 0 or specified amount)
+ *   isTurn: boolean,   // True if it's this player's turn
+ *   color: string,     // Player's chosen color
+ *   position: number   // Board position (for future use)
+ * }
+ *
+ * @module stores/players
+ */
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 export const usePlayerStore = defineStore('playerStore', () => {
-  // State
+  // STATE
 
-  // Example player structure:
-  // { id: 1, name: 'Player 1', cash: 1000, isTurn: false, position: 0 }
-
-  const players = ref([]) // Array of player objects
+  /** Array of player objects in turn order */
+  const players = ref([])
 
   // Getters
   /**

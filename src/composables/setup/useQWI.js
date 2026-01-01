@@ -1,7 +1,26 @@
+/**
+ * QWI API Composable (useQWI.js)
+ *
+ * Fetches employment data from the Census Bureau's Quarterly Workforce Indicators (QWI) API.
+ * QWI provides detailed employment statistics by industry and geography.
+ *
+ * API: https://api.census.gov/data/timeseries/qwi/sa
+ * Requires: VITE_QWI_KEY environment variable
+ *
+ * Data returned includes employment counts (Emp) by MSA over the last 5 years.
+ *
+ * @module composables/setup/useQWI
+ */
+
 import { ref } from 'vue'
 
-// useQWI.js
-
+/**
+ * Composable for fetching QWI employment data.
+ *
+ * @param {string} state - Two-digit state FIPS code (e.g., "27" for Minnesota)
+ * @param {number} industry - NAICS industry code to query
+ * @returns {Object} { data, error, fetchQWI }
+ */
 export default function useQWI(state, industry) {
   const data = ref([])
   const error = ref(null)
@@ -74,16 +93,18 @@ export default function useQWI(state, industry) {
       console.log('Parsing response as JSON...')
       const jsonData = await response.json()
 
-      // Process the data
+      // Process the data - Census API returns data as array of arrays
+      // First row is headers, subsequent rows are data
       console.log('Processing the data...')
-      // manually rename MSA/MICROSA column to 'msa_code'
+
+      // The Census API uses a long column name for MSA codes - rename it for easier access
       jsonData[0][
         jsonData[0].indexOf('metropolitan statistical area/micropolitan statistical area')
       ] = 'msa_code'
 
-      // convert data from array of arrays to array of objects
-      // the keys are the first element in the array
-      // the values are the remaining elements in the array
+      // Transform from array-of-arrays to array-of-objects format
+      // Input:  [["Emp", "msa_code", ...], ["100", "12345", ...], ...]
+      // Output: [{Emp: "100", msa_code: "12345", ...}, ...]
       const convertedData = jsonData.map((arr) => {
         return arr.reduce((acc, val, i) => {
           acc[jsonData[0][i]] = val
@@ -91,7 +112,8 @@ export default function useQWI(state, industry) {
         }, {})
       })
 
-      data.value = convertedData.slice(1) // Remove the first element (header row)
+      // Skip the header row (index 0) - it's now embedded as keys in each object
+      data.value = convertedData.slice(1)
     } catch (err) {
       // Log any errors to the console
       console.error(`There was a problem with the fetch operation:`, err)

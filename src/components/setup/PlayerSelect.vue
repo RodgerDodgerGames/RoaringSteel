@@ -1,14 +1,29 @@
-<!-- src/components/setup/PlayerSelect.vue -->
+<!--
+  PlayerSelect.vue
+
+  Player setup form allowing users to add 1-6 players with unique names
+  and colors. Validates that all names are filled and unique before
+  allowing progression.
+
+  Features:
+  - Add/remove players dynamically
+  - Color picker with 12 preset pastel colors
+  - Name uniqueness validation
+  - Notification system for validation errors
+
+  @emits done - Array of player objects when validation passes
+-->
+
 <script setup>
 import { ref } from 'vue'
 
+/** Player entries with name, color, and UI state */
 const players = ref([{ name: '', color: '#FF5733', showColorPicker: false }])
 
-// Notification state
 const notificationMessage = ref('')
 const showNotification = ref(false)
 
-// Available colors for selection
+/** Available pastel colors for player selection */
 const availableColors = [
   '#FFC080',
   '#80FF80',

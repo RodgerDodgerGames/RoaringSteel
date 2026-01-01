@@ -1,3 +1,14 @@
+<!--
+  AreaSelectMap.vue
+
+  Interactive US map for state selection during game setup.
+  Displays all US states as clickable polygons with hover tooltips.
+  When a state is clicked, it is highlighted and the selection is
+  emitted to the parent component.
+
+  @emits state-click - GeoJSON feature object of the selected state
+-->
+
 <template>
   <div id="map" ref="mapContainer" class="map-container"></div>
 </template>

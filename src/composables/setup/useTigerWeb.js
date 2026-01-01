@@ -1,3 +1,21 @@
+/**
+ * TigerWeb API Composable (useTigerWeb.js)
+ *
+ * Fetches geographic coordinates for MSAs from the Census Bureau's TIGERweb service.
+ * TIGERweb provides CBSA (Core Based Statistical Area) boundary data including
+ * internal point coordinates (centroid).
+ *
+ * API: https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer
+ *
+ * @module composables/setup/useTigerWeb
+ */
+
+/**
+ * Fetches the centroid coordinates for an MSA/CBSA.
+ *
+ * @param {string} cbsaCode - The CBSA code (e.g., "33460" for Minneapolis)
+ * @returns {Promise<Object|false>} { centroidLongitude, centroidLatitude } or false if not found
+ */
 export default async function getMSALatLon(cbsaCode) {
   const baseUrl = `https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/{layerID}/query`
   const layerIDs = [3, 4]

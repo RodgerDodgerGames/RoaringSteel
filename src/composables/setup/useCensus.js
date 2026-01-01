@@ -1,5 +1,23 @@
+/**
+ * Census API Composable (useCensus.js)
+ *
+ * Fetches population data from the US Census Bureau's American Community Survey (ACS).
+ * Uses the 5-year estimates for MSA/Micropolitan area population counts.
+ *
+ * API: https://api.census.gov/data/2022/acs/acs5
+ * Requires: VITE_QWI_KEY environment variable
+ *
+ * @module composables/setup/useCensus
+ */
+
 import { ref } from 'vue'
 
+/**
+ * Composable for fetching Census population data by state.
+ *
+ * @param {string} state - Two-digit state FIPS code (e.g., "27" for Minnesota)
+ * @returns {Object} { populationData, fetchPopulationData }
+ */
 export default function useCensus(state) {
   const populationData = ref([])
 
@@ -8,6 +26,12 @@ export default function useCensus(state) {
   // root url
   const rootUrl = 'https://api.census.gov/data/2022/acs/acs5'
 
+  /**
+   * Fetches population data for all MSAs in the specified state.
+   * Results are stored in populationData ref.
+   *
+   * @returns {Promise<void>}
+   */
   const fetchPopulationData = async () => {
     const url = setupRequest()
 
@@ -21,15 +45,18 @@ export default function useCensus(state) {
       const censusData = await response.json()
       console.log('Census data:', censusData)
 
-      // The first element in the response is the header, so we remove it
+      // Census API returns array-of-arrays with header row first
+      // Example: [["NAME", "B01001_001E", "state", "msa"], ["Minneapolis...", "3500000", "27", "33460"], ...]
+      // Remove the header row since we'll destructure by position
       censusData.shift()
 
-      // Map the response to an object for easier use
+      // Transform array data to named object properties
+      // B01001_001E is the Census variable code for total population
       populationData.value = censusData.map(([name, population, state_code, msa_code]) => ({
-        name,
-        population,
-        state_code,
-        msa_code
+        name,           // Full MSA name (e.g., "Minneapolis-St. Paul-Bloomington, MN-WI")
+        population,     // Total population count
+        state_code,     // State FIPS code
+        msa_code        // Metropolitan Statistical Area code
       }))
       console.log('Population data:', populationData.value)
     } catch (error) {

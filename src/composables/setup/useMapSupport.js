@@ -1,5 +1,12 @@
-// useMapSupport.js
-// export functions that support the mapping operations
+/**
+ * Map Support Utilities (useMapSupport.js)
+ *
+ * Provides coordinate conversion functions for translating between
+ * meters and geographic degrees. Essential for grid cell sizing
+ * and distance calculations on the map.
+ *
+ * @module composables/setup/useMapSupport
+ */
 
 // Conversion constants
 const METERS_PER_DEGREE_LAT = 111320 // Approximate meters per degree latitude

@@ -1,7 +1,23 @@
-// Land Cover API
+/**
+ * Land Cover API Composable (useLandCoverAPI.js)
+ *
+ * Fetches land cover data from the USGS National Land Cover Database (NLCD).
+ * Uses WMS GetFeatureInfo requests to determine land cover type at a point.
+ * Land cover types are mapped to building cost multipliers.
+ *
+ * API: https://www.mrlc.gov/geoserver (NLCD 2021 Land Cover)
+ * Cost mapping: See @/config/nlcd.js for terrain cost values
+ *
+ * @module composables/setup/useLandCoverAPI
+ */
 
 import { nlcdCostMap } from '@/config/nlcd'
 
+/**
+ * Composable for fetching land cover data and converting to building costs.
+ *
+ * @returns {Object} { fetchLandCover }
+ */
 export function useLandCoverAPI() {
   const landCoverApiUrl = 'https://www.mrlc.gov/geoserver/mrlc_display/NLCD_2021_Land_Cover_L48/ows'
 

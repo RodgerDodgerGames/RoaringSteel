@@ -1,7 +1,22 @@
-// Elevation API
+/**
+ * Elevation API Composable (useElevationAPI.js)
+ *
+ * Fetches elevation data from the Open-Elevation API.
+ * Used to determine terrain difficulty for railroad building costs.
+ *
+ * API: https://api.open-elevation.com/api/v1/lookup
+ * No API key required (public API)
+ *
+ * @module composables/setup/useElevationAPI
+ */
 
 import { waitRandomly } from '@/composables/utils'
 
+/**
+ * Composable for batch fetching elevation data.
+ *
+ * @returns {Object} { fetchElevationsInBatches }
+ */
 export function useElevationAPI() {
   const apiUrl = 'https://api.open-elevation.com/api/v1/lookup'
 

@@ -1,4 +1,15 @@
-<!-- src/components/setup/PlayerConfirm.vue -->
+<!--
+  PlayerConfirm.vue
+
+  Confirmation screen showing selected players before starting the game.
+  When confirmed, saves players to the Pinia store with starting cash
+  and sets the first player's turn.
+
+  @prop {Array} players - Array of player objects from PlayerSelect
+  @emits back - User wants to go back and edit players
+  @emits confirmed - Players saved to store, ready to proceed
+-->
+
 <script setup>
 import { usePlayerStore } from '@/stores/players'
 
@@ -10,10 +21,12 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['back', 'confirmed'])
-
 const playerStore = usePlayerStore()
 
-// Handle confirmation - save players to store and emit event
+/**
+ * Saves players to the store with starting cash and initiates the first turn.
+ * Starting cash is $20,000 per Empire Builder rules.
+ */
 function confirmPlayers() {
   // Remove all existing players using the store's removePlayer action
   const existingPlayerIds = playerStore.players.map((p) => p.id)

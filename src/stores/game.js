@@ -1,5 +1,11 @@
-// game store
-// stores information related to the game state
+/**
+ * Game Store (game.js)
+ *
+ * Manages global game state including the selected playing region
+ * and current turn number. This is the central state for game progression.
+ *
+ * @module stores/game
+ */
 
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -7,21 +13,27 @@ import { ref } from 'vue'
 export const useGameStore = defineStore('gameStore', () => {
   // STATE
 
-  // selected states (from area select)
+  /** The selected geographic region (GeoJSON FeatureCollection) */
   const region = ref(null)
 
-  // game turn
+  /** Current game turn number (starts at 0) */
   const turn = ref(0)
 
   // ACTIONS
 
-  // set new state
+  /**
+   * Sets the playing region for the game.
+   * @param {Object} newRegion - GeoJSON FeatureCollection defining the play area
+   */
   function setRegion(newRegion) {
     console.log('setting new region', newRegion)
     region.value = newRegion
   }
 
-  // advance the game turn
+  /**
+   * Advances the game to the next turn.
+   * Called after all players have completed their actions for the current turn.
+   */
   function advanceTurn() {
     turn.value++
   }

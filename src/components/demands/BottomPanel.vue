@@ -1,3 +1,13 @@
+<!--
+  BottomPanel.vue
+
+  Slide-up panel for displaying demand cards at the bottom of the screen.
+  Hidden by default, slides up when toggle button is clicked.
+  Shows the player's current demand cards (first 3).
+
+  Uses CSS transitions for smooth animation.
+-->
+
 <template>
   <div>
     <!-- Sliding Panel -->

@@ -40,6 +40,12 @@ export const useGridStore = defineStore('gridStore', () => {
   /** Flag indicating if grid generation is complete */
   const isGridGenerated = ref(false)
 
+  /** Loading state for elevation data fetching */
+  const isLoadingElevation = ref(false)
+
+  /** Loading state for land cover data fetching */
+  const isLoadingLandCover = ref(false)
+
   const { fetchElevationsInBatches } = useElevationAPI()
   const { fetchLandCover } = useLandCoverAPI()
 
@@ -102,9 +108,19 @@ export const useGridStore = defineStore('gridStore', () => {
     }
 
     // Fetch elevation for all locations
-    const elevationResults = await fetchElevationsInBatches(locations, 10)
+    let elevationResults = []
+    isLoadingElevation.value = true
+    try {
+      elevationResults = await fetchElevationsInBatches(locations, 10)
+    } catch (e) {
+      console.error('Error fetching elevation data:', e)
+      isLoadingElevation.value = false
+      return
+    }
+    isLoadingElevation.value = false
 
     // Fetch land cover data for each grid cell
+    isLoadingLandCover.value = true
     for (let index = 0; index < locations.length; index++) {
       // if the elevation for a location is null or zero, skip it
       if (!elevationResults[index] || elevationResults[index].elevation === 0) {
@@ -112,18 +128,24 @@ export const useGridStore = defineStore('gridStore', () => {
       }
 
       const location = locations[index]
-      const landCoverCost = await fetchLandCover(location)
+      try {
+        const landCoverCost = await fetchLandCover(location)
 
-      // wait for a random amount of time to avoid overloading the API
-      await waitRandomly(200, 2000)
+        // wait for a random amount of time to avoid overloading the API
+        await waitRandomly(200, 2000)
 
-      grid.value[index].elevation = elevationResults[index].elevation
-      grid.value[index].landCover = landCoverCost
+        grid.value[index].elevation = elevationResults[index].elevation
+        grid.value[index].landCover = landCoverCost
 
-      console.log(
-        `Assigned elevation ${grid.value[index].elevation} and land cover ${grid.value[index].landCover} to cell ${grid.value[index].id}`
-      )
+        console.log(
+          `Assigned elevation ${grid.value[index].elevation} and land cover ${grid.value[index].landCover} to cell ${grid.value[index].id}`
+        )
+      } catch (e) {
+        console.error(`Error fetching land cover for cell ${grid.value[index].id}:`, e)
+        // Continue to next cell on error
+      }
     }
+    isLoadingLandCover.value = false
 
     // remove all grid cells where either elevation or land cover is null or zero
     grid.value = grid.value.filter((cell) => cell.elevation && cell.landCover)
@@ -142,6 +164,8 @@ export const useGridStore = defineStore('gridStore', () => {
   return {
     grid,
     isGridGenerated,
+    isLoadingElevation,
+    isLoadingLandCover,
     generateGrid
   }
 

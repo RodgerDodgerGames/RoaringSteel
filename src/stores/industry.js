@@ -43,6 +43,12 @@ export const useIndustryStore = defineStore('qwiStore', () => {
   /** List of MSA codes found in the employment data */
   const MSAs = ref([])
 
+  /** Loading state for CSV file loading */
+  const isLoadingCSV = ref(false)
+
+  /** Loading state for QWI API data fetching */
+  const isLoadingQWI = ref(false)
+
   // ACTIONS
 
   /**
@@ -69,10 +75,19 @@ export const useIndustryStore = defineStore('qwiStore', () => {
     }
 
     // load the industry data from the CSV file
-    industries.value = await loadCSV(csvFile)
-    console.log('Loaded industry data:', industries.value) // Log the loaded industry data
+    isLoadingCSV.value = true
+    try {
+      industries.value = await loadCSV(csvFile)
+      console.log('Loaded industry data:', industries.value)
+    } catch (e) {
+      console.error('Error loading industry CSV:', e)
+      isLoadingCSV.value = false
+      return
+    }
+    isLoadingCSV.value = false
 
     // iterate over each industry and fetch the QWI data
+    isLoadingQWI.value = true
     for (const industry of industries.value) {
       console.log('Fetching QWI data for industry:', industry) // Log the industry being processed
 
@@ -106,6 +121,7 @@ export const useIndustryStore = defineStore('qwiStore', () => {
         console.error('Error calling useQWI:', error)
       }
     }
+    isLoadingQWI.value = false
 
     // Calculate and assign proportions
     calculateAndAssignProportions()
@@ -124,9 +140,10 @@ export const useIndustryStore = defineStore('qwiStore', () => {
     employmentData,
     industries,
     MSAs,
+    isLoadingCSV,
+    isLoadingQWI,
     // ACTIONS
     useIndustryData
-    // calculateAverageEmployment
   }
 
   // HELPERS

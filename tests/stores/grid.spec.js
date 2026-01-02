@@ -12,9 +12,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 // Create hoisted mocks that can be configured per test
 const mockFetchElevationsInBatches = vi.hoisted(() => vi.fn())
-const mockFetchLandCover = vi.hoisted(() => vi.fn())
+const mockFetchLandCoverInBatches = vi.hoisted(() => vi.fn())
 const mockUseLocalStorage = vi.hoisted(() => vi.fn())
-const mockWaitRandomly = vi.hoisted(() => vi.fn(() => Promise.resolve()))
 
 // Mock dependencies before any imports
 vi.mock('@vueuse/core', () => ({
@@ -29,17 +28,13 @@ vi.mock('@/composables/setup/useElevationAPI', () => ({
 
 vi.mock('@/composables/setup/useLandCoverAPI', () => ({
   useLandCoverAPI: () => ({
-    fetchLandCover: mockFetchLandCover
+    fetchLandCoverInBatches: mockFetchLandCoverInBatches
   })
 }))
 
 vi.mock('@/composables/setup/useMapSupport', () => ({
   metersToLatitudeDegrees: () => 0.1,
   metersToLongitudeDegrees: () => 0.1
-}))
-
-vi.mock('@/composables/utils', () => ({
-  waitRandomly: mockWaitRandomly
 }))
 
 // Import store after mocks are set up
@@ -53,7 +48,7 @@ describe('Grid Store', () => {
     // Default mock implementations
     mockUseLocalStorage.mockImplementation((key, defaultValue) => ({ value: defaultValue }))
     mockFetchElevationsInBatches.mockResolvedValue([])
-    mockFetchLandCover.mockResolvedValue(5)
+    mockFetchLandCoverInBatches.mockResolvedValue([])
     gridStore = useGridStore()
   })
 
@@ -96,7 +91,7 @@ describe('Grid Store', () => {
       await gridStore.generateGrid('27', [-95, 44, -94, 45], 10000)
 
       expect(mockFetchElevationsInBatches).not.toHaveBeenCalled()
-      expect(mockFetchLandCover).not.toHaveBeenCalled()
+      expect(mockFetchLandCoverInBatches).not.toHaveBeenCalled()
     })
   })
 
@@ -125,11 +120,11 @@ describe('Grid Store', () => {
         { elevation: 300 },
         { elevation: 400 }
       ])
-      mockFetchLandCover.mockImplementation(async () => {
+      mockFetchLandCoverInBatches.mockImplementation(async () => {
         if (gridStore.isLoadingLandCover) {
           wasLoadingLandCover = true
         }
-        return 5
+        return [5, 5, 5, 5]
       })
 
       // Generate grid - bounds create 2x2 = 4 cells
@@ -141,7 +136,7 @@ describe('Grid Store', () => {
 
     it('should reset loading states after completion', async () => {
       mockFetchElevationsInBatches.mockResolvedValue([{ elevation: 100 }])
-      mockFetchLandCover.mockResolvedValue(5)
+      mockFetchLandCoverInBatches.mockResolvedValue([5])
 
       await gridStore.generateGrid('27', [-95, 44, -94.9, 44.1], 10000)
 
@@ -166,44 +161,39 @@ describe('Grid Store', () => {
 
       await gridStore.generateGrid('27', [-95, 44, -94.9, 44.1], 10000)
 
-      expect(mockFetchLandCover).not.toHaveBeenCalled()
+      expect(mockFetchLandCoverInBatches).not.toHaveBeenCalled()
     })
 
-    it('should handle land cover fetch errors and continue to next cell', async () => {
+    it('should handle land cover fetch errors gracefully', async () => {
       mockFetchElevationsInBatches.mockResolvedValue([
         { elevation: 100 },
         { elevation: 200 }
       ])
 
-      let callCount = 0
-      mockFetchLandCover.mockImplementation(async () => {
-        callCount++
-        if (callCount === 1) {
-          throw new Error('Land cover API error')
-        }
-        return 5
-      })
+      mockFetchLandCoverInBatches.mockRejectedValue(new Error('Land cover API error'))
 
       // Should not throw
       await gridStore.generateGrid('27', [-95, 44, -94.8, 44.2], 10000)
 
       expect(gridStore.isLoadingLandCover).toBe(false)
-      // Should have called for both cells despite first one erroring
-      expect(mockFetchLandCover).toHaveBeenCalledTimes(2)
+      expect(gridStore.isGridGenerated).toBe(false)
     })
   })
 
   describe('generateGrid data processing', () => {
-    it('should skip cells with zero elevation', async () => {
+    it('should skip cells with zero elevation when fetching land cover', async () => {
       mockFetchElevationsInBatches.mockResolvedValue([
         { elevation: 0 },
         { elevation: 100 }
       ])
+      mockFetchLandCoverInBatches.mockResolvedValue([5])
 
       await gridStore.generateGrid('27', [-95, 44, -94.8, 44.2], 10000)
 
-      // Should only call fetchLandCover for the cell with valid elevation
-      expect(mockFetchLandCover).toHaveBeenCalledTimes(1)
+      // Should only call fetchLandCoverInBatches with 1 location (the valid one)
+      expect(mockFetchLandCoverInBatches).toHaveBeenCalledTimes(1)
+      const calledLocations = mockFetchLandCoverInBatches.mock.calls[0][0]
+      expect(calledLocations).toHaveLength(1)
     })
 
     it('should skip cells with missing elevation results', async () => {
@@ -212,13 +202,15 @@ describe('Grid Store', () => {
         { elevation: 100 }
         // Second cell has no corresponding elevation result
       ])
+      mockFetchLandCoverInBatches.mockResolvedValue([5])
 
       // Use bounds that generate exactly 2 cells (1 row x 2 cols)
-      // With cell size 0.1: rows = floor(0.1/0.1) = 1, cols = floor(0.2/0.1) = 2
       await gridStore.generateGrid('27', [-95, 44, -94.8, 44.1], 10000)
 
-      // Should only call fetchLandCover for the cell with valid elevation (1 of 2)
-      expect(mockFetchLandCover).toHaveBeenCalledTimes(1)
+      // Should only call fetchLandCoverInBatches with 1 location
+      expect(mockFetchLandCoverInBatches).toHaveBeenCalledTimes(1)
+      const calledLocations = mockFetchLandCoverInBatches.mock.calls[0][0]
+      expect(calledLocations).toHaveLength(1)
     })
 
     it('should filter out cells without valid data after processing', async () => {
@@ -226,12 +218,8 @@ describe('Grid Store', () => {
         { elevation: 100 },
         { elevation: 200 }
       ])
-
-      let callCount = 0
-      mockFetchLandCover.mockImplementation(async () => {
-        callCount++
-        return callCount === 1 ? null : 5
-      })
+      // Return null for first cell, valid for second
+      mockFetchLandCoverInBatches.mockResolvedValue([null, 5])
 
       await gridStore.generateGrid('27', [-95, 44, -94.8, 44.2], 10000)
 
@@ -241,7 +229,7 @@ describe('Grid Store', () => {
 
     it('should set isGridGenerated to true after successful generation', async () => {
       mockFetchElevationsInBatches.mockResolvedValue([{ elevation: 100 }])
-      mockFetchLandCover.mockResolvedValue(5)
+      mockFetchLandCoverInBatches.mockResolvedValue([5])
 
       await gridStore.generateGrid('27', [-95, 44, -94.9, 44.1], 10000)
 
@@ -256,7 +244,7 @@ describe('Grid Store', () => {
         { elevation: 120 },
         { elevation: 180 }
       ])
-      mockFetchLandCover.mockResolvedValue(10)
+      mockFetchLandCoverInBatches.mockResolvedValue([10, 10, 10, 10])
 
       await gridStore.generateGrid('27', [-95, 44, -94.8, 44.2], 10000)
 

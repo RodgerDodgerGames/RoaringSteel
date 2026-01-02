@@ -45,19 +45,24 @@ export function useElevationAPI() {
    * Splits large location arrays into smaller batches to avoid URL length limits.
    * @param {Array} locations - Array of location objects {lat, lng}.
    * @param {Number} batchSize - Number of locations per request (URL size limit).
+   * @param {Function} onProgress - Optional callback called after each batch with (completed, total).
    */
-  async function fetchElevationsInBatches(locations, batchSize = 100) {
+  async function fetchElevationsInBatches(locations, batchSize = 100, onProgress = null) {
     const elevationResults = []
 
     for (let i = 0; i < locations.length; i += batchSize) {
       const batch = locations.slice(i, i + batchSize)
-      console.log(`Fetching batch ${i / batchSize + 1}...`)
 
       // Wait a random amount of time to avoid overloading the API
       await waitRandomly(500, 5000)
 
       const batchResults = await fetchElevationBatch(batch)
-      elevationResults.push(...batchResults) // Append batch results
+      elevationResults.push(...batchResults)
+
+      // Report progress after each batch
+      if (onProgress) {
+        onProgress(elevationResults.length, locations.length)
+      }
     }
 
     return elevationResults

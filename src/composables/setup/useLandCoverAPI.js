@@ -16,7 +16,7 @@ import { nlcdCostMap } from '@/config/nlcd'
 /**
  * Composable for fetching land cover data and converting to building costs.
  *
- * @returns {Object} { fetchLandCover }
+ * @returns {Object} { fetchLandCover, fetchLandCoverInBatches }
  */
 export function useLandCoverAPI() {
   const landCoverApiUrl = 'https://www.mrlc.gov/geoserver/mrlc_display/NLCD_2021_Land_Cover_L48/ows'
@@ -52,10 +52,9 @@ export function useLandCoverAPI() {
   /**
    * Fetches land cover data for a given location using GetFeatureInfo.
    * @param {Object} location - The latitude and longitude of the location { lat, lng }.
+   * @returns {Promise<number|null>} The land cover cost or null on error.
    */
   async function fetchLandCover(location) {
-    console.log(`Fetching land cover data for location: ${location.lat}, ${location.lng}`)
-
     // Define a small bounding box around the point for the GetFeatureInfo query
     const bbox = {
       minLng: location.lng - 0.01,
@@ -63,29 +62,53 @@ export function useLandCoverAPI() {
       maxLng: location.lng + 0.01,
       maxLat: location.lat + 0.01
     }
-    const width = 256 // Example map width
-    const height = 256 // Example map height
-    const x = Math.floor(width / 2) // Center pixel
-    const y = Math.floor(height / 2) // Center pixel
+    const width = 256
+    const height = 256
+    const x = Math.floor(width / 2)
+    const y = Math.floor(height / 2)
 
     const url = getFeatureInfoUrl(location, bbox, width, height, x, y)
-    console.log(`Constructed GetFeatureInfo URL: ${url}`)
 
     try {
       const response = await fetch(url)
       const data = await response.json()
-      console.log('Received land cover data:', data)
-      // convert to cost using class map
-      // just grab first feature
       const cost = nlcdCostMap[data.features[0].properties['PALETTE_INDEX']]
       return cost
     } catch (error) {
       console.error('Error fetching land cover data:', error)
-      return null // Return null in case of error
+      return null
     }
   }
 
+  /**
+   * Fetches land cover data for multiple locations in parallel batches.
+   * @param {Array} locations - Array of location objects {lat, lng}.
+   * @param {Number} batchSize - Number of concurrent requests per batch (default: 10).
+   * @param {Function} onProgress - Optional callback called after each batch with (completed, total).
+   * @returns {Promise<Array>} Array of land cover costs (or null for failed requests).
+   */
+  async function fetchLandCoverInBatches(locations, batchSize = 10, onProgress = null) {
+    const results = []
+
+    for (let i = 0; i < locations.length; i += batchSize) {
+      const batch = locations.slice(i, i + batchSize)
+
+      // Fetch all locations in this batch concurrently
+      const batchResults = await Promise.all(batch.map((location) => fetchLandCover(location)))
+
+      results.push(...batchResults)
+
+      // Report progress after each batch
+      if (onProgress) {
+        onProgress(results.length, locations.length)
+      }
+    }
+
+    return results
+  }
+
   return {
-    fetchLandCover
+    fetchLandCover,
+    fetchLandCoverInBatches
   }
 }

@@ -161,12 +161,35 @@ export const useGridStore = defineStore('gridStore', () => {
     console.log('Grid:', grid.value)
   }
 
+  /**
+   * Resets the grid store to initial state.
+   */
+  function reset() {
+    grid.value = []
+    isGridGenerated.value = false
+    isLoadingElevation.value = false
+    isLoadingLandCover.value = false
+  }
+
+  /**
+   * Sets the complete grid array (used for loading saved games).
+   * @param {Array} gridArray - Array of grid cell objects
+   */
+  function setGrid(gridArray) {
+    if (Array.isArray(gridArray)) {
+      grid.value = gridArray
+      isGridGenerated.value = true
+    }
+  }
+
   return {
     grid,
     isGridGenerated,
     isLoadingElevation,
     isLoadingLandCover,
-    generateGrid
+    generateGrid,
+    reset,
+    setGrid
   }
 
   /**

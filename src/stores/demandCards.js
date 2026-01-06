@@ -155,9 +155,28 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
     }
   }
 
+  /**
+   * Resets the demand cards store to initial state.
+   */
+  function reset() {
+    demandCards.value = []
+  }
+
+  /**
+   * Sets the complete demand cards array (used for loading saved games).
+   * @param {Array} cardsArray - Array of demand card objects
+   */
+  function setDemandCards(cardsArray) {
+    if (Array.isArray(cardsArray)) {
+      demandCards.value = cardsArray
+    }
+  }
+
   return {
     demandCards,
-    generateDemandCards
+    generateDemandCards,
+    reset,
+    setDemandCards
   }
 
   /**

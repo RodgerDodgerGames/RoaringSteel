@@ -6,7 +6,7 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 
 // customized version of bulma
-import './assets/roaring-steel.css'
+import './assets/roaring-steel.scss'
 // custom styles
 import './assets/main.scss'
 

@@ -60,6 +60,26 @@ export const useMapStore = defineStore('map', () => {
     townsLayer.value = newTownsLayer
   }
 
+  /**
+   * Resets the map store to initial state.
+   * Note: Only resets serializable state (zoom/center), not Leaflet instances.
+   */
+  const reset = () => {
+    mapZoom.value = 3
+    mapCenter.value = [40, -100]
+    isDrawingActive.value = false
+    // Note: map and townsLayer are Leaflet instances and should not be reset here
+  }
+
+  /**
+   * Sets the map view state (used for loading saved games).
+   * @param {Object} viewState - Object with zoom and center properties
+   */
+  const setMapView = (viewState) => {
+    if (viewState.zoom !== undefined) mapZoom.value = viewState.zoom
+    if (viewState.center) mapCenter.value = viewState.center
+  }
+
   return {
     // state
     map,
@@ -72,6 +92,8 @@ export const useMapStore = defineStore('map', () => {
     setMapZoom,
     setMapCenter,
     setIsDrawingActive,
-    setTownsLayer
+    setTownsLayer,
+    reset,
+    setMapView
   }
 })

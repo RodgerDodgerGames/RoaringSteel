@@ -357,11 +357,34 @@ export const useTownsStore = defineStore('towns', () => {
     return sortedData
   }
 
+  /**
+   * Resets the towns store to initial state.
+   */
+  function reset() {
+    towns.value = []
+    selectedState.value = ''
+    isLoadingIndustry.value = false
+    isLoadingPopulation.value = false
+    isLoadingCoordinates.value = false
+  }
+
+  /**
+   * Sets the complete towns array (used for loading saved games).
+   * @param {Array} townsArray - Array of town objects
+   */
+  function setTowns(townsArray) {
+    if (Array.isArray(townsArray)) {
+      towns.value = townsArray
+    }
+  }
+
   return {
     towns,
     isLoadingIndustry,
     isLoadingPopulation,
     isLoadingCoordinates,
-    setupTowns
+    setupTowns,
+    reset,
+    setTowns
   }
 })

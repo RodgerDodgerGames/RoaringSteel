@@ -38,12 +38,31 @@ export const useGameStore = defineStore('gameStore', () => {
     turn.value++
   }
 
+  /**
+   * Resets the game state to initial values.
+   */
+  function reset() {
+    region.value = null
+    turn.value = 0
+  }
+
+  /**
+   * Sets the complete game state (used for loading saved games).
+   * @param {Object} state - Game state object with region and turn
+   */
+  function setGameState(state) {
+    if (state.region) region.value = state.region
+    if (state.turn !== undefined) turn.value = state.turn
+  }
+
   return {
     // STATE
     region,
     turn,
     // ACTIONS
     setRegion,
-    advanceTurn
+    advanceTurn,
+    reset,
+    setGameState
   }
 })

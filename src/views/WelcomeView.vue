@@ -16,14 +16,18 @@
 import { ref } from 'vue'
 import PlayerSelect from '@/components/setup/PlayerSelect.vue'
 import PlayerConfirm from '@/components/setup/PlayerConfirm.vue'
+import LoadGameDialog from '@/components/dialogs/LoadGameDialog.vue'
 
-const emit = defineEmits(['players-confirmed'])
+const emit = defineEmits(['players-confirmed', 'game-loaded'])
 
 // which pane should be shown
 const activePane = ref('gameButtons')
 
 // Store selected players for confirmation
 const selectedPlayers = ref([])
+
+// Dialog visibility
+const showLoadDialog = ref(false)
 
 function newGame() {
   console.log('new game clicked')
@@ -32,6 +36,16 @@ function newGame() {
 
 function loadGame() {
   console.log('load game clicked')
+  showLoadDialog.value = true
+}
+
+function handleLoadDialogClose() {
+  showLoadDialog.value = false
+}
+
+function handleGameLoaded() {
+  showLoadDialog.value = false
+  emit('game-loaded')
 }
 
 // Handle when player selection is done
@@ -85,6 +99,13 @@ function handleConfirmed() {
         />
       </div>
     </div>
+
+    <!-- Load Game Dialog -->
+    <LoadGameDialog
+      v-if="showLoadDialog"
+      @close="handleLoadDialogClose"
+      @game-loaded="handleGameLoaded"
+    />
   </section>
 </template>
 

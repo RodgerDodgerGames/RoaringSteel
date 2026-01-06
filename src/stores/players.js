@@ -217,6 +217,16 @@ export const usePlayerStore = defineStore('playerStore', () => {
     isLoading.value = false
   }
 
+  /**
+   * Sets the complete players array (used for loading saved games).
+   * @param {Array} playersArray - Array of player objects
+   */
+  function setPlayers(playersArray) {
+    if (Array.isArray(playersArray)) {
+      players.value = playersArray
+    }
+  }
+
   return {
     // state
     players,
@@ -230,6 +240,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     updatePlayer,
     removePlayer,
     nextTurn,
-    reset
+    reset,
+    setPlayers
   }
 })

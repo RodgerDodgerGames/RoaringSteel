@@ -41,7 +41,8 @@
       <!-- Right Slot for Navigation Items -->
       <slot name="right">
         <div class="navbar-end">
-          <a class="navbar-item" @click="openSaveDialog">Save Game</a>
+          <a class="navbar-item" @click="showSaveDialog = true">Save</a>
+          <a class="navbar-item" @click="showLoadDialog = true">Load</a>
           <a class="navbar-item" href="#">About</a>
           <a class="navbar-item" href="#">Contact</a>
         </div>
@@ -50,27 +51,24 @@
   </nav>
 
   <!-- Save Game Dialog -->
-  <SaveGameDialog v-if="showSaveDialog" @close="closeSaveDialog" />
+  <SaveGameDialog v-if="showSaveDialog" @close="showSaveDialog = false" />
+
+  <!-- Load Game Dialog -->
+  <LoadGameDialog v-if="showLoadDialog" @close="showLoadDialog = false" />
 </template>
 
 <script setup>
 // State for controlling the burger menu
 import { ref } from 'vue'
 import SaveGameDialog from '@/components/dialogs/SaveGameDialog.vue'
+import LoadGameDialog from '@/components/dialogs/LoadGameDialog.vue'
 
 const isMenuActive = ref(false)
 const showSaveDialog = ref(false)
+const showLoadDialog = ref(false)
 
 const toggleMenu = () => {
   isMenuActive.value = !isMenuActive.value
-}
-
-const openSaveDialog = () => {
-  showSaveDialog.value = true
-}
-
-const closeSaveDialog = () => {
-  showSaveDialog.value = false
 }
 </script>
 

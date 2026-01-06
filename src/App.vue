@@ -19,11 +19,17 @@ import { useDemandCardsStore } from '@/stores/demandCards'
 // import config
 import { gridConfig } from '@/config/grid'
 
+// import composables
+import { useGamePersistence } from '@/composables/useGamePersistence'
+
 // setup stores
 const townsStore = useTownsStore()
 const gameStore = useGameStore()
 const gridStore = useGridStore()
 const demandCardsStore = useDemandCardsStore()
+
+// setup composables
+const { autoSave } = useGamePersistence()
 
 // STATE
 
@@ -48,6 +54,12 @@ function handlePlayersConfirmed() {
   currentView.value = 'areaSelect'
 }
 
+// Handle game loaded event from WelcomeView
+function handleGameLoaded() {
+  console.log('Game loaded, navigating to game view')
+  currentView.value = 'game'
+}
+
 // Handle play game button click
 async function handlePlayGameClick() {
   console.log('handlePlayGameClick', region.value)
@@ -62,6 +74,8 @@ async function handlePlayGameClick() {
     await gridStore.generateGrid(region.value.properties.STATE, bounds, gridConfig.cellSize)
     // once grid is generated, set view to game
     currentView.value = 'game'
+    // auto-save after setup completes
+    autoSave()
   }
 }
 </script>
@@ -74,6 +88,7 @@ async function handlePlayGameClick() {
     <component
       :is="viewComponents[currentView]"
       @players-confirmed="handlePlayersConfirmed"
+      @game-loaded="handleGameLoaded"
       @play-game="handlePlayGameClick"
     />
   </div>

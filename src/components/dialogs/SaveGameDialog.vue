@@ -1,39 +1,61 @@
 <!--
   SaveGameDialog.vue
 
-  Dialog for saving/exporting game to file.
-  Displays auto-save info and provides file export functionality.
+  Modal dialog component for saving and exporting the current game state.
 
-  @emits close - User closed the dialog
+  Features:
+  - Displays information about automatic save functionality
+  - Allows users to export game state as a downloadable JSON file
+  - Provides filename customization for exported saves
+  - Shows success/error feedback for export operations
+
+  The game is automatically saved to browser localStorage after each turn,
+  with the last 3 auto-saves being retained. This dialog provides an
+  additional manual export option for creating portable backup files.
+
+  @emits close - Emitted when user clicks the close button or modal background
 -->
 
 <script setup>
 import { ref } from 'vue'
 import { useGamePersistence } from '@/composables/useGamePersistence'
 
+// Component events
 const emit = defineEmits(['close'])
 
+// Get export functionality from game persistence composable
 const { exportToFile } = useGamePersistence()
 
-const filename = ref('roaring-steel-save')
-const isExporting = ref(false)
-const successMessage = ref('')
-const errorMessage = ref('')
+// Reactive state
+const filename = ref('roaring-steel-save') // Default filename for exported save
+const isExporting = ref(false) // Loading state during export operation
+const successMessage = ref('') // Success feedback message
+const errorMessage = ref('') // Error feedback message
 
+/**
+ * Handles the export of the current game state to a JSON file.
+ *
+ * Validates the filename, clears previous messages, and triggers the file download.
+ * Shows success or error feedback based on the export result.
+ */
 async function handleExport() {
+  // Validate filename input
   if (!filename.value.trim()) {
     errorMessage.value = 'Please enter a filename'
     return
   }
 
+  // Reset UI state
   isExporting.value = true
   errorMessage.value = ''
   successMessage.value = ''
 
+  // Attempt to export game to file
   const success = exportToFile(filename.value.trim())
 
   isExporting.value = false
 
+  // Display appropriate feedback message
   if (success) {
     successMessage.value = 'Game exported successfully!'
   } else {
@@ -41,6 +63,9 @@ async function handleExport() {
   }
 }
 
+/**
+ * Closes the dialog by emitting the close event to the parent component.
+ */
 function handleClose() {
   emit('close')
 }
@@ -57,7 +82,7 @@ function handleClose() {
 
       <section class="modal-card-body">
         <!-- Auto-save Info -->
-        <div class="notification is-info is-light mb-5">
+        <div class="notification is-info is-light">
           <p class="has-text-weight-bold mb-2">Your game is auto-saved after each turn</p>
           <p class="is-size-7">
             The last 3 auto-saves are stored in your browser. Use the Load Game option to restore

@@ -2,7 +2,7 @@
   GameSidePanel.vue
 
   Main game action panel with tabbed navigation. Provides access to:
-  - Home: Overview with quick actions
+  - Info: Overview with quick actions
   - Build: Railroad track building tools
   - Upgrade: Train upgrade options (not yet implemented)
 
@@ -20,7 +20,7 @@ const mapStore = useMapStore()
 const { map, townsLayer } = storeToRefs(mapStore)
 
 // Track the active tab
-const activeTab = ref('Home')
+const activeTab = ref('Info')
 
 // Function to change active tab
 const setActiveTab = (tab) => {
@@ -32,8 +32,8 @@ const setActiveTab = (tab) => {
   <!-- Bulma Tabs Navigation -->
   <div class="tabs is-boxed">
     <ul>
-      <li :class="{ 'is-active': activeTab === 'Home' }">
-        <a @click="setActiveTab('Home')">Home</a>
+      <li :class="{ 'is-active': activeTab === 'Info' }">
+        <a @click="setActiveTab('Info')">Info</a>
       </li>
       <li :class="{ 'is-active': activeTab === 'Build' }">
         <a @click="setActiveTab('Build')">Build</a>
@@ -46,8 +46,8 @@ const setActiveTab = (tab) => {
 
   <!-- Tab Content -->
 
-  <!-- Home tab content -->
-  <div v-if="activeTab === 'Home'">
+  <!-- Info tab content -->
+  <div v-if="activeTab === 'Info'">
     <div class="block is-flex is-align-items-center mt-2">
       Would you like to
       <button @click="setActiveTab('Build')" class="button mx-2">Build</button> track?

@@ -2,14 +2,15 @@
  * Game Persistence Composable (useGamePersistence.js)
  *
  * Handles game save/load functionality including:
- * - Auto-save to localStorage (rotating 3 slots)
- * - File export/import (JSON)
+ * - Auto-save to localStorage (rotating 3 slots, LZ-compressed)
+ * - File export/import (JSON, uncompressed for compatibility)
  * - State serialization/deserialization
  * - Save data validation
  *
  * @module composables/useGamePersistence
  */
 
+import LZString from 'lz-string'
 import { useGameStore } from '@/stores/game'
 import { usePlayerStore } from '@/stores/players'
 import { useTownsStore } from '@/stores/towns'
@@ -123,10 +124,12 @@ export function useGamePersistence() {
   /**
    * Auto-saves the current game state to localStorage with rotation.
    * Keeps the last 3 saves in rotating slots.
+   * Uses LZ-String compression to reduce storage size by ~60-80%.
    */
   function autoSave() {
     try {
       const saveData = serializeGameState('Auto-save')
+      const jsonString = JSON.stringify(saveData)
 
       // Get current index (0, 1, or 2)
       const currentIndex = parseInt(localStorage.getItem(AUTOSAVE_INDEX_KEY) || '0', 10)
@@ -134,14 +137,21 @@ export function useGamePersistence() {
       // Calculate next index (rotate through 0, 1, 2)
       const nextIndex = (currentIndex + 1) % MAX_AUTOSAVES
 
-      // Save to the next slot
+      // Compress and save to the next slot
       const slotKey = `${AUTOSAVE_PREFIX}${nextIndex}`
-      localStorage.setItem(slotKey, JSON.stringify(saveData))
+      const compressed = LZString.compress(jsonString)
+      localStorage.setItem(slotKey, compressed)
 
       // Update the index pointer
       localStorage.setItem(AUTOSAVE_INDEX_KEY, nextIndex.toString())
 
-      console.log(`Auto-saved to slot ${nextIndex}`)
+      const originalSize = new Blob([jsonString]).size
+      const compressedSize = new Blob([compressed]).size
+      const savings = ((1 - compressedSize / originalSize) * 100).toFixed(1)
+
+      console.log(
+        `Auto-saved to slot ${nextIndex} (${(originalSize / 1024).toFixed(1)}KB → ${(compressedSize / 1024).toFixed(1)}KB, ${savings}% reduction)`
+      )
       return true
     } catch (e) {
       console.error('Error auto-saving game:', e)
@@ -151,6 +161,7 @@ export function useGamePersistence() {
 
   /**
    * Gets all available auto-saves from localStorage.
+   * Decompresses LZ-compressed saves.
    * @returns {Array} Array of {index, data, metadata} objects, sorted newest first
    */
   function getAutoSaves() {
@@ -158,11 +169,18 @@ export function useGamePersistence() {
 
     for (let i = 0; i < MAX_AUTOSAVES; i++) {
       const slotKey = `${AUTOSAVE_PREFIX}${i}`
-      const saveStr = localStorage.getItem(slotKey)
+      const compressed = localStorage.getItem(slotKey)
 
-      if (saveStr) {
+      if (compressed) {
         try {
-          const data = JSON.parse(saveStr)
+          // Decompress and parse
+          const jsonString = LZString.decompress(compressed)
+          if (!jsonString) {
+            console.error(`Error decompressing save from slot ${i}`)
+            continue
+          }
+
+          const data = JSON.parse(jsonString)
           saves.push({
             index: i,
             data,
@@ -187,20 +205,28 @@ export function useGamePersistence() {
 
   /**
    * Loads a specific auto-save by index.
+   * Decompresses LZ-compressed save data.
    * @param {number} index - Auto-save slot index (0-2)
    * @returns {boolean} True if successful
    */
   function loadAutoSave(index) {
     try {
       const slotKey = `${AUTOSAVE_PREFIX}${index}`
-      const saveStr = localStorage.getItem(slotKey)
+      const compressed = localStorage.getItem(slotKey)
 
-      if (!saveStr) {
+      if (!compressed) {
         console.error(`No auto-save found at slot ${index}`)
         return false
       }
 
-      const data = JSON.parse(saveStr)
+      // Decompress and parse
+      const jsonString = LZString.decompress(compressed)
+      if (!jsonString) {
+        console.error(`Error decompressing save from slot ${index}`)
+        return false
+      }
+
+      const data = JSON.parse(jsonString)
       return deserializeGameState(data)
     } catch (e) {
       console.error(`Error loading auto-save from slot ${index}:`, e)

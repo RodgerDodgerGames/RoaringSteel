@@ -1,6 +1,6 @@
 # Roaring Steel - Improvement Task List
 
-Based on codebase analysis. All PRs target `vue-app` branch.
+Based on codebase analysis. All PRs target `main` branch.
 
 ## Completed
 

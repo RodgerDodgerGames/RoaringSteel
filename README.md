@@ -10,6 +10,18 @@ Run `npm install roaring-steel`
 
 The app is built with [Vite](https://vitejs.dev/) and [Vue](https://vuejs.org/). [Bulma](https://bulma.io/) is used as a CSS framework.
 
+## Development
+
+```sh
+npm install
+npm run dev        # dev server at localhost:5173
+npm run test:run   # test suite
+npm run build      # production build
+```
+
+See [docs/workflow.md](docs/workflow.md) for how work moves from issue to merge, and
+[docs/codebase_analysis.md](docs/codebase_analysis.md) for a technical analysis of the codebase.
+
 ## File Summary
 
 public/data

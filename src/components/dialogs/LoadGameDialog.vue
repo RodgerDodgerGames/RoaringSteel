@@ -26,12 +26,7 @@ import { useGamePersistence } from '@/composables/useGamePersistence'
 const emit = defineEmits(['close', 'game-loaded'])
 
 // Get persistence functionality from game persistence composable
-const {
-  getAutoSaves,
-  loadAutoSave,
-  hasAutoSaves,
-  importFromFile
-} = useGamePersistence()
+const { getAutoSaves, loadAutoSave, hasAutoSaves, importFromFile } = useGamePersistence()
 
 // Reactive state
 const autoSaves = ref([]) // List of available auto-save entries with metadata
@@ -145,25 +140,19 @@ function handleClose() {
         <div class="mb-5">
           <h4 class="title is-5 mb-3">Auto-Saved Games</h4>
 
-          <div v-if="autoSaves.length === 0" class="notification is-info is-light">
+          <div v-if="autoSaves.length === 0" class="notification is-warning is-light">
             No auto-saves found. Start a new game to create an auto-save.
           </div>
 
           <div v-else>
-            <div
-              v-for="save in autoSaves"
-              :key="save.index"
-              class="box mb-3"
-            >
+            <div v-for="save in autoSaves" :key="save.index" class="box mb-3">
               <div class="columns is-vcentered is-mobile">
                 <div class="column">
                   <p class="has-text-weight-bold">Turn {{ save.metadata.turn }}</p>
                   <p class="is-size-7 has-text-grey">
                     {{ formatDate(save.metadata.savedAt) }}
                   </p>
-                  <p class="is-size-7">
-                    Players: {{ save.metadata.playerNames.join(', ') }}
-                  </p>
+                  <p class="is-size-7">Players: {{ save.metadata.playerNames.join(', ') }}</p>
                 </div>
                 <div class="column is-narrow">
                   <button
@@ -182,8 +171,9 @@ function handleClose() {
 
         <!-- File Upload Section -->
         <div>
-          <h4 class="title is-5 mb-3">Load from File</h4>
-          <div class="file is-boxed is-centered">
+          <h4 class="title is-5 mb-2">Load from File</h4>
+          <p class="subtitle is-6 mb-3">Choose a previously saved game file (.json)</p>
+          <div class="file is-centered">
             <label class="file-label">
               <input
                 ref="fileInput"
@@ -197,7 +187,7 @@ function handleClose() {
                 <span class="file-icon">
                   <i class="fas fa-upload"></i>
                 </span>
-                <span class="file-label"> Choose a save file (.json) </span>
+                <span class="file-label">Choose a file...</span>
               </span>
             </label>
           </div>
@@ -222,7 +212,8 @@ function handleClose() {
 }
 
 .box:hover {
-  box-shadow: 0 0.5em 1em -0.125em rgba(10, 10, 10, 0.2),
+  box-shadow:
+    0 0.5em 1em -0.125em rgba(10, 10, 10, 0.2),
     0 0px 0 1px rgba(10, 10, 10, 0.02);
 }
 </style>

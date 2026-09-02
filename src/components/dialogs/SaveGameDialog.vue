@@ -58,6 +58,10 @@ async function handleExport() {
   // Display appropriate feedback message
   if (success) {
     successMessage.value = 'Game exported successfully!'
+    // close modal after a short delay
+    setTimeout(() => {
+      handleClose()
+    }, 1000)
   } else {
     errorMessage.value = 'Failed to export game. Please try again.'
   }
@@ -102,7 +106,7 @@ function handleClose() {
 
         <!-- File Export Section -->
         <div>
-          <h4 class="title is-5 mb-3">Export to File</h4>
+          <h4 class="title is-5 mb-3">Save Game to File</h4>
           <p class="mb-3 is-size-7 has-text-grey">
             Download your game as a JSON file to back it up or share with others.
           </p>

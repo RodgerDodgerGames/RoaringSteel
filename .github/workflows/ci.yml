@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Test
+        run: npm run test:run
+
+      - name: Build
+        run: npm run build
+
+      # NOTE: `npm run lint` is currently broken (issue #44) -- ESLint 9 needs flat config
+      # (eslint.config.js) but the repo has .eslintrc.cjs, and the script uses
+      # the removed --ext / --ignore-path flags. Add a Lint step here as part of
+      # the fix for #44 so it gates PRs from then on.

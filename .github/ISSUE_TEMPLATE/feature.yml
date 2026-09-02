@@ -1,0 +1,42 @@
+name: Feature / Change
+description: A user-visible change, sized to one pull request.
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Keep it to one sitting's worth of work. If it needs more than one PR,
+        file it as several issues and link them.
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: What should be true when this is done, from a player's point of view?
+      placeholder: On my turn, the info panel greets me by name and tells me what I can do.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: The checklist you'll walk through when testing the draft PR.
+      value: |
+        - [ ] 
+        - [ ] 
+    validations:
+      required: true
+
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+      description: Anything nearby that should NOT change in this PR. Prevents scope creep.
+      placeholder: Don't restyle the panel; don't touch the demand card layout.
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes / pointers
+      description: Files, stores, or prior art that are probably involved. Optional.

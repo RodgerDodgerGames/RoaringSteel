@@ -152,19 +152,6 @@ npm install
 and restart `npm run dev` if it was running — Vite won't pick up new dependencies on its
 own.
 
-### In VS Code
-
-The current branch name sits in the **bottom-left of the status bar**. Click it to open
-the branch picker and choose `main` — that's the equivalent of `git checkout main`.
-
-For the rest, use the integrated terminal (**⌃`**, Control plus backtick). It's tempting
-to click the circular-arrows **Sync** button next to the branch name instead, but that
-runs a pull *and* a push, and its pull isn't `--ff-only` — so it can quietly produce the
-merge commit you were avoiding. Pull from the terminal.
-
-To confirm you're ready: the status bar reads `main`, and the **Source Control** view
-(**⌃⇧G**) shows no pending changes. Now you can file or pick up the next issue.
-
 ### Branch cleanup
 
 Deleting each branch as you go is the habit that prevents pileup, but if some accumulate,

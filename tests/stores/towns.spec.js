@@ -75,9 +75,7 @@ describe('Towns Store', () => {
 
   describe('setupTowns with cached data', () => {
     it('should use cached towns data when available', async () => {
-      const cachedTowns = [
-        { msa: '12345', name: 'Minneapolis', population: 400000, size: 'large' }
-      ]
+      const cachedTowns = [{ msa: '12345', name: 'Minneapolis', population: 400000, size: 'large' }]
       mockUseLocalStorage.mockReturnValue({ value: cachedTowns })
 
       await townsStore.setupTowns('27')
@@ -208,13 +206,18 @@ describe('Towns Store', () => {
       industryStore.MSAs.push('12345', '12346', '12347')
       industryStore.employmentData.push({
         industry: 111,
-        meanEmp: { '12345': 1000, '12346': 500, '12347': 100 },
+        meanEmp: { 12345: 1000, 12346: 500, 12347: 100 },
         proportion: 0.15
       })
       industryStore.industries.push({ naics_code: 111, label: 'Agriculture' })
 
       mockPopulationData.value = [
-        { msa_code: '12345', name: 'Minneapolis-St. Paul, MN', population: '3000000', state_code: '27' },
+        {
+          msa_code: '12345',
+          name: 'Minneapolis-St. Paul, MN',
+          population: '3000000',
+          state_code: '27'
+        },
         { msa_code: '12346', name: 'Rochester, MN', population: '200000', state_code: '27' },
         { msa_code: '12347', name: 'Duluth, MN', population: '50000', state_code: '27' }
       ]
@@ -230,21 +233,21 @@ describe('Towns Store', () => {
 
       await townsStore.setupTowns('27')
 
-      const msaCodes = townsStore.towns.map(t => t.msa)
+      const msaCodes = townsStore.towns.map((t) => t.msa)
       expect(msaCodes).not.toContain('99999')
     })
 
     it('should parse full name correctly from MSA name', async () => {
       await townsStore.setupTowns('27')
 
-      const minneapolis = townsStore.towns.find(t => t.msa === '12345')
+      const minneapolis = townsStore.towns.find((t) => t.msa === '12345')
       expect(minneapolis.fullName).toBe('Minneapolis-St. Paul')
     })
 
     it('should parse short name correctly from MSA name', async () => {
       await townsStore.setupTowns('27')
 
-      const minneapolis = townsStore.towns.find(t => t.msa === '12345')
+      const minneapolis = townsStore.towns.find((t) => t.msa === '12345')
       expect(minneapolis.name).toBe('Minneapolis')
     })
 
@@ -252,7 +255,7 @@ describe('Towns Store', () => {
       await townsStore.setupTowns('27')
 
       // All towns should have a size property
-      townsStore.towns.forEach(town => {
+      townsStore.towns.forEach((town) => {
         expect(['small', 'medium', 'large']).toContain(town.size)
       })
     })
@@ -261,18 +264,18 @@ describe('Towns Store', () => {
       await townsStore.setupTowns('27')
 
       // Minneapolis with 3M population should be classified as large
-      const minneapolis = townsStore.towns.find(t => t.msa === '12345')
+      const minneapolis = townsStore.towns.find((t) => t.msa === '12345')
       expect(minneapolis.size).toBe('large')
     })
 
     it('should assign Tourism to large towns', async () => {
       await townsStore.setupTowns('27')
 
-      const largeTowns = townsStore.towns.filter(t => t.size === 'large')
+      const largeTowns = townsStore.towns.filter((t) => t.size === 'large')
       expect(largeTowns.length).toBeGreaterThan(0)
 
-      largeTowns.forEach(town => {
-        const hasTourism = town.industries.some(i => i.name === 'Tourism')
+      largeTowns.forEach((town) => {
+        const hasTourism = town.industries.some((i) => i.name === 'Tourism')
         expect(hasTourism).toBe(true)
       })
     })
@@ -285,7 +288,7 @@ describe('Towns Store', () => {
       await townsStore.setupTowns('27')
 
       // All towns should have an industries array (may have Tourism for large towns)
-      townsStore.towns.forEach(town => {
+      townsStore.towns.forEach((town) => {
         expect(Array.isArray(town.industries)).toBe(true)
       })
     })

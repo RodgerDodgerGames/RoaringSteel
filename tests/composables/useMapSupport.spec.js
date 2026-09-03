@@ -177,7 +177,7 @@ describe('useMapSupport Utilities', () => {
       const lonDegrees = metersToLongitudeDegrees(cellSizeMeters, meanLatitude)
 
       // Both should be small fractions of a degree
-      expect(latDegrees).toBeCloseTo(0.090, 2)
+      expect(latDegrees).toBeCloseTo(0.09, 2)
       expect(lonDegrees).toBeCloseTo(0.127, 2)
     })
 

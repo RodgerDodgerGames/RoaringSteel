@@ -108,7 +108,7 @@ export const useGridStore = defineStore('gridStore', () => {
     }
 
     // Fetch elevation for all locations
-    let elevationResults = []
+    let elevationResults
     isLoadingElevation.value = true
     try {
       elevationResults = await fetchElevationsInBatches(locations, 10)

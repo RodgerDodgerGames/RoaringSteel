@@ -77,7 +77,7 @@ describe('Industry Store', () => {
   describe('useIndustryData with cached data', () => {
     it('should use cached data when available', async () => {
       const cachedIndustries = [{ naics_code: 111, label: 'Agriculture' }]
-      const cachedEmploymentData = [{ industry: 111, meanEmp: { '12345': 100 } }]
+      const cachedEmploymentData = [{ industry: 111, meanEmp: { 12345: 100 } }]
       const cachedMSAs = ['12345']
 
       mockUseLocalStorage.mockImplementation((key) => {
@@ -198,7 +198,10 @@ describe('Industry Store', () => {
       mockFetchQWI.mockImplementation(async () => {
         callCount++
         if (callCount === 1) {
-          mockQWIData.value = [{ Emp: 0, msa_code: '12345' }, { Emp: null, msa_code: '12346' }]
+          mockQWIData.value = [
+            { Emp: 0, msa_code: '12345' },
+            { Emp: null, msa_code: '12346' }
+          ]
         } else {
           mockQWIData.value = [{ Emp: 100, msa_code: '12345' }]
         }
@@ -268,7 +271,7 @@ describe('Industry Store', () => {
       await industryStore.useIndustryData('27')
 
       // Agriculture proportion should be capped at 0.2 despite being ~99% of employment
-      const agricultureData = industryStore.employmentData.find(e => e.industry === 111)
+      const agricultureData = industryStore.employmentData.find((e) => e.industry === 111)
       expect(agricultureData.proportion).toBe(0.2)
     })
   })

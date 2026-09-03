@@ -77,9 +77,7 @@ describe('Grid Store', () => {
 
   describe('generateGrid with cached data', () => {
     it('should use cached grid data when available', async () => {
-      const cachedData = [
-        { id: '0-0', elevation: 100, landCover: 5, cost: 10 }
-      ]
+      const cachedData = [{ id: '0-0', elevation: 100, landCover: 5, cost: 10 }]
       mockUseLocalStorage.mockReturnValue({ value: cachedData })
 
       await gridStore.generateGrid('27', [-95, 44, -94, 45], 10000)
@@ -170,10 +168,7 @@ describe('Grid Store', () => {
     })
 
     it('should handle land cover fetch errors and continue to next cell', async () => {
-      mockFetchElevationsInBatches.mockResolvedValue([
-        { elevation: 100 },
-        { elevation: 200 }
-      ])
+      mockFetchElevationsInBatches.mockResolvedValue([{ elevation: 100 }, { elevation: 200 }])
 
       let callCount = 0
       mockFetchLandCover.mockImplementation(async () => {
@@ -195,10 +190,7 @@ describe('Grid Store', () => {
 
   describe('generateGrid data processing', () => {
     it('should skip cells with zero elevation', async () => {
-      mockFetchElevationsInBatches.mockResolvedValue([
-        { elevation: 0 },
-        { elevation: 100 }
-      ])
+      mockFetchElevationsInBatches.mockResolvedValue([{ elevation: 0 }, { elevation: 100 }])
 
       await gridStore.generateGrid('27', [-95, 44, -94.8, 44.2], 10000)
 
@@ -222,10 +214,7 @@ describe('Grid Store', () => {
     })
 
     it('should filter out cells without valid data after processing', async () => {
-      mockFetchElevationsInBatches.mockResolvedValue([
-        { elevation: 100 },
-        { elevation: 200 }
-      ])
+      mockFetchElevationsInBatches.mockResolvedValue([{ elevation: 100 }, { elevation: 200 }])
 
       let callCount = 0
       mockFetchLandCover.mockImplementation(async () => {
@@ -236,7 +225,7 @@ describe('Grid Store', () => {
       await gridStore.generateGrid('27', [-95, 44, -94.8, 44.2], 10000)
 
       // Only cells with both elevation and landCover should remain
-      expect(gridStore.grid.every(cell => cell.elevation && cell.landCover)).toBe(true)
+      expect(gridStore.grid.every((cell) => cell.elevation && cell.landCover)).toBe(true)
     })
 
     it('should set isGridGenerated to true after successful generation', async () => {
@@ -261,7 +250,7 @@ describe('Grid Store', () => {
       await gridStore.generateGrid('27', [-95, 44, -94.8, 44.2], 10000)
 
       // Each cell should have a cost calculated
-      gridStore.grid.forEach(cell => {
+      gridStore.grid.forEach((cell) => {
         expect(cell.cost).toBeDefined()
         expect(cell.cost).toBeGreaterThanOrEqual(cell.landCover)
       })

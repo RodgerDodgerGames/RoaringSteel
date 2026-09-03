@@ -34,7 +34,12 @@ describe('useCensus Composable', () => {
   describe('fetchPopulationData Success', () => {
     it('should transform array-of-arrays to array-of-objects', async () => {
       const mockResponse = [
-        ['NAME', 'B01001_001E', 'state', 'metropolitan statistical area/micropolitan statistical area'],
+        [
+          'NAME',
+          'B01001_001E',
+          'state',
+          'metropolitan statistical area/micropolitan statistical area'
+        ],
         ['Minneapolis-St. Paul, MN-WI', '3500000', '27', '33460'],
         ['St. Cloud, MN', '250000', '27', '34820']
       ]
@@ -72,7 +77,7 @@ describe('useCensus Composable', () => {
       await fetchPopulationData()
 
       // Header row should not be in data
-      expect(populationData.value.some(item => item.name === 'NAME')).toBe(false)
+      expect(populationData.value.some((item) => item.name === 'NAME')).toBe(false)
       expect(populationData.value).toHaveLength(2)
     })
 
@@ -93,7 +98,7 @@ describe('useCensus Composable', () => {
       await fetchPopulationData()
 
       expect(populationData.value).toHaveLength(3)
-      expect(populationData.value.map(d => d.msa_code)).toEqual(['12345', '12346', '12347'])
+      expect(populationData.value.map((d) => d.msa_code)).toEqual(['12345', '12346', '12347'])
     })
   })
 

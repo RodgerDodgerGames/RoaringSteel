@@ -116,7 +116,7 @@ not reading diffs.
 Once the developer marks the PR **ready for review**:
 
 1. Read the final diff.
-2. **Squash and merge** — keeps `main` history one commit per issue.
+2. **merge** 
 3. **Delete branch** on the confirmation page.
 
 `Closes #NN` in the PR body closes the issue automatically.

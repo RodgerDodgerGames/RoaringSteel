@@ -154,19 +154,3 @@ npm run test:run               # full test suite, single run
 npm run build                  # production build
 npm run lint                   # see "Known issues" below
 ```
-
-## Known issues
-
-- **`npm run lint` is broken.** ESLint 9 and later require flat config
-  (`eslint.config.js`), but the repo still has the older `.eslintrc.cjs`, and the
-  script passes `--ext` and `--ignore-path`, both removed in ESLint 9. Linting has
-  been silently doing nothing. Tracked in **#44**; CI omits the lint step until it's
-  fixed.
-- **Test output carries ~60 lines of `ECONNREFUSED localhost:3000` noise.** All tests
-  pass; it's noise, not failure, but it could hide a real error. Tracked in **#53**.
-
-## A note on `.claude/`
-
-`.claude/` is gitignored, so `CLAUDE.md` — the developer-side copy of this contract —
-is deliberately not checked in. This document is the canonical, shared version. If the
-two ever disagree, this one is right.

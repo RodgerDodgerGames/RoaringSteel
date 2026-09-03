@@ -20,7 +20,7 @@ npm run build      # production build
 ```
 
 See [docs/workflow.md](docs/workflow.md) for how work moves from issue to merge, and
-[docs/codebase_analysis.md](docs/codebase_analysis.md) for a technical analysis of the codebase.
+[docs/codebase_analysis.md](docs/codebase_analysis.md) for a technical analysis of the codebase (dated December 2025).
 
 ## File Summary
 

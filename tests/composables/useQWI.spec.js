@@ -101,7 +101,7 @@ describe('useQWI Composable', () => {
       await fetchQWI()
 
       // Should not include header row
-      expect(data.value.some(item => item.Emp === 'Emp')).toBe(false)
+      expect(data.value.some((item) => item.Emp === 'Emp')).toBe(false)
       expect(data.value).toHaveLength(2)
     })
 

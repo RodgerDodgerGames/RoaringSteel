@@ -56,10 +56,10 @@ export function useTowns() {
         const { lon, lat, ...properties } = town
         return {
           type: 'Feature',
-          properties: properties,  // name, size, industries, msa, etc.
+          properties: properties, // name, size, industries, msa, etc.
           geometry: {
             type: 'Point',
-            coordinates: [lon, lat]  // GeoJSON uses [lng, lat] order
+            coordinates: [lon, lat] // GeoJSON uses [lng, lat] order
           }
         }
       })

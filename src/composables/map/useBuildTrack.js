@@ -4,6 +4,7 @@
 
 import { ref, computed, onMounted } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
+import L from 'leaflet'
 import 'leaflet-textpath'
 import { storeToRefs } from 'pinia'
 import { useMapStore } from '@/stores/map'

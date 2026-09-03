@@ -53,10 +53,10 @@ export default function useCensus(state) {
       // Transform array data to named object properties
       // B01001_001E is the Census variable code for total population
       populationData.value = censusData.map(([name, population, state_code, msa_code]) => ({
-        name,           // Full MSA name (e.g., "Minneapolis-St. Paul-Bloomington, MN-WI")
-        population,     // Total population count
-        state_code,     // State FIPS code
-        msa_code        // Metropolitan Statistical Area code
+        name, // Full MSA name (e.g., "Minneapolis-St. Paul-Bloomington, MN-WI")
+        population, // Total population count
+        state_code, // State FIPS code
+        msa_code // Metropolitan Statistical Area code
       }))
       console.log('Population data:', populationData.value)
     } catch (error) {

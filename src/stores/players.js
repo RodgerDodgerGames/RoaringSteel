@@ -78,7 +78,9 @@ export const usePlayerStore = defineStore('playerStore', () => {
     }
 
     // Check for duplicate names
-    const duplicateName = players.value.some((p) => p.name.toLowerCase() === player.name.toLowerCase())
+    const duplicateName = players.value.some(
+      (p) => p.name.toLowerCase() === player.name.toLowerCase()
+    )
     if (duplicateName) {
       error.value = `Player "${player.name}" already exists`
       return false

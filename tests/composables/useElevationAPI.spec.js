@@ -30,7 +30,7 @@ describe('useElevationAPI Composable', () => {
       })
 
       const { fetchElevationsInBatches } = useElevationAPI()
-      const locations = [{ lat: 44.9778, lng: -93.2650 }]
+      const locations = [{ lat: 44.9778, lng: -93.265 }]
 
       const results = await fetchElevationsInBatches(locations)
 
@@ -41,11 +41,7 @@ describe('useElevationAPI Composable', () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({
-          results: [
-            { elevation: 100 },
-            { elevation: 200 },
-            { elevation: 300 }
-          ]
+          results: [{ elevation: 100 }, { elevation: 200 }, { elevation: 300 }]
         })
       })
 
@@ -132,11 +128,7 @@ describe('useElevationAPI Composable', () => {
 
       const results = await fetchElevationsInBatches(locations)
 
-      expect(results).toEqual([
-        { elevation: 0 },
-        { elevation: 0 },
-        { elevation: 0 }
-      ])
+      expect(results).toEqual([{ elevation: 0 }, { elevation: 0 }, { elevation: 0 }])
     })
 
     it('should not throw on error', async () => {
@@ -157,7 +149,7 @@ describe('useElevationAPI Composable', () => {
       })
 
       const { fetchElevationsInBatches } = useElevationAPI()
-      const locations = [{ lat: 44.9778, lng: -93.2650 }]
+      const locations = [{ lat: 44.9778, lng: -93.265 }]
 
       await fetchElevationsInBatches(locations)
 

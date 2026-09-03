@@ -49,7 +49,7 @@ describe('useLandCoverAPI Composable', () => {
           features: [
             {
               properties: {
-                'PALETTE_INDEX': 22 // Urban/developed area
+                PALETTE_INDEX: 22 // Urban/developed area
               }
             }
           ]
@@ -57,7 +57,7 @@ describe('useLandCoverAPI Composable', () => {
       })
 
       const { fetchLandCover } = useLandCoverAPI()
-      const location = { lat: 44.9778, lng: -93.2650 }
+      const location = { lat: 44.9778, lng: -93.265 }
 
       const cost = await fetchLandCover(location)
 
@@ -71,7 +71,7 @@ describe('useLandCoverAPI Composable', () => {
           features: [
             {
               properties: {
-                'PALETTE_INDEX': 41 // Forest
+                PALETTE_INDEX: 41 // Forest
               }
             }
           ]
@@ -93,12 +93,12 @@ describe('useLandCoverAPI Composable', () => {
           features: [
             {
               properties: {
-                'PALETTE_INDEX': 22
+                PALETTE_INDEX: 22
               }
             },
             {
               properties: {
-                'PALETTE_INDEX': 41
+                PALETTE_INDEX: 41
               }
             }
           ]
@@ -157,12 +157,12 @@ describe('useLandCoverAPI Composable', () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({
-          features: [{ properties: { 'PALETTE_INDEX': 22 } }]
+          features: [{ properties: { PALETTE_INDEX: 22 } }]
         })
       })
 
       const { fetchLandCover } = useLandCoverAPI()
-      const location = { lat: 44.9778, lng: -93.2650 }
+      const location = { lat: 44.9778, lng: -93.265 }
 
       await fetchLandCover(location)
 
@@ -176,7 +176,7 @@ describe('useLandCoverAPI Composable', () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({
-          features: [{ properties: { 'PALETTE_INDEX': 22 } }]
+          features: [{ properties: { PALETTE_INDEX: 22 } }]
         })
       })
 
@@ -198,7 +198,7 @@ describe('useLandCoverAPI Composable', () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({
-          features: [{ properties: { 'PALETTE_INDEX': 22 } }]
+          features: [{ properties: { PALETTE_INDEX: 22 } }]
         })
       })
 
@@ -216,7 +216,7 @@ describe('useLandCoverAPI Composable', () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({
-          features: [{ properties: { 'PALETTE_INDEX': 22 } }]
+          features: [{ properties: { PALETTE_INDEX: 22 } }]
         })
       })
 
@@ -235,7 +235,7 @@ describe('useLandCoverAPI Composable', () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({
-          features: [{ properties: { 'PALETTE_INDEX': 22 } }]
+          features: [{ properties: { PALETTE_INDEX: 22 } }]
         })
       })
 

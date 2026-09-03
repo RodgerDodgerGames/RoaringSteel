@@ -131,9 +131,7 @@ PR's branch, and your local `main` still points at the commit from before the me
 Three commands put it right:
 
 ```sh
-git checkout main
-git pull --ff-only
-git branch -d <the-branch-you-were-on>
+git checkout main && git pull --ff-only && git branch -d <the-branch-you-were-on>
 ```
 
 `--ff-only` is the safety flag. It tells git to fast-forward or fail, never to invent a

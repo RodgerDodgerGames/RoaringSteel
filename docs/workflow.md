@@ -116,13 +116,53 @@ not reading diffs.
 Once the developer marks the PR **ready for review**:
 
 1. Read the final diff.
-2. **Squash and merge** — keeps `main` history one commit per issue.
+2. **merge** 
 3. **Delete branch** on the confirmation page.
 
 `Closes #NN` in the PR body closes the issue automatically.
 
 Deleting the branch at merge time is the habit that prevents branch pileup. This repo
 accumulated 13 stale merged branches before the habit existed.
+
+## After merging
+
+Merging on GitHub changes nothing on your machine. Your clone is still sitting on the
+PR's branch, and your local `main` still points at the commit from before the merge.
+Three commands put it right:
+
+```sh
+git checkout main
+git pull --ff-only
+git branch -d <the-branch-you-were-on>
+```
+
+`--ff-only` is the safety flag. It tells git to fast-forward or fail, never to invent a
+merge commit because your local `main` drifted. If it ever errors, that's a signal to
+look at why — not to reach for a plain `git pull`.
+
+`git branch -d` (lowercase) refuses to delete a branch whose work isn't merged, so it
+can't lose anything. That's why it's `-d` and not `-D`.
+
+If the PR changed `package.json`, add one more:
+
+```sh
+npm install
+```
+
+and restart `npm run dev` if it was running — Vite won't pick up new dependencies on its
+own.
+
+### Branch cleanup
+
+Deleting each branch as you go is the habit that prevents pileup, but if some accumulate,
+this clears every branch already merged into `main` and leaves unmerged work alone:
+
+```sh
+git branch --merged main | grep -vE '^\*|^\s+main$' | xargs git branch -d
+```
+
+Local branches are just labels — deleting one that's been merged discards nothing, since
+the commits live on in `main`.
 
 ## Rules
 

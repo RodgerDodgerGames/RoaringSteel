@@ -204,6 +204,27 @@ export const usePlayerStore = defineStore('playerStore', () => {
   }
 
   /**
+   * Give one specific player the turn, clearing it from everyone else.
+   * Used when restoring a save and when repairing inconsistent turn state.
+   * @param {number} id The ID of the player who should have the turn.
+   * @returns {boolean} True if the turn was assigned successfully.
+   */
+  function setActivePlayer(id) {
+    error.value = null
+
+    const target = players.value.find((p) => p.id === id)
+    if (!target) {
+      error.value = `Player with ID ${id} not found`
+      return false
+    }
+
+    players.value.forEach((player) => {
+      player.isTurn = player.id === id
+    })
+    return true
+  }
+
+  /**
    * End the current player's turn and switch to the next one.
    * @returns {boolean} True if turn was advanced successfully.
    */
@@ -261,6 +282,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     updatePlayer,
     removePlayer,
     startGame,
+    setActivePlayer,
     nextTurn,
     reset,
     setPlayers

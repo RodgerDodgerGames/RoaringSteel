@@ -83,6 +83,45 @@ describe('useGamePersistence', () => {
       expect(playerStore.activePlayer.name).toBe('Charlie')
     })
 
+    it('should warn but still load when the save records no active player', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const save = persistence.serializeGameState()
+      // Simulate a save whose turn state was lost
+      save.players = save.players.map((p) => ({ ...p, isTurn: false }))
+
+      expect(persistence.validateSaveData(save).valid).toBe(true)
+      expect(persistence.validateSaveData(save).warnings).toContain(
+        'Expected 1 active player, found 0'
+      )
+      expect(persistence.deserializeGameState(save)).toBe(true)
+
+      // Repaired to the first player rather than left with nobody to play
+      expect(playerStore.activePlayer.name).toBe('Alice')
+      expect(warn).toHaveBeenCalled()
+    })
+
+    it('should repair a save with more than one active player', () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const save = persistence.serializeGameState()
+      save.players = save.players.map((p, i) => ({ ...p, isTurn: i !== 0 }))
+
+      expect(persistence.validateSaveData(save).warnings).toContain(
+        'Expected 1 active player, found 2'
+      )
+      persistence.deserializeGameState(save)
+
+      // Keeps the earliest player already flagged rather than resetting the round
+      expect(playerStore.activePlayer.name).toBe('Bob')
+      expect(playerStore.players.filter((p) => p.isTurn)).toHaveLength(1)
+    })
+
+    it('should not warn when turn state is consistent', () => {
+      const validation = persistence.validateSaveData(persistence.serializeGameState())
+
+      expect(validation.valid).toBe(true)
+      expect(validation.warnings).toEqual([])
+    })
+
     it('should restore player cash so spending survives a reload', () => {
       playerStore.updatePlayer(1, { cash: 12500 })
       persistence.autoSave()

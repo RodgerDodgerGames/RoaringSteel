@@ -78,9 +78,15 @@ export function useGamePersistence() {
       demandCardsStore.reset()
       mapStore.reset()
 
+      // Surface non-fatal problems without refusing the load
+      validation.warnings.forEach((w) => console.warn('Save data warning:', w))
+
       // Restore state
       if (data.game) gameStore.setGameState(data.game)
-      if (data.players) playerStore.setPlayers(data.players)
+      if (data.players) {
+        playerStore.setPlayers(data.players)
+        ensureSingleActivePlayer()
+      }
       if (data.towns) townsStore.setTowns(data.towns)
       if (data.grid) gridStore.setGrid(data.grid)
       if (data.demandCards) demandCardsStore.setDemandCards(data.demandCards)
@@ -96,14 +102,20 @@ export function useGamePersistence() {
 
   /**
    * Validates save data structure and required fields.
+   *
+   * Errors block the load; warnings do not. Inconsistent turn state is a
+   * warning because it is repairable — refusing the load would throw away an
+   * otherwise good game over a single boolean.
+   *
    * @param {Object} data - Save data to validate
-   * @returns {Object} {valid: boolean, errors: Array}
+   * @returns {Object} {valid: boolean, errors: Array, warnings: Array}
    */
   function validateSaveData(data) {
     const errors = []
+    const warnings = []
 
     if (!data || typeof data !== 'object') {
-      return { valid: false, errors: ['Save data must be an object'] }
+      return { valid: false, errors: ['Save data must be an object'], warnings }
     }
 
     if (!data.version) errors.push('Missing version field')
@@ -115,9 +127,40 @@ export function useGamePersistence() {
     if (data.game && !data.game.region) errors.push('Missing game.region')
     if (data.players && !Array.isArray(data.players)) errors.push('players must be an array')
 
+    // Exactly one player should hold the turn, so the right player resumes play
+    if (Array.isArray(data.players) && data.players.length > 0) {
+      const activeCount = data.players.filter((p) => p.isTurn).length
+      if (activeCount !== 1) {
+        warnings.push(`Expected 1 active player, found ${activeCount}`)
+      }
+    }
+
     return {
       valid: errors.length === 0,
-      errors
+      errors,
+      warnings
+    }
+  }
+
+  /**
+   * Repairs turn state after a restore so exactly one player is active.
+   * Falls back to the earliest player already flagged, or the first player in
+   * turn order when the save recorded nobody.
+   */
+  function ensureSingleActivePlayer() {
+    const players = playerStore.players
+    if (players.length === 0) return
+
+    const firstActive = players.find((p) => p.isTurn)
+    const activeCount = players.filter((p) => p.isTurn).length
+    if (activeCount === 1) return
+
+    if (firstActive) {
+      console.warn(`Repairing turn state: resuming play with ${firstActive.name}`)
+      playerStore.setActivePlayer(firstActive.id)
+    } else {
+      console.warn('Save recorded no active player: resuming play with the first player')
+      playerStore.startGame()
     }
   }
 

@@ -1,7 +1,8 @@
 <!--
   GameSidePanel.vue
 
-  Main game action panel with tabbed navigation. Provides access to:
+  Main game action panel with tabbed navigation. Topped by a card naming the
+  player whose turn it is. Provides access to:
   - Info: Overview with quick actions
   - Build: Railroad track building tools
   - Upgrade: Train upgrade options (not yet implemented)
@@ -13,6 +14,7 @@
 import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import DrawButtons from '@/components/map/DrawButtons.vue'
+import PlayerCard from '@/components/panel/PlayerCard.vue'
 import { useMapStore } from '@/stores/map'
 
 // Import map store
@@ -29,6 +31,9 @@ const setActiveTab = (tab) => {
 </script>
 
 <template>
+  <!-- Whose turn it is, and what they have to spend -->
+  <PlayerCard />
+
   <!-- Bulma Tabs Navigation -->
   <div class="tabs is-boxed">
     <ul>

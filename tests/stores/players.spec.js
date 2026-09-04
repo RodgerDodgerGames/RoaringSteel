@@ -135,6 +135,66 @@ describe('Player Store', () => {
     })
   })
 
+  describe('startGame', () => {
+    it('should give the first player the turn', () => {
+      playerStore.addPlayer({ name: 'Alice', color: 'red' })
+      playerStore.addPlayer({ name: 'Bob', color: 'blue' })
+
+      expect(playerStore.startGame()).toBe(true)
+
+      expect(playerStore.players[0].isTurn).toBe(true)
+      expect(playerStore.players[1].isTurn).toBe(false)
+      expect(playerStore.activePlayer.name).toBe('Alice')
+    })
+
+    it('should clear any turn already assigned to another player', () => {
+      playerStore.addPlayer({ name: 'Alice', color: 'red' })
+      playerStore.addPlayer({ name: 'Bob', color: 'blue' })
+      playerStore.players[1].isTurn = true
+
+      playerStore.startGame()
+
+      expect(playerStore.players.filter((p) => p.isTurn)).toHaveLength(1)
+      expect(playerStore.activePlayer.name).toBe('Alice')
+    })
+
+    it('should fail when there are no players', () => {
+      expect(playerStore.startGame()).toBe(false)
+      expect(playerStore.error).toBe('No players in game')
+    })
+  })
+
+  describe('setActivePlayer', () => {
+    beforeEach(() => {
+      playerStore.addPlayer({ name: 'Alice', color: 'red' })
+      playerStore.addPlayer({ name: 'Bob', color: 'blue' })
+      playerStore.addPlayer({ name: 'Charlie', color: 'green' })
+    })
+
+    it('should give the named player the turn', () => {
+      expect(playerStore.setActivePlayer(2)).toBe(true)
+
+      expect(playerStore.activePlayer.name).toBe('Bob')
+    })
+
+    it('should clear the turn from every other player', () => {
+      playerStore.players[0].isTurn = true
+      playerStore.players[2].isTurn = true
+
+      playerStore.setActivePlayer(2)
+
+      expect(playerStore.players.map((p) => p.isTurn)).toEqual([false, true, false])
+    })
+
+    it('should fail for an unknown player ID', () => {
+      playerStore.startGame()
+
+      expect(playerStore.setActivePlayer(99)).toBe(false)
+      expect(playerStore.error).toBe('Player with ID 99 not found')
+      expect(playerStore.activePlayer.name).toBe('Alice')
+    })
+  })
+
   describe('nextTurn', () => {
     beforeEach(() => {
       playerStore.addPlayer({ name: 'Alice', color: 'red' })

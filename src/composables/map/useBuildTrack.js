@@ -2,12 +2,13 @@
 // Vue composable for handling map drawing and cost calculation logic
 // Organizes and manages all drawing-related logic, including setup, drawing controls, cost calculations, and utility functions.
 
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import L from 'leaflet'
 import 'leaflet-textpath'
 import { storeToRefs } from 'pinia'
 import { useMapStore } from '@/stores/map'
+import { usePlayerStore } from '@/stores/players'
 
 /**
  * Main composable function to handle map drawing logic
@@ -35,12 +36,33 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   const mapStore = useMapStore()
   const { isDrawingActive } = storeToRefs(mapStore)
 
+  // the active player drives per-turn build state
+  const playerStore = usePlayerStore()
+
   // ================== COMPUTED PROPERTIES ==================
 
   // total cost for all track segments
   const totalCost = computed(() => itemizedCosts.value.reduce((acc, cost) => acc + cost, 0))
   // has any track been drawn
   const hasTrackBeenDrawn = computed(() => existingLineLayers.value.length > 0)
+
+  // ================== TURN HANDLING ==================
+
+  /**
+   * Clear per-turn build state when play passes to another player, so the
+   * cost panel shows what the *current* player has spent rather than an
+   * ever-growing list. Any drawing left in progress is cancelled first.
+   *
+   * Completed track layers are deliberately left on the map — persisting and
+   * attributing them to their owner is #63.
+   */
+  watch(
+    () => playerStore.activePlayer?.id,
+    () => {
+      if (isDrawingActive.value) cancelDrawing()
+      resetLineTracking()
+    }
+  )
 
   // ================== INITIAL SETUP ==================
 

@@ -185,6 +185,25 @@ export const usePlayerStore = defineStore('playerStore', () => {
   }
 
   /**
+   * Begin the game by giving the first player in turn order the turn.
+   * Any turn already assigned is cleared, so this is safe to call more than once.
+   * @returns {boolean} True if the first turn was assigned successfully.
+   */
+  function startGame() {
+    error.value = null
+
+    if (players.value.length === 0) {
+      error.value = 'No players in game'
+      return false
+    }
+
+    players.value.forEach((player, index) => {
+      player.isTurn = index === 0
+    })
+    return true
+  }
+
+  /**
    * End the current player's turn and switch to the next one.
    * @returns {boolean} True if turn was advanced successfully.
    */
@@ -241,6 +260,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     addPlayer,
     updatePlayer,
     removePlayer,
+    startGame,
     nextTurn,
     reset,
     setPlayers

@@ -43,10 +43,8 @@ function confirmPlayers() {
     })
   })
 
-  // Set the first player's turn
-  if (playerStore.players.length > 0) {
-    playerStore.players[0].isTurn = true
-  }
+  // Give the first player in turn order the turn
+  playerStore.startGame()
 
   emit('confirmed')
 }

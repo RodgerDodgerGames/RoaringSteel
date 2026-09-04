@@ -135,6 +135,35 @@ describe('Player Store', () => {
     })
   })
 
+  describe('startGame', () => {
+    it('should give the first player the turn', () => {
+      playerStore.addPlayer({ name: 'Alice', color: 'red' })
+      playerStore.addPlayer({ name: 'Bob', color: 'blue' })
+
+      expect(playerStore.startGame()).toBe(true)
+
+      expect(playerStore.players[0].isTurn).toBe(true)
+      expect(playerStore.players[1].isTurn).toBe(false)
+      expect(playerStore.activePlayer.name).toBe('Alice')
+    })
+
+    it('should clear any turn already assigned to another player', () => {
+      playerStore.addPlayer({ name: 'Alice', color: 'red' })
+      playerStore.addPlayer({ name: 'Bob', color: 'blue' })
+      playerStore.players[1].isTurn = true
+
+      playerStore.startGame()
+
+      expect(playerStore.players.filter((p) => p.isTurn)).toHaveLength(1)
+      expect(playerStore.activePlayer.name).toBe('Alice')
+    })
+
+    it('should fail when there are no players', () => {
+      expect(playerStore.startGame()).toBe(false)
+      expect(playerStore.error).toBe('No players in game')
+    })
+  })
+
   describe('nextTurn', () => {
     beforeEach(() => {
       playerStore.addPlayer({ name: 'Alice', color: 'red' })

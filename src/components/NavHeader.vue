@@ -7,7 +7,7 @@
 
   Features:
   - Responsive burger menu toggle
-  - End Turn button
+  - End Turn button that passes play to the next player
   - Named slots for customization
 -->
 
@@ -20,7 +20,7 @@
           <h1 class="title">Roaring Steel</h1>
         </a>
 
-        <a id="endTurnButton" class="navbar-item ml-6">End Turn</a>
+        <a id="endTurnButton" class="navbar-item ml-6" @click="handleEndTurn">End Turn</a>
       </slot>
       <!-- Burger Menu for Mobile -->
       <a
@@ -62,13 +62,22 @@
 import { ref } from 'vue'
 import SaveGameDialog from '@/components/dialogs/SaveGameDialog.vue'
 import LoadGameDialog from '@/components/dialogs/LoadGameDialog.vue'
+import { useTurn } from '@/composables/useTurn'
 
 const isMenuActive = ref(false)
 const showSaveDialog = ref(false)
 const showLoadDialog = ref(false)
 
+const { endTurn } = useTurn()
+
 const toggleMenu = () => {
   isMenuActive.value = !isMenuActive.value
+}
+
+// Pass play to the next player, closing the mobile menu behind us.
+const handleEndTurn = () => {
+  endTurn()
+  isMenuActive.value = false
 }
 </script>
 

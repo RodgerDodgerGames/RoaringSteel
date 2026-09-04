@@ -45,6 +45,11 @@ const phaseLabel = computed(() => {
   }
 })
 
+// Town and demand card setup runs before the grid store reports any phase.
+// There is no cell count to show yet, so the bar runs indeterminate rather
+// than sitting at a misleading 0%.
+const isIndeterminate = computed(() => currentPhase.value === '')
+
 const progressDetail = computed(() => {
   if (currentPhase.value === 'elevation') {
     return `${elevationProgress.value.completed} / ${elevationProgress.value.total} cells`
@@ -74,11 +79,15 @@ const progressDetail = computed(() => {
         <h2 class="title is-4">Setting Up Game</h2>
         <p class="subtitle is-6 mb-4">{{ phaseLabel }}</p>
 
-        <progress class="progress is-primary is-medium" :value="progressPercent" max="100">
+        <progress
+          class="progress is-primary is-medium"
+          :value="isIndeterminate ? undefined : progressPercent"
+          max="100"
+        >
           {{ progressPercent }}%
         </progress>
 
-        <p class="has-text-grey">{{ progressPercent }}% complete</p>
+        <p v-if="!isIndeterminate" class="has-text-grey">{{ progressPercent }}% complete</p>
         <p v-if="progressDetail" class="has-text-grey-light is-size-7">{{ progressDetail }}</p>
       </div>
     </div>

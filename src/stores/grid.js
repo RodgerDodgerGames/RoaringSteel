@@ -61,26 +61,53 @@ export const useGridStore = defineStore('gridStore', () => {
   /**
    * Combined progress percentage across both fetch phases.
    *
-   * Progress is weighted by how many HTTP requests each phase needs rather
-   * than by cell count: elevation asks about `elevationBatchSize` cells per
-   * request while land cover asks about one, so counting cells would make the
-   * bar crawl through the short phase and sprint through the long one.
+   * Neither cell count nor request count tracks the wait the player actually
+   * experiences, because the two phases are paced differently: elevation
+   * sleeps between batches of `elevationBatchSize`, while land cover paces
+   * every single request. Each phase is weighted by the time its pacing is
+   * expected to cost, so the bar moves at a roughly even rate throughout.
    */
   const progressPercent = computed(() => {
-    const elevationRequests = (count) => Math.ceil(count / gridApiConfig.elevationBatchSize)
+    const totalMs =
+      estimatedElevationMs(elevationProgress.value.total) +
+      estimatedLandCoverMs(landCoverProgress.value.total)
+    if (totalMs === 0) return 0
 
-    const totalRequests =
-      elevationRequests(elevationProgress.value.total) + landCoverProgress.value.total
-    if (totalRequests === 0) return 0
+    const doneMs =
+      estimatedElevationMs(elevationProgress.value.completed) +
+      estimatedLandCoverMs(landCoverProgress.value.completed)
 
-    const doneRequests =
-      elevationRequests(elevationProgress.value.completed) + landCoverProgress.value.completed
-
-    return Math.min(100, Math.round((doneRequests / totalRequests) * 100))
+    return Math.min(100, Math.round((doneMs / totalMs) * 100))
   })
+
+  /** Time the pacing between elevation batches is expected to cost, in ms. */
+  function estimatedElevationMs(cellCount) {
+    const averagePause = (gridApiConfig.elevationPauseMinMs + gridApiConfig.elevationPauseMaxMs) / 2
+    return Math.ceil(cellCount / gridApiConfig.elevationBatchSize) * averagePause
+  }
+
+  /** Time the pacing between land cover requests is expected to cost, in ms. */
+  function estimatedLandCoverMs(cellCount) {
+    return cellCount * gridApiConfig.landCoverMinIntervalMs
+  }
 
   const { fetchElevationsInBatches } = useElevationAPI()
   const { fetchLandCoverInBatches } = useLandCoverAPI()
+
+  /**
+   * `useLocalStorage` registers storage listeners and a deep watcher that
+   * nothing here disposes of. Binding once per state rather than once per
+   * attempt keeps a retry loop from stacking up live bindings to the same key.
+   */
+  const cacheBindings = new Map()
+
+  function cachedGridFor(stateFipsCode) {
+    const key = `cachedGrid_${stateFipsCode}`
+    if (!cacheBindings.has(key)) {
+      cacheBindings.set(key, useLocalStorage(key, []))
+    }
+    return cacheBindings.get(key)
+  }
 
   /**
    * Generates a grid of cells covering the specified bounds.
@@ -100,7 +127,7 @@ export const useGridStore = defineStore('gridStore', () => {
     isGridGenerated.value = false
 
     // `useLocalStorage` automatically binds `grid` to `localStorage`
-    const cachedGrid = useLocalStorage(`cachedGrid_${stateFipsCode}`, [])
+    const cachedGrid = cachedGridFor(stateFipsCode)
 
     // check if grid already exists in cache
     if (cachedGrid.value.length > 0) {
@@ -204,6 +231,18 @@ export const useGridStore = defineStore('gridStore', () => {
       landCoverResults.forEach((cost, index) => {
         pending[index].cell.landCover = cost
       })
+
+      // fetchLandCover turns every failure into a null rather than throwing, so
+      // a throttled run looks like success and would be cached permanently.
+      // Judge it on the share of lookups that failed, not on the share of cells
+      // dropped overall, which legitimately includes water and no-data terrain.
+      const failed = landCoverResults.filter((cost) => cost == null).length
+      if (failed / landCoverResults.length > gridApiConfig.maxLandCoverFailureRate) {
+        isLoadingLandCover.value = false
+        return fail(
+          `Land cover data was missing for ${failed} of ${landCoverResults.length} cells. Check your connection and retry.`
+        )
+      }
     } catch (e) {
       console.error('Error fetching land cover data:', e)
       return fail(
@@ -256,6 +295,15 @@ export const useGridStore = defineStore('gridStore', () => {
   }
 
   /**
+   * Clears a previous failure without discarding the grid.
+   * Used when the player retries so the progress UI can leave the error state
+   * before the next attempt reaches `generateGrid`.
+   */
+  function clearError() {
+    error.value = null
+  }
+
+  /**
    * Resets the grid store to initial state.
    */
   function reset() {
@@ -292,6 +340,7 @@ export const useGridStore = defineStore('gridStore', () => {
     progressPercent,
     error,
     generateGrid,
+    clearError,
     reset,
     setGrid
   }

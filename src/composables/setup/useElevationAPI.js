@@ -25,9 +25,9 @@ export function useElevationAPI() {
    * Fetches elevation data for multiple locations in one request.
    *
    * Always resolves to exactly `locations.length` entries so the caller can
-   * line results up with the locations it asked for. Positions the API did
-   * not answer for are `null`, which reads as "unknown" rather than being
-   * confused with a real sea-level reading of 0.
+   * line results up with the locations it asked for. A batch the API did not
+   * answer completely resolves to all `null`, which reads as "unknown" rather
+   * than being confused with a real sea-level reading of 0.
    *
    * @param {Array} locations - An array of location objects {lat, lng}.
    * @returns {Promise<Array<{elevation: number}|null>>} One entry per location.
@@ -49,9 +49,18 @@ export function useElevationAPI() {
       const data = await response.json()
       const results = Array.isArray(data?.results) ? data.results : []
 
-      // Pad or trim to the requested length. A short response would otherwise
-      // shift every later location onto the wrong grid cell.
-      return locations.map((_, index) => results[index] ?? null)
+      // Results are positional, so a count that doesn't match means there is no
+      // way to tell which reading belongs to which location — an omission in
+      // the middle would shift every later one onto the wrong grid cell, and a
+      // wrong elevation is worse than a missing one because it silently
+      // mis-prices track. Discard the whole batch instead of guessing.
+      if (results.length !== locations.length) {
+        throw new Error(
+          `Elevation API returned ${results.length} results for ${locations.length} locations`
+        )
+      }
+
+      return results
     } catch (error) {
       console.error('Error fetching elevation data:', error)
       return locations.map(() => null)

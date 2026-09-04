@@ -225,6 +225,41 @@ describe('Grid Store', () => {
       expect(mockFetchLandCoverInBatches).not.toHaveBeenCalled()
     })
 
+    it('should report a failure when most land cover lookups fail', async () => {
+      // A throttled NLCD returns nulls rather than throwing, so this used to
+      // read as success and get cached permanently as a fragmented grid.
+      mockFetchElevationsInBatches.mockResolvedValue([
+        { elevation: 100 },
+        { elevation: 200 },
+        { elevation: 300 },
+        { elevation: 400 }
+      ])
+      mockFetchLandCoverInBatches.mockResolvedValue([5, null, null, null])
+
+      const result = await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000)
+
+      expect(result).toBe(false)
+      expect(gridStore.isGridGenerated).toBe(false)
+      expect(gridStore.error).toMatch(/land cover data was missing/i)
+    })
+
+    it('should not cache a grid from a mostly-failed land cover pass', async () => {
+      const cacheEntry = { value: [] }
+      mockUseLocalStorage.mockReturnValue(cacheEntry)
+      mockFetchElevationsInBatches.mockResolvedValue([
+        { elevation: 100 },
+        { elevation: 200 },
+        { elevation: 300 },
+        { elevation: 400 }
+      ])
+      mockFetchLandCoverInBatches.mockResolvedValue([5, null, null, null])
+
+      await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000)
+
+      // A cached fragment would be reused on every future game in this state
+      expect(cacheEntry.value).toEqual([])
+    })
+
     it('should report a failure when every land cover lookup fails', async () => {
       mockFetchElevationsInBatches.mockResolvedValue([{ elevation: 100 }, { elevation: 200 }])
       mockFetchLandCoverInBatches.mockResolvedValue([null, null])
@@ -233,7 +268,7 @@ describe('Grid Store', () => {
 
       expect(result).toBe(false)
       expect(gridStore.isGridGenerated).toBe(false)
-      expect(gridStore.error).toMatch(/terrain/i)
+      expect(gridStore.error).toMatch(/land cover data was missing for 2 of 2/i)
     })
 
     it('should report a failure when the region is too small to hold a cell', async () => {
@@ -288,14 +323,19 @@ describe('Grid Store', () => {
     })
 
     it('should filter out cells without valid data after processing', async () => {
-      mockFetchElevationsInBatches.mockResolvedValue([{ elevation: 100 }, { elevation: 200 }])
-      // Return null for first cell, valid for second
-      mockFetchLandCoverInBatches.mockResolvedValue([null, 5])
+      // One failed lookup in four stays under the acceptable failure rate
+      mockFetchElevationsInBatches.mockResolvedValue([
+        { elevation: 100 },
+        { elevation: 200 },
+        { elevation: 300 },
+        { elevation: 400 }
+      ])
+      mockFetchLandCoverInBatches.mockResolvedValue([null, 5, 5, 5])
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000)
 
       // Only cells with both elevation and landCover should remain
-      expect(gridStore.grid).toHaveLength(1)
+      expect(gridStore.grid).toHaveLength(3)
       expect(gridStore.grid.every((cell) => cell.elevation && cell.landCover)).toBe(true)
     })
 
@@ -372,17 +412,36 @@ describe('Grid Store', () => {
   })
 
   describe('progressPercent', () => {
-    it('should weight phases by request count, not cell count', () => {
-      // 100 cells: elevation is 10 batched requests, land cover is 100 single
-      // ones. Finishing elevation is therefore a small slice of the wait, not
-      // the ~30% a cell-count split would suggest.
+    /** Mirrors the store's weighting: each phase costs what its pacing costs. */
+    const estimatedMs = (elevationCells, landCoverCells) => {
+      const averagePause =
+        (gridApiConfig.elevationPauseMinMs + gridApiConfig.elevationPauseMaxMs) / 2
+      return (
+        Math.ceil(elevationCells / gridApiConfig.elevationBatchSize) * averagePause +
+        landCoverCells * gridApiConfig.landCoverMinIntervalMs
+      )
+    }
+
+    it('should weight phases by the time their pacing costs', () => {
+      // Elevation sleeps between batches while land cover paces every request,
+      // so finishing elevation is a substantial share of the wait even though
+      // it is a small share of the requests.
       gridStore.elevationProgress = { completed: 100, total: 100 }
       gridStore.landCoverProgress = { completed: 0, total: 100 }
 
-      const elevationRequests = Math.ceil(100 / gridApiConfig.elevationBatchSize)
-      const expected = Math.round((elevationRequests / (elevationRequests + 100)) * 100)
+      const expected = Math.round((estimatedMs(100, 0) / estimatedMs(100, 100)) * 100)
 
       expect(gridStore.progressPercent).toBe(expected)
+    })
+
+    it('should not treat the elevation phase as a negligible sliver', () => {
+      // Regression on the first cut of this: weighting purely by request count
+      // gave elevation ~9% of the bar while it took about half the wall time,
+      // so the bar crawled and then sprinted.
+      gridStore.elevationProgress = { completed: 500, total: 500 }
+      gridStore.landCoverProgress = { completed: 0, total: 500 }
+
+      expect(gridStore.progressPercent).toBeGreaterThan(25)
     })
 
     it('should reach 100 when both phases are complete', () => {
@@ -401,6 +460,21 @@ describe('Grid Store', () => {
       gridStore.landCoverProgress = { completed: 25, total: 20 }
 
       expect(gridStore.progressPercent).toBeLessThanOrEqual(100)
+    })
+  })
+
+  describe('clearError', () => {
+    it('should drop the error without discarding the grid', async () => {
+      mockFetchElevationsInBatches.mockResolvedValue([{ elevation: 100 }, { elevation: 200 }])
+      mockFetchLandCoverInBatches.mockResolvedValue([5, 5])
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      const generated = gridStore.grid
+
+      gridStore.error = 'something went wrong'
+      gridStore.clearError()
+
+      expect(gridStore.error).toBeNull()
+      expect(gridStore.grid).toEqual(generated)
     })
   })
 

@@ -37,17 +37,21 @@ const { autoSave } = useGamePersistence()
 // which view should be shown (start with welcome)
 const currentView = ref('welcome')
 
-// track if game setup is in progress
+// track if the setup flow owns the screen (covers the modal, including the
+// error state after a failed attempt)
 const isSettingUpGame = ref(false)
+
+// track if an attempt is actually in flight, so a second click cannot start a
+// concurrent run against the same stores
+const isSetupRunning = ref(false)
 
 // region where game is being played
 const { region } = storeToRefs(gameStore)
 
-// show the modal while setup is running, and keep it up on failure so the
-// error has somewhere to appear
-const showProgressModal = computed(() => {
-  return isSettingUpGame.value && (gridStore.currentPhase !== '' || gridStore.error !== null)
-})
+// Cover the whole setup flow, not just grid generation. Town and demand card
+// setup runs first and fetches a state's worth of census data, which used to
+// happen behind an unchanged screen with the Play Game button still live.
+const showProgressModal = computed(() => isSettingUpGame.value)
 
 // View Map
 const viewComponents = {
@@ -72,36 +76,44 @@ function handleGameLoaded() {
 
 // Handle play game button click
 async function handlePlayGameClick() {
-  if (!region.value) return
+  if (!region.value || isSetupRunning.value) return
 
   isSettingUpGame.value = true
+  isSetupRunning.value = true
 
-  // run setup towns after the region is selected
-  await townsStore.setupTowns(region.value.properties.STATE)
-  // generate demand cards
-  demandCardsStore.generateDemandCards()
-  // run cost grid setup
-  // generate grid using the selected region bounds
-  const bounds = turf.bbox(region.value)
-  const generated = await gridStore.generateGrid(
-    region.value.properties.STATE,
-    bounds,
-    gridConfig.cellSize
-  )
+  try {
+    // run setup towns after the region is selected
+    await townsStore.setupTowns(region.value.properties.STATE)
+    // generate demand cards
+    demandCardsStore.generateDemandCards()
+    // run cost grid setup
+    // generate grid using the selected region bounds
+    const bounds = turf.bbox(region.value)
+    const generated = await gridStore.generateGrid(
+      region.value.properties.STATE,
+      bounds,
+      gridConfig.cellSize
+    )
 
-  // Leave the modal up on failure so it can show the error and offer a retry.
-  // Entering the game view here would drop the player onto an empty map.
-  if (!generated) return
+    // Leave the modal up on failure so it can show the error and offer a retry.
+    // Entering the game view here would drop the player onto an empty map.
+    if (!generated) return
 
-  isSettingUpGame.value = false
-  // once grid is generated, set view to game
-  currentView.value = 'game'
-  // auto-save after setup completes
-  autoSave()
+    isSettingUpGame.value = false
+    // once grid is generated, set view to game
+    currentView.value = 'game'
+    // auto-save after setup completes
+    autoSave()
+  } finally {
+    isSetupRunning.value = false
+  }
 }
 
 // Player asked to retry after a failed grid setup
 function handleSetupRetry() {
+  // Drop the error first so the modal shows progress again straight away,
+  // rather than sitting on the old message through the town setup fetch.
+  gridStore.clearError()
   handlePlayGameClick()
 }
 

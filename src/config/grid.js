@@ -20,5 +20,12 @@ export const gridApiConfig = {
   /** NLCD is queried one cell at a time, so it needs a real ceiling. */
   landCoverConcurrency: 4,
   /** Minimum gap between land cover request starts, in ms. */
-  landCoverMinIntervalMs: 120
+  landCoverMinIntervalMs: 120,
+
+  /**
+   * Share of land cover lookups allowed to fail before setup is treated as a
+   * failure. Some loss is normal, but a throttled run fails most of them, and
+   * the resulting grid would otherwise be cached and reused forever.
+   */
+  maxLandCoverFailureRate: 0.25
 }

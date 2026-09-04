@@ -162,9 +162,10 @@ describe('useElevationAPI Composable', () => {
       expect(results).toEqual([null, null])
     })
 
-    it('should return one entry per location when the API returns a short result set', async () => {
-      // Two locations asked about, one answered. Padding keeps every later
-      // location lined up with its own grid cell.
+    it('should discard a batch whose result count does not match the request', async () => {
+      // Two locations asked about, one answered. Which one it belongs to is
+      // unknowable, and a reading on the wrong cell silently mis-prices track,
+      // so the whole batch is dropped rather than guessed at.
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({ results: [{ elevation: 100 }] })
@@ -178,7 +179,28 @@ describe('useElevationAPI Composable', () => {
 
       const results = await fetchElevationsInBatches(locations)
 
-      expect(results).toEqual([{ elevation: 100 }, null])
+      expect(results).toEqual([null, null])
+    })
+
+    it('should not let a short batch shift later batches onto the wrong cells', async () => {
+      // First batch answers 1 of 2 and is discarded; the second is intact and
+      // must still line up with locations 3 and 4.
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ results: [{ elevation: 100 }] })
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ results: [{ elevation: 300 }, { elevation: 400 }] })
+        })
+
+      const { fetchElevationsInBatches } = useElevationAPI()
+      const locations = Array(4).fill({ lat: 44.0, lng: -93.0 })
+
+      const results = await fetchElevationsInBatches(locations, 2)
+
+      expect(results).toEqual([null, null, { elevation: 300 }, { elevation: 400 }])
     })
 
     it('should keep later batches aligned when an earlier batch fails', async () => {
@@ -276,9 +298,13 @@ describe('useElevationAPI Composable', () => {
 
   describe('Batching Behavior', () => {
     it('should use default batch size of 100', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ results: [] })
+      mockFetch.mockImplementation(async (url) => {
+        // Answer with one result per requested location so the batch is kept
+        const count = decodeURIComponent(url).split('|').length
+        return {
+          ok: true,
+          json: async () => ({ results: Array(count).fill({ elevation: 100 }) })
+        }
       })
 
       const { fetchElevationsInBatches } = useElevationAPI()

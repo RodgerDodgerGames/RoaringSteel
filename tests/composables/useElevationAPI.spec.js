@@ -105,7 +105,7 @@ describe('useElevationAPI Composable', () => {
   })
 
   describe('Error Handling', () => {
-    it('should return zero elevation on fetch error', async () => {
+    it('should return null for each location on fetch error', async () => {
       mockFetch.mockRejectedValue(new Error('Network error'))
 
       const { fetchElevationsInBatches } = useElevationAPI()
@@ -113,10 +113,12 @@ describe('useElevationAPI Composable', () => {
 
       const results = await fetchElevationsInBatches(locations)
 
-      expect(results).toEqual([{ elevation: 0 }])
+      // null means "we never found out", which the grid store drops. A zero
+      // would be indistinguishable from a genuine sea-level reading.
+      expect(results).toEqual([null])
     })
 
-    it('should return zero elevation for each location on error', async () => {
+    it('should return one null per location on error', async () => {
       mockFetch.mockRejectedValue(new Error('API unavailable'))
 
       const { fetchElevationsInBatches } = useElevationAPI()
@@ -128,7 +130,7 @@ describe('useElevationAPI Composable', () => {
 
       const results = await fetchElevationsInBatches(locations)
 
-      expect(results).toEqual([{ elevation: 0 }, { elevation: 0 }, { elevation: 0 }])
+      expect(results).toEqual([null, null, null])
     })
 
     it('should not throw on error', async () => {
@@ -138,6 +140,96 @@ describe('useElevationAPI Composable', () => {
       const locations = [{ lat: 44.0, lng: -93.0 }]
 
       expect(async () => await fetchElevationsInBatches(locations)).not.toThrow()
+    })
+
+    it('should not treat a rate-limited response as elevation data', async () => {
+      // A 429 still returns a parseable body, just without `results`. Reading
+      // it as success used to blow up on the spread in the batch loop.
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 429,
+        json: async () => ({ error: 'Too Many Requests' })
+      })
+
+      const { fetchElevationsInBatches } = useElevationAPI()
+      const locations = [
+        { lat: 44.0, lng: -93.0 },
+        { lat: 45.0, lng: -94.0 }
+      ]
+
+      const results = await fetchElevationsInBatches(locations)
+
+      expect(results).toEqual([null, null])
+    })
+
+    it('should return one entry per location when the API returns a short result set', async () => {
+      // Two locations asked about, one answered. Padding keeps every later
+      // location lined up with its own grid cell.
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ results: [{ elevation: 100 }] })
+      })
+
+      const { fetchElevationsInBatches } = useElevationAPI()
+      const locations = [
+        { lat: 44.0, lng: -93.0 },
+        { lat: 45.0, lng: -94.0 }
+      ]
+
+      const results = await fetchElevationsInBatches(locations)
+
+      expect(results).toEqual([{ elevation: 100 }, null])
+    })
+
+    it('should keep later batches aligned when an earlier batch fails', async () => {
+      // First batch errors, second succeeds. Without padding, the second
+      // batch's readings would slide onto the first batch's cells.
+      mockFetch.mockRejectedValueOnce(new Error('Network error')).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ results: [{ elevation: 300 }, { elevation: 400 }] })
+      })
+
+      const { fetchElevationsInBatches } = useElevationAPI()
+      const locations = Array(4).fill({ lat: 44.0, lng: -93.0 })
+
+      const results = await fetchElevationsInBatches(locations, 2)
+
+      expect(results).toEqual([null, null, { elevation: 300 }, { elevation: 400 }])
+    })
+
+    it('should return null entries when the response has no results array', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({})
+      })
+
+      const { fetchElevationsInBatches } = useElevationAPI()
+      const locations = [{ lat: 44.0, lng: -93.0 }]
+
+      const results = await fetchElevationsInBatches(locations)
+
+      expect(results).toEqual([null])
+    })
+  })
+
+  describe('Progress Reporting', () => {
+    it('should report cumulative progress after each batch', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ results: [{ elevation: 100 }, { elevation: 200 }] })
+      })
+
+      const onProgress = vi.fn()
+      const { fetchElevationsInBatches } = useElevationAPI()
+      const locations = Array(6).fill({ lat: 44.0, lng: -93.0 })
+
+      await fetchElevationsInBatches(locations, 2, onProgress)
+
+      expect(onProgress.mock.calls).toEqual([
+        [2, 6],
+        [4, 6],
+        [6, 6]
+      ])
     })
   })
 

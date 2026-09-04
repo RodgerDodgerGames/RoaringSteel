@@ -1,11 +1,15 @@
 <!--
   GridProgressModal.vue
 
-  Modal overlay showing progress during grid generation.
-  Displays current phase and progress bar while fetching
-  elevation and land cover data for grid cells.
+  Modal overlay shown during grid generation.
+
+  While the fetch is running it reports the current phase and a progress bar.
+  If generation fails it swaps to the store's error message with a retry, so a
+  failed setup explains itself instead of leaving a stalled bar on screen.
 
   @prop isActive - Controls modal visibility
+  @emits retry   - Player asked to run grid generation again
+  @emits cancel  - Player gave up and wants to go back
 -->
 
 <script setup>
@@ -20,8 +24,10 @@ defineProps({
   }
 })
 
+defineEmits(['retry', 'cancel'])
+
 const gridStore = useGridStore()
-const { currentPhase, progressPercent, elevationProgress, landCoverProgress } =
+const { currentPhase, progressPercent, elevationProgress, landCoverProgress, error } =
   storeToRefs(gridStore)
 
 const phaseLabel = computed(() => {
@@ -54,7 +60,17 @@ const progressDetail = computed(() => {
   <div class="modal" :class="{ 'is-active': isActive }">
     <div class="modal-background"></div>
     <div class="modal-content">
-      <div class="box has-text-centered">
+      <div v-if="error" class="box has-text-centered">
+        <h2 class="title is-4">Setup Failed</h2>
+        <p class="subtitle is-6 mb-4">{{ error }}</p>
+
+        <div class="buttons is-centered">
+          <button class="button is-primary" @click="$emit('retry')">Try Again</button>
+          <button class="button is-light" @click="$emit('cancel')">Back</button>
+        </div>
+      </div>
+
+      <div v-else class="box has-text-centered">
         <h2 class="title is-4">Setting Up Game</h2>
         <p class="subtitle is-6 mb-4">{{ phaseLabel }}</p>
 

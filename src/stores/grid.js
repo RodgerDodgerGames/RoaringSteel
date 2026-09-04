@@ -31,6 +31,7 @@ import {
   metersToLatitudeDegrees,
   metersToLongitudeDegrees
 } from '../composables/setup/useMapSupport'
+import { gridApiConfig } from '@/config/grid'
 
 export const useGridStore = defineStore('gridStore', () => {
   /** Array of grid cells with terrain and cost data */
@@ -51,24 +52,31 @@ export const useGridStore = defineStore('gridStore', () => {
   /** Progress tracking for land cover fetching */
   const landCoverProgress = ref({ completed: 0, total: 0 })
 
-  /** Current phase of grid generation */
+  /** Current phase of grid generation ('' when idle) */
   const currentPhase = ref('')
 
-  /** Combined progress percentage */
+  /** Player-facing message when generation fails, otherwise null */
+  const error = ref(null)
+
+  /**
+   * Combined progress percentage across both fetch phases.
+   *
+   * Progress is weighted by how many HTTP requests each phase needs rather
+   * than by cell count: elevation asks about `elevationBatchSize` cells per
+   * request while land cover asks about one, so counting cells would make the
+   * bar crawl through the short phase and sprint through the long one.
+   */
   const progressPercent = computed(() => {
-    const elevTotal = elevationProgress.value.total
-    const lcTotal = landCoverProgress.value.total
+    const elevationRequests = (count) => Math.ceil(count / gridApiConfig.elevationBatchSize)
 
-    if (elevTotal === 0 && lcTotal === 0) return 0
+    const totalRequests =
+      elevationRequests(elevationProgress.value.total) + landCoverProgress.value.total
+    if (totalRequests === 0) return 0
 
-    // Elevation is ~30% of work, land cover is ~70% (since it's slower)
-    const elevWeight = 0.3
-    const lcWeight = 0.7
+    const doneRequests =
+      elevationRequests(elevationProgress.value.completed) + landCoverProgress.value.completed
 
-    const elevPct = elevTotal > 0 ? elevationProgress.value.completed / elevTotal : 0
-    const lcPct = lcTotal > 0 ? landCoverProgress.value.completed / lcTotal : 0
-
-    return Math.round((elevPct * elevWeight + lcPct * lcWeight) * 100)
+    return Math.min(100, Math.round((doneRequests / totalRequests) * 100))
   })
 
   const { fetchElevationsInBatches } = useElevationAPI()
@@ -82,13 +90,14 @@ export const useGridStore = defineStore('gridStore', () => {
    * @param {string} stateFipsCode - State FIPS code for cache key
    * @param {Array<number>} bounds - Bounding box [minLng, minLat, maxLng, maxLat]
    * @param {number} cellSize - Grid cell size in meters
-   * @returns {Promise<void>}
+   * @returns {Promise<boolean>} True when a usable grid was produced
    */
   async function generateGrid(stateFipsCode, bounds, cellSize) {
-    // Reset progress state
     elevationProgress.value = { completed: 0, total: 0 }
     landCoverProgress.value = { completed: 0, total: 0 }
     currentPhase.value = 'initializing'
+    error.value = null
+    isGridGenerated.value = false
 
     // `useLocalStorage` automatically binds `grid` to `localStorage`
     const cachedGrid = useLocalStorage(`cachedGrid_${stateFipsCode}`, [])
@@ -98,7 +107,7 @@ export const useGridStore = defineStore('gridStore', () => {
       grid.value = cachedGrid.value
       isGridGenerated.value = true
       currentPhase.value = ''
-      return
+      return true
     }
 
     // cell size is in meters so convert to degrees
@@ -110,9 +119,14 @@ export const useGridStore = defineStore('gridStore', () => {
 
     const rows = Math.floor((bounds[3] - bounds[1]) / latCellSize)
     const cols = Math.floor((bounds[2] - bounds[0]) / lngCellSize)
-    const locations = []
 
-    // Loop through the grid and prepare location data for elevation and land cover
+    // Cells are built in a plain array and only published to `grid` once the
+    // data is in. Indexing into the store's array mid-build meant anything
+    // already there — a grid restored from a save, say — silently pushed every
+    // lookup onto the wrong cell.
+    const locations = []
+    const cells = []
+
     for (let i = 0; i < rows; i++) {
       for (let j = 0; j < cols; j++) {
         const centroid = {
@@ -121,7 +135,7 @@ export const useGridStore = defineStore('gridStore', () => {
         }
         locations.push(centroid)
 
-        grid.value.push({
+        cells.push({
           id: `${i}-${j}`,
           centroid,
           elevation: null,
@@ -131,67 +145,87 @@ export const useGridStore = defineStore('gridStore', () => {
       }
     }
 
-    // Initialize progress totals
-    elevationProgress.value.total = locations.length
-    landCoverProgress.value.total = locations.length
+    if (locations.length === 0) {
+      return fail('That region is too small to build a grid from. Try selecting a larger area.')
+    }
+
+    // Both totals start at the full cell count so the bar has a stable
+    // denominator; the land cover total is narrowed once elevation says which
+    // cells are actually worth querying.
+    elevationProgress.value = { completed: 0, total: locations.length }
+    landCoverProgress.value = { completed: 0, total: locations.length }
 
     // Fetch elevation for all locations
     let elevationResults
     isLoadingElevation.value = true
     currentPhase.value = 'elevation'
     try {
-      elevationResults = await fetchElevationsInBatches(locations, 10, (completed, total) => {
-        elevationProgress.value = { completed, total }
-      })
+      elevationResults = await fetchElevationsInBatches(
+        locations,
+        gridApiConfig.elevationBatchSize,
+        (completed, total) => {
+          elevationProgress.value = { completed, total }
+        }
+      )
     } catch (e) {
       console.error('Error fetching elevation data:', e)
+      return fail('Could not load elevation data for this region. Check your connection and retry.')
+    } finally {
       isLoadingElevation.value = false
-      currentPhase.value = ''
-      return
     }
-    isLoadingElevation.value = false
 
-    // Filter locations that have valid elevation data
-    const validLocations = []
-    const validIndices = []
-    for (let i = 0; i < locations.length; i++) {
-      if (elevationResults[i] && elevationResults[i].elevation !== 0) {
-        validLocations.push(locations[i])
-        validIndices.push(i)
+    // Keep only cells the elevation lookup actually answered for. A null entry
+    // is a failed lookup; a zero is open water or a gap in the dataset.
+    const pending = []
+    elevationResults.forEach((result, index) => {
+      if (result && result.elevation) {
+        cells[index].elevation = result.elevation
+        pending.push({ cell: cells[index], location: locations[index] })
       }
+    })
+
+    if (pending.length === 0) {
+      return fail('No elevation data came back for this region. Check your connection and retry.')
     }
 
-    // Update land cover progress total to only count valid locations
-    landCoverProgress.value.total = validLocations.length
+    landCoverProgress.value = { completed: 0, total: pending.length }
 
-    // Fetch land cover data in batches
+    // Fetch land cover data for the surviving cells
     isLoadingLandCover.value = true
     currentPhase.value = 'landcover'
     try {
       const landCoverResults = await fetchLandCoverInBatches(
-        validLocations,
-        10,
+        pending.map((entry) => entry.location),
         (completed, total) => {
           landCoverProgress.value = { completed, total }
         }
       )
 
-      // Assign results to grid cells
-      for (let i = 0; i < validIndices.length; i++) {
-        const gridIndex = validIndices[i]
-        grid.value[gridIndex].elevation = elevationResults[gridIndex].elevation
-        grid.value[gridIndex].landCover = landCoverResults[i]
-      }
+      landCoverResults.forEach((cost, index) => {
+        pending[index].cell.landCover = cost
+      })
     } catch (e) {
       console.error('Error fetching land cover data:', e)
+      return fail(
+        'Could not load land cover data for this region. Check your connection and retry.'
+      )
+    } finally {
       isLoadingLandCover.value = false
-      currentPhase.value = ''
-      return
     }
-    isLoadingLandCover.value = false
 
     // remove all grid cells where either elevation or land cover is null or zero
-    grid.value = grid.value.filter((cell) => cell.elevation && cell.landCover)
+    const usableCells = cells.filter((cell) => cell.elevation && cell.landCover)
+
+    if (usableCells.length === 0) {
+      return fail('No terrain data came back for this region. Check your connection and retry.')
+    }
+
+    const dropped = cells.length - usableCells.length
+    if (dropped > 0) {
+      console.warn(`Dropped ${dropped} of ${cells.length} grid cells with incomplete terrain data.`)
+    }
+
+    grid.value = usableCells
 
     // calculate total cost for grid
     currentPhase.value = 'calculating'
@@ -202,6 +236,23 @@ export const useGridStore = defineStore('gridStore', () => {
 
     isGridGenerated.value = true
     currentPhase.value = ''
+    return true
+  }
+
+  /**
+   * Records a generation failure and leaves the store in a clean idle state.
+   * The phase is cleared so the progress UI can swap to the error message
+   * instead of sitting on a bar that has stopped moving.
+   *
+   * @param {string} message - Player-facing explanation
+   * @returns {false}
+   */
+  function fail(message) {
+    console.error('Grid generation failed:', message)
+    error.value = message
+    currentPhase.value = ''
+    isGridGenerated.value = false
+    return false
   }
 
   /**
@@ -212,6 +263,10 @@ export const useGridStore = defineStore('gridStore', () => {
     isGridGenerated.value = false
     isLoadingElevation.value = false
     isLoadingLandCover.value = false
+    elevationProgress.value = { completed: 0, total: 0 }
+    landCoverProgress.value = { completed: 0, total: 0 }
+    currentPhase.value = ''
+    error.value = null
   }
 
   /**
@@ -222,6 +277,7 @@ export const useGridStore = defineStore('gridStore', () => {
     if (Array.isArray(gridArray)) {
       grid.value = gridArray
       isGridGenerated.value = true
+      error.value = null
     }
   }
 
@@ -234,6 +290,7 @@ export const useGridStore = defineStore('gridStore', () => {
     landCoverProgress,
     currentPhase,
     progressPercent,
+    error,
     generateGrid,
     reset,
     setGrid

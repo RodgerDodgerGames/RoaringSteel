@@ -43,9 +43,10 @@ const isSettingUpGame = ref(false)
 // region where game is being played
 const { region } = storeToRefs(gameStore)
 
-// show progress modal when setting up game and grid is being generated
+// show the modal while setup is running, and keep it up on failure so the
+// error has somewhere to appear
 const showProgressModal = computed(() => {
-  return isSettingUpGame.value && gridStore.currentPhase !== ''
+  return isSettingUpGame.value && (gridStore.currentPhase !== '' || gridStore.error !== null)
 })
 
 // View Map
@@ -71,24 +72,43 @@ function handleGameLoaded() {
 
 // Handle play game button click
 async function handlePlayGameClick() {
-  if (region.value) {
-    isSettingUpGame.value = true
+  if (!region.value) return
 
-    // run setup towns after the region is selected
-    await townsStore.setupTowns(region.value.properties.STATE)
-    // generate demand cards
-    demandCardsStore.generateDemandCards()
-    // run cost grid setup
-    // generate grid using the selected region bounds
-    const bounds = turf.bbox(region.value)
-    await gridStore.generateGrid(region.value.properties.STATE, bounds, gridConfig.cellSize)
+  isSettingUpGame.value = true
 
-    isSettingUpGame.value = false
-    // once grid is generated, set view to game
-    currentView.value = 'game'
-    // auto-save after setup completes
-    autoSave()
-  }
+  // run setup towns after the region is selected
+  await townsStore.setupTowns(region.value.properties.STATE)
+  // generate demand cards
+  demandCardsStore.generateDemandCards()
+  // run cost grid setup
+  // generate grid using the selected region bounds
+  const bounds = turf.bbox(region.value)
+  const generated = await gridStore.generateGrid(
+    region.value.properties.STATE,
+    bounds,
+    gridConfig.cellSize
+  )
+
+  // Leave the modal up on failure so it can show the error and offer a retry.
+  // Entering the game view here would drop the player onto an empty map.
+  if (!generated) return
+
+  isSettingUpGame.value = false
+  // once grid is generated, set view to game
+  currentView.value = 'game'
+  // auto-save after setup completes
+  autoSave()
+}
+
+// Player asked to retry after a failed grid setup
+function handleSetupRetry() {
+  handlePlayGameClick()
+}
+
+// Player backed out of a failed grid setup
+function handleSetupCancel() {
+  gridStore.reset()
+  isSettingUpGame.value = false
 }
 </script>
 
@@ -104,7 +124,11 @@ async function handlePlayGameClick() {
       @play-game="handlePlayGameClick"
     />
     <!-- Grid Progress Modal -->
-    <GridProgressModal :is-active="showProgressModal" />
+    <GridProgressModal
+      :is-active="showProgressModal"
+      @retry="handleSetupRetry"
+      @cancel="handleSetupCancel"
+    />
   </div>
 </template>
 

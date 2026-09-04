@@ -12,6 +12,8 @@
  */
 
 import { nlcdCostMap } from '@/config/nlcd'
+import { mapWithConcurrency } from '@/composables/utils'
+import { gridApiConfig } from '@/config/grid'
 
 /**
  * Composable for fetching land cover data and converting to building costs.
@@ -71,9 +73,16 @@ export function useLandCoverAPI() {
 
     try {
       const response = await fetch(url)
+
+      // Without this a throttled response falls through to the parse below and
+      // is written off as a cell with no land cover, quietly shrinking the map.
+      if (!response.ok) {
+        throw new Error(`Land cover API responded ${response.status}`)
+      }
+
       const data = await response.json()
       const cost = nlcdCostMap[data.features[0].properties['PALETTE_INDEX']]
-      return cost
+      return cost ?? null
     } catch (error) {
       console.error('Error fetching land cover data:', error)
       return null
@@ -81,30 +90,19 @@ export function useLandCoverAPI() {
   }
 
   /**
-   * Fetches land cover data for multiple locations in parallel batches.
+   * Fetches land cover for many locations with a bounded number of requests in
+   * flight, paced so NLCD is not hit in bursts.
+   *
    * @param {Array} locations - Array of location objects {lat, lng}.
-   * @param {Number} batchSize - Number of concurrent requests per batch (default: 10).
-   * @param {Function} onProgress - Optional callback called after each batch with (completed, total).
-   * @returns {Promise<Array>} Array of land cover costs (or null for failed requests).
+   * @param {Function} [onProgress] - Called with (completed, total) after each cell.
+   * @returns {Promise<Array<number|null>>} Costs in location order; null where the lookup failed.
    */
-  async function fetchLandCoverInBatches(locations, batchSize = 10, onProgress = null) {
-    const results = []
-
-    for (let i = 0; i < locations.length; i += batchSize) {
-      const batch = locations.slice(i, i + batchSize)
-
-      // Fetch all locations in this batch concurrently
-      const batchResults = await Promise.all(batch.map((location) => fetchLandCover(location)))
-
-      results.push(...batchResults)
-
-      // Report progress after each batch
-      if (onProgress) {
-        onProgress(results.length, locations.length)
-      }
-    }
-
-    return results
+  function fetchLandCoverInBatches(locations, onProgress = null) {
+    return mapWithConcurrency(locations, (location) => fetchLandCover(location), {
+      concurrency: gridApiConfig.landCoverConcurrency,
+      minIntervalMs: gridApiConfig.landCoverMinIntervalMs,
+      onProgress
+    })
   }
 
   return {

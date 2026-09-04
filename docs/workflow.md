@@ -73,6 +73,53 @@ and link the pieces.
 - Right-sized: *"Add welcome message at top of info panel"* (#42)
 - Too big: *"Build bad-ass basemap"* (#14) — that's a milestone wearing an issue's clothes
 
+## What gets a test
+
+New logic ships with tests. That is the default, not a judgment call the developer
+makes fresh each time.
+
+It is a default, not a rule that fires on every line. The question to ask is: **if this
+broke silently, would a player notice — and would anyone catch it before they did?**
+
+**Write a test for:**
+
+- Game rules and state transitions — movement costs, build legality, turn order,
+  payouts, win conditions. Anything where "wrong" means the game is playing itself
+  incorrectly.
+- Anything with branches, arithmetic, or edge cases. Off-by-one on a track segment
+  cost is invisible in the UI and obvious in a test.
+- Every bug fix. The test reproduces the bug first, then the fix turns it green.
+  This is the one case with no exceptions — an untested fix can regress silently,
+  and a bug that already happened once is proof the case is reachable.
+- Data parsing and transforms — anything reading an external API or CSV into game
+  state, where the shape can change underneath us.
+
+**Don't write a test for:**
+
+- Wiring: a click handler that calls one store action, a computed that renames a
+  field, a prop passed down a level.
+- Styling, layout, copy.
+- Rendering, unless the component itself holds logic worth protecting. This repo
+  currently has no component tests, and that's a deliberate line — logic lives in
+  stores and composables, and that's where the suite lives too.
+
+A test that only restates the implementation is worse than no test: it fails on every
+refactor and catches nothing. If the only way to write it is to mirror the code
+line-for-line, that's a signal the code has no behavior worth asserting yet.
+
+### Where tests live
+
+`tests/` mirrors `src/` — `tests/stores/` and `tests/composables/`. A new store or
+composable gets a matching spec file.
+
+### Coverage gaps in existing code
+
+If work uncovers an important game function that has no test — not a gap in the
+current diff, but pre-existing — the developer says so and **files an issue**. It does
+not become extra commits on the current branch; that's the same scope rule that
+applies to everything else. Naming the gap out loud is the point, so the coordinator
+can decide when it gets paid down.
+
 ## Testing a draft PR
 
 Check CI first — there's a checks section at the bottom of the PR, or:
@@ -172,6 +219,8 @@ the commits live on in `main`.
 - Never push directly to `main`.
 - Work outside an issue's stated scope becomes a new issue, not extra commits.
 - The developer does not merge. The coordinator does.
+- New logic ships with tests; every bug fix ships with a regression test. See
+  [What gets a test](#what-gets-a-test).
 - Test and CI results get reported honestly. A red CI is reported, not worked around.
 
 ## Command reference

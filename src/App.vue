@@ -1,6 +1,6 @@
 <script setup>
 // IMPORTS
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import * as turf from '@turf/turf'
 
@@ -9,6 +9,7 @@ import AreaSelectView from '@/views/AreaSelectView.vue'
 import GameView from './views/GameView.vue'
 import WelcomeView from './views/WelcomeView.vue'
 import NavHeader from './components/NavHeader.vue'
+import GridProgressModal from './components/setup/GridProgressModal.vue'
 
 // import stores
 import { useGameStore } from '@/stores/game'
@@ -36,8 +37,16 @@ const { autoSave } = useGamePersistence()
 // which view should be shown (start with welcome)
 const currentView = ref('welcome')
 
+// track if game setup is in progress
+const isSettingUpGame = ref(false)
+
 // region where game is being played
 const { region } = storeToRefs(gameStore)
+
+// show progress modal when setting up game and grid is being generated
+const showProgressModal = computed(() => {
+  return isSettingUpGame.value && gridStore.currentPhase !== ''
+})
 
 // View Map
 const viewComponents = {
@@ -62,8 +71,9 @@ function handleGameLoaded() {
 
 // Handle play game button click
 async function handlePlayGameClick() {
-  console.log('handlePlayGameClick', region.value)
   if (region.value) {
+    isSettingUpGame.value = true
+
     // run setup towns after the region is selected
     await townsStore.setupTowns(region.value.properties.STATE)
     // generate demand cards
@@ -72,6 +82,8 @@ async function handlePlayGameClick() {
     // generate grid using the selected region bounds
     const bounds = turf.bbox(region.value)
     await gridStore.generateGrid(region.value.properties.STATE, bounds, gridConfig.cellSize)
+
+    isSettingUpGame.value = false
     // once grid is generated, set view to game
     currentView.value = 'game'
     // auto-save after setup completes
@@ -91,6 +103,8 @@ async function handlePlayGameClick() {
       @game-loaded="handleGameLoaded"
       @play-game="handlePlayGameClick"
     />
+    <!-- Grid Progress Modal -->
+    <GridProgressModal :is-active="showProgressModal" />
   </div>
 </template>
 

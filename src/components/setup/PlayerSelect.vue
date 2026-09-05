@@ -5,6 +5,9 @@
   and colors. Validates that all names are filled and unique before
   allowing progression.
 
+  The roster is held in the player store as draft players, so it survives
+  leaving and returning to this screen. Only the open color picker is local.
+
   Features:
   - Add/remove players dynamically
   - Color picker with 12 preset pastel colors
@@ -16,12 +19,16 @@
 
 <script setup>
 import { ref } from 'vue'
+import { storeToRefs } from 'pinia'
+import { usePlayerStore } from '@/stores/players'
 
-/** Player entries with name, color, and UI state */
-const players = ref([{ name: '', color: '#FF5733', showColorPicker: false }])
+const playerStore = usePlayerStore()
 
 const notificationMessage = ref('')
 const showNotification = ref(false)
+
+/** Id of the draft whose color picker is open, or null. UI-only state. */
+const openColorPickerId = ref(null)
 
 /** Available pastel colors for player selection */
 const availableColors = [
@@ -39,6 +46,14 @@ const availableColors = [
   '#8080C0'
 ]
 
+/** The setup roster lives in the store, so it survives leaving this screen. */
+const { draftPlayers: players } = storeToRefs(playerStore)
+
+// Seed the first row on a fresh setup
+if (players.value.length === 0) {
+  playerStore.addDraftPlayer({ color: '#FF5733' })
+}
+
 // Add a new player
 function addPlayer() {
   const hasEmptyName = players.value.some((player) => player.name.trim() === '')
@@ -51,7 +66,7 @@ function addPlayer() {
 
   const usedColors = players.value.map((player) => player.color)
   const nextColor = availableColors.find((color) => !usedColors.includes(color)) || '#FFFFFF'
-  players.value.push({ name: '', color: nextColor, showColorPicker: false })
+  playerStore.addDraftPlayer({ color: nextColor })
 }
 
 // Dismiss notification
@@ -60,26 +75,32 @@ const dismissNotification = () => {
 }
 
 // Remove a player
-const removePlayer = (index) => {
-  players.value.splice(index, 1)
+const removePlayer = (id) => {
+  playerStore.removeDraftPlayer(id)
+  if (openColorPickerId.value === id) {
+    openColorPickerId.value = null
+  }
 }
 
 // Toggle color picker visibility
-const toggleColorPicker = (index) => {
-  players.value.forEach((_, i) => {
-    players.value[i].showColorPicker = i === index ? !players.value[i].showColorPicker : false
-  })
+const toggleColorPicker = (id) => {
+  openColorPickerId.value = openColorPickerId.value === id ? null : id
 }
 
 // Select a color and close the picker
 const selectColor = (player, color) => {
-  player.color = color
-  player.showColorPicker = false
+  playerStore.updateDraftPlayer(player.id, { color })
+  openColorPickerId.value = null
+}
+
+// Update a player's name
+const setName = (player, name) => {
+  playerStore.updateDraftPlayer(player.id, { name })
 }
 
 // Validate if all player names are unique
-const isNameUnique = (index, name) => {
-  return players.value.every((player, i) => i === index || player.name !== name)
+const isNameUnique = (id, name) => {
+  return players.value.every((player) => player.id === id || player.name !== name)
 }
 
 // Emit events
@@ -96,7 +117,7 @@ const handleDone = () => {
   }
 
   // Check if all names are unique
-  const hasDuplicateNames = players.value.some((player, index) => !isNameUnique(index, player.name))
+  const hasDuplicateNames = players.value.some((player) => !isNameUnique(player.id, player.name))
   if (hasDuplicateNames) {
     notificationMessage.value = 'All player names must be unique!'
     showNotification.value = true
@@ -119,7 +140,7 @@ const handleDone = () => {
     </div>
 
     <!-- Player Form -->
-    <div v-for="(player, index) in players" :key="index" class="block">
+    <div v-for="(player, index) in players" :key="player.id" class="block">
       <form @submit.prevent>
         <!-- Player Name and Color Picker Row -->
         <div class="field">
@@ -128,8 +149,9 @@ const handleDone = () => {
             <!-- Player Name Input -->
             <div class="control is-expanded">
               <input
-                v-model="player.name"
-                :class="['input', { 'is-danger': !isNameUnique(index, player.name) }]"
+                :value="player.name"
+                @input="setName(player, $event.target.value)"
+                :class="['input', { 'is-danger': !isNameUnique(player.id, player.name) }]"
                 type="text"
                 placeholder="Enter player name"
               />
@@ -140,7 +162,7 @@ const handleDone = () => {
               <button
                 class="button"
                 :style="{ backgroundColor: player.color, color: '#000' }"
-                @click="toggleColorPicker(index)"
+                @click="toggleColorPicker(player.id)"
               >
                 Pick a Color
               </button>
@@ -150,19 +172,19 @@ const handleDone = () => {
             <div v-if="players.length > 1" class="control">
               <button
                 class="button is-family-sans-serif is-danger is-outlined is-rounded is-small"
-                @click.prevent="removePlayer(index)"
+                @click.prevent="removePlayer(player.id)"
               >
                 X
               </button>
             </div>
           </div>
-          <p v-if="!isNameUnique(index, player.name)" class="help is-danger">
+          <p v-if="!isNameUnique(player.id, player.name)" class="help is-danger">
             Player name must be unique.
           </p>
         </div>
 
         <!-- Color Picker Grid -->
-        <div v-if="player.showColorPicker" class="color-picker-grid">
+        <div v-if="openColorPickerId === player.id" class="color-picker-grid">
           <div
             v-for="(color, colorIndex) in availableColors"
             :key="colorIndex"

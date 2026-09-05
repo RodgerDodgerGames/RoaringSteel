@@ -374,6 +374,19 @@ describe('useLandCoverAPI Composable', () => {
       await expect(pending).resolves.toBeNull()
     })
 
+    it('should give up on a cell whose body never arrives', async () => {
+      // A response can answer with headers and then stall part-way through the
+      // body. A ceiling that covered only the headers would let this hang.
+      vi.useFakeTimers()
+      mockFetch.mockResolvedValue({ ok: true, json: () => new Promise(() => {}) })
+
+      const { fetchLandCover } = useLandCoverAPI()
+      const pending = fetchLandCover({ lat: 44.9778, lng: -93.265 })
+      await vi.advanceTimersByTimeAsync(gridApiConfig.landCoverTimeoutMs)
+
+      await expect(pending).resolves.toBeNull()
+    })
+
     it('should finish the run when one cell stalls, instead of parking setup (#85)', async () => {
       // This is the reported bug: two of 399 cells never answered, so two pool
       // workers waited forever, the run never resolved, and the game sat on the

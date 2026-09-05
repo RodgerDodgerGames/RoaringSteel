@@ -33,42 +33,71 @@ export function waitRandomly(minWaitTime = 500, maxWaitTime = 2000) {
 export const DEFAULT_REQUEST_TIMEOUT_MS = 30000
 
 /**
- * Fetches a URL that is guaranteed to settle.
+ * Fetches a URL under a ceiling that covers the whole exchange.
  *
  * A browser `fetch` against a connection that stalls mid-flight never resolves
  * and never rejects. Setup awaits these requests, so one stalled socket parked
  * the whole game on the loading modal with a full progress bar and no error
  * (#85). The timer both aborts the request, so the socket is released, and
- * rejects on its own, so the returned promise settles even if the underlying
- * fetch ignores the abort.
+ * rejects on its own, so the caller settles even if the underlying fetch
+ * ignores the abort.
+ *
+ * The budget spans headers *and* body. `fetch` resolves as soon as the headers
+ * land, so a ceiling that stopped there would leave `response.json()`
+ * unbounded — and a connection that stalls part-way through the body hangs
+ * exactly as the reported bug did.
+ *
+ * Returns a response-like object rather than the `Response` itself: only the
+ * members the app actually reads are carried over, with the body readers
+ * wrapped so they share the request's remaining budget.
  *
  * @param {string} url - Request URL
  * @param {Object} [options] - Standard fetch options, plus `timeoutMs`
- * @param {number} [options.timeoutMs] - Ceiling before the request is abandoned
- * @returns {Promise<Response>} Rejects with a timeout error if the ceiling is hit
+ * @param {number} [options.timeoutMs] - Ceiling for the whole exchange
+ * @returns {Promise<{ok: boolean, status: number, statusText: string,
+ *   json: function(): Promise<*>, text: function(): Promise<string>}>}
  */
-export function fetchWithTimeout(url, { timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS, ...options } = {}) {
+export async function fetchWithTimeout(
+  url,
+  { timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS, signal, ...options } = {}
+) {
   const controller = new AbortController()
+  const expiresAt = Date.now() + timeoutMs
 
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      controller.abort()
-      reject(new Error(`Request timed out after ${timeoutMs}ms`))
-    }, timeoutMs)
+  // A caller's own signal still cancels. Without this it would be dropped in
+  // favour of the one this helper installs, silently, and a future cancel
+  // button would do nothing.
+  if (signal) signal.addEventListener('abort', () => controller.abort(), { once: true })
 
-    // The timer is cleared before settling rather than in a trailing `finally`,
-    // so an answered request never leaves a pending timer behind it.
-    fetch(url, { ...options, signal: controller.signal }).then(
-      (response) => {
-        clearTimeout(timer)
-        resolve(response)
-      },
-      (error) => {
-        clearTimeout(timer)
-        reject(error)
-      }
-    )
-  })
+  /** Races a step of the exchange against what is left of the budget. */
+  async function beforeDeadline(promise) {
+    let timer
+    const deadline = new Promise((_, reject) => {
+      timer = setTimeout(
+        () => {
+          controller.abort()
+          reject(new Error(`Request timed out after ${timeoutMs}ms`))
+        },
+        Math.max(0, expiresAt - Date.now())
+      )
+    })
+
+    try {
+      return await Promise.race([promise, deadline])
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  const response = await beforeDeadline(fetch(url, { ...options, signal: controller.signal }))
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    statusText: response.statusText,
+    json: () => beforeDeadline(response.json()),
+    text: () => beforeDeadline(response.text())
+  }
 }
 
 /**

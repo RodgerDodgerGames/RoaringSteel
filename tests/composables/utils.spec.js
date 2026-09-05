@@ -131,11 +131,17 @@ describe('fetchWithTimeout', () => {
     vi.unstubAllGlobals()
   })
 
-  it('should pass the response straight through when the request answers', async () => {
-    const response = { ok: true }
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response))
+  it('should carry the response through when the request answers', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ cost: 5 }) })
+    )
 
-    await expect(fetchWithTimeout('https://example.test')).resolves.toBe(response)
+    const response = await fetchWithTimeout('https://example.test')
+
+    expect(response.ok).toBe(true)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ cost: 5 })
   })
 
   it('should settle rather than hang when the request never does', async () => {
@@ -172,11 +178,74 @@ describe('fetchWithTimeout', () => {
     )
   })
 
+  it('should keep the ceiling armed while the body is read', async () => {
+    // `fetch` resolves as soon as the headers land, so a ceiling that stopped
+    // there would leave the body read unbounded and a connection that stalls
+    // part-way through the body would hang exactly as #85 did.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => new Promise(() => {}) })
+    )
+
+    const response = await fetchWithTimeout('https://example.test', { timeoutMs: 20 })
+
+    await expect(response.json()).rejects.toThrow(/timed out/i)
+  })
+
+  it('should spend one budget across headers and body, not one each', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve({ ok: true, json: () => new Promise(() => {}) }), 80)
+          })
+      )
+    )
+
+    const pending = fetchWithTimeout('https://example.test', { timeoutMs: 100 })
+    await vi.advanceTimersByTimeAsync(80)
+    const response = await pending
+
+    // 80ms of the 100ms budget went on the headers, so the body gets the
+    // remaining 20 — not a fresh 100.
+    const body = response.json()
+    const assertion = expect(body).rejects.toThrow(/timed out/i)
+    await vi.advanceTimersByTimeAsync(20)
+
+    await assertion
+  })
+
+  it('should still honour a signal the caller supplied', async () => {
+    // The helper installs a signal of its own; dropping the caller's would make
+    // a future cancel button silently do nothing.
+    const caller = new AbortController()
+    let installed = null
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url, options) => {
+        installed = options.signal
+        return new Promise(() => {})
+      })
+    )
+
+    const pending = fetchWithTimeout('https://example.test', {
+      timeoutMs: 20,
+      signal: caller.signal
+    })
+    caller.abort()
+
+    expect(installed.aborted).toBe(true)
+    await expect(pending).rejects.toThrow()
+  })
+
   it('should leave no timer running once the request answers', async () => {
     vi.useFakeTimers()
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }))
 
-    await fetchWithTimeout('https://example.test', { timeoutMs: 20 })
+    const response = await fetchWithTimeout('https://example.test', { timeoutMs: 20 })
+    await response.json()
 
     expect(vi.getTimerCount()).toBe(0)
   })

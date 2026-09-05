@@ -12,7 +12,7 @@
  */
 
 import { nlcdCostMap } from '@/config/nlcd'
-import { mapWithConcurrency } from '@/composables/utils'
+import { fetchWithTimeout, mapWithConcurrency } from '@/composables/utils'
 import { gridApiConfig } from '@/config/grid'
 
 /**
@@ -72,7 +72,9 @@ export function useLandCoverAPI() {
     const url = getFeatureInfoUrl(location, bbox, width, height, x, y)
 
     try {
-      const response = await fetch(url)
+      const response = await fetchWithTimeout(url, {
+        timeoutMs: gridApiConfig.landCoverTimeoutMs
+      })
 
       // Without this a throttled response falls through to the parse below and
       // is written off as a cell with no land cover, quietly shrinking the map.

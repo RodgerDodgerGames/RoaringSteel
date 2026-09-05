@@ -10,6 +10,8 @@
  * @module composables/setup/useTigerWeb
  */
 
+import { fetchWithTimeout } from '@/composables/utils'
+
 /**
  * Fetches the centroid coordinates for an MSA/CBSA.
  *
@@ -31,7 +33,7 @@ export default async function getMSALatLon(cbsaCode) {
 
     for (const layerID of layerIDs) {
       const url = `${baseUrl.replace('{layerID}', layerID)}/query?${params.toString()}`
-      const response = await fetch(url)
+      const response = await fetchWithTimeout(url)
 
       if (response.ok) {
         const data = await response.json()

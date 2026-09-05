@@ -78,7 +78,10 @@ export const useGridStore = defineStore('gridStore', () => {
       estimatedElevationMs(elevationProgress.value.completed) +
       estimatedLandCoverMs(landCoverProgress.value.completed)
 
-    return Math.min(100, Math.round((doneMs / totalMs) * 100))
+    // Floor, not round: 397 of 399 cells rounds to 100% and reads as a finished
+    // setup, which is exactly how a stalled run disguised itself as a hang (#85).
+    // Only a genuinely complete run should ever show 100.
+    return Math.min(100, Math.floor((doneMs / totalMs) * 100))
   })
 
   /** Wall time the elevation phase is expected to cost, in ms. */

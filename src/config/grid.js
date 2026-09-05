@@ -56,6 +56,20 @@ export const gridApiConfig = {
   elevationRequestMs: 550,
 
   /**
+   * How long a single request may stall before it is abandoned, in ms.
+   *
+   * These are dead-man's switches, not pacing: a stalled connection neither
+   * resolves nor rejects, so without a ceiling one hung socket parks setup
+   * forever (#85). Both are set far above the measured latencies above — 63ms
+   * for a land cover cell, ~550ms for a 50-location elevation batch — so a
+   * merely slow response is never mistaken for a dead one. Land cover gets the
+   * tighter ceiling because a timeout there costs one cell, where an elevation
+   * timeout costs a whole batch of 50.
+   */
+  landCoverTimeoutMs: 10000,
+  elevationTimeoutMs: 20000,
+
+  /**
    * Share of lookups allowed to fail, per phase, before setup is treated as a
    * failure. Some loss is normal, but a throttled run fails most of them, and
    * the resulting grid would otherwise be cached and reused forever.

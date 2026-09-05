@@ -225,6 +225,48 @@ describe('Grid Store', () => {
       expect(mockFetchLandCoverInBatches).not.toHaveBeenCalled()
     })
 
+    it('should report a failure when most elevation lookups fail', async () => {
+      // Open-Elevation fails a whole batch into nulls rather than throwing, so
+      // a throttled run used to reach the end and cache a grid full of holes.
+      mockFetchElevationsInBatches.mockResolvedValue([{ elevation: 100 }, null, null, null])
+      mockFetchLandCoverInBatches.mockResolvedValue([5])
+
+      const result = await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000)
+
+      expect(result).toBe(false)
+      expect(gridStore.isGridGenerated).toBe(false)
+      expect(gridStore.error).toMatch(/elevation data was missing for 3 of 4/i)
+      expect(mockFetchLandCoverInBatches).not.toHaveBeenCalled()
+    })
+
+    it('should not cache a grid from a mostly-failed elevation pass', async () => {
+      const cacheEntry = { value: [] }
+      mockUseLocalStorage.mockReturnValue(cacheEntry)
+      mockFetchElevationsInBatches.mockResolvedValue([{ elevation: 100 }, null, null, null])
+
+      await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000)
+
+      // A cached fragment would be reused on every future game in this state
+      expect(cacheEntry.value).toEqual([])
+    })
+
+    it('should not count a sea-level reading as an elevation failure', async () => {
+      // Zero is a real reading. It is dropped from the playable grid, but
+      // counting it as a failed lookup would fail setup for a flat region.
+      mockFetchElevationsInBatches.mockResolvedValue([
+        { elevation: 0 },
+        { elevation: 0 },
+        { elevation: 0 },
+        { elevation: 400 }
+      ])
+      mockFetchLandCoverInBatches.mockResolvedValue([5])
+
+      const result = await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000)
+
+      expect(result).toBe(true)
+      expect(gridStore.error).toBeNull()
+    })
+
     it('should report a failure when most land cover lookups fail', async () => {
       // A throttled NLCD returns nulls rather than throwing, so this used to
       // read as success and get cached permanently as a fragmented grid.
@@ -352,16 +394,25 @@ describe('Grid Store', () => {
     })
 
     it('should skip land cover lookups for cells whose elevation failed', async () => {
-      // First cell's lookup failed, second succeeded. Land cover must be asked
-      // about the second cell's location, not the first's.
-      mockFetchElevationsInBatches.mockResolvedValue([null, { elevation: 200 }])
-      mockFetchLandCoverInBatches.mockResolvedValue([7])
+      // First cell's lookup failed, the rest succeeded. Land cover must be
+      // asked about the surviving cells' locations, not shifted onto the
+      // failed one. Four cells keeps the single failure inside the acceptable
+      // rate so this exercises the alignment, not the failure guard.
+      mockFetchElevationsInBatches.mockResolvedValue([
+        null,
+        { elevation: 200 },
+        { elevation: 300 },
+        { elevation: 400 }
+      ])
+      mockFetchLandCoverInBatches.mockResolvedValue([7, 8, 9])
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000)
 
-      expect(gridStore.grid).toHaveLength(1)
+      const askedFor = mockFetchLandCoverInBatches.mock.calls[0][0]
+      expect(askedFor).toHaveLength(3)
+      expect(gridStore.grid).toHaveLength(3)
       expect(gridStore.grid[0].id).toBe('0-1')
-      expect(gridStore.grid[0].landCover).toBe(7)
+      expect(gridStore.grid.map((cell) => cell.landCover)).toEqual([7, 8, 9])
     })
 
     it('should set isGridGenerated to true after successful generation', async () => {
@@ -412,26 +463,31 @@ describe('Grid Store', () => {
   })
 
   describe('progressPercent', () => {
-    /** Mirrors the store's weighting: each phase costs what its pacing costs. */
-    const estimatedMs = (elevationCells, landCoverCells) => {
-      const averagePause =
-        (gridApiConfig.elevationPauseMinMs + gridApiConfig.elevationPauseMaxMs) / 2
-      return (
-        Math.ceil(elevationCells / gridApiConfig.elevationBatchSize) * averagePause +
-        landCoverCells * gridApiConfig.landCoverMinIntervalMs
-      )
-    }
-
-    it('should weight phases by the time their pacing costs', () => {
-      // Elevation sleeps between batches while land cover paces every request,
-      // so finishing elevation is a substantial share of the wait even though
-      // it is a small share of the requests.
+    it('should weight elevation above its share of the requests', () => {
+      // Elevation is batched, so it is a tiny share of the requests but a real
+      // share of the wait. Asserting the relationship rather than the formula
+      // keeps this from having to be rewritten every time pacing is retuned.
       gridStore.elevationProgress = { completed: 100, total: 100 }
       gridStore.landCoverProgress = { completed: 0, total: 100 }
 
-      const expected = Math.round((estimatedMs(100, 0) / estimatedMs(100, 100)) * 100)
+      const elevationRequests = Math.ceil(100 / gridApiConfig.elevationBatchSize)
+      const naiveRequestShare = (elevationRequests / (elevationRequests + 100)) * 100
 
-      expect(gridStore.progressPercent).toBe(expected)
+      expect(gridStore.progressPercent).toBeGreaterThan(naiveRequestShare)
+      // ...but finishing the cheaper phase must not read as most of the job.
+      expect(gridStore.progressPercent).toBeLessThan(50)
+    })
+
+    it('should give elevation a smaller share as land cover work grows', () => {
+      // The two phases scale differently, so the split has to move with the
+      // grid size rather than being a fixed ratio.
+      gridStore.elevationProgress = { completed: 100, total: 100 }
+      gridStore.landCoverProgress = { completed: 0, total: 100 }
+      const smallGridShare = gridStore.progressPercent
+
+      gridStore.landCoverProgress = { completed: 0, total: 1000 }
+
+      expect(gridStore.progressPercent).toBeLessThan(smallGridShare)
     })
 
     it('should not treat the elevation phase as a negligible sliver', () => {

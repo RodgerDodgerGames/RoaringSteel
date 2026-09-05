@@ -62,10 +62,11 @@ export const useGridStore = defineStore('gridStore', () => {
    * Combined progress percentage across both fetch phases.
    *
    * Neither cell count nor request count tracks the wait the player actually
-   * experiences, because the two phases are paced differently: elevation
-   * sleeps between batches of `elevationBatchSize`, while land cover paces
-   * every single request. Each phase is weighted by the time its pacing is
-   * expected to cost, so the bar moves at a roughly even rate throughout.
+   * experiences, because the two phases are shaped differently: elevation
+   * makes few, slow, spaced-out requests while land cover makes thousands of
+   * fast ones through a throttled pool. Each phase is weighted by the wall
+   * time it is expected to cost — pacing plus request latency — so the bar
+   * moves at a roughly even rate throughout.
    */
   const progressPercent = computed(() => {
     const totalMs =
@@ -80,15 +81,26 @@ export const useGridStore = defineStore('gridStore', () => {
     return Math.min(100, Math.round((doneMs / totalMs) * 100))
   })
 
-  /** Time the pacing between elevation batches is expected to cost, in ms. */
+  /** Wall time the elevation phase is expected to cost, in ms. */
   function estimatedElevationMs(cellCount) {
     const averagePause = (gridApiConfig.elevationPauseMinMs + gridApiConfig.elevationPauseMaxMs) / 2
-    return Math.ceil(cellCount / gridApiConfig.elevationBatchSize) * averagePause
+    const batches = Math.ceil(cellCount / gridApiConfig.elevationBatchSize)
+    // Batches run one after another, each costing its own request. Pauses sit
+    // between batches, and the fetcher deliberately skips the one before the
+    // first, so there is always one fewer pause than there are requests.
+    return batches * gridApiConfig.elevationRequestMs + Math.max(0, batches - 1) * averagePause
   }
 
-  /** Time the pacing between land cover requests is expected to cost, in ms. */
+  /** Wall time the land cover phase is expected to cost, in ms. */
   function estimatedLandCoverMs(cellCount) {
-    return cellCount * gridApiConfig.landCoverMinIntervalMs
+    // Two ceilings apply and the slower one wins: the pool-wide interval floor
+    // between request starts, and how fast `landCoverConcurrency` workers can
+    // retire requests of the observed latency.
+    const perCellMs = Math.max(
+      gridApiConfig.landCoverMinIntervalMs,
+      gridApiConfig.landCoverRequestMs / gridApiConfig.landCoverConcurrency
+    )
+    return cellCount * perCellMs
   }
 
   const { fetchElevationsInBatches } = useElevationAPI()
@@ -213,6 +225,17 @@ export const useGridStore = defineStore('gridStore', () => {
 
     if (pending.length === 0) {
       return fail('No elevation data came back for this region. Check your connection and retry.')
+    }
+
+    // fetchElevationBatch turns every failure into nulls rather than throwing,
+    // so a run that lost most of its batches still looks like a success here
+    // and would be cached permanently. Count only nulls: a zero is a real
+    // reading the filter above drops on purpose, not a failed lookup.
+    const failedElevations = elevationResults.filter((result) => result == null).length
+    if (failedElevations / elevationResults.length > gridApiConfig.maxElevationFailureRate) {
+      return fail(
+        `Elevation data was missing for ${failedElevations} of ${elevationResults.length} cells. Check your connection and retry.`
+      )
     }
 
     landCoverProgress.value = { completed: 0, total: pending.length }

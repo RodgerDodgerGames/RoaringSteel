@@ -2,18 +2,19 @@
   PlayerConfirm.vue
 
   Confirmation screen showing selected players before starting the game.
-  When confirmed, saves players to the Pinia store with starting cash
-  and sets the first player's turn.
+  When confirmed, commits the store's setup roster to players with starting
+  cash and sets the first player's turn.
 
-  @prop {Array} players - Array of player objects from PlayerSelect
+  @prop {Array} players - The setup roster, for display
   @emits back - User wants to go back and edit players
   @emits confirmed - Players saved to store, ready to proceed
 -->
 
 <script setup>
+import { ref } from 'vue'
 import { usePlayerStore } from '@/stores/players'
 
-const props = defineProps({
+defineProps({
   players: {
     type: Array,
     required: true
@@ -23,28 +24,26 @@ const props = defineProps({
 const emit = defineEmits(['back', 'confirmed'])
 const playerStore = usePlayerStore()
 
+/** Message shown when the roster could not be turned into players */
+const commitError = ref('')
+
 /**
- * Saves players to the store with starting cash and initiates the first turn.
+ * Turns the setup roster into the game's players and initiates the first turn.
  * Starting cash is $20,000 per Empire Builder rules.
  */
 function confirmPlayers() {
-  // Remove all existing players using the store's removePlayer action
-  const existingPlayerIds = playerStore.players.map((p) => p.id)
-  existingPlayerIds.forEach((id) => {
-    playerStore.removePlayer(id)
-  })
+  commitError.value = ''
 
-  // Add all players to the store
-  props.players.forEach((player) => {
-    playerStore.addPlayer({
-      name: player.name,
-      color: player.color,
-      cash: 20000 // Starting cash for Empire Builder
-    })
-  })
+  if (!playerStore.commitDraftPlayers({ cash: 20000 })) {
+    commitError.value = playerStore.error || 'Could not start the game with these players.'
+    return
+  }
 
   // Give the first player in turn order the turn
-  playerStore.startGame()
+  if (!playerStore.startGame()) {
+    commitError.value = playerStore.error || 'Could not start the game with these players.'
+    return
+  }
 
   emit('confirmed')
 }
@@ -58,6 +57,11 @@ function goBack() {
 <template>
   <div class="welcome-modal-container container has-background-info-dark p-5 mt-4">
     <h3 class="is-size-3 mb-4">Confirm Players</h3>
+
+    <!-- Commit failure -->
+    <div v-if="commitError" class="notification is-warning">
+      {{ commitError }}
+    </div>
 
     <!-- Player List -->
     <div class="mb-5">

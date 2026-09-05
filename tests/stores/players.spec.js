@@ -236,6 +236,111 @@ describe('Player Store', () => {
     })
   })
 
+  describe('draft players', () => {
+    it('should start with an empty draft roster', () => {
+      expect(playerStore.draftPlayers).toEqual([])
+    })
+
+    it('should add drafts with unique ids and no validation', () => {
+      const first = playerStore.addDraftPlayer({ color: '#FF5733' })
+      const second = playerStore.addDraftPlayer({ name: 'Alice', color: '#80FF80' })
+
+      expect(playerStore.draftPlayers).toHaveLength(2)
+      expect(first.name).toBe('')
+      expect(second.id).not.toBe(first.id)
+    })
+
+    it('should update a draft by id', () => {
+      const draft = playerStore.addDraftPlayer({ color: '#FF5733' })
+
+      expect(playerStore.updateDraftPlayer(draft.id, { name: 'Alice' })).toBe(true)
+      expect(playerStore.draftPlayers[0].name).toBe('Alice')
+      expect(playerStore.draftPlayers[0].color).toBe('#FF5733')
+    })
+
+    it('should reject updates to an unknown draft', () => {
+      expect(playerStore.updateDraftPlayer(99, { name: 'Nobody' })).toBe(false)
+    })
+
+    it('should remove a draft by id without shifting the others', () => {
+      const first = playerStore.addDraftPlayer({ name: 'Alice', color: '#FF5733' })
+      const second = playerStore.addDraftPlayer({ name: 'Bob', color: '#80FF80' })
+
+      expect(playerStore.removeDraftPlayer(first.id)).toBe(true)
+      expect(playerStore.draftPlayers).toHaveLength(1)
+      expect(playerStore.draftPlayers[0].id).toBe(second.id)
+
+      // The surviving draft is still addressable by its original id
+      expect(playerStore.updateDraftPlayer(second.id, { name: 'Bobby' })).toBe(true)
+      expect(playerStore.draftPlayers[0].name).toBe('Bobby')
+    })
+
+    it('should report removing an unknown draft as a failure', () => {
+      expect(playerStore.removeDraftPlayer(99)).toBe(false)
+    })
+
+    it('should commit drafts as players with starting cash', () => {
+      playerStore.addDraftPlayer({ name: 'Alice', color: '#FF5733' })
+      playerStore.addDraftPlayer({ name: '  Bob  ', color: '#80FF80' })
+
+      expect(playerStore.commitDraftPlayers({ cash: 20000 })).toBe(true)
+      expect(playerStore.players).toHaveLength(2)
+      expect(playerStore.players[0]).toMatchObject({ id: 1, name: 'Alice', cash: 20000 })
+      expect(playerStore.players[1]).toMatchObject({ id: 2, name: 'Bob', cash: 20000 })
+    })
+
+    it('should replace any players already in the game when committing', () => {
+      playerStore.addPlayer({ name: 'Stale', color: 'red' })
+      playerStore.addDraftPlayer({ name: 'Alice', color: '#FF5733' })
+
+      playerStore.commitDraftPlayers({ cash: 20000 })
+
+      expect(playerStore.players).toHaveLength(1)
+      expect(playerStore.players[0].name).toBe('Alice')
+    })
+
+    it('should fail to commit a draft that is not a valid player', () => {
+      playerStore.addDraftPlayer({ name: 'Alice', color: '#FF5733' })
+      playerStore.addDraftPlayer({ name: '', color: '#80FF80' })
+
+      expect(playerStore.commitDraftPlayers({ cash: 20000 })).toBe(false)
+      expect(playerStore.error).toBeTruthy()
+    })
+
+    it('should leave the existing roster untouched when a commit fails', () => {
+      playerStore.addPlayer({ name: 'Stale', color: 'red' })
+      playerStore.addDraftPlayer({ name: '', color: '#80FF80' })
+
+      expect(playerStore.commitDraftPlayers({ cash: 20000 })).toBe(false)
+      expect(playerStore.players).toHaveLength(1)
+      expect(playerStore.players[0].name).toBe('Stale')
+    })
+
+    it('should refuse to commit an empty roster', () => {
+      playerStore.addPlayer({ name: 'Stale', color: 'red' })
+
+      expect(playerStore.commitDraftPlayers({ cash: 20000 })).toBe(false)
+      expect(playerStore.error).toBe('No players to start the game with')
+      expect(playerStore.players).toHaveLength(1)
+    })
+
+    it('should reject drafts whose names differ only by case or spacing', () => {
+      playerStore.addDraftPlayer({ name: 'Alice', color: '#FF5733' })
+      playerStore.addDraftPlayer({ name: ' alice ', color: '#80FF80' })
+
+      expect(playerStore.commitDraftPlayers({ cash: 20000 })).toBe(false)
+      expect(playerStore.players).toEqual([])
+    })
+
+    it('should clear drafts on reset', () => {
+      playerStore.addDraftPlayer({ name: 'Alice', color: '#FF5733' })
+
+      playerStore.reset()
+
+      expect(playerStore.draftPlayers).toEqual([])
+    })
+  })
+
   describe('activePlayer getter', () => {
     beforeEach(() => {
       playerStore.addPlayer({ name: 'Alice', color: 'red' })

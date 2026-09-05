@@ -26,6 +26,16 @@ export const usePlayerStore = defineStore('playerStore', () => {
   /** Array of player objects in turn order */
   const players = ref([])
 
+  /**
+   * Player entries being edited on the setup screen, before the game starts.
+   * Kept separate from `players` so a half-typed roster never has to satisfy
+   * the validation that real players do.
+   */
+  const draftPlayers = ref([])
+
+  /** Monotonic id source for drafts, so ids stay stable across removals */
+  let nextDraftId = 1
+
   /** Loading state for async operations */
   const isLoading = ref(false)
 
@@ -251,12 +261,92 @@ export const usePlayerStore = defineStore('playerStore', () => {
   }
 
   /**
+   * Add an entry to the setup roster.
+   * Drafts are not validated — the setup screen is where a name gets typed.
+   * @param {{name?: string, color?: string}} draft The draft to add.
+   * @returns {Object} The stored draft, including its generated id.
+   */
+  function addDraftPlayer({ name = '', color = '' } = {}) {
+    const draft = { id: nextDraftId++, name, color }
+    draftPlayers.value.push(draft)
+    return draft
+  }
+
+  /**
+   * Update a setup roster entry.
+   * @param {number} id The id of the draft to update.
+   * @param {{name?: string, color?: string}} updates The fields to change.
+   * @returns {boolean} True if the draft was found and updated.
+   */
+  function updateDraftPlayer(id, updates) {
+    if (!updates || typeof updates !== 'object') return false
+
+    const draft = draftPlayers.value.find((d) => d.id === id)
+    if (!draft) return false
+
+    Object.assign(draft, updates)
+    return true
+  }
+
+  /**
+   * Remove a setup roster entry.
+   * @param {number} id The id of the draft to remove.
+   * @returns {boolean} True if the draft was found and removed.
+   */
+  function removeDraftPlayer(id) {
+    const exists = draftPlayers.value.some((d) => d.id === id)
+    if (!exists) return false
+
+    draftPlayers.value = draftPlayers.value.filter((d) => d.id !== id)
+    return true
+  }
+
+  /**
+   * Replace the players in the game with the current setup roster.
+   * @param {{cash?: number}} options Starting cash for each player.
+   * @returns {boolean} True if every draft became a player.
+   */
+  function commitDraftPlayers({ cash = 0 } = {}) {
+    error.value = null
+
+    if (draftPlayers.value.length === 0) {
+      error.value = 'No players to start the game with'
+      return false
+    }
+
+    const previous = players.value
+    players.value = []
+
+    const committed = draftPlayers.value.every((draft) =>
+      addPlayer({ name: draft.name.trim(), color: draft.color, cash })
+    )
+
+    // All or nothing: a rejected draft must not leave a half-built roster
+    if (!committed) {
+      const failure = error.value
+      players.value = previous
+      error.value = failure
+    }
+
+    return committed
+  }
+
+  /**
+   * Clear the setup roster.
+   */
+  function resetDraftPlayers() {
+    draftPlayers.value = []
+    nextDraftId = 1
+  }
+
+  /**
    * Clear all players and errors from the store.
    */
   function reset() {
     players.value = []
     error.value = null
     isLoading.value = false
+    resetDraftPlayers()
   }
 
   /**
@@ -272,6 +362,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
   return {
     // state
     players,
+    draftPlayers,
     isLoading,
     error,
     // getters
@@ -284,6 +375,11 @@ export const usePlayerStore = defineStore('playerStore', () => {
     startGame,
     setActivePlayer,
     nextTurn,
+    addDraftPlayer,
+    updateDraftPlayer,
+    removeDraftPlayer,
+    commitDraftPlayers,
+    resetDraftPlayers,
     reset,
     setPlayers
   }

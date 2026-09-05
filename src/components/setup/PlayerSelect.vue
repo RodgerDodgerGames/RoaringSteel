@@ -2,8 +2,8 @@
   PlayerSelect.vue
 
   Player setup form allowing users to add 1-6 players with unique names
-  and colors. Validates that all names are filled and unique before
-  allowing progression.
+  and colors. Blank rows are dropped when the user is done; the names that
+  remain must be unique before progression is allowed.
 
   The roster is held in the player store as draft players, so it survives
   leaving and returning to this screen. Only the open color picker is local.
@@ -46,13 +46,21 @@ const availableColors = [
   '#8080C0'
 ]
 
+/** Colour the first row starts with, before any of the palette is taken */
+const DEFAULT_FIRST_COLOR = '#FF5733'
+
 /** The setup roster lives in the store, so it survives leaving this screen. */
 const { draftPlayers: players } = storeToRefs(playerStore)
 
-// Seed the first row on a fresh setup
-if (players.value.length === 0) {
-  playerStore.addDraftPlayer({ color: '#FF5733' })
+/** Keep at least one row on screen, so the form is never a dead end. */
+function ensureOneRow() {
+  if (players.value.length === 0) {
+    playerStore.addDraftPlayer({ color: DEFAULT_FIRST_COLOR })
+  }
 }
+
+// Seed the first row on a fresh setup
+ensureOneRow()
 
 // Add a new player
 function addPlayer() {
@@ -118,9 +126,12 @@ const onCompositionEnd = (player, event) => {
 /** Names are compared the way the store compares them when drafts are committed */
 const normalizeName = (name) => name.trim().toLowerCase()
 
-// Validate if all player names are unique
+// Validate if all player names are unique. A blank row is not a duplicate of
+// another blank row - it is a row that will be dropped when the user is done.
 const isNameUnique = (id, name) => {
   const target = normalizeName(name)
+  if (target === '') return true
+
   return players.value.every((player) => player.id === id || normalizeName(player.name) !== target)
 }
 
@@ -129,10 +140,13 @@ const emit = defineEmits(['done'])
 
 // Handle done button - validate before proceeding
 const handleDone = () => {
-  // Check if all names are filled
-  const hasEmptyName = players.value.some((player) => player.name.trim() === '')
-  if (hasEmptyName) {
-    notificationMessage.value = 'Please fill in all player names before proceeding!'
+  // Rows left blank are rows the user decided against - drop them rather than
+  // making them clear each one out by hand
+  playerStore.pruneEmptyDraftPlayers()
+
+  if (players.value.length === 0) {
+    ensureOneRow()
+    notificationMessage.value = 'Enter at least one player name before proceeding!'
     showNotification.value = true
     return
   }

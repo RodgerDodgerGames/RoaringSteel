@@ -316,6 +316,42 @@ describe('Player Store', () => {
       expect(playerStore.players[0].name).toBe('Stale')
     })
 
+    it('should prune drafts left blank', () => {
+      playerStore.addDraftPlayer({ name: 'Alice', color: '#FF5733' })
+      playerStore.addDraftPlayer({ name: '', color: '#80FF80' })
+      playerStore.addDraftPlayer({ name: '   ', color: '#8080FF' })
+
+      expect(playerStore.pruneEmptyDraftPlayers()).toBe(2)
+      expect(playerStore.draftPlayers).toHaveLength(1)
+      expect(playerStore.draftPlayers[0].name).toBe('Alice')
+    })
+
+    it('should report pruning nothing when every draft is named', () => {
+      playerStore.addDraftPlayer({ name: 'Alice', color: '#FF5733' })
+
+      expect(playerStore.pruneEmptyDraftPlayers()).toBe(0)
+      expect(playerStore.draftPlayers).toHaveLength(1)
+    })
+
+    it('should prune every draft when none are named', () => {
+      playerStore.addDraftPlayer({ name: '', color: '#FF5733' })
+      playerStore.addDraftPlayer({ name: ' ', color: '#80FF80' })
+
+      expect(playerStore.pruneEmptyDraftPlayers()).toBe(2)
+      expect(playerStore.draftPlayers).toEqual([])
+    })
+
+    it('should commit the remaining drafts after pruning blank ones', () => {
+      playerStore.addDraftPlayer({ name: 'Alice', color: '#FF5733' })
+      playerStore.addDraftPlayer({ name: '', color: '#80FF80' })
+
+      playerStore.pruneEmptyDraftPlayers()
+
+      expect(playerStore.commitDraftPlayers({ cash: 20000 })).toBe(true)
+      expect(playerStore.players).toHaveLength(1)
+      expect(playerStore.players[0].name).toBe('Alice')
+    })
+
     it('should refuse to commit an empty roster', () => {
       playerStore.addPlayer({ name: 'Stale', color: 'red' })
 

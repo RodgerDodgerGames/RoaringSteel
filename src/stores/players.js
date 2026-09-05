@@ -332,6 +332,22 @@ export const usePlayerStore = defineStore('playerStore', () => {
   }
 
   /**
+   * Drop setup roster entries that were left blank.
+   * Adding a row is cheap and reversible, so an unfilled one is treated as
+   * "never mind" rather than as an error the user has to go back and clear.
+   * @returns {number} How many blank drafts were removed.
+   */
+  function pruneEmptyDraftPlayers() {
+    const kept = draftPlayers.value.filter((draft) => draft.name.trim().length > 0)
+    const removed = draftPlayers.value.length - kept.length
+
+    if (removed > 0) {
+      draftPlayers.value = kept
+    }
+    return removed
+  }
+
+  /**
    * Clear the setup roster.
    */
   function resetDraftPlayers() {
@@ -378,6 +394,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     addDraftPlayer,
     updateDraftPlayer,
     removeDraftPlayer,
+    pruneEmptyDraftPlayers,
     commitDraftPlayers,
     resetDraftPlayers,
     reset,

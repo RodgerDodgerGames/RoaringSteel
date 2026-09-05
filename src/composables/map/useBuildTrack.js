@@ -2,7 +2,7 @@
 // Vue composable for handling map drawing and cost calculation logic
 // Organizes and manages all drawing-related logic, including setup, drawing controls, cost calculations, and utility functions.
 
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, markRaw } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import L from 'leaflet'
 import 'leaflet-textpath'
@@ -156,6 +156,12 @@ export default function useBuildTrack(props, grid, formatCurrency) {
       setupDrawingEvents()
     })
     props.map.on('pm:create', finalizeDrawing)
+    // Geoman's global removal and edit modes act on the layer, so the store has
+    // to be told; without this the map and the rail network drift apart (#83).
+    // Removal is re-fired on the map (`_fireRemove(this.map, layer)`) but an
+    // edit is not — `_fireUpdate` only ever fires on the layer itself — so the
+    // edit handler is bound per layer in `attachSegment` and `styleTracks`.
+    props.map.on('pm:remove', handleLayerRemoved)
   }
 
   function initializeCaches() {
@@ -164,7 +170,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
 
     // Cache the endpoints of every line already on the map, so restored track
     // is a legal place to start building from
-    ;[...existingLineLayers.value, ...restoredLineLayers.value].forEach(updateLineEndpoints)
+    rebuildLineEndpoints()
   }
 
   /**
@@ -179,7 +185,11 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     trackStore.segments.forEach((segment) => {
       const latlngs = segment.coordinates.map((point) => L.latLng(point.lat, point.lng))
       const layer = L.polyline(latlngs).addTo(props.map)
-      restoredLineLayers.value.push(layer)
+      attachSegment(layer, segment.id)
+      // markRaw: a Leaflet layer read back out of a reactive array comes back as
+      // a proxy, and Geoman hands back the raw layer, so the two would never
+      // compare equal and the cleanup filters below would never match
+      restoredLineLayers.value.push(markRaw(layer))
       styleTracks(layer)
     })
   }
@@ -233,8 +243,20 @@ export default function useBuildTrack(props, grid, formatCurrency) {
       // in the accumulator. Flush it before the segment is priced.
       if (runningCost.value > 0) calculateSegmentCost()
 
-      existingLineLayers.value.push(e.layer)
-      recordSegment(e.layer)
+      // Record before styling: the layer has to carry its segment id from the
+      // moment it exists, or a removal cannot find what to un-record
+      const segment = recordSegment(e.layer)
+      if (!segment) {
+        // Track that nothing owns and no save records is worse than no track at
+        // all, so take it back off the map rather than leave a phantom line
+        props.map.removeLayer(e.layer)
+        resetHintMarkerMoveHandler()
+        workingLayer.value = null
+        return
+      }
+
+      attachSegment(e.layer, segment.id)
+      existingLineLayers.value.push(markRaw(e.layer))
       updateLineEndpoints(e.layer)
       styleTracks(e.layer)
     }
@@ -261,6 +283,151 @@ export default function useBuildTrack(props, grid, formatCurrency) {
       console.error('Could not record track segment:', trackStore.error)
     }
     return segment
+  }
+
+  // ================== MAP / STORE SYNCHRONISATION ==================
+
+  /**
+   * Ties a Leaflet layer to the segment it draws, so a later removal or edit
+   * can find what to change in the store.
+   *
+   * The edit handler is bound here rather than on the map because Geoman fires
+   * `pm:update` on the layer alone — unlike `pm:remove`, it is never re-fired
+   * on the map, so a map-level listener would never run.
+   *
+   * @param {Object} layer - The track layer
+   * @param {number} segmentId - Id of the segment it draws
+   */
+  function attachSegment(layer, segmentId) {
+    layer.segmentId = segmentId
+    layer.on('pm:update', handleLayerEdited)
+  }
+
+  /**
+   * Finds the track layer an event belongs to.
+   *
+   * The rails a player actually sees and drags are the styled decoration, not
+   * the line itself — the line is set fully transparent by `styleTracks`. So an
+   * event can arrive on either, and both have to lead back to the same segment.
+   *
+   * @param {Object} layer - The layer the Geoman event fired on
+   * @returns {Object|null} The track layer carrying a segment id, if any
+   */
+  function resolveTrackLayer(layer) {
+    if (!layer) return null
+    if (layer.trackLayer) return layer.trackLayer
+    // `!= null` rather than a truthiness check: a save can carry segment id 0
+    return layer.segmentId != null ? layer : null
+  }
+
+  /**
+   * Whether the active player is allowed to change this segment.
+   *
+   * Geoman's global modes offer up every track layer on the map, including
+   * other players' and earlier turns'. That was harmless while removal was
+   * cosmetic; now that it reaches the save, an unguarded removal would delete
+   * another player's network permanently.
+   *
+   * @param {Object|undefined} segment - The segment behind the layer
+   * @returns {boolean} True if the segment is the active player's, built this turn
+   */
+  function canModifySegment(segment) {
+    if (!segment) return false
+    return segment.ownerId === playerStore.activePlayer?.id && segment.turn === gameStore.turn
+  }
+
+  /**
+   * Takes a removed layer out of the rail network, so a torn-up section stays
+   * torn up after a reload.
+   * @param {Object} e - Geoman removal event
+   */
+  function handleLayerRemoved(e) {
+    const layer = resolveTrackLayer(e.layer)
+    if (!layer) return
+
+    const segment = trackStore.getSegment(layer.segmentId)
+    if (!canModifySegment(segment)) {
+      // Geoman has already taken it off the map, so put it back rather than
+      // let the map lose track the store still holds
+      redrawLayer(layer, segment)
+      return
+    }
+
+    if (!trackStore.removeSegment(layer.segmentId)) {
+      console.error('Could not remove track segment:', trackStore.error)
+      redrawLayer(layer, segment)
+      return
+    }
+
+    // The rails and the line are one piece of track to the player, so removing
+    // either has to take the other off the map with it
+    removeStyling(layer)
+    if (props.map.hasLayer(layer)) props.map.removeLayer(layer)
+
+    existingLineLayers.value = existingLineLayers.value.filter((l) => l !== layer)
+    restoredLineLayers.value = restoredLineLayers.value.filter((l) => l !== layer)
+    rebuildLineEndpoints()
+  }
+
+  /**
+   * Writes a reshaped layer's new geometry back to its segment, and redraws the
+   * rails to match.
+   *
+   * The player drags the rails, not the line, so the geometry is read from
+   * whichever layer the event fired on and the line underneath is caught up to
+   * it — reading the line's own points would silently discard the edit.
+   *
+   * @param {Object} e - Geoman update event
+   */
+  function handleLayerEdited(e) {
+    const editedLayer = e.layer
+    const layer = resolveTrackLayer(editedLayer)
+    if (!layer) return
+
+    const segment = trackStore.getSegment(layer.segmentId)
+    if (!canModifySegment(segment)) {
+      redrawLayer(layer, segment)
+      return
+    }
+
+    const coordinates = editedLayer.getLatLngs().map(({ lat, lng }) => ({ lat, lng }))
+    if (!trackStore.updateSegmentCoordinates(layer.segmentId, coordinates)) {
+      console.error('Could not update track segment:', trackStore.error)
+      // The store refused the new shape, so the map must not keep it either
+      redrawLayer(layer, segment)
+      return
+    }
+
+    layer.setLatLngs(editedLayer.getLatLngs())
+    removeStyling(layer)
+    styleTracks(layer)
+    rebuildLineEndpoints()
+  }
+
+  /**
+   * Puts a layer back the way the store has it — on the map, in the stored
+   * shape, with fresh rails. Used whenever a change is refused, so a rejected
+   * removal or edit cannot leave the map showing something the save does not.
+   * @param {Object} layer - The track layer
+   * @param {Object|undefined} segment - The segment it should match
+   */
+  function redrawLayer(layer, segment) {
+    if (segment) {
+      layer.setLatLngs(segment.coordinates.map((point) => L.latLng(point.lat, point.lng)))
+    }
+    if (!props.map.hasLayer(layer)) layer.addTo(props.map)
+    removeStyling(layer)
+    styleTracks(layer)
+  }
+
+  /**
+   * Rebuilds the endpoint cache from the track currently on the map.
+   * Recomputing beats patching: after a removal or an edit the old endpoints
+   * are no longer places track can legally start from.
+   */
+  function rebuildLineEndpoints() {
+    lineEndpoints.value = []
+    ;[...existingLineLayers.value, ...restoredLineLayers.value].forEach(updateLineEndpoints)
   }
 
   // ================== COST TRACKING & TOOLTIP ==================
@@ -420,6 +587,33 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     }
     tieLayer.setText(tieText, tieOptions)
     tieLayer.addTo(props.map)
+
+    // Link the decoration to the track it draws, in both directions, so a
+    // click or a drag on the visible rails still resolves to the segment behind
+    // them. The ties are rebuilt on every restyle, so this listener goes with
+    // the layer it is bound to rather than accumulating.
+    tieLayer.trackLayer = layer
+    tieLayer.on('pm:update', handleLayerEdited)
+    layer.tieLayer = tieLayer
+  }
+
+  /**
+   * Takes the drawn rails off the map, leaving the underlying line alone.
+   * Used before redrawing after an edit, and when a section is removed.
+   *
+   * The rail text is cleared too: leaflet-textpath only drops its existing text
+   * node when `setText` is called with nothing, so restyling without this
+   * abandons a text node in the SVG on every edit.
+   *
+   * @param {Object} layer - The track layer whose styling should be cleared
+   */
+  function removeStyling(layer) {
+    layer.setText(null)
+
+    if (layer.tieLayer) {
+      props.map.removeLayer(layer.tieLayer)
+      layer.tieLayer = null
+    }
   }
 
   // function to add ties to railroad tracks

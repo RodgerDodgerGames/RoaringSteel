@@ -136,6 +136,64 @@ describe('track store', () => {
     })
   })
 
+  describe('updateSegmentCoordinates', () => {
+    it('should rewrite a reshaped segment in place', () => {
+      const segment = trackStore.addSegment({ ownerId: 1, coordinates: line(), cost: 400 })
+      const reshaped = [
+        { lat: 45, lng: -94 },
+        { lat: 45.5, lng: -94.5 },
+        { lat: 46, lng: -95 }
+      ]
+
+      expect(trackStore.updateSegmentCoordinates(segment.id, reshaped)).toBe(true)
+      expect(trackStore.getSegment(segment.id).coordinates).toEqual(reshaped)
+    })
+
+    it('should leave owner, cost and turn alone — dragging a vertex is not rebuilding', () => {
+      const segment = trackStore.addSegment({
+        ownerId: 2,
+        coordinates: line(),
+        cost: 400,
+        turn: 5
+      })
+
+      trackStore.updateSegmentCoordinates(segment.id, line(3))
+
+      expect(trackStore.getSegment(segment.id)).toMatchObject({ ownerId: 2, cost: 400, turn: 5 })
+    })
+
+    it('should strip anything Leaflet-shaped out of the new coordinates', () => {
+      const segment = trackStore.addSegment({ ownerId: 1, coordinates: line() })
+      const latlng = { lat: 44, lng: -93, distanceTo: () => 0 }
+
+      trackStore.updateSegmentCoordinates(segment.id, [latlng, latlng])
+
+      expect(trackStore.getSegment(segment.id).coordinates[0]).toEqual({ lat: 44, lng: -93 })
+    })
+
+    it('should refuse to update a segment that does not exist', () => {
+      expect(trackStore.updateSegmentCoordinates(99, line())).toBe(false)
+      expect(trackStore.error).toBe('Track segment with ID 99 not found')
+    })
+
+    it('should refuse coordinates that no longer make a line', () => {
+      const segment = trackStore.addSegment({ ownerId: 1, coordinates: line() })
+
+      expect(trackStore.updateSegmentCoordinates(segment.id, line(1))).toBe(false)
+      expect(trackStore.error).toBe('Track segment needs at least two points')
+      expect(trackStore.getSegment(segment.id).coordinates).toEqual(line())
+    })
+
+    it('should refuse a coordinate that is not a usable position', () => {
+      const segment = trackStore.addSegment({ ownerId: 1, coordinates: line() })
+      const bad = [{ lat: 44, lng: -93 }, { lat: 44.1 }]
+
+      expect(trackStore.updateSegmentCoordinates(segment.id, bad)).toBe(false)
+      expect(trackStore.error).toBe('Track segment has an invalid coordinate')
+      expect(trackStore.getSegment(segment.id).coordinates).toEqual(line())
+    })
+  })
+
   describe('setTrack', () => {
     it('should restore a saved network', () => {
       trackStore.setTrack([

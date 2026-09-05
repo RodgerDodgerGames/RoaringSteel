@@ -35,6 +35,7 @@ vi.mock('@/config/nlcd', () => ({
 }))
 
 import { useLandCoverAPI } from '@/composables/setup/useLandCoverAPI'
+import { gridApiConfig } from '@/config/grid'
 
 describe('useLandCoverAPI Composable', () => {
   beforeEach(() => {
@@ -149,6 +150,133 @@ describe('useLandCoverAPI Composable', () => {
       const location = { lat: 44.0, lng: -93.0 }
 
       expect(async () => await fetchLandCover(location)).not.toThrow()
+    })
+
+    it('should return null on a rate-limited response', async () => {
+      // A 429 body has no `features`, so it used to fall through to the parse
+      // and get written off as a cell with no land cover.
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 429,
+        json: async () => ({ error: 'Too Many Requests' })
+      })
+
+      const { fetchLandCover } = useLandCoverAPI()
+
+      const cost = await fetchLandCover({ lat: 44.0, lng: -93.0 })
+
+      expect(cost).toBeNull()
+    })
+
+    it('should return null for a land cover class with no cost mapping', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          features: [{ properties: { PALETTE_INDEX: 999 } }]
+        })
+      })
+
+      const { fetchLandCover } = useLandCoverAPI()
+
+      const cost = await fetchLandCover({ lat: 44.0, lng: -93.0 })
+
+      expect(cost).toBeNull()
+    })
+  })
+
+  describe('fetchLandCoverInBatches', () => {
+    it('should return one cost per location, in order', async () => {
+      const palettes = [22, 41, 31]
+      let call = 0
+
+      mockFetch.mockImplementation(async () => ({
+        ok: true,
+        json: async () => ({
+          features: [{ properties: { PALETTE_INDEX: palettes[call++] } }]
+        })
+      }))
+
+      const { fetchLandCoverInBatches } = useLandCoverAPI()
+      const locations = [
+        { lat: 44.0, lng: -93.0 },
+        { lat: 45.0, lng: -94.0 },
+        { lat: 46.0, lng: -95.0 }
+      ]
+
+      const results = await fetchLandCoverInBatches(locations)
+
+      expect(results).toEqual([5, 1, 2])
+    })
+
+    it('should keep going when a single location fails', async () => {
+      let call = 0
+
+      mockFetch.mockImplementation(async () => {
+        call++
+        if (call === 1) throw new Error('Network error')
+        return {
+          ok: true,
+          json: async () => ({ features: [{ properties: { PALETTE_INDEX: 22 } }] })
+        }
+      })
+
+      const { fetchLandCoverInBatches } = useLandCoverAPI()
+      const locations = [
+        { lat: 44.0, lng: -93.0 },
+        { lat: 45.0, lng: -94.0 }
+      ]
+
+      const results = await fetchLandCoverInBatches(locations)
+
+      expect(results).toEqual([null, 5])
+    })
+
+    it('should report progress for every location', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ features: [{ properties: { PALETTE_INDEX: 22 } }] })
+      })
+
+      const onProgress = vi.fn()
+      const { fetchLandCoverInBatches } = useLandCoverAPI()
+      const locations = Array(5).fill({ lat: 44.0, lng: -93.0 })
+
+      await fetchLandCoverInBatches(locations, onProgress)
+
+      expect(onProgress).toHaveBeenCalledTimes(5)
+      expect(onProgress.mock.calls.map((c) => c[0])).toEqual([1, 2, 3, 4, 5])
+      expect(onProgress).toHaveBeenLastCalledWith(5, 5)
+    })
+
+    it('should cap how many requests are in flight at once', async () => {
+      let inFlight = 0
+      let peak = 0
+
+      mockFetch.mockImplementation(async () => {
+        inFlight++
+        peak = Math.max(peak, inFlight)
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        inFlight--
+        return {
+          ok: true,
+          json: async () => ({ features: [{ properties: { PALETTE_INDEX: 22 } }] })
+        }
+      })
+
+      const { fetchLandCoverInBatches } = useLandCoverAPI()
+
+      await fetchLandCoverInBatches(Array(20).fill({ lat: 44.0, lng: -93.0 }))
+
+      expect(peak).toBeLessThanOrEqual(gridApiConfig.landCoverConcurrency)
+    })
+
+    it('should handle an empty location list', async () => {
+      const { fetchLandCoverInBatches } = useLandCoverAPI()
+
+      const results = await fetchLandCoverInBatches([])
+
+      expect(results).toEqual([])
+      expect(mockFetch).not.toHaveBeenCalled()
     })
   })
 

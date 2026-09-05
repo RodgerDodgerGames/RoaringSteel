@@ -23,7 +23,7 @@
  */
 
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useLocalStorage } from '@vueuse/core'
 import { useElevationAPI } from '../composables/setup/useElevationAPI'
 import { useLandCoverAPI } from '../composables/setup/useLandCoverAPI'
@@ -31,7 +31,7 @@ import {
   metersToLatitudeDegrees,
   metersToLongitudeDegrees
 } from '../composables/setup/useMapSupport'
-import { waitRandomly } from '@/composables/utils'
+import { gridApiConfig } from '@/config/grid'
 
 export const useGridStore = defineStore('gridStore', () => {
   /** Array of grid cells with terrain and cost data */
@@ -46,8 +46,80 @@ export const useGridStore = defineStore('gridStore', () => {
   /** Loading state for land cover data fetching */
   const isLoadingLandCover = ref(false)
 
+  /** Progress tracking for elevation fetching */
+  const elevationProgress = ref({ completed: 0, total: 0 })
+
+  /** Progress tracking for land cover fetching */
+  const landCoverProgress = ref({ completed: 0, total: 0 })
+
+  /** Current phase of grid generation ('' when idle) */
+  const currentPhase = ref('')
+
+  /** Player-facing message when generation fails, otherwise null */
+  const error = ref(null)
+
+  /**
+   * Combined progress percentage across both fetch phases.
+   *
+   * Neither cell count nor request count tracks the wait the player actually
+   * experiences, because the two phases are shaped differently: elevation
+   * makes few, slow, spaced-out requests while land cover makes thousands of
+   * fast ones through a throttled pool. Each phase is weighted by the wall
+   * time it is expected to cost — pacing plus request latency — so the bar
+   * moves at a roughly even rate throughout.
+   */
+  const progressPercent = computed(() => {
+    const totalMs =
+      estimatedElevationMs(elevationProgress.value.total) +
+      estimatedLandCoverMs(landCoverProgress.value.total)
+    if (totalMs === 0) return 0
+
+    const doneMs =
+      estimatedElevationMs(elevationProgress.value.completed) +
+      estimatedLandCoverMs(landCoverProgress.value.completed)
+
+    return Math.min(100, Math.round((doneMs / totalMs) * 100))
+  })
+
+  /** Wall time the elevation phase is expected to cost, in ms. */
+  function estimatedElevationMs(cellCount) {
+    const averagePause = (gridApiConfig.elevationPauseMinMs + gridApiConfig.elevationPauseMaxMs) / 2
+    const batches = Math.ceil(cellCount / gridApiConfig.elevationBatchSize)
+    // Batches run one after another, each costing its own request. Pauses sit
+    // between batches, and the fetcher deliberately skips the one before the
+    // first, so there is always one fewer pause than there are requests.
+    return batches * gridApiConfig.elevationRequestMs + Math.max(0, batches - 1) * averagePause
+  }
+
+  /** Wall time the land cover phase is expected to cost, in ms. */
+  function estimatedLandCoverMs(cellCount) {
+    // Two ceilings apply and the slower one wins: the pool-wide interval floor
+    // between request starts, and how fast `landCoverConcurrency` workers can
+    // retire requests of the observed latency.
+    const perCellMs = Math.max(
+      gridApiConfig.landCoverMinIntervalMs,
+      gridApiConfig.landCoverRequestMs / gridApiConfig.landCoverConcurrency
+    )
+    return cellCount * perCellMs
+  }
+
   const { fetchElevationsInBatches } = useElevationAPI()
-  const { fetchLandCover } = useLandCoverAPI()
+  const { fetchLandCoverInBatches } = useLandCoverAPI()
+
+  /**
+   * `useLocalStorage` registers storage listeners and a deep watcher that
+   * nothing here disposes of. Binding once per state rather than once per
+   * attempt keeps a retry loop from stacking up live bindings to the same key.
+   */
+  const cacheBindings = new Map()
+
+  function cachedGridFor(stateFipsCode) {
+    const key = `cachedGrid_${stateFipsCode}`
+    if (!cacheBindings.has(key)) {
+      cacheBindings.set(key, useLocalStorage(key, []))
+    }
+    return cacheBindings.get(key)
+  }
 
   /**
    * Generates a grid of cells covering the specified bounds.
@@ -57,20 +129,24 @@ export const useGridStore = defineStore('gridStore', () => {
    * @param {string} stateFipsCode - State FIPS code for cache key
    * @param {Array<number>} bounds - Bounding box [minLng, minLat, maxLng, maxLat]
    * @param {number} cellSize - Grid cell size in meters
-   * @returns {Promise<void>}
+   * @returns {Promise<boolean>} True when a usable grid was produced
    */
   async function generateGrid(stateFipsCode, bounds, cellSize) {
-    console.log('Generating grid...')
+    elevationProgress.value = { completed: 0, total: 0 }
+    landCoverProgress.value = { completed: 0, total: 0 }
+    currentPhase.value = 'initializing'
+    error.value = null
+    isGridGenerated.value = false
 
     // `useLocalStorage` automatically binds `grid` to `localStorage`
-    const cachedGrid = useLocalStorage(`cachedGrid_${stateFipsCode}`, [])
+    const cachedGrid = cachedGridFor(stateFipsCode)
 
     // check if grid already exists in cache
     if (cachedGrid.value.length > 0) {
       grid.value = cachedGrid.value
       isGridGenerated.value = true
-      console.log('Using cached grid data.')
-      return
+      currentPhase.value = ''
+      return true
     }
 
     // cell size is in meters so convert to degrees
@@ -82,13 +158,14 @@ export const useGridStore = defineStore('gridStore', () => {
 
     const rows = Math.floor((bounds[3] - bounds[1]) / latCellSize)
     const cols = Math.floor((bounds[2] - bounds[0]) / lngCellSize)
+
+    // Cells are built in a plain array and only published to `grid` once the
+    // data is in. Indexing into the store's array mid-build meant anything
+    // already there — a grid restored from a save, say — silently pushed every
+    // lookup onto the wrong cell.
     const locations = []
+    const cells = []
 
-    console.log(`Grid bounds: ${bounds[0]}, ${bounds[1]}, ${bounds[2]}, ${bounds[3]}`)
-    console.log(`Grid dimensions: ${rows} rows x ${cols} cols`)
-    console.log(`Grid cell size: ${cellSize} meters`)
-
-    // Loop through the grid and prepare location data for elevation and land cover
     for (let i = 0; i < rows; i++) {
       for (let j = 0; j < cols; j++) {
         const centroid = {
@@ -97,68 +174,156 @@ export const useGridStore = defineStore('gridStore', () => {
         }
         locations.push(centroid)
 
-        grid.value.push({
+        cells.push({
           id: `${i}-${j}`,
           centroid,
-          elevation: null, // To be filled later
-          landCover: null, // To be filled later
-          cost: null // To be calculated
+          elevation: null,
+          landCover: null,
+          cost: null
         })
       }
     }
 
+    if (locations.length === 0) {
+      return fail('That region is too small to build a grid from. Try selecting a larger area.')
+    }
+
+    // Both totals start at the full cell count so the bar has a stable
+    // denominator; the land cover total is narrowed once elevation says which
+    // cells are actually worth querying.
+    elevationProgress.value = { completed: 0, total: locations.length }
+    landCoverProgress.value = { completed: 0, total: locations.length }
+
     // Fetch elevation for all locations
     let elevationResults
     isLoadingElevation.value = true
+    currentPhase.value = 'elevation'
     try {
-      elevationResults = await fetchElevationsInBatches(locations, 10)
+      elevationResults = await fetchElevationsInBatches(
+        locations,
+        gridApiConfig.elevationBatchSize,
+        (completed, total) => {
+          elevationProgress.value = { completed, total }
+        }
+      )
     } catch (e) {
       console.error('Error fetching elevation data:', e)
+      return fail('Could not load elevation data for this region. Check your connection and retry.')
+    } finally {
       isLoadingElevation.value = false
-      return
     }
-    isLoadingElevation.value = false
 
-    // Fetch land cover data for each grid cell
+    // Keep only cells the elevation lookup actually answered for. A null entry
+    // is a failed lookup; a zero is open water or a gap in the dataset.
+    const pending = []
+    elevationResults.forEach((result, index) => {
+      if (result && result.elevation) {
+        cells[index].elevation = result.elevation
+        pending.push({ cell: cells[index], location: locations[index] })
+      }
+    })
+
+    if (pending.length === 0) {
+      return fail('No elevation data came back for this region. Check your connection and retry.')
+    }
+
+    // fetchElevationBatch turns every failure into nulls rather than throwing,
+    // so a run that lost most of its batches still looks like a success here
+    // and would be cached permanently. Count only nulls: a zero is a real
+    // reading the filter above drops on purpose, not a failed lookup.
+    const failedElevations = elevationResults.filter((result) => result == null).length
+    if (failedElevations / elevationResults.length > gridApiConfig.maxElevationFailureRate) {
+      return fail(
+        `Elevation data was missing for ${failedElevations} of ${elevationResults.length} cells. Check your connection and retry.`
+      )
+    }
+
+    landCoverProgress.value = { completed: 0, total: pending.length }
+
+    // Fetch land cover data for the surviving cells
     isLoadingLandCover.value = true
-    for (let index = 0; index < locations.length; index++) {
-      // if the elevation for a location is null or zero, skip it
-      if (!elevationResults[index] || elevationResults[index].elevation === 0) {
-        continue
-      }
+    currentPhase.value = 'landcover'
+    try {
+      const landCoverResults = await fetchLandCoverInBatches(
+        pending.map((entry) => entry.location),
+        (completed, total) => {
+          landCoverProgress.value = { completed, total }
+        }
+      )
 
-      const location = locations[index]
-      try {
-        const landCoverCost = await fetchLandCover(location)
+      landCoverResults.forEach((cost, index) => {
+        pending[index].cell.landCover = cost
+      })
 
-        // wait for a random amount of time to avoid overloading the API
-        await waitRandomly(200, 2000)
-
-        grid.value[index].elevation = elevationResults[index].elevation
-        grid.value[index].landCover = landCoverCost
-
-        console.log(
-          `Assigned elevation ${grid.value[index].elevation} and land cover ${grid.value[index].landCover} to cell ${grid.value[index].id}`
+      // fetchLandCover turns every failure into a null rather than throwing, so
+      // a throttled run looks like success and would be cached permanently.
+      // Judge it on the share of lookups that failed, not on the share of cells
+      // dropped overall, which legitimately includes water and no-data terrain.
+      const failed = landCoverResults.filter((cost) => cost == null).length
+      if (failed / landCoverResults.length > gridApiConfig.maxLandCoverFailureRate) {
+        isLoadingLandCover.value = false
+        return fail(
+          `Land cover data was missing for ${failed} of ${landCoverResults.length} cells. Check your connection and retry.`
         )
-      } catch (e) {
-        console.error(`Error fetching land cover for cell ${grid.value[index].id}:`, e)
-        // Continue to next cell on error
       }
+    } catch (e) {
+      console.error('Error fetching land cover data:', e)
+      return fail(
+        'Could not load land cover data for this region. Check your connection and retry.'
+      )
+    } finally {
+      isLoadingLandCover.value = false
     }
-    isLoadingLandCover.value = false
 
     // remove all grid cells where either elevation or land cover is null or zero
-    grid.value = grid.value.filter((cell) => cell.elevation && cell.landCover)
+    const usableCells = cells.filter((cell) => cell.elevation && cell.landCover)
+
+    if (usableCells.length === 0) {
+      return fail('No terrain data came back for this region. Check your connection and retry.')
+    }
+
+    const dropped = cells.length - usableCells.length
+    if (dropped > 0) {
+      console.warn(`Dropped ${dropped} of ${cells.length} grid cells with incomplete terrain data.`)
+    }
+
+    grid.value = usableCells
 
     // calculate total cost for grid
+    currentPhase.value = 'calculating'
     focalOpElevation(grid)
 
     // save grid to cache
     cachedGrid.value = grid.value
 
     isGridGenerated.value = true
-    console.log('Grid generation with elevation and land cover complete.')
-    console.log('Grid:', grid.value)
+    currentPhase.value = ''
+    return true
+  }
+
+  /**
+   * Records a generation failure and leaves the store in a clean idle state.
+   * The phase is cleared so the progress UI can swap to the error message
+   * instead of sitting on a bar that has stopped moving.
+   *
+   * @param {string} message - Player-facing explanation
+   * @returns {false}
+   */
+  function fail(message) {
+    console.error('Grid generation failed:', message)
+    error.value = message
+    currentPhase.value = ''
+    isGridGenerated.value = false
+    return false
+  }
+
+  /**
+   * Clears a previous failure without discarding the grid.
+   * Used when the player retries so the progress UI can leave the error state
+   * before the next attempt reaches `generateGrid`.
+   */
+  function clearError() {
+    error.value = null
   }
 
   /**
@@ -169,6 +334,10 @@ export const useGridStore = defineStore('gridStore', () => {
     isGridGenerated.value = false
     isLoadingElevation.value = false
     isLoadingLandCover.value = false
+    elevationProgress.value = { completed: 0, total: 0 }
+    landCoverProgress.value = { completed: 0, total: 0 }
+    currentPhase.value = ''
+    error.value = null
   }
 
   /**
@@ -179,6 +348,7 @@ export const useGridStore = defineStore('gridStore', () => {
     if (Array.isArray(gridArray)) {
       grid.value = gridArray
       isGridGenerated.value = true
+      error.value = null
     }
   }
 
@@ -187,7 +357,13 @@ export const useGridStore = defineStore('gridStore', () => {
     isGridGenerated,
     isLoadingElevation,
     isLoadingLandCover,
+    elevationProgress,
+    landCoverProgress,
+    currentPhase,
+    progressPercent,
+    error,
     generateGrid,
+    clearError,
     reset,
     setGrid
   }

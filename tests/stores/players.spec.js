@@ -316,6 +316,22 @@ describe('Player Store', () => {
       expect(playerStore.players[0].name).toBe('Stale')
     })
 
+    it('should refuse to commit an empty roster', () => {
+      playerStore.addPlayer({ name: 'Stale', color: 'red' })
+
+      expect(playerStore.commitDraftPlayers({ cash: 20000 })).toBe(false)
+      expect(playerStore.error).toBe('No players to start the game with')
+      expect(playerStore.players).toHaveLength(1)
+    })
+
+    it('should reject drafts whose names differ only by case or spacing', () => {
+      playerStore.addDraftPlayer({ name: 'Alice', color: '#FF5733' })
+      playerStore.addDraftPlayer({ name: ' alice ', color: '#80FF80' })
+
+      expect(playerStore.commitDraftPlayers({ cash: 20000 })).toBe(false)
+      expect(playerStore.players).toEqual([])
+    })
+
     it('should clear drafts on reset', () => {
       playerStore.addDraftPlayer({ name: 'Alice', color: '#FF5733' })
 

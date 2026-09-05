@@ -93,14 +93,35 @@ const selectColor = (player, color) => {
   openColorPickerId.value = null
 }
 
+/**
+ * True while an IME composition is in flight. Writing the half-composed buffer
+ * back to the store would echo it into the input and garble the name, so the
+ * store is only updated once composition ends — the same thing `v-model` does.
+ */
+const isComposing = ref(false)
+
 // Update a player's name
 const setName = (player, name) => {
   playerStore.updateDraftPlayer(player.id, { name })
 }
 
+const onNameInput = (player, event) => {
+  if (isComposing.value) return
+  setName(player, event.target.value)
+}
+
+const onCompositionEnd = (player, event) => {
+  isComposing.value = false
+  setName(player, event.target.value)
+}
+
+/** Names are compared the way the store compares them when drafts are committed */
+const normalizeName = (name) => name.trim().toLowerCase()
+
 // Validate if all player names are unique
 const isNameUnique = (id, name) => {
-  return players.value.every((player) => player.id === id || player.name !== name)
+  const target = normalizeName(name)
+  return players.value.every((player) => player.id === id || normalizeName(player.name) !== target)
 }
 
 // Emit events
@@ -150,7 +171,9 @@ const handleDone = () => {
             <div class="control is-expanded">
               <input
                 :value="player.name"
-                @input="setName(player, $event.target.value)"
+                @input="onNameInput(player, $event)"
+                @compositionstart="isComposing = true"
+                @compositionend="onCompositionEnd(player, $event)"
                 :class="['input', { 'is-danger': !isNameUnique(player.id, player.name) }]"
                 type="text"
                 placeholder="Enter player name"

@@ -309,6 +309,11 @@ export const usePlayerStore = defineStore('playerStore', () => {
   function commitDraftPlayers({ cash = 0 } = {}) {
     error.value = null
 
+    if (draftPlayers.value.length === 0) {
+      error.value = 'No players to start the game with'
+      return false
+    }
+
     const previous = players.value
     players.value = []
 

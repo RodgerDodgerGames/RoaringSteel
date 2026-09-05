@@ -40,7 +40,10 @@ function confirmPlayers() {
   }
 
   // Give the first player in turn order the turn
-  playerStore.startGame()
+  if (!playerStore.startGame()) {
+    commitError.value = playerStore.error || 'Could not start the game with these players.'
+    return
+  }
 
   emit('confirmed')
 }

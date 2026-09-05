@@ -140,26 +140,31 @@ const emit = defineEmits(['done'])
 
 // Handle done button - validate before proceeding
 const handleDone = () => {
-  // Rows left blank are rows the user decided against - drop them rather than
-  // making them clear each one out by hand
-  playerStore.pruneEmptyDraftPlayers()
+  // The screen is kept alive between visits, so an old warning would otherwise
+  // still be sitting there
+  showNotification.value = false
 
-  if (players.value.length === 0) {
-    ensureOneRow()
+  // Rows left blank are rows the user decided against, so they are not what is
+  // being validated. Nothing is removed until the roster is known good - a
+  // failed Done must leave the form exactly as the user left it.
+  const named = players.value.filter((player) => player.name.trim() !== '')
+
+  if (named.length === 0) {
     notificationMessage.value = 'Enter at least one player name before proceeding!'
     showNotification.value = true
     return
   }
 
   // Check if all names are unique
-  const hasDuplicateNames = players.value.some((player) => !isNameUnique(player.id, player.name))
+  const hasDuplicateNames = named.some((player) => !isNameUnique(player.id, player.name))
   if (hasDuplicateNames) {
     notificationMessage.value = 'All player names must be unique!'
     showNotification.value = true
     return
   }
 
-  // All validations passed - emit done event with player data
+  // All validations passed - drop the blank rows and hand over the roster
+  playerStore.pruneEmptyDraftPlayers()
   emit('done', players.value)
 }
 </script>

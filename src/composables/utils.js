@@ -29,6 +29,48 @@ export function waitRandomly(minWaitTime = 500, maxWaitTime = 2000) {
   return wait(waitTime)
 }
 
+/** Fallback ceiling for any request that does not name its own. */
+export const DEFAULT_REQUEST_TIMEOUT_MS = 30000
+
+/**
+ * Fetches a URL that is guaranteed to settle.
+ *
+ * A browser `fetch` against a connection that stalls mid-flight never resolves
+ * and never rejects. Setup awaits these requests, so one stalled socket parked
+ * the whole game on the loading modal with a full progress bar and no error
+ * (#85). The timer both aborts the request, so the socket is released, and
+ * rejects on its own, so the returned promise settles even if the underlying
+ * fetch ignores the abort.
+ *
+ * @param {string} url - Request URL
+ * @param {Object} [options] - Standard fetch options, plus `timeoutMs`
+ * @param {number} [options.timeoutMs] - Ceiling before the request is abandoned
+ * @returns {Promise<Response>} Rejects with a timeout error if the ceiling is hit
+ */
+export function fetchWithTimeout(url, { timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS, ...options } = {}) {
+  const controller = new AbortController()
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      controller.abort()
+      reject(new Error(`Request timed out after ${timeoutMs}ms`))
+    }, timeoutMs)
+
+    // The timer is cleared before settling rather than in a trailing `finally`,
+    // so an answered request never leaves a pending timer behind it.
+    fetch(url, { ...options, signal: controller.signal }).then(
+      (response) => {
+        clearTimeout(timer)
+        resolve(response)
+      },
+      (error) => {
+        clearTimeout(timer)
+        reject(error)
+      }
+    )
+  })
+}
+
 /**
  * Maps over items with a bounded number of concurrent workers, optionally
  * pacing request starts so an upstream API is not hit in bursts.

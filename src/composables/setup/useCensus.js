@@ -11,6 +11,7 @@
  */
 
 import { ref } from 'vue'
+import { fetchWithTimeout } from '@/composables/utils'
 
 /**
  * Composable for fetching Census population data by state.
@@ -39,7 +40,7 @@ export default function useCensus(state) {
       console.log('Fetching population data...')
       console.log('URL:', url)
 
-      const response = await fetch(url)
+      const response = await fetchWithTimeout(url)
       console.log('Response:', response)
 
       const censusData = await response.json()

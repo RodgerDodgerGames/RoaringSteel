@@ -13,6 +13,7 @@
  */
 
 import { ref } from 'vue'
+import { fetchWithTimeout } from '@/composables/utils'
 
 /**
  * Composable for fetching QWI employment data.
@@ -68,7 +69,7 @@ export default function useQWI(state, industry) {
 
       // Send the request
       console.log('Sending GET request to the API...')
-      const response = await fetch(url)
+      const response = await fetchWithTimeout(url)
 
       // Check if the request was successful
       if (!response.ok) {

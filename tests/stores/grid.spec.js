@@ -507,6 +507,16 @@ describe('Grid Store', () => {
       expect(gridStore.progressPercent).toBe(100)
     })
 
+    it('should not report 100 while any cell is still outstanding', () => {
+      // 397 of 399 cells rounded up to 100%, so a run stalled on two hung
+      // requests looked like a finished one and the player had nothing to go
+      // on but a full bar that never moved (#85).
+      gridStore.elevationProgress = { completed: 399, total: 399 }
+      gridStore.landCoverProgress = { completed: 397, total: 399 }
+
+      expect(gridStore.progressPercent).toBeLessThan(100)
+    })
+
     it('should stay at zero before any work is queued', () => {
       expect(gridStore.progressPercent).toBe(0)
     })

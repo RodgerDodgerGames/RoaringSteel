@@ -4,16 +4,20 @@
  * Tests for Open-Elevation API integration
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 const mockFetch = vi.hoisted(() => vi.fn())
 vi.stubGlobal('fetch', mockFetch)
 
-vi.mock('@/composables/utils', () => ({
+// Only the pacing is stubbed out; `fetchWithTimeout` stays real so the
+// request ceiling is genuinely exercised here rather than mocked away.
+vi.mock('@/composables/utils', async (importActual) => ({
+  ...(await importActual()),
   waitRandomly: vi.fn(() => Promise.resolve())
 }))
 
 import { useElevationAPI } from '@/composables/setup/useElevationAPI'
+import { gridApiConfig } from '@/config/grid'
 
 describe('useElevationAPI Composable', () => {
   beforeEach(() => {
@@ -101,6 +105,25 @@ describe('useElevationAPI Composable', () => {
         { elevation: 300 },
         { elevation: 400 }
       ])
+    })
+  })
+
+  describe('Stalled Requests', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('should abandon a batch whose request never answers', async () => {
+      // Without a ceiling this promise never settles and setup hangs (#85).
+      vi.useFakeTimers()
+      mockFetch.mockReturnValue(new Promise(() => {}))
+
+      const { fetchElevationsInBatches } = useElevationAPI()
+      const pending = fetchElevationsInBatches([{ lat: 44, lng: -93 }], 50)
+      await vi.advanceTimersByTimeAsync(gridApiConfig.elevationTimeoutMs)
+
+      // A null reads as "unknown", never as a sea-level reading of 0
+      await expect(pending).resolves.toEqual([null])
     })
   })
 

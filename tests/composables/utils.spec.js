@@ -5,8 +5,13 @@
  * setup relies on it to stay inside the upstream APIs' tolerance.
  */
 
-import { describe, it, expect, vi } from 'vitest'
-import { mapWithConcurrency, wait } from '@/composables/utils'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import {
+  DEFAULT_REQUEST_TIMEOUT_MS,
+  fetchWithTimeout,
+  mapWithConcurrency,
+  wait
+} from '@/composables/utils'
 
 describe('mapWithConcurrency', () => {
   it('should return results in input order regardless of completion order', async () => {
@@ -117,5 +122,84 @@ describe('mapWithConcurrency', () => {
     await mapWithConcurrency(['only'], worker, { concurrency: 10 })
 
     expect(peak).toBe(1)
+  })
+})
+
+describe('fetchWithTimeout', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('should pass the response straight through when the request answers', async () => {
+    const response = { ok: true }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response))
+
+    await expect(fetchWithTimeout('https://example.test')).resolves.toBe(response)
+  })
+
+  it('should settle rather than hang when the request never does', async () => {
+    // The #85 stall: a stalled socket neither resolves nor rejects, so setup
+    // sat on a full progress bar forever. Nothing but a timer can end this.
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})))
+
+    await expect(fetchWithTimeout('https://example.test', { timeoutMs: 20 })).rejects.toThrow(
+      /timed out/i
+    )
+  })
+
+  it('should abort the stalled request so the connection is released', async () => {
+    let signal = null
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url, options) => {
+        signal = options.signal
+        return new Promise(() => {})
+      })
+    )
+
+    await expect(
+      fetchWithTimeout('https://example.test', { timeoutMs: 20 })
+    ).rejects.toBeInstanceOf(Error)
+    expect(signal.aborted).toBe(true)
+  })
+
+  it('should surface a real network failure as itself, not as a timeout', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')))
+
+    await expect(fetchWithTimeout('https://example.test', { timeoutMs: 20 })).rejects.toThrow(
+      'Network error'
+    )
+  })
+
+  it('should leave no timer running once the request answers', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
+
+    await fetchWithTimeout('https://example.test', { timeoutMs: 20 })
+
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('should forward fetch options without leaking timeoutMs into them', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal('fetch', mockFetch)
+
+    await fetchWithTimeout('https://example.test', { timeoutMs: 20, method: 'POST' })
+
+    const options = mockFetch.mock.calls[0][1]
+    expect(options.method).toBe('POST')
+    expect(options.timeoutMs).toBeUndefined()
+  })
+
+  it('should apply a default ceiling when the caller names none', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})))
+
+    const pending = fetchWithTimeout('https://example.test')
+    const assertion = expect(pending).rejects.toThrow(/timed out/i)
+    await vi.advanceTimersByTimeAsync(DEFAULT_REQUEST_TIMEOUT_MS)
+
+    await assertion
   })
 })

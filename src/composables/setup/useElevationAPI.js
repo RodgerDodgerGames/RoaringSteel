@@ -10,7 +10,7 @@
  * @module composables/setup/useElevationAPI
  */
 
-import { waitRandomly } from '@/composables/utils'
+import { fetchWithTimeout, waitRandomly } from '@/composables/utils'
 import { gridApiConfig } from '@/config/grid'
 
 /**
@@ -37,7 +37,9 @@ export function useElevationAPI() {
     const url = `${apiUrl}?locations=${encodeURIComponent(locationString)}`
 
     try {
-      const response = await fetch(url)
+      const response = await fetchWithTimeout(url, {
+        timeoutMs: gridApiConfig.elevationTimeoutMs
+      })
 
       // A rate-limited or failing response still parses as JSON, just without
       // a `results` array. Checking status first keeps that from being read as

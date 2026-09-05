@@ -4,7 +4,7 @@
  * Tests for NLCD Land Cover API integration
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 const mockFetch = vi.hoisted(() => vi.fn())
 vi.stubGlobal('fetch', mockFetch)
@@ -355,6 +355,50 @@ describe('useLandCoverAPI Composable', () => {
 
       const url = mockFetch.mock.calls[0][0]
       expect(url).toContain('application%2Fjson')
+    })
+  })
+
+  describe('Stalled Requests', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('should give up on a cell whose request never answers', async () => {
+      vi.useFakeTimers()
+      mockFetch.mockReturnValue(new Promise(() => {}))
+
+      const { fetchLandCover } = useLandCoverAPI()
+      const pending = fetchLandCover({ lat: 44.9778, lng: -93.265 })
+      await vi.advanceTimersByTimeAsync(gridApiConfig.landCoverTimeoutMs)
+
+      await expect(pending).resolves.toBeNull()
+    })
+
+    it('should finish the run when one cell stalls, instead of parking setup (#85)', async () => {
+      // This is the reported bug: two of 399 cells never answered, so two pool
+      // workers waited forever, the run never resolved, and the game sat on the
+      // setup modal with a full bar and no error.
+      vi.useFakeTimers()
+      const answered = {
+        ok: true,
+        json: async () => ({ features: [{ properties: { PALETTE_INDEX: 22 } }] })
+      }
+      mockFetch
+        .mockImplementationOnce(() => Promise.resolve(answered))
+        .mockImplementationOnce(() => new Promise(() => {}))
+        .mockImplementationOnce(() => Promise.resolve(answered))
+
+      const { fetchLandCoverInBatches } = useLandCoverAPI()
+      const pending = fetchLandCoverInBatches([
+        { lat: 44.0, lng: -93.0 },
+        { lat: 45.0, lng: -94.0 },
+        { lat: 46.0, lng: -95.0 }
+      ])
+      await vi.advanceTimersByTimeAsync(gridApiConfig.landCoverTimeoutMs * 2)
+
+      // The stalled cell comes back null, which the grid store counts against
+      // its land cover failure rate like any other failed lookup.
+      await expect(pending).resolves.toEqual([5, null, 5])
     })
   })
 

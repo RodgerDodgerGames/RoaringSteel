@@ -17,6 +17,7 @@ import { useTownsStore } from '@/stores/towns'
 import { useGridStore } from '@/stores/grid'
 import { useDemandCardsStore } from '@/stores/demandCards'
 import { useMapStore } from '@/stores/map'
+import { useTrackStore } from '@/stores/track'
 
 const SAVE_VERSION = '1.0.0'
 const AUTOSAVE_PREFIX = 'roaringsteel_autosave_'
@@ -30,6 +31,7 @@ export function useGamePersistence() {
   const gridStore = useGridStore()
   const demandCardsStore = useDemandCardsStore()
   const mapStore = useMapStore()
+  const trackStore = useTrackStore()
 
   /**
    * Serializes the current game state into a JSON-safe object.
@@ -52,7 +54,8 @@ export function useGamePersistence() {
       },
       towns: townsStore.towns,
       grid: gridStore.grid,
-      demandCards: demandCardsStore.demandCards
+      demandCards: demandCardsStore.demandCards,
+      track: trackStore.segments
     }
   }
 
@@ -77,6 +80,7 @@ export function useGamePersistence() {
       gridStore.reset()
       demandCardsStore.reset()
       mapStore.reset()
+      trackStore.reset()
 
       // Surface non-fatal problems without refusing the load
       validation.warnings.forEach((w) => console.warn('Save data warning:', w))
@@ -90,6 +94,9 @@ export function useGamePersistence() {
       if (data.towns) townsStore.setTowns(data.towns)
       if (data.grid) gridStore.setGrid(data.grid)
       if (data.demandCards) demandCardsStore.setDemandCards(data.demandCards)
+      // Saves written before track was persisted have no `track` field; that is
+      // a game with no track, not a broken save
+      if (data.track) trackStore.setTrack(data.track)
       if (data.mapView) mapStore.setMapView(data.mapView)
 
       console.log('Game state restored successfully')

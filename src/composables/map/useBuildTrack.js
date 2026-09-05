@@ -156,6 +156,10 @@ export default function useBuildTrack(props, grid, formatCurrency) {
       setupDrawingEvents()
     })
     props.map.on('pm:create', finalizeDrawing)
+    // Geoman's global removal and edit modes act on the layer, so the store has
+    // to be told; without this the map and the rail network drift apart (#83)
+    props.map.on('pm:remove', handleLayerRemoved)
+    props.map.on('pm:update', handleLayerEdited)
   }
 
   function initializeCaches() {
@@ -164,7 +168,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
 
     // Cache the endpoints of every line already on the map, so restored track
     // is a legal place to start building from
-    ;[...existingLineLayers.value, ...restoredLineLayers.value].forEach(updateLineEndpoints)
+    rebuildLineEndpoints()
   }
 
   /**
@@ -179,6 +183,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     trackStore.segments.forEach((segment) => {
       const latlngs = segment.coordinates.map((point) => L.latLng(point.lat, point.lng))
       const layer = L.polyline(latlngs).addTo(props.map)
+      layer.segmentId = segment.id
       restoredLineLayers.value.push(layer)
       styleTracks(layer)
     })
@@ -233,8 +238,12 @@ export default function useBuildTrack(props, grid, formatCurrency) {
       // in the accumulator. Flush it before the segment is priced.
       if (runningCost.value > 0) calculateSegmentCost()
 
+      // Record before styling: the layer has to carry its segment id from the
+      // moment it exists, or a removal cannot find what to un-record
+      const segment = recordSegment(e.layer)
+      if (segment) e.layer.segmentId = segment.id
+
       existingLineLayers.value.push(e.layer)
-      recordSegment(e.layer)
       updateLineEndpoints(e.layer)
       styleTracks(e.layer)
     }
@@ -261,6 +270,76 @@ export default function useBuildTrack(props, grid, formatCurrency) {
       console.error('Could not record track segment:', trackStore.error)
     }
     return segment
+  }
+
+  // ================== MAP / STORE SYNCHRONISATION ==================
+
+  /**
+   * Finds the track layer an event belongs to.
+   *
+   * The rails a player actually sees and clicks are the styled decoration, not
+   * the line itself — the line is set fully transparent by `styleTracks`. So an
+   * event can arrive on either, and both have to lead back to the same segment.
+   *
+   * @param {Object} layer - The layer the Geoman event fired on
+   * @returns {Object|null} The track layer carrying a segment id, if any
+   */
+  function resolveTrackLayer(layer) {
+    if (!layer) return null
+    if (layer.trackLayer) return layer.trackLayer
+    return layer.segmentId ? layer : null
+  }
+
+  /**
+   * Takes a removed layer out of the rail network, so a torn-up section stays
+   * torn up after a reload.
+   * @param {Object} e - Geoman removal event
+   */
+  function handleLayerRemoved(e) {
+    const layer = resolveTrackLayer(e.layer)
+    if (!layer) return
+
+    if (!trackStore.removeSegment(layer.segmentId)) {
+      console.error('Could not remove track segment:', trackStore.error)
+    }
+
+    // The rails and the line are one piece of track to the player, so removing
+    // either has to take the other off the map with it
+    removeStyling(layer)
+    if (props.map.hasLayer(layer)) props.map.removeLayer(layer)
+
+    existingLineLayers.value = existingLineLayers.value.filter((l) => l !== layer)
+    restoredLineLayers.value = restoredLineLayers.value.filter((l) => l !== layer)
+    rebuildLineEndpoints()
+  }
+
+  /**
+   * Writes a reshaped layer's new geometry back to its segment, and redraws the
+   * rails to match.
+   * @param {Object} e - Geoman update event
+   */
+  function handleLayerEdited(e) {
+    const layer = resolveTrackLayer(e.layer)
+    if (!layer) return
+
+    const coordinates = layer.getLatLngs().map(({ lat, lng }) => ({ lat, lng }))
+    if (!trackStore.updateSegmentCoordinates(layer.segmentId, coordinates)) {
+      console.error('Could not update track segment:', trackStore.error)
+    }
+
+    removeStyling(layer)
+    styleTracks(layer)
+    rebuildLineEndpoints()
+  }
+
+  /**
+   * Rebuilds the endpoint cache from the track currently on the map.
+   * Recomputing beats patching: after a removal or an edit the old endpoints
+   * are no longer places track can legally start from.
+   */
+  function rebuildLineEndpoints() {
+    lineEndpoints.value = []
+    ;[...existingLineLayers.value, ...restoredLineLayers.value].forEach(updateLineEndpoints)
   }
 
   // ================== COST TRACKING & TOOLTIP ==================
@@ -420,6 +499,23 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     }
     tieLayer.setText(tieText, tieOptions)
     tieLayer.addTo(props.map)
+
+    // Link the decoration to the track it draws, in both directions, so a
+    // click on the visible rails still resolves to the segment behind them
+    tieLayer.trackLayer = layer
+    layer.tieLayer = tieLayer
+  }
+
+  /**
+   * Takes the drawn rails off the map, leaving the underlying line alone.
+   * Used before redrawing after an edit, and when a section is removed.
+   * @param {Object} layer - The track layer whose styling should be cleared
+   */
+  function removeStyling(layer) {
+    if (layer.tieLayer) {
+      props.map.removeLayer(layer.tieLayer)
+      layer.tieLayer = null
+    }
   }
 
   // function to add ties to railroad tracks

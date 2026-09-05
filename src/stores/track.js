@@ -148,6 +148,37 @@ export const useTrackStore = defineStore('track', () => {
   }
 
   /**
+   * Rewrite a segment's coordinates after the player reshapes it on the map.
+   * Only the geometry is editable: ownership, price and turn are decided when
+   * the track is built, not when a vertex is dragged.
+   * @param {number} id - The segment id.
+   * @param {Array} coordinates - The new [{lat, lng}, ...] in draw order.
+   * @returns {boolean} True if the segment was found and updated.
+   */
+  function updateSegmentCoordinates(id, coordinates) {
+    error.value = null
+
+    const segment = getSegment(id)
+    if (!segment) {
+      error.value = `Track segment with ID ${id} not found`
+      return false
+    }
+
+    if (!Array.isArray(coordinates) || coordinates.length < 2) {
+      error.value = 'Track segment needs at least two points'
+      return false
+    }
+
+    if (!coordinates.every(isValidPoint)) {
+      error.value = 'Track segment has an invalid coordinate'
+      return false
+    }
+
+    segment.coordinates = coordinates.map(toPlainPoint)
+    return true
+  }
+
+  /**
    * Every segment belonging to one player.
    * @param {number} ownerId - The player's id.
    * @returns {Array} That player's segments, in build order.
@@ -199,6 +230,7 @@ export const useTrackStore = defineStore('track', () => {
     addSegment,
     getSegment,
     removeSegment,
+    updateSegmentCoordinates,
     segmentsForOwner,
     setTrack,
     reset

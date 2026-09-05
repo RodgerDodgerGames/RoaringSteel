@@ -180,6 +180,35 @@ describe('useGamePersistence', () => {
       expect(trackStore.segments).toEqual([])
     })
 
+    it('should not bring back a section the player tore up', () => {
+      const segment = trackStore.addSegment({ ownerId: 1, coordinates: line, cost: 500, turn: 0 })
+      trackStore.removeSegment(segment.id)
+      persistence.autoSave()
+
+      trackStore.reset()
+      const [latest] = persistence.getAutoSaves()
+      persistence.loadAutoSave(latest.index)
+
+      expect(trackStore.segments).toEqual([])
+    })
+
+    it('should keep the edited shape of a reshaped section', () => {
+      const segment = trackStore.addSegment({ ownerId: 1, coordinates: line, cost: 500, turn: 0 })
+      const reshaped = [
+        { lat: 44.98, lng: -93.27 },
+        { lat: 44.96, lng: -93.18 },
+        { lat: 44.94, lng: -93.09 }
+      ]
+      trackStore.updateSegmentCoordinates(segment.id, reshaped)
+      persistence.autoSave()
+
+      trackStore.reset()
+      const [latest] = persistence.getAutoSaves()
+      persistence.loadAutoSave(latest.index)
+
+      expect(trackStore.segments[0].coordinates).toEqual(reshaped)
+    })
+
     it('should clear track left over from the previous game on load', () => {
       persistence.autoSave() // a save taken before any track was built
       trackStore.addSegment({ ownerId: 1, coordinates: line, cost: 500, turn: 0 })

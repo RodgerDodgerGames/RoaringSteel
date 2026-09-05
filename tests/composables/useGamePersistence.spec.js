@@ -10,11 +10,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { usePlayerStore } from '@/stores/players'
 import { useGameStore } from '@/stores/game'
+import { useTrackStore } from '@/stores/track'
 import { useGamePersistence } from '@/composables/useGamePersistence'
 
 describe('useGamePersistence', () => {
   let playerStore
   let gameStore
+  let trackStore
   let persistence
 
   beforeEach(() => {
@@ -23,6 +25,7 @@ describe('useGamePersistence', () => {
     localStorage.clear()
     playerStore = usePlayerStore()
     gameStore = useGameStore()
+    trackStore = useTrackStore()
     persistence = useGamePersistence()
 
     gameStore.setRegion({ name: 'Test Region' })
@@ -131,6 +134,60 @@ describe('useGamePersistence', () => {
       persistence.loadAutoSave(latest.index)
 
       expect(playerStore.players[0].cash).toBe(12500)
+    })
+  })
+
+  describe('track', () => {
+    const line = [
+      { lat: 44.98, lng: -93.27 },
+      { lat: 44.94, lng: -93.09 }
+    ]
+
+    it('should carry built track through a save and reload', () => {
+      trackStore.addSegment({ ownerId: 2, coordinates: line, cost: 3000, turn: 1 })
+      persistence.autoSave()
+
+      trackStore.reset()
+      playerStore.reset()
+      gameStore.reset()
+
+      const [latest] = persistence.getAutoSaves()
+      expect(persistence.loadAutoSave(latest.index)).toBe(true)
+
+      expect(trackStore.segments).toHaveLength(1)
+      expect(trackStore.segments[0]).toMatchObject({ ownerId: 2, cost: 3000, turn: 1 })
+      expect(trackStore.segments[0].coordinates).toEqual(line)
+    })
+
+    it('should keep track attributed to the player who built it', () => {
+      trackStore.addSegment({ ownerId: 1, coordinates: line, cost: 1000, turn: 0 })
+      trackStore.addSegment({ ownerId: 3, coordinates: line, cost: 2000, turn: 0 })
+      persistence.autoSave()
+
+      trackStore.reset()
+      const [latest] = persistence.getAutoSaves()
+      persistence.loadAutoSave(latest.index)
+
+      expect(trackStore.segmentsForOwner(1).map((s) => s.cost)).toEqual([1000])
+      expect(trackStore.segmentsForOwner(3).map((s) => s.cost)).toEqual([2000])
+    })
+
+    it('should load a save written before track was persisted', () => {
+      const save = persistence.serializeGameState()
+      delete save.track
+
+      expect(persistence.deserializeGameState(save)).toBe(true)
+      expect(trackStore.segments).toEqual([])
+    })
+
+    it('should clear track left over from the previous game on load', () => {
+      persistence.autoSave() // a save taken before any track was built
+      trackStore.addSegment({ ownerId: 1, coordinates: line, cost: 500, turn: 0 })
+
+      const [latest] = persistence.getAutoSaves()
+      persistence.loadAutoSave(latest.index)
+
+      expect(trackStore.segments).toEqual([])
     })
   })
 })

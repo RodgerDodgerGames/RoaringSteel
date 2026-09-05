@@ -9,6 +9,8 @@ import 'leaflet-textpath'
 import { storeToRefs } from 'pinia'
 import { useMapStore } from '@/stores/map'
 import { usePlayerStore } from '@/stores/players'
+import { useTrackStore } from '@/stores/track'
+import { useGameStore } from '@/stores/game'
 
 /**
  * Main composable function to handle map drawing logic
@@ -24,7 +26,8 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   const runningCost = ref(0) // Accumulator for the ongoing segment cost
   const workingLayer = ref(null) // Reference to the currently drawn line layer
   const hintMarkerMoveHandler = ref(null) // Handler for hint marker movement
-  const existingLineLayers = ref([]) // Store for completed line layers
+  const existingLineLayers = ref([]) // Leaflet layers for track drawn in this session
+  const restoredLineLayers = ref([]) // Leaflet layers redrawn from a saved game
   const currentGridCellId = ref(null) // ID of the current grid cell for cost tracking
   const isFirstVertexAdded = ref(false) // Flag to track if the first vertex has been added
 
@@ -38,6 +41,10 @@ export default function useBuildTrack(props, grid, formatCurrency) {
 
   // the active player drives per-turn build state
   const playerStore = usePlayerStore()
+
+  // completed track is game state, not a map layer, so it lives in its own store
+  const trackStore = useTrackStore()
+  const gameStore = useGameStore()
 
   // ================== COMPUTED PROPERTIES ==================
 
@@ -53,8 +60,8 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    * cost panel shows what the *current* player has spent rather than an
    * ever-growing list. Any drawing left in progress is cancelled first.
    *
-   * Completed track layers are deliberately left on the map — persisting and
-   * attributing them to their owner is #63.
+   * Completed track layers are deliberately left on the map; the segments
+   * behind them are already recorded in the track store.
    */
   watch(
     () => playerStore.activePlayer?.id,
@@ -74,6 +81,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     initializeMapEvents() // Set up general drawing events on the map
     setupCursorValidation() // Enable cursor validation during drawing
     setGeomanOptions() // Configure Geoman drawing tool options
+    restoreTrackLayers() // Redraw track carried in from a saved game
     initializeCaches() // Initialize town marker and line endpoint caches
   })
 
@@ -154,10 +162,25 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     // Cache town marker positions
     townMarkerPositions.value = props.towns.value.getLayers().map((marker) => marker.getLatLng())
 
-    // Cache initial line endpoints (assuming some existing lines)
-    existingLineLayers.value.forEach((line) => {
-      const linePoints = line.getLatLngs()
-      lineEndpoints.value.push(linePoints[0], linePoints[linePoints.length - 1])
+    // Cache the endpoints of every line already on the map, so restored track
+    // is a legal place to start building from
+    ;[...existingLineLayers.value, ...restoredLineLayers.value].forEach(updateLineEndpoints)
+  }
+
+  /**
+   * Redraws the track held in the track store, so a loaded game comes back with
+   * its rail network on the map.
+   *
+   * Restored layers are kept apart from `existingLineLayers` because that list
+   * drives the "track you have built this turn" controls — loading a save is
+   * not building.
+   */
+  function restoreTrackLayers() {
+    trackStore.segments.forEach((segment) => {
+      const latlngs = segment.coordinates.map((point) => L.latLng(point.lat, point.lng))
+      const layer = L.polyline(latlngs).addTo(props.map)
+      restoredLineLayers.value.push(layer)
+      styleTracks(layer)
     })
   }
 
@@ -205,12 +228,39 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   function finalizeDrawing(e) {
     mapStore.setIsDrawingActive(false)
     if (e.layer?.pm?._shape === 'Line') {
+      // A line finished by double-clicking rather than by landing on a town
+      // never fires a final `pm:vertexadded`, so the last leg is still sitting
+      // in the accumulator. Flush it before the segment is priced.
+      if (runningCost.value > 0) calculateSegmentCost()
+
       existingLineLayers.value.push(e.layer)
+      recordSegment(e.layer)
       updateLineEndpoints(e.layer)
       styleTracks(e.layer)
     }
     resetHintMarkerMoveHandler()
     workingLayer.value = null
+  }
+
+  /**
+   * Writes a finished line into the track store as owned, priced game state.
+   * @param {Object} layer - The completed Leaflet line layer
+   * @returns {Object|null} The stored segment, or null if it was rejected
+   */
+  function recordSegment(layer) {
+    const segment = trackStore.addSegment({
+      ownerId: playerStore.activePlayer?.id,
+      coordinates: layer.getLatLngs().map(({ lat, lng }) => ({ lat, lng })),
+      cost: totalCost.value,
+      turn: gameStore.turn
+    })
+
+    // Losing the segment silently would leave track on the map that no player
+    // owns and no save records, so say so rather than carrying on quietly
+    if (!segment) {
+      console.error('Could not record track segment:', trackStore.error)
+    }
+    return segment
   }
 
   // ================== COST TRACKING & TOOLTIP ==================
@@ -340,7 +390,6 @@ export default function useBuildTrack(props, grid, formatCurrency) {
 
   // function to style layer like railroad tracks
   function styleTracks(layer) {
-    if (layer?.pm?._shape != 'Line') return
     const latlngs = layer.getLatLngs()
 
     // Hide the original layer
@@ -349,8 +398,6 @@ export default function useBuildTrack(props, grid, formatCurrency) {
       opacity: 0,
       weight: 0
     })
-
-    existingLineLayers.value.push(layer) // Store the original layer for reference
 
     // Add rails using text
     const railText = '-'

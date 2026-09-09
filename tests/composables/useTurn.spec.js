@@ -5,12 +5,14 @@
  * - Passing play to the next player
  * - Advancing the game turn only on wrap-around
  * - Auto-saving after each turn
+ * - Clearing the finishing player's track building allowance
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useTurn } from '@/composables/useTurn'
 import { usePlayerStore } from '@/stores/players'
 import { useGameStore } from '@/stores/game'
+import { gameRules } from '@/config/game'
 
 // autoSave is stubbed so these tests exercise turn logic, not persistence
 const { autoSave } = vi.hoisted(() => ({ autoSave: vi.fn(() => true) }))
@@ -111,6 +113,44 @@ describe('useTurn', () => {
 
       expect(endTurn()).toBe(false)
       expect(gameStore.turn).toBe(0)
+    })
+
+    it("should clear the finishing player's build allowance", () => {
+      seedPlayers()
+      playerStore.updatePlayer(1, { cash: 20000 })
+      playerStore.spendOnTrack(1, 8000)
+      const { endTurn } = useTurn()
+
+      endTurn()
+
+      // The allowance resets; the money spent does not come back
+      expect(playerStore.players[0].trackSpentThisTurn).toBe(0)
+      expect(playerStore.players[0].cash).toBe(12000)
+    })
+
+    it('should leave the incoming player their own allowance', () => {
+      seedPlayers()
+      playerStore.updatePlayer(2, { cash: 20000 })
+      playerStore.updatePlayer(2, { trackSpentThisTurn: 3000 })
+      const { endTurn } = useTurn()
+
+      endTurn() // Alice -> Bob
+
+      // Only the player who just finished is reset, so a counter carried in
+      // from a save still limits the player it belongs to
+      expect(playerStore.players[1].trackSpentThisTurn).toBe(3000)
+    })
+
+    it('should give a player a full allowance again on their next turn', () => {
+      seedPlayers(['Alice', 'Bob'])
+      playerStore.updatePlayer(1, { cash: 100000 })
+      playerStore.spendOnTrack(1, gameRules.trackBudgetPerTurn)
+      const { endTurn } = useTurn()
+
+      endTurn() // Alice -> Bob
+      endTurn() // Bob -> Alice
+
+      expect(playerStore.availableForTrack(1)).toBe(gameRules.trackBudgetPerTurn)
     })
 
     it('should auto-save after each turn', () => {

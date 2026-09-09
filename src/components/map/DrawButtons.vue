@@ -2,8 +2,9 @@
   DrawButtons.vue
 
   Track building control panel with drawing tools and cost display.
-  Provides buttons to start/stop building, edit, and remove track.
-  Shows itemized costs for each track section and running total.
+  Provides buttons to start/stop building and to remove track built this turn.
+  Shows itemized costs for each track section, the running total, and what the
+  active player has left to spend.
 
   @prop map - Leaflet map instance
   @prop towns - Towns layer for track connections
@@ -39,11 +40,14 @@ const { isDrawingActive } = storeToRefs(mapStore)
 const {
   itemizedCosts,
   totalCost,
+  pendingCost,
+  availableToSpend,
+  isOverBudget,
+  buildError,
   hasTrackBeenDrawn,
   startDrawingLine,
   enableRemoveMode,
-  cancelDrawing,
-  enableEditing
+  cancelDrawing
 } = useBuildTrack(props, grid, formatCurrency)
 </script>
 
@@ -60,17 +64,32 @@ const {
     <button v-else class="button is-danger" @click="cancelDrawing">Stop Building</button>
   </div>
 
-  <!-- edit and remove buttons -->
+  <!-- remove button -->
   <div class="block">
     <div v-if="hasTrackBeenDrawn" class="buttons">
       <button class="button is-danger" @click="enableRemoveMode">Remove</button>
-      -OR-
-      <button class="button is-info" @click="enableEditing">Edit</button>
       <div class="is-size-5">sections of track you have built this turn</div>
     </div>
   </div>
 
   <hr class="my-3" />
+
+  <!-- what is left to spend, and why a section was turned away -->
+  <div class="block">
+    <div class="is-flex is-justify-content-space-between">
+      <span>Available to build</span>
+      <span class="has-text-weight-bold">{{ formatCurrency(availableToSpend) }}</span>
+    </div>
+
+    <p v-if="isOverBudget" class="notification is-warning is-light mt-2 p-2">
+      This section costs {{ formatCurrency(pendingCost) }} — more than the
+      {{ formatCurrency(availableToSpend) }} you have to spend. It cannot be built.
+    </p>
+
+    <p v-else-if="buildError" class="notification is-danger is-light mt-2 p-2">
+      {{ buildError }}
+    </p>
+  </div>
 
   <!-- itemized costs and total cost -->
   <div class="block" v-if="itemizedCosts.length">

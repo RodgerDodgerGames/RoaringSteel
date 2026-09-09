@@ -277,7 +277,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
 
       // Record before styling: the layer has to carry its segment id from the
       // moment it exists, or a removal cannot find what to un-record
-      const segment = recordSegment(e.layer)
+      const segment = recordSegment(e.layer, cost)
       if (!segment) {
         // Nothing was built, so nothing stays charged for
         playerStore.refundTrackSpend(builderId, cost)
@@ -310,14 +310,20 @@ export default function useBuildTrack(props, grid, formatCurrency) {
 
   /**
    * Writes a finished line into the track store as owned, priced game state.
+   *
+   * The price is passed in rather than read from `totalCost` again, so the
+   * amount the player was charged and the amount the segment records are the
+   * same number by construction — a refund pays back what the segment says.
+   *
    * @param {Object} layer - The completed Leaflet line layer
+   * @param {number} cost - What the player was charged for it
    * @returns {Object|null} The stored segment, or null if it was rejected
    */
-  function recordSegment(layer) {
+  function recordSegment(layer, cost) {
     const segment = trackStore.addSegment({
       ownerId: playerStore.activePlayer?.id,
       coordinates: layer.getLatLngs().map(({ lat, lng }) => ({ lat, lng })),
-      cost: totalCost.value,
+      cost,
       turn: gameStore.turn
     })
 

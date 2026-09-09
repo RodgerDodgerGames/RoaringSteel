@@ -494,6 +494,16 @@ describe('Player Store', () => {
         expect(playerStore.players[0].trackSpentThisTurn).toBe(0)
       })
 
+      it('should still hold a player with no spend counter to the budget', () => {
+        // `budget - undefined` is NaN, and every comparison against NaN is
+        // false, so an unguarded check would let this player build for free
+        playerStore.updatePlayer(1, { cash: 100000, trackSpentThisTurn: undefined })
+
+        expect(playerStore.spendOnTrack(1, gameRules.trackBudgetPerTurn)).toBe(true)
+        expect(playerStore.players[0].trackSpentThisTurn).toBe(gameRules.trackBudgetPerTurn)
+        expect(playerStore.spendOnTrack(1, 1)).toBe(false)
+      })
+
       it('should not count a refused section against the budget', () => {
         playerStore.updatePlayer(1, { cash: 500 })
         playerStore.spendOnTrack(1, 800)

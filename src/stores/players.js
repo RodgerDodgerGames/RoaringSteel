@@ -266,6 +266,21 @@ export const usePlayerStore = defineStore('playerStore', () => {
   // MONEY
 
   /**
+   * What a player has spent on track this turn.
+   *
+   * Read through a helper because a missing counter has to come back as 0
+   * rather than as undefined: `budget - undefined` is NaN, and every
+   * comparison against NaN is false, so a player carrying one would sail
+   * through the budget check with no limit at all.
+   *
+   * @param {Object} player The player.
+   * @returns {number} Amount spent on track this turn.
+   */
+  function spentOnTrack(player) {
+    return Number.isFinite(player.trackSpentThisTurn) ? player.trackSpentThisTurn : 0
+  }
+
+  /**
    * How much of this turn's track allowance a player has left.
    * @param {number} id The player's ID.
    * @returns {number} Unspent allowance, never negative.
@@ -274,7 +289,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     const player = players.value.find((p) => p.id === id)
     if (!player) return 0
 
-    return Math.max(0, gameRules.trackBudgetPerTurn - player.trackSpentThisTurn)
+    return Math.max(0, gameRules.trackBudgetPerTurn - spentOnTrack(player))
   }
 
   /**
@@ -358,7 +373,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     // spendCash sets its own error if the player cannot cover it
     if (!spendCash(id, amount)) return false
 
-    player.trackSpentThisTurn += amount
+    player.trackSpentThisTurn = spentOnTrack(player) + amount
     return true
   }
 
@@ -388,7 +403,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     // A refund can only ever hand back what this turn's building took, so the
     // counter floors at zero rather than going negative and quietly granting a
     // larger allowance than the rules allow
-    player.trackSpentThisTurn = Math.max(0, player.trackSpentThisTurn - amount)
+    player.trackSpentThisTurn = Math.max(0, spentOnTrack(player) - amount)
     return true
   }
 

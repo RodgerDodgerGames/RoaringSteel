@@ -179,6 +179,38 @@ export const useTrackStore = defineStore('track', () => {
   }
 
   /**
+   * Whether a segment was built by a given player on a given turn.
+   *
+   * This is the rule for what a player may tear up: their own track, from the
+   * turn in progress. It lives here rather than in the map code because the
+   * same question decides both whether the Remove control is offered and
+   * whether a removal is honoured, and those two must never disagree.
+   *
+   * @param {Object|undefined} segment - The segment to test.
+   * @param {number} ownerId - The player's id.
+   * @param {number} turn - The turn in progress.
+   * @returns {boolean} True if the segment is that player's, from that turn.
+   */
+  function isOwnedFromTurn(segment, ownerId, turn) {
+    return !!segment && segment.ownerId === ownerId && segment.turn === turn
+  }
+
+  /**
+   * Track a player built on a given turn, and so may still tear up.
+   *
+   * Read from the store rather than from the layers drawn this session, so a
+   * player who reloads mid-turn can still remove — and get a refund for — the
+   * track they have already paid for.
+   *
+   * @param {number} ownerId - The player's id.
+   * @param {number} turn - The turn in progress.
+   * @returns {Array} Matching segments, in build order.
+   */
+  function segmentsBuiltOn(ownerId, turn) {
+    return segments.value.filter((segment) => isOwnedFromTurn(segment, ownerId, turn))
+  }
+
+  /**
    * Every segment belonging to one player.
    * @param {number} ownerId - The player's id.
    * @returns {Array} That player's segments, in build order.
@@ -231,6 +263,8 @@ export const useTrackStore = defineStore('track', () => {
     getSegment,
     removeSegment,
     updateSegmentCoordinates,
+    isOwnedFromTurn,
+    segmentsBuiltOn,
     segmentsForOwner,
     setTrack,
     reset

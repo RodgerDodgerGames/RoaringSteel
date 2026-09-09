@@ -234,4 +234,74 @@ describe('track store', () => {
       expect(trackStore.addSegment({ ownerId: 1, coordinates: line() }).id).toBe(1)
     })
   })
+
+  describe('what a player may tear up', () => {
+    beforeEach(() => {
+      trackStore.addSegment({ ownerId: 1, coordinates: line(), cost: 1000, turn: 3 })
+      trackStore.addSegment({ ownerId: 1, coordinates: line(), cost: 500, turn: 2 })
+      trackStore.addSegment({ ownerId: 2, coordinates: line(), cost: 2500, turn: 3 })
+    })
+
+    describe('isOwnedFromTurn', () => {
+      it("should accept a player's own track from the turn in progress", () => {
+        const [own] = trackStore.segmentsBuiltOn(1, 3)
+
+        expect(trackStore.isOwnedFromTurn(own, 1, 3)).toBe(true)
+      })
+
+      it('should refuse track built on an earlier turn', () => {
+        const earlier = trackStore.segments.find((s) => s.turn === 2)
+
+        // Track is only refundable on the turn it was paid for
+        expect(trackStore.isOwnedFromTurn(earlier, 1, 3)).toBe(false)
+      })
+
+      it("should refuse another player's track", () => {
+        const theirs = trackStore.segments.find((s) => s.ownerId === 2)
+
+        expect(trackStore.isOwnedFromTurn(theirs, 1, 3)).toBe(false)
+      })
+
+      it('should refuse a segment that does not exist', () => {
+        expect(trackStore.isOwnedFromTurn(undefined, 1, 3)).toBe(false)
+      })
+
+      it('should refuse when nobody holds the turn', () => {
+        const [own] = trackStore.segmentsBuiltOn(1, 3)
+
+        // `activePlayer?.id` is undefined between turns, and an unowned
+        // segment must not match an unknown player
+        expect(trackStore.isOwnedFromTurn(own, undefined, 3)).toBe(false)
+      })
+    })
+
+    describe('segmentsBuiltOn', () => {
+      it("should return only this turn's track for the player asking", () => {
+        expect(trackStore.segmentsBuiltOn(1, 3).map((s) => s.cost)).toEqual([1000])
+      })
+
+      it('should be empty for a player who has not built this turn', () => {
+        // This is what hides the Remove control from the next player, who
+        // would otherwise be offered track they did not build
+        expect(trackStore.segmentsBuiltOn(3, 3)).toEqual([])
+      })
+
+      it('should still find track after the network is restored from a save', () => {
+        const saved = trackStore.segments.map((segment) => ({ ...segment }))
+        trackStore.reset()
+        trackStore.setTrack(saved)
+
+        // A player who reloads mid-turn has already been charged, so the
+        // refund has to stay reachable
+        expect(trackStore.segmentsBuiltOn(1, 3).map((s) => s.cost)).toEqual([1000])
+      })
+
+      it('should drop a segment once it is removed', () => {
+        const [own] = trackStore.segmentsBuiltOn(1, 3)
+        trackStore.removeSegment(own.id)
+
+        expect(trackStore.segmentsBuiltOn(1, 3)).toEqual([])
+      })
+    })
+  })
 })

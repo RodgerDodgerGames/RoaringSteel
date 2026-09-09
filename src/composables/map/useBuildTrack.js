@@ -26,6 +26,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   const runningCost = ref(0) // Accumulator for the ongoing segment cost
   const workingLayer = ref(null) // Reference to the currently drawn line layer
   const hintMarkerMoveHandler = ref(null) // Handler for hint marker movement
+  const costedHintMarker = ref(null) // The hint marker that handler is bound to
   const existingLineLayers = ref([]) // Leaflet layers for track drawn in this session
   const restoredLineLayers = ref([]) // Leaflet layers redrawn from a saved game
   const currentGridCellId = ref(null) // ID of the current grid cell for cost tracking
@@ -51,8 +52,18 @@ export default function useBuildTrack(props, grid, formatCurrency) {
 
   // total cost for all track segments
   const totalCost = computed(() => itemizedCosts.value.reduce((acc, cost) => acc + cost, 0))
-  // has any track been drawn
-  const hasTrackBeenDrawn = computed(() => existingLineLayers.value.length > 0)
+  /**
+   * Whether the active player has track they may still tear up.
+   *
+   * Read from the track store rather than from the layers drawn this session,
+   * so it is right in both directions: a player who reloads mid-turn can still
+   * reach the refund for track they have already paid for, and a player who
+   * has built nothing is not offered a Remove button for the previous
+   * player's track.
+   */
+  const hasRemovableTrack = computed(
+    () => trackStore.segmentsBuiltOn(playerStore.activePlayer?.id, gameStore.turn).length > 0
+  )
 
   /**
    * What the active player can still put into track — whichever of cash on hand
@@ -126,9 +137,18 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    * Initiates line drawing mode on the map.
    */
   function startDrawingLine() {
+    resetLineTracking()
+
+    // Cost comes from the grid cells a line crosses, so with no grid every
+    // line prices at zero and is built for nothing. Refuse rather than give
+    // the map away.
+    if (!grid.value?.length) {
+      buildError.value = 'The map has not finished loading, so track cannot be priced yet.'
+      return
+    }
+
     props.map.pm.enableDraw('Line')
     mapStore.setIsDrawingActive(true)
-    resetLineTracking()
   }
 
   /**
@@ -137,6 +157,9 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   function cancelDrawing() {
     props.map.pm.disableDraw('Line')
     mapStore.setIsDrawingActive(false)
+    // Without this the handler stays held, the next drawing never rebinds one,
+    // and every leg of it prices at zero — free track
+    resetHintMarkerMoveHandler()
     workingLayer.value = null
   }
 
@@ -270,8 +293,15 @@ export default function useBuildTrack(props, grid, formatCurrency) {
         // The store's own message is in raw numbers and names the player, which
         // is what a log wants and not what the person building wants to read
         console.warn('Track section refused:', playerStore.error)
-        buildError.value = `That section costs ${formatCurrency(cost)} — more than the ${formatCurrency(affordable)} you have left to spend.`
+        // `discardDrawnLayer` resets the drawing state, `buildError` included,
+        // so the explanation is written after it rather than before
         discardDrawnLayer(e.layer)
+        // Money is only one of the ways the charge can fail; blaming the budget
+        // for a section that could not be priced at all would send the player
+        // looking for cash they already have
+        buildError.value = Number.isFinite(cost)
+          ? `That section costs ${formatCurrency(cost)} — more than the ${formatCurrency(affordable)} you have left to spend.`
+          : 'That section could not be priced, so it was not built.'
         return
       }
 
@@ -284,6 +314,8 @@ export default function useBuildTrack(props, grid, formatCurrency) {
         // Track that nothing owns and no save records is worse than no track at
         // all, so take it back off the map rather than leave a phantom line
         discardDrawnLayer(e.layer)
+        // The line vanishing with no explanation reads as the game losing work
+        buildError.value = 'That section could not be recorded, so it was not built.'
         return
       }
 
@@ -305,6 +337,9 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   function discardDrawnLayer(layer) {
     props.map.removeLayer(layer)
     resetHintMarkerMoveHandler()
+    // The itemised costs describe a line that no longer exists, and leaving
+    // them up puts a total next to the message explaining it was not built
+    resetLineTracking()
     workingLayer.value = null
   }
 
@@ -377,8 +412,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    * @returns {boolean} True if the segment is the active player's, built this turn
    */
   function canRemoveSegment(segment) {
-    if (!segment) return false
-    return segment.ownerId === playerStore.activePlayer?.id && segment.turn === gameStore.turn
+    return trackStore.isOwnedFromTurn(segment, playerStore.activePlayer?.id, gameStore.turn)
   }
 
   /**
@@ -417,6 +451,8 @@ export default function useBuildTrack(props, grid, formatCurrency) {
 
     existingLineLayers.value = existingLineLayers.value.filter((l) => l !== layer)
     restoredLineLayers.value = restoredLineLayers.value.filter((l) => l !== layer)
+    // The panel was itemising the section just torn up
+    resetLineTracking()
     rebuildLineEndpoints()
   }
 
@@ -449,7 +485,12 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   // ================== COST TRACKING & TOOLTIP ==================
 
   /**
-   * Attaches a tooltip update handler to the hint marker to show running cost.
+   * Attaches the running-cost handler to the hint marker the player is dragging.
+   *
+   * This is what prices a line, so failing to bind it does not degrade the
+   * tooltip — it makes the track free. The guard below skips binding when a
+   * handler is already held, which is why `resetHintMarkerMoveHandler` has to
+   * run on every path that ends a drawing, cancellation included.
    */
   function addHintMarkerMoveHandler() {
     const hintMarker = props.map.pm.Draw.Line._hintMarker
@@ -458,19 +499,28 @@ export default function useBuildTrack(props, grid, formatCurrency) {
         (e) => updateRunningCostTooltip(e.latlng, hintMarker),
         100
       ) // Throttle to reduce lag
+      // Held so the handler can be taken off the marker it was put on, rather
+      // than off whichever marker happens to be current when it is released
+      costedHintMarker.value = markRaw(hintMarker)
       hintMarker.on('move', hintMarkerMoveHandler.value)
     }
   }
 
   /**
-   * Detaches the tooltip update handler from the hint marker after drawing completion.
+   * Releases the running-cost handler once a drawing ends, however it ended.
+   *
+   * Geoman builds a fresh hint marker on every `enable()` and never clears the
+   * old one, so the handler is unbound from the marker it was actually put on.
+   * The handler is dropped whether or not that marker is still around: holding
+   * a stale one would make `addHintMarkerMoveHandler` skip the next drawing,
+   * and every leg of it would then price at zero.
    */
   function resetHintMarkerMoveHandler() {
-    const hintMarker = props.map.pm.Draw.Line._hintMarker
-    if (hintMarker && hintMarkerMoveHandler.value) {
-      hintMarker.off('move', hintMarkerMoveHandler.value)
-      hintMarkerMoveHandler.value = null
+    if (costedHintMarker.value && hintMarkerMoveHandler.value) {
+      costedHintMarker.value.off('move', hintMarkerMoveHandler.value)
     }
+    costedHintMarker.value = null
+    hintMarkerMoveHandler.value = null
   }
 
   /**
@@ -480,7 +530,9 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    */
   function updateRunningCostTooltip(latlng, hintMarker) {
     const cell = getGridCellByLatLng(latlng)
-    if (cell && cell.id !== currentGridCellId.value && cell.cost !== null) {
+    // `Number.isFinite` rather than a null check: an undefined or NaN cell cost
+    // propagates into the running total and prices the whole line at NaN
+    if (cell && cell.id !== currentGridCellId.value && Number.isFinite(cell.cost)) {
       currentGridCellId.value = cell.id
       runningCost.value += cell.cost
       hintMarker.setTooltipContent(`Cost: ${formatCurrency(runningCost.value)}`)
@@ -723,7 +775,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     availableToSpend,
     isOverBudget,
     buildError,
-    hasTrackBeenDrawn,
+    hasRemovableTrack,
     startDrawingLine,
     enableRemoveMode,
     cancelDrawing

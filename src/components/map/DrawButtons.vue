@@ -44,7 +44,7 @@ const {
   availableToSpend,
   isOverBudget,
   buildError,
-  hasTrackBeenDrawn,
+  hasRemovableTrack,
   startDrawingLine,
   enableRemoveMode,
   cancelDrawing
@@ -66,7 +66,7 @@ const {
 
   <!-- remove button -->
   <div class="block">
-    <div v-if="hasTrackBeenDrawn" class="buttons">
+    <div v-if="hasRemovableTrack" class="buttons">
       <button class="button is-danger" @click="enableRemoveMode">Remove</button>
       <div class="is-size-5">sections of track you have built this turn</div>
     </div>

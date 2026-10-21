@@ -63,8 +63,13 @@ const setActiveTab = (tab) => {
     </div>
   </div>
 
-  <!-- Build tab content -->
-  <div v-if="activeTab === 'Build'">
+  <!--
+    Build tab content. Hidden with v-show rather than v-if: the build controls
+    own the track layers on the map, so they have to stay mounted for the whole
+    game. Unmounting them on a tab switch would take every section off the map,
+    and a saved game would show no track until Build was opened.
+  -->
+  <div v-show="activeTab === 'Build'">
     <DrawButtons v-if="townsLayer && map" :map="map" :towns="townsLayer" />
   </div>
 

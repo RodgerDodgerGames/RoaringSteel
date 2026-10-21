@@ -2,7 +2,7 @@
 // Vue composable for handling map drawing and cost calculation logic
 // Organizes and manages all drawing-related logic, including setup, drawing controls, cost calculations, and utility functions.
 
-import { ref, computed, onMounted, watch, markRaw } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, markRaw } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import L from 'leaflet'
 import 'leaflet-textpath'
@@ -122,6 +122,26 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     initializeCaches() // Initialize town marker and line endpoint caches
   })
 
+  /**
+   * onBeforeUnmount hook: takes back off the map everything the mount put on it.
+   *
+   * The map outlives the component that runs this composable, so anything left
+   * behind keeps working after the component is gone. A later mount then adds a
+   * second set on top: every listener fires twice, so a new section is charged
+   * for and recorded twice, and every saved section is drawn twice.
+   *
+   * Runs before unmount rather than after so the map is still reachable
+   * through props.
+   */
+  onBeforeUnmount(() => {
+    // A drawing left open would carry on with no listener to price or record it
+    if (isDrawingActive.value) cancelDrawing()
+
+    removeMapEvents()
+    removeTownMarkerEvents()
+    removeTrackLayers()
+  })
+
   // ================== PUBLIC FUNCTIONS (EXPOSED) ==================
 
   /**
@@ -179,28 +199,64 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    */
   function initializeTownMarkers() {
     props.towns.value.eachLayer((layer) => {
-      layer.on('click', (e) => {
-        if (isDrawingActive.value) {
-          props.map.pm.Draw.Line._createVertex(e.latlng)
-        }
-      })
+      layer.on('click', handleTownClick)
     })
+  }
+
+  /**
+   * Takes the click handler back off every town marker, so a later mount does
+   * not add a second one that places every vertex twice.
+   */
+  function removeTownMarkerEvents() {
+    props.towns.value.eachLayer((layer) => {
+      layer.off('click', handleTownClick)
+    })
+  }
+
+  /**
+   * Places a vertex exactly on a town when its marker is clicked mid-drawing.
+   * The marker sits on top of the map and swallows the click, so without this
+   * a line could never start or end precisely on a town.
+   * @param {Object} e - Leaflet click event from the marker
+   */
+  function handleTownClick(e) {
+    if (isDrawingActive.value) {
+      props.map.pm.Draw.Line._createVertex(e.latlng)
+    }
   }
 
   /**
    * Sets up map-wide drawing events, including starting and completing a line.
    */
   function initializeMapEvents() {
-    props.map.on('pm:drawstart', ({ workingLayer: layer }) => {
-      workingLayer.value = layer
-      setupDrawingEvents()
-    })
+    props.map.on('pm:drawstart', handleDrawStart)
     props.map.on('pm:create', finalizeDrawing)
     // Geoman's global removal mode acts on the layer, so the store has to be
     // told; without this the map and the rail network drift apart (#83).
     // Removal is re-fired on the map (`_fireRemove(this.map, layer)`), so one
     // map-level listener catches every section.
     props.map.on('pm:remove', handleLayerRemoved)
+  }
+
+  /**
+   * Takes the map-wide drawing events back off. Leaflet's `off` only removes a
+   * listener when given the same function `on` was given, which is why every
+   * handler here is a named function rather than an inline one.
+   */
+  function removeMapEvents() {
+    props.map.off('pm:drawstart', handleDrawStart)
+    props.map.off('pm:create', finalizeDrawing)
+    props.map.off('pm:remove', handleLayerRemoved)
+    props.map.off('mousemove', handleCursorMove)
+  }
+
+  /**
+   * Picks up the line Geoman has just started, so its vertices can be priced.
+   * @param {Object} e - Geoman draw-start event carrying the line being drawn
+   */
+  function handleDrawStart({ workingLayer: layer }) {
+    workingLayer.value = layer
+    setupDrawingEvents()
   }
 
   function initializeCaches() {
@@ -231,6 +287,23 @@ export default function useBuildTrack(props, grid, formatCurrency) {
       restoredLineLayers.value.push(markRaw(layer))
       styleTracks(layer)
     })
+  }
+
+  /**
+   * Takes every track layer this composable drew off the map, rails included.
+   *
+   * The sections themselves stay in the track store, which is what the next
+   * mount redraws from. Leaving these layers up as well would put two copies of
+   * every section on the map, and the copy nobody holds a reference to could
+   * never be removed.
+   */
+  function removeTrackLayers() {
+    ;[...existingLineLayers.value, ...restoredLineLayers.value].forEach((layer) => {
+      removeStyling(layer)
+      props.map.removeLayer(layer)
+    })
+    existingLineLayers.value = []
+    restoredLineLayers.value = []
   }
 
   // ================== DRAWING EVENT HANDLERS ==================
@@ -585,20 +658,33 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   // ================== MAP OPTIONS & CURSOR SETUP ==================
 
   /**
+   * Shows a "not allowed" cursor over places a line cannot start from, so a
+   * player can see where track may begin before they click.
+   *
+   * Debounced because mousemove fires on every pixel and the check scans every
+   * town and track endpoint.
+   */
+  const debouncedCursorValidation = useDebounceFn((latlng) => {
+    const cursorStyle = validateStartPoint(latlng) ? 'default' : 'not-allowed'
+    props.map.getContainer().style.cursor = cursorStyle
+  }, 50)
+
+  /**
+   * Re-checks the cursor as it moves, but only while the player is choosing
+   * where a line starts — once the first vertex is down, anywhere is fair game.
+   * @param {Object} e - Leaflet mousemove event
+   */
+  function handleCursorMove(e) {
+    if (isDrawingActive.value && !isFirstVertexAdded.value) {
+      debouncedCursorValidation(e.latlng)
+    }
+  }
+
+  /**
    * Sets up cursor styles based on the validity of points during line drawing.
    */
   function setupCursorValidation() {
-    const debouncedCursorValidation = useDebounceFn((latlng) => {
-      const cursorStyle = validateStartPoint(latlng) ? 'default' : 'not-allowed'
-      props.map.getContainer().style.cursor = cursorStyle
-    }, 50) // Adjust debounce delay as needed
-
-    props.map.on('mousemove', (e) => {
-      // only update cursor when drawing is active but first vertex has not been added
-      if (isDrawingActive.value && !isFirstVertexAdded.value) {
-        debouncedCursorValidation(e.latlng)
-      }
-    })
+    props.map.on('mousemove', handleCursorMove)
   }
 
   /**

@@ -8,7 +8,6 @@ import * as turf from '@turf/turf'
 import AreaSelectView from '@/views/AreaSelectView.vue'
 import GameView from './views/GameView.vue'
 import WelcomeView from './views/WelcomeView.vue'
-import NavHeader from './components/NavHeader.vue'
 import GridProgressModal from './components/setup/GridProgressModal.vue'
 
 // import stores
@@ -126,9 +125,7 @@ function handleSetupCancel() {
 
 <template>
   <div id="app">
-    <!-- Header Section -->
-    <NavHeader v-if="currentView === 'game'" />
-    <!-- Main Content Section -->
+    <!-- Main Content Section. The game view brings its own top bar. -->
     <component
       :is="viewComponents[currentView]"
       @players-confirmed="handlePlayersConfirmed"

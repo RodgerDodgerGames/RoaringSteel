@@ -1,14 +1,18 @@
 /**
  * useBuildTrack Composable Tests
  *
- * Covers the composable's lifecycle against the map: whatever it puts on the
- * map when its host component mounts — event listeners and track layers — it
- * has to take off again when that component unmounts.
+ * Covers the composable's lifecycle against the map, and the map modes it
+ * switches between.
  *
- * The build controls used to live in a tab that mounted and unmounted as the
- * player switched tabs. Each visit added another full set of map listeners
- * and another copy of every saved section, so a section drawn afterwards was
- * charged for and recorded once per visit.
+ * Lifecycle: whatever it puts on the map when its host component mounts —
+ * event listeners and track layers — it has to take off again when that
+ * component unmounts. The build controls used to live in a tab that mounted
+ * and unmounted as the player switched tabs. Each visit added another full set
+ * of map listeners and another copy of every saved section, so a section drawn
+ * afterwards was charged for and recorded once per visit.
+ *
+ * Modes: drawing and removing both act on map clicks, so at most one may be on,
+ * and Escape backs out of either.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
@@ -16,6 +20,7 @@ import { defineComponent, ref } from 'vue'
 import { mount } from '@vue/test-utils'
 import L from 'leaflet'
 import useBuildTrack from '@/composables/map/useBuildTrack'
+import { useMapStore } from '@/stores/map'
 import { usePlayerStore } from '@/stores/players'
 import { useTrackStore } from '@/stores/track'
 import { formatCurrency } from '@/composables/utils'
@@ -24,7 +29,7 @@ import { formatCurrency } from '@/composables/utils'
  * A stand-in for the Leaflet map, with just enough surface for the
  * composable: real Leaflet events (so `on`/`off`/`fire` behave as they do in
  * the game), a record of which layers are on it, and stubs for the Geoman
- * calls made at mount.
+ * calls the composable makes.
  *
  * Layers added here never get a `_map`, so leaflet-textpath skips its SVG
  * work and the track styling runs without a renderer.
@@ -53,19 +58,21 @@ function createFakeMap() {
   /** @returns {Array} Layers on the map that draw a recorded track segment */
   map.trackLayers = () => [...layers].filter((layer) => layer.segmentId != null)
 
-  // Geoman's removal mode, reduced to the on/off state the composable controls
+  // Geoman's removal mode, reduced to its on/off state. Like the real thing,
+  // every change is announced on the map with `pm:globalremovalmodetoggled`.
   let removalMode = false
+  const setRemovalMode = (enabled) => {
+    removalMode = enabled
+    map.fire('pm:globalremovalmodetoggled', { enabled })
+  }
+
   map.pm = {
     setLang: () => {},
     setGlobalOptions: () => {},
     enableDraw: () => {},
     disableDraw: () => {},
-    toggleGlobalRemovalMode: () => {
-      removalMode = !removalMode
-    },
-    disableGlobalRemovalMode: () => {
-      removalMode = false
-    },
+    toggleGlobalRemovalMode: () => setRemovalMode(!removalMode),
+    disableGlobalRemovalMode: () => setRemovalMode(false),
     globalRemovalModeEnabled: () => removalMode,
     Draw: { Line: {} }
   }
@@ -75,22 +82,32 @@ function createFakeMap() {
 
 /**
  * Mounts a bare component that does nothing but run the composable, the way
- * the build controls do.
+ * the game view does. The map and towns go into the map store first, which is
+ * where the composable looks for them when it mounts.
  * @param {Object} map - Fake map from `createFakeMap`
  * @param {Object} [towns] - Layer group of town markers
+ * @param {Array} [grid] - Cost grid; a non-empty one lets drawing start
  * @returns {Object} The mounted wrapper, plus the composable's exposed API
  */
-function mountBuildTrack(map, towns = L.layerGroup()) {
+function mountBuildTrack(map, towns = L.layerGroup(), grid = []) {
+  const mapStore = useMapStore()
+  mapStore.setMap(map)
+  // The store holds the ref useTowns hands it, not the bare layer group
+  mapStore.setTownsLayer(ref(towns))
+
   let api
   const Host = defineComponent({
     setup() {
-      api = useBuildTrack({ map, towns: ref(towns) }, ref([]), formatCurrency)
+      api = useBuildTrack(ref(grid), formatCurrency)
       return () => null
     }
   })
   const wrapper = mount(Host)
   return { wrapper, api }
 }
+
+/** A single grid cell, enough for drawing to be allowed to start */
+const pricedGrid = [{ id: 1, cost: 1000, centroid: { lat: 40, lng: -100 } }]
 
 /** A saved section, as the track store holds one after a load */
 const savedSegment = {
@@ -117,6 +134,11 @@ function createDrawnLine() {
   return layer
 }
 
+/** Presses Escape the way the browser would deliver it */
+function pressEscape() {
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+}
+
 describe('useBuildTrack', () => {
   let map
   let playerStore
@@ -131,7 +153,7 @@ describe('useBuildTrack', () => {
     playerStore.startGame()
   })
 
-  describe('when the build controls are unmounted and mounted again', () => {
+  describe('when the host is unmounted and mounted again', () => {
     it('should record a newly drawn section once', () => {
       mountBuildTrack(map).wrapper.unmount()
       mountBuildTrack(map)
@@ -187,7 +209,7 @@ describe('useBuildTrack', () => {
 
     it('should switch off removal mode the player left on', () => {
       const { wrapper, api } = mountBuildTrack(map)
-      api.enableRemoveMode()
+      api.toggleRemoveMode()
 
       wrapper.unmount()
 
@@ -201,6 +223,85 @@ describe('useBuildTrack', () => {
       wrapper.unmount()
 
       expect(map.getContainer().style.cursor).toBe('')
+    })
+
+    it('should stop answering Escape', () => {
+      const { wrapper, api } = mountBuildTrack(map, L.layerGroup(), pricedGrid)
+      api.startDrawingLine()
+      wrapper.unmount()
+      // Unmounting cancelled the drawing; put the flag back to see whether a
+      // leftover key listener would clear it again
+      useMapStore().setIsDrawingActive(true)
+
+      pressEscape()
+
+      expect(useMapStore().isDrawingActive).toBe(true)
+    })
+  })
+
+  describe('removal mode', () => {
+    it('should report removal mode as on once it is toggled on', () => {
+      const { api } = mountBuildTrack(map)
+
+      api.toggleRemoveMode()
+
+      expect(api.isRemoving.value).toBe(true)
+    })
+
+    it('should report removal mode as off once it is toggled off again', () => {
+      const { api } = mountBuildTrack(map)
+
+      api.toggleRemoveMode()
+      api.toggleRemoveMode()
+
+      expect(api.isRemoving.value).toBe(false)
+    })
+
+    it('should follow removal mode switched off from outside the controls', () => {
+      const { api } = mountBuildTrack(map)
+      api.toggleRemoveMode()
+
+      map.pm.disableGlobalRemovalMode()
+
+      expect(api.isRemoving.value).toBe(false)
+    })
+
+    it('should stop a drawing in progress when switched on', () => {
+      const { api } = mountBuildTrack(map, L.layerGroup(), pricedGrid)
+      api.startDrawingLine()
+
+      api.toggleRemoveMode()
+
+      expect(api.isDrawingActive.value).toBe(false)
+    })
+
+    it('should be switched off when a drawing starts', () => {
+      const { api } = mountBuildTrack(map, L.layerGroup(), pricedGrid)
+      api.toggleRemoveMode()
+
+      api.startDrawingLine()
+
+      expect(api.isRemoving.value).toBe(false)
+    })
+  })
+
+  describe('pressing Escape', () => {
+    it('should stop a drawing in progress', () => {
+      const { api } = mountBuildTrack(map, L.layerGroup(), pricedGrid)
+      api.startDrawingLine()
+
+      pressEscape()
+
+      expect(api.isDrawingActive.value).toBe(false)
+    })
+
+    it('should switch removal mode off', () => {
+      const { api } = mountBuildTrack(map)
+      api.toggleRemoveMode()
+
+      pressEscape()
+
+      expect(api.isRemoving.value).toBe(false)
     })
   })
 })

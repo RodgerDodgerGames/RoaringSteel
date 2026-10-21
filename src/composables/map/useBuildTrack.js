@@ -3,7 +3,7 @@
 // Organizes and manages all drawing-related logic, including setup, drawing controls, cost calculations, and utility functions.
 
 import { ref, computed, onMounted, onBeforeUnmount, watch, markRaw } from 'vue'
-import { useDebounceFn } from '@vueuse/core'
+import { useDebounceFn, onKeyStroke } from '@vueuse/core'
 import L from 'leaflet'
 import 'leaflet-textpath'
 import { storeToRefs } from 'pinia'
@@ -13,13 +13,28 @@ import { useTrackStore } from '@/stores/track'
 import { useGameStore } from '@/stores/game'
 
 /**
- * Main composable function to handle map drawing logic
- * @param {Object} props - The component props (map, towns)
+ * Injection key for the one build-track instance a game view runs.
+ *
+ * The instance has to live as long as the map, because it owns the track
+ * layers drawn on it, while the controls that drive it sit in the side dock.
+ * The game view creates it and provides it under this key; the controls
+ * inject it rather than each starting their own copy.
+ */
+export const buildTrackKey = Symbol('buildTrack')
+
+/**
+ * Main composable function to handle map drawing logic.
+ *
+ * Works on the map and towns layer held in the map store, and reads them when
+ * its host component mounts. The host must therefore mount after the map
+ * exists — a parent of the map component qualifies, since a parent's
+ * `onMounted` runs after its children's.
+ *
  * @param {Object} grid - Reactive grid data for cell-based calculations
  * @param {Function} formatCurrency - Utility function to format currency values
  * @returns {Object} - Exposes reactive state, computed properties, and functions for map drawing
  */
-export default function useBuildTrack(props, grid, formatCurrency) {
+export default function useBuildTrack(grid, formatCurrency) {
   // ================== STATE VARIABLES ==================
 
   const itemizedCosts = ref([]) // Array to store individual segment costs
@@ -32,6 +47,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   const currentGridCellId = ref(null) // ID of the current grid cell for cost tracking
   const isFirstVertexAdded = ref(false) // Flag to track if the first vertex has been added
   const buildError = ref('') // Why the last section could not be built, if it could not
+  const isRemoving = ref(false) // True while Geoman's removal mode is on
 
   // Caching town marker positions and endpoints for faster validation
   const townMarkerPositions = ref([])
@@ -40,6 +56,13 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   // get access to isDrawingActive from map store
   const mapStore = useMapStore()
   const { isDrawingActive } = storeToRefs(mapStore)
+
+  /**
+   * The town markers' layer group. The store holds the ref `useTowns` created
+   * rather than the group itself, so the group sits one `.value` further down.
+   * @returns {Object} Leaflet layer group of town markers
+   */
+  const townsLayer = () => mapStore.townsLayer.value
 
   // the active player drives per-turn build state
   const playerStore = usePlayerStore()
@@ -115,7 +138,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    */
   onMounted(() => {
     initializeTownMarkers() // Set up events for clickable town markers
-    props.map.on(mapEvents) // Listen for drawing, removal and cursor movement
+    mapStore.map.on(mapEvents) // Listen for drawing, removal and cursor movement
     setGeomanOptions() // Configure Geoman drawing tool options
     restoreTrackLayers() // Redraw track carried in from a saved game
     initializeCaches() // Initialize town marker and line endpoint caches
@@ -129,8 +152,8 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    * second set on top: every listener fires twice, so a new section is charged
    * for and recorded twice, and every saved section is drawn twice.
    *
-   * Runs before unmount rather than after so the map is still reachable
-   * through props.
+   * Runs before unmount rather than after, so the teardown happens while the
+   * host's map is certainly still the one in the store.
    */
   onBeforeUnmount(() => {
     // A drawing left open would carry on with no listener to price or record it
@@ -138,24 +161,41 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     // Likewise removal mode: left on, it would let a player tear sections off
     // the map with nothing listening to take them out of the store or refund
     // them — the drift between map and save that #83 fixed
-    if (props.map.pm.globalRemovalModeEnabled()) props.map.pm.disableGlobalRemovalMode()
+    if (mapStore.map.pm.globalRemovalModeEnabled()) mapStore.map.pm.disableGlobalRemovalMode()
     // The start-point check may have left a "not allowed" cursor on the map
-    props.map.getContainer().style.cursor = ''
+    mapStore.map.getContainer().style.cursor = ''
 
-    props.map.off(mapEvents)
+    mapStore.map.off(mapEvents)
     removeTownMarkerEvents()
     allTrackLayers().forEach(removeTrackLayer)
     existingLineLayers.value = []
     restoredLineLayers.value = []
   })
 
+  /**
+   * Escape backs out of whichever map mode the player is in, the way it does in
+   * most drawing tools. Registered through VueUse so the key listener is taken
+   * off the window when the host unmounts.
+   */
+  onKeyStroke('Escape', () => {
+    if (isDrawingActive.value) cancelDrawing()
+    if (isRemoving.value) mapStore.map.pm.disableGlobalRemovalMode()
+  })
+
   // ================== PUBLIC FUNCTIONS (EXPOSED) ==================
 
   /**
-   * Enables removal mode for deleting map elements.
+   * Switches removal mode on or off. While it is on, clicking a section the
+   * active player built this turn tears it up and refunds it.
+   *
+   * `isRemoving` is not set here: Geoman announces every change of mode with
+   * an event, whatever caused it, and the listener for that event keeps the
+   * flag in step.
    */
-  function enableRemoveMode() {
-    props.map.pm.toggleGlobalRemovalMode()
+  function toggleRemoveMode() {
+    // Drawing and removing both act on map clicks, so only one may be live
+    if (isDrawingActive.value) cancelDrawing()
+    mapStore.map.pm.toggleGlobalRemovalMode()
   }
 
   // ================== DRAWING CONTROL FUNCTIONS ==================
@@ -166,6 +206,9 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   function startDrawingLine() {
     resetLineTracking()
 
+    // Drawing and removing both act on map clicks, so only one may be live
+    if (isRemoving.value) mapStore.map.pm.disableGlobalRemovalMode()
+
     // Cost comes from the grid cells a line crosses, so with no grid every
     // line prices at zero and is built for nothing. Refuse rather than give
     // the map away.
@@ -174,7 +217,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
       return
     }
 
-    props.map.pm.enableDraw('Line')
+    mapStore.map.pm.enableDraw('Line')
     mapStore.setIsDrawingActive(true)
   }
 
@@ -182,7 +225,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    * Cancels line drawing mode and resets state.
    */
   function cancelDrawing() {
-    props.map.pm.disableDraw('Line')
+    mapStore.map.pm.disableDraw('Line')
     mapStore.setIsDrawingActive(false)
     // Without this the handler stays held, the next drawing never rebinds one,
     // and every leg of it prices at zero — free track
@@ -205,7 +248,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    * This allows starting a line from specific points (e.g., town markers).
    */
   function initializeTownMarkers() {
-    props.towns.value.eachLayer((layer) => {
+    townsLayer().eachLayer((layer) => {
       layer.on('click', handleTownClick)
     })
   }
@@ -215,7 +258,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    * not add a second one that places every vertex twice.
    */
   function removeTownMarkerEvents() {
-    props.towns.value.eachLayer((layer) => {
+    townsLayer().eachLayer((layer) => {
       layer.off('click', handleTownClick)
     })
   }
@@ -228,7 +271,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    */
   function handleTownClick(e) {
     if (isDrawingActive.value) {
-      props.map.pm.Draw.Line._createVertex(e.latlng)
+      mapStore.map.pm.Draw.Line._createVertex(e.latlng)
     }
   }
 
@@ -249,7 +292,18 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     // Removal is re-fired on the map (`_fireRemove(this.map, layer)`), so one
     // map-level listener catches every section.
     'pm:remove': handleLayerRemoved,
+    'pm:globalremovalmodetoggled': handleRemovalModeToggled,
     mousemove: handleCursorMove
+  }
+
+  /**
+   * Keeps `isRemoving` in step with Geoman's removal mode, so the controls and
+   * the map's hint can say which mode the player is in.
+   * @param {Object} e - Geoman toggle event
+   * @param {boolean} e.enabled - Whether removal mode is now on
+   */
+  function handleRemovalModeToggled({ enabled }) {
+    isRemoving.value = enabled
   }
 
   /**
@@ -263,7 +317,9 @@ export default function useBuildTrack(props, grid, formatCurrency) {
 
   function initializeCaches() {
     // Cache town marker positions
-    townMarkerPositions.value = props.towns.value.getLayers().map((marker) => marker.getLatLng())
+    townMarkerPositions.value = townsLayer()
+      .getLayers()
+      .map((marker) => marker.getLatLng())
 
     // Cache the endpoints of every line already on the map, so restored track
     // is a legal place to start building from
@@ -281,7 +337,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   function restoreTrackLayers() {
     trackStore.segments.forEach((segment) => {
       const latlngs = segment.coordinates.map((point) => L.latLng(point.lat, point.lng))
-      const layer = L.polyline(latlngs).addTo(props.map)
+      const layer = L.polyline(latlngs).addTo(mapStore.map)
       attachSegment(layer, segment.id)
       // markRaw: a Leaflet layer read back out of a reactive array comes back as
       // a proxy, and Geoman hands back the raw layer, so the two would never
@@ -312,7 +368,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    */
   function removeTrackLayer(layer) {
     removeStyling(layer)
-    if (props.map.hasLayer(layer)) props.map.removeLayer(layer)
+    if (mapStore.map.hasLayer(layer)) mapStore.map.removeLayer(layer)
   }
 
   // ================== DRAWING EVENT HANDLERS ==================
@@ -346,7 +402,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
         const isOnTown = townMarkerPositions.value.some((townPos) => townPos.equals(addedVertex))
         // if so, then finish the drawing
         if (isOnTown) {
-          props.map.pm.Draw.Line._finishShape()
+          mapStore.map.pm.Draw.Line._finishShape()
         }
       }
     })
@@ -417,7 +473,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    * @param {Object} layer - The layer Geoman just created
    */
   function discardDrawnLayer(layer) {
-    props.map.removeLayer(layer)
+    mapStore.map.removeLayer(layer)
     resetHintMarkerMoveHandler()
     // The itemised costs describe a line that no longer exists, and leaving
     // them up puts a total next to the message explaining it was not built
@@ -548,7 +604,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     if (segment) {
       layer.setLatLngs(segment.coordinates.map((point) => L.latLng(point.lat, point.lng)))
     }
-    if (!props.map.hasLayer(layer)) layer.addTo(props.map)
+    if (!mapStore.map.hasLayer(layer)) layer.addTo(mapStore.map)
     removeStyling(layer)
     styleTracks(layer)
   }
@@ -574,7 +630,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    * run on every path that ends a drawing, cancellation included.
    */
   function addHintMarkerMoveHandler() {
-    const hintMarker = props.map.pm.Draw.Line._hintMarker
+    const hintMarker = mapStore.map.pm.Draw.Line._hintMarker
     if (hintMarker && !hintMarkerMoveHandler.value) {
       hintMarkerMoveHandler.value = useDebounceFn(
         (e) => updateRunningCostTooltip(e.latlng, hintMarker),
@@ -632,7 +688,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     let closestCell = null
     let minDistance = Infinity
     grid.value.forEach((cell) => {
-      const dist = props.map.distance(latlng, L.latLng(cell.centroid.lat, cell.centroid.lng))
+      const dist = mapStore.map.distance(latlng, L.latLng(cell.centroid.lat, cell.centroid.lng))
       if (dist < minDistance) {
         minDistance = dist
         closestCell = cell
@@ -674,7 +730,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    */
   const debouncedCursorValidation = useDebounceFn((latlng) => {
     const cursorStyle = validateStartPoint(latlng) ? 'default' : 'not-allowed'
-    props.map.getContainer().style.cursor = cursorStyle
+    mapStore.map.getContainer().style.cursor = cursorStyle
   }, 50)
 
   /**
@@ -692,7 +748,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    * Configures Geoman global drawing options, including tooltips and snapping behavior.
    */
   function setGeomanOptions() {
-    props.map.pm.setLang('en', {
+    mapStore.map.pm.setLang('en', {
       tooltips: {
         placeMarker: 'Place your marker here!',
         firstVertex: 'Track must start in a town or on existing track',
@@ -701,7 +757,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
       }
     })
 
-    props.map.pm.setGlobalOptions({
+    mapStore.map.pm.setGlobalOptions({
       snappable: true,
       snapDistance: 50,
       markerStyle: { draggable: true, color: 'red' },
@@ -742,7 +798,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
       attributes: { fill: 'black', 'font-size': '10px' }
     }
     tieLayer.setText(tieText, tieOptions)
-    tieLayer.addTo(props.map)
+    tieLayer.addTo(mapStore.map)
 
     // Link the decoration to the track it draws, in both directions, so a
     // click on the visible rails still resolves to the segment behind them.
@@ -764,7 +820,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     layer.setText(null)
 
     if (layer.tieLayer) {
-      props.map.removeLayer(layer.tieLayer)
+      mapStore.map.removeLayer(layer.tieLayer)
       layer.tieLayer = null
     }
   }
@@ -856,15 +912,15 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   // ================== RETURN EXPOSED METHODS AND STATE ==================
 
   return {
-    itemizedCosts,
-    totalCost,
     pendingCost,
     availableToSpend,
     isOverBudget,
     buildError,
     hasRemovableTrack,
+    isDrawingActive,
+    isRemoving,
     startDrawingLine,
-    enableRemoveMode,
+    toggleRemoveMode,
     cancelDrawing
   }
 }

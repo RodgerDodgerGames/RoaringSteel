@@ -52,6 +52,24 @@ export const usePlayerStore = defineStore('playerStore', () => {
   const activePlayer = computed(() => players.value.find((player) => player.isTurn))
 
   /**
+   * The player who gets the turn when the active player ends theirs: the next
+   * one in turn order, wrapping from the last back to the first. If nobody
+   * holds the turn yet, that is the first player.
+   *
+   * `nextTurn` hands the turn to exactly this player, so anything that names
+   * who is up next (the End Turn button) cannot disagree with what happens.
+   *
+   * @returns {Object|undefined} The next player, or undefined with no players.
+   */
+  const nextPlayer = computed(() => {
+    if (players.value.length === 0) return undefined
+
+    // -1 when nobody holds the turn, which the +1 below turns into the first
+    const activeIndex = players.value.findIndex((player) => player.isTurn)
+    return players.value[(activeIndex + 1) % players.value.length]
+  })
+
+  /**
    * Check if there are any players in the game.
    * @returns {boolean} True if players exist.
    */
@@ -250,12 +268,12 @@ export const usePlayerStore = defineStore('playerStore', () => {
     }
 
     try {
-      const currentTurnIndex = players.value.findIndex((p) => p.isTurn)
-      if (currentTurnIndex >= 0) {
-        players.value[currentTurnIndex].isTurn = false
-      }
-      const nextIndex = (currentTurnIndex + 1) % players.value.length
-      players.value[nextIndex].isTurn = true
+      // Read before any flag changes: clearing the current turn first would
+      // make nextPlayer answer "the first player" instead
+      const next = nextPlayer.value
+      players.value.forEach((player) => {
+        player.isTurn = player === next
+      })
       return true
     } catch (e) {
       error.value = `Failed to advance turn: ${e.message}`
@@ -551,6 +569,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     error,
     // getters
     activePlayer,
+    nextPlayer,
     hasPlayers,
     // actions
     addPlayer,

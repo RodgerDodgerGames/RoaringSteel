@@ -406,6 +406,45 @@ describe('Player Store', () => {
     })
   })
 
+  describe('nextPlayer getter', () => {
+    it('should return undefined when there are no players', () => {
+      expect(playerStore.nextPlayer).toBeUndefined()
+    })
+
+    describe('with players', () => {
+      beforeEach(() => {
+        playerStore.addPlayer({ name: 'Alice', color: 'red' })
+        playerStore.addPlayer({ name: 'Bob', color: 'blue' })
+        playerStore.addPlayer({ name: 'Cara', color: 'green' })
+      })
+
+      it('should return the first player when nobody holds the turn', () => {
+        expect(playerStore.nextPlayer.name).toBe('Alice')
+      })
+
+      it('should return the player after the active one', () => {
+        playerStore.players[0].isTurn = true
+
+        expect(playerStore.nextPlayer.name).toBe('Bob')
+      })
+
+      it('should wrap from the last player back to the first', () => {
+        playerStore.players[2].isTurn = true
+
+        expect(playerStore.nextPlayer.name).toBe('Alice')
+      })
+
+      it('should name the player nextTurn then hands the turn to', () => {
+        playerStore.players[1].isTurn = true
+        const named = playerStore.nextPlayer.name
+
+        playerStore.nextTurn()
+
+        expect(playerStore.activePlayer.name).toBe(named)
+      })
+    })
+  })
+
   describe('money', () => {
     beforeEach(() => {
       playerStore.addPlayer({ name: 'Alice', color: 'red', cash: gameRules.startingCash })

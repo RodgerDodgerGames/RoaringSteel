@@ -616,6 +616,36 @@ describe('Player Store', () => {
       })
     })
 
+    describe('trackSpendThisTurn', () => {
+      it('should be zero at the start of a turn', () => {
+        expect(playerStore.trackSpendThisTurn(1)).toBe(0)
+      })
+
+      it('should add up everything built this turn', () => {
+        playerStore.spendOnTrack(1, 5000)
+        playerStore.spendOnTrack(1, 2500)
+
+        expect(playerStore.trackSpendThisTurn(1)).toBe(7500)
+      })
+
+      it('should drop by what a removed section refunds', () => {
+        playerStore.spendOnTrack(1, 5000)
+        playerStore.refundTrackSpend(1, 2000)
+
+        expect(playerStore.trackSpendThisTurn(1)).toBe(3000)
+      })
+
+      it('should treat a missing counter from an old save as zero', () => {
+        playerStore.updatePlayer(1, { trackSpentThisTurn: undefined })
+
+        expect(playerStore.trackSpendThisTurn(1)).toBe(0)
+      })
+
+      it('should be zero for an unknown player', () => {
+        expect(playerStore.trackSpendThisTurn(999)).toBe(0)
+      })
+    })
+
     describe('resetTrackSpend', () => {
       it('should clear the counter without touching cash', () => {
         playerStore.spendOnTrack(1, 5000)

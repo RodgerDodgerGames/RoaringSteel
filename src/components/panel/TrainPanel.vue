@@ -14,14 +14,14 @@
 -->
 
 <script setup>
-import DockSection from '@/components/panel/DockSection.vue'
+import CollapsibleSection from '@/components/CollapsibleSection.vue'
 
 // The two cargo slots a Freight has, drawn as empty bays
 const LOAD_SLOTS = 2
 </script>
 
 <template>
-  <DockSection title="Train" storage-key="train" badge="Not built yet">
+  <CollapsibleSection title="Train" storage-key="dock_train" badge="Not built yet">
     <div class="train-panel">
       <div class="train-panel__type">
         <span class="icon"><i class="fas fa-train" aria-hidden="true"></i></span>
@@ -33,7 +33,7 @@ const LOAD_SLOTS = 2
         <span v-for="slot in LOAD_SLOTS" :key="slot" class="train-panel__load">Empty</span>
       </div>
     </div>
-  </DockSection>
+  </CollapsibleSection>
 </template>
 
 <style scoped>

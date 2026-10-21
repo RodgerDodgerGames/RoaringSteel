@@ -57,12 +57,9 @@ export default function useBuildTrack(grid, formatCurrency) {
   const mapStore = useMapStore()
   const { isDrawingActive } = storeToRefs(mapStore)
 
-  /**
-   * The town markers' layer group. The store holds the ref `useTowns` created
-   * rather than the group itself, so the group sits one `.value` further down.
-   * @returns {Object} Leaflet layer group of town markers
-   */
-  const townsLayer = () => mapStore.townsLayer.value
+  // Whether the mount found a map to attach to, and so whether there is
+  // anything for the unmount to take back off
+  let isAttached = false
 
   // the active player drives per-turn build state
   const playerStore = usePlayerStore()
@@ -118,7 +115,8 @@ export default function useBuildTrack(grid, formatCurrency) {
   /**
    * Clear per-turn build state when play passes to another player, so the
    * cost panel shows what the *current* player has spent rather than an
-   * ever-growing list. Any drawing left in progress is cancelled first.
+   * ever-growing list. Any drawing or removal left in progress is ended first:
+   * neither may carry over into someone else's turn.
    *
    * Completed track layers are deliberately left on the map; the segments
    * behind them are already recorded in the track store.
@@ -127,16 +125,38 @@ export default function useBuildTrack(grid, formatCurrency) {
     () => playerStore.activePlayer?.id,
     () => {
       if (isDrawingActive.value) cancelDrawing()
+      stopRemoving()
       resetLineTracking()
     }
   )
+
+  /**
+   * Leave removal mode once there is nothing left to remove. The control that
+   * switches removal mode off is only shown while there is track to remove, so
+   * tearing up the last section would otherwise strand the player in removal
+   * mode with no button to leave it.
+   */
+  watch(hasRemovableTrack, (canRemove) => {
+    if (!canRemove) stopRemoving()
+  })
 
   // ================== INITIAL SETUP ==================
 
   /**
    * onMounted hook: Initializes map and marker events and sets default options.
+   *
+   * Does nothing if the map or its towns never made it into the store — the
+   * map component failed to set up, and there is nothing to build on. That is
+   * logged rather than thrown, so the failure stays in the map and does not
+   * take the rest of the game screen down with it.
    */
   onMounted(() => {
+    if (!mapStore.map || !mapStore.townsLayer) {
+      console.error('Track building is unavailable: the map did not finish setting up')
+      return
+    }
+    isAttached = true
+
     initializeTownMarkers() // Set up events for clickable town markers
     mapStore.map.on(mapEvents) // Listen for drawing, removal and cursor movement
     setGeomanOptions() // Configure Geoman drawing tool options
@@ -156,12 +176,14 @@ export default function useBuildTrack(grid, formatCurrency) {
    * host's map is certainly still the one in the store.
    */
   onBeforeUnmount(() => {
+    if (!isAttached) return
+
     // A drawing left open would carry on with no listener to price or record it
     if (isDrawingActive.value) cancelDrawing()
     // Likewise removal mode: left on, it would let a player tear sections off
     // the map with nothing listening to take them out of the store or refund
     // them — the drift between map and save that #83 fixed
-    if (mapStore.map.pm.globalRemovalModeEnabled()) mapStore.map.pm.disableGlobalRemovalMode()
+    stopRemoving()
     // The start-point check may have left a "not allowed" cursor on the map
     mapStore.map.getContainer().style.cursor = ''
 
@@ -179,7 +201,7 @@ export default function useBuildTrack(grid, formatCurrency) {
    */
   onKeyStroke('Escape', () => {
     if (isDrawingActive.value) cancelDrawing()
-    if (isRemoving.value) mapStore.map.pm.disableGlobalRemovalMode()
+    stopRemoving()
   })
 
   // ================== PUBLIC FUNCTIONS (EXPOSED) ==================
@@ -198,6 +220,14 @@ export default function useBuildTrack(grid, formatCurrency) {
     mapStore.map.pm.toggleGlobalRemovalMode()
   }
 
+  /**
+   * Switches removal mode off if it is on. Asks Geoman rather than trusting
+   * `isRemoving`, so it is right even before the first toggle event arrives.
+   */
+  function stopRemoving() {
+    if (mapStore.map?.pm.globalRemovalModeEnabled()) mapStore.map.pm.disableGlobalRemovalMode()
+  }
+
   // ================== DRAWING CONTROL FUNCTIONS ==================
 
   /**
@@ -207,7 +237,7 @@ export default function useBuildTrack(grid, formatCurrency) {
     resetLineTracking()
 
     // Drawing and removing both act on map clicks, so only one may be live
-    if (isRemoving.value) mapStore.map.pm.disableGlobalRemovalMode()
+    stopRemoving()
 
     // Cost comes from the grid cells a line crosses, so with no grid every
     // line prices at zero and is built for nothing. Refuse rather than give
@@ -248,7 +278,7 @@ export default function useBuildTrack(grid, formatCurrency) {
    * This allows starting a line from specific points (e.g., town markers).
    */
   function initializeTownMarkers() {
-    townsLayer().eachLayer((layer) => {
+    mapStore.townsLayer.eachLayer((layer) => {
       layer.on('click', handleTownClick)
     })
   }
@@ -258,7 +288,7 @@ export default function useBuildTrack(grid, formatCurrency) {
    * not add a second one that places every vertex twice.
    */
   function removeTownMarkerEvents() {
-    townsLayer().eachLayer((layer) => {
+    mapStore.townsLayer.eachLayer((layer) => {
       layer.off('click', handleTownClick)
     })
   }
@@ -317,9 +347,7 @@ export default function useBuildTrack(grid, formatCurrency) {
 
   function initializeCaches() {
     // Cache town marker positions
-    townMarkerPositions.value = townsLayer()
-      .getLayers()
-      .map((marker) => marker.getLatLng())
+    townMarkerPositions.value = mapStore.townsLayer.getLayers().map((marker) => marker.getLatLng())
 
     // Cache the endpoints of every line already on the map, so restored track
     // is a legal place to start building from
@@ -916,7 +944,6 @@ export default function useBuildTrack(grid, formatCurrency) {
     availableToSpend,
     isOverBudget,
     buildError,
-    hasRemovableTrack,
     isDrawingActive,
     isRemoving,
     startDrawingLine,

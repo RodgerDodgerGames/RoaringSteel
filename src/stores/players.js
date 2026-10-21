@@ -299,6 +299,17 @@ export const usePlayerStore = defineStore('playerStore', () => {
   }
 
   /**
+   * What a player has spent on track so far this turn, looked up by id — the
+   * figure the build controls show as allowance used and as the turn's total.
+   * @param {number} id The player's ID.
+   * @returns {number} Amount spent on track this turn; 0 for an unknown player.
+   */
+  function trackSpendThisTurn(id) {
+    const player = players.value.find((p) => p.id === id)
+    return player ? spentOnTrack(player) : 0
+  }
+
+  /**
    * How much of this turn's track allowance a player has left.
    * @param {number} id The player's ID.
    * @returns {number} Unspent allowance, never negative.
@@ -578,6 +589,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     startGame,
     setActivePlayer,
     nextTurn,
+    trackSpendThisTurn,
     trackBudgetRemaining,
     availableForTrack,
     spendCash,

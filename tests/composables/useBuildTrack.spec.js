@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import { defineComponent, ref } from 'vue'
+import { defineComponent, ref, nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import L from 'leaflet'
 import useBuildTrack from '@/composables/map/useBuildTrack'
@@ -92,8 +92,7 @@ function createFakeMap() {
 function mountBuildTrack(map, towns = L.layerGroup(), grid = []) {
   const mapStore = useMapStore()
   mapStore.setMap(map)
-  // The store holds the ref useTowns hands it, not the bare layer group
-  mapStore.setTownsLayer(ref(towns))
+  mapStore.setTownsLayer(towns)
 
   let api
   const Host = defineComponent({
@@ -282,6 +281,61 @@ describe('useBuildTrack', () => {
       api.startDrawingLine()
 
       expect(api.isRemoving.value).toBe(false)
+    })
+
+    it('should be switched off when the turn passes to another player', async () => {
+      playerStore.addPlayer({ name: 'Bob', color: 'blue', cash: 20000 })
+      const { api } = mountBuildTrack(map)
+      api.toggleRemoveMode()
+
+      playerStore.nextTurn()
+      await nextTick()
+
+      expect(api.isRemoving.value).toBe(false)
+    })
+
+    it('should be switched off once the last removable section is gone', async () => {
+      const section = trackStore.addSegment(savedSegment)
+      const { api } = mountBuildTrack(map)
+      api.toggleRemoveMode()
+
+      trackStore.removeSegment(section.id)
+      await nextTick()
+
+      expect(api.isRemoving.value).toBe(false)
+    })
+
+    it('should stay on while there is still something to remove', async () => {
+      const first = trackStore.addSegment(savedSegment)
+      trackStore.addSegment(savedSegment)
+      const { api } = mountBuildTrack(map)
+      api.toggleRemoveMode()
+
+      trackStore.removeSegment(first.id)
+      await nextTick()
+
+      expect(api.isRemoving.value).toBe(true)
+    })
+  })
+
+  describe('when the map never finished setting up', () => {
+    /**
+     * Mounts with nothing in the map store, as happens when the map component
+     * fails part way through its own setup.
+     * @returns {Object} The mounted wrapper
+     */
+    function mountWithoutMap() {
+      const Host = defineComponent({
+        setup() {
+          useBuildTrack(ref(pricedGrid), formatCurrency)
+          return () => null
+        }
+      })
+      return mount(Host)
+    }
+
+    it('should mount and unmount without throwing', () => {
+      expect(() => mountWithoutMap().unmount()).not.toThrow()
     })
   })
 

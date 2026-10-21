@@ -20,7 +20,7 @@
 import { storeToRefs } from 'pinia'
 import PlayerCard from '@/components/panel/PlayerCard.vue'
 import TrainPanel from '@/components/panel/TrainPanel.vue'
-import DockSection from '@/components/panel/DockSection.vue'
+import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import BuildControls from '@/components/panel/BuildControls.vue'
 import { usePlayerStore } from '@/stores/players'
 import { useTurn } from '@/composables/useTurn'
@@ -36,7 +36,7 @@ const { endTurn } = useTurn()
     <div class="player-dock__body">
       <TrainPanel />
 
-      <DockSection title="This turn" storage-key="turn">
+      <CollapsibleSection title="This turn" storage-key="dock_turn">
         <ol class="turn-steps">
           <!-- Step 1: placeholder until trains can move -->
           <li class="turn-step is-placeholder">
@@ -69,7 +69,7 @@ const { endTurn } = useTurn()
             <BuildControls />
           </li>
         </ol>
-      </DockSection>
+      </CollapsibleSection>
     </div>
 
     <footer class="player-dock__footer">
@@ -92,6 +92,13 @@ const { endTurn } = useTurn()
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+}
+
+/* A rule under each collapsible section, dividing the dock into its parts.
+   The sections' root elements carry this component's scope, so this reaches
+   them without :deep. */
+.player-dock__body > section {
+  border-bottom: 1px solid var(--bulma-border-weak);
 }
 
 .turn-steps {

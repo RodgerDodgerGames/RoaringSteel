@@ -31,7 +31,6 @@ const {
   availableToSpend,
   isOverBudget,
   buildError,
-  hasRemovableTrack,
   isDrawingActive,
   isRemoving,
   startDrawingLine,
@@ -43,20 +42,21 @@ const playerStore = usePlayerStore()
 const trackStore = useTrackStore()
 const { turn } = storeToRefs(useGameStore())
 
-/** How much of this turn's building allowance the active player has used */
-const allowanceUsed = computed(
-  () =>
-    gameRules.trackBudgetPerTurn - playerStore.trackBudgetRemaining(playerStore.activePlayer?.id)
-)
+/**
+ * What the active player has spent on track this turn. It is both how much of
+ * the turn's allowance is used and the total of the sections listed below — a
+ * section is charged as it is recorded and refunded as it is removed, so the
+ * two never differ.
+ */
+const spentThisTurn = computed(() => playerStore.trackSpendThisTurn(playerStore.activePlayer?.id))
 
-/** The sections the active player has built so far this turn, in build order */
+/**
+ * The sections the active player has built so far this turn, in build order.
+ * These are exactly the ones they may still tear up, so the Remove control
+ * lives with this list.
+ */
 const sectionsThisTurn = computed(() =>
   trackStore.segmentsBuiltOn(playerStore.activePlayer?.id, turn.value)
-)
-
-/** What the sections built this turn cost altogether */
-const spentThisTurn = computed(() =>
-  sectionsThisTurn.value.reduce((total, section) => total + section.cost, 0)
 )
 </script>
 
@@ -71,12 +71,12 @@ const spentThisTurn = computed(() =>
       </div>
       <progress
         class="progress is-small is-primary mt-2 mb-1"
-        :value="allowanceUsed"
+        :value="spentThisTurn"
         :max="gameRules.trackBudgetPerTurn"
-        :aria-label="`Building allowance used: ${formatCurrency(allowanceUsed)}`"
+        :aria-label="`Building allowance used: ${formatCurrency(spentThisTurn)}`"
       ></progress>
       <p class="build-controls__note">
-        {{ formatCurrency(allowanceUsed) }} of {{ formatCurrency(gameRules.trackBudgetPerTurn) }}
+        {{ formatCurrency(spentThisTurn) }} of {{ formatCurrency(gameRules.trackBudgetPerTurn) }}
         turn allowance used
       </p>
     </div>
@@ -115,7 +115,6 @@ const spentThisTurn = computed(() =>
       <div class="build-controls__built-header">
         <span class="has-text-weight-bold">Built this turn</span>
         <button
-          v-if="hasRemovableTrack"
           class="button is-small"
           :class="{ 'is-warning': isRemoving }"
           @click="toggleRemoveMode"

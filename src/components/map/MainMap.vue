@@ -55,7 +55,7 @@ onMounted(() => {
     // add towns to map
     addTownsToMap(map, towns)
     // add townsLayer to store
-    mapStore.setTownsLayer(townsLayer)
+    mapStore.setTownsLayer(townsLayer.value)
   }
 })
 

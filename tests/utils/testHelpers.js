@@ -18,6 +18,7 @@ export function createMockPlayer(overrides = {}) {
     isTurn: false,
     color: 'red',
     position: 0,
+    trackSpentThisTurn: 0,
     ...overrides
   }
 }
@@ -37,7 +38,8 @@ export function createMockPlayers(count, customizer = null) {
       cash: 0,
       isTurn: i === 0, // First player starts
       color: colors[i % colors.length],
-      position: 0
+      position: 0,
+      trackSpentThisTurn: 0
     }
     return customizer ? customizer(player, i) : player
   })

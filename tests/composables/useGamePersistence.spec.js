@@ -135,6 +135,19 @@ describe('useGamePersistence', () => {
 
       expect(playerStore.players[0].cash).toBe(12500)
     })
+
+    it('should restore how much of the build allowance is already used', () => {
+      // Without this a player reloads mid-turn with a fresh $20k to build with
+      playerStore.spendOnTrack(1, 7500)
+      persistence.autoSave()
+
+      playerStore.reset()
+      const [latest] = persistence.getAutoSaves()
+      persistence.loadAutoSave(latest.index)
+
+      expect(playerStore.players[0].cash).toBe(12500)
+      expect(playerStore.availableForTrack(1)).toBe(12500)
+    })
   })
 
   describe('track', () => {

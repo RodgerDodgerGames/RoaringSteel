@@ -26,10 +26,12 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   const runningCost = ref(0) // Accumulator for the ongoing segment cost
   const workingLayer = ref(null) // Reference to the currently drawn line layer
   const hintMarkerMoveHandler = ref(null) // Handler for hint marker movement
+  const costedHintMarker = ref(null) // The hint marker that handler is bound to
   const existingLineLayers = ref([]) // Leaflet layers for track drawn in this session
   const restoredLineLayers = ref([]) // Leaflet layers redrawn from a saved game
   const currentGridCellId = ref(null) // ID of the current grid cell for cost tracking
   const isFirstVertexAdded = ref(false) // Flag to track if the first vertex has been added
+  const buildError = ref('') // Why the last section could not be built, if it could not
 
   // Caching town marker positions and endpoints for faster validation
   const townMarkerPositions = ref([])
@@ -50,8 +52,43 @@ export default function useBuildTrack(props, grid, formatCurrency) {
 
   // total cost for all track segments
   const totalCost = computed(() => itemizedCosts.value.reduce((acc, cost) => acc + cost, 0))
-  // has any track been drawn
-  const hasTrackBeenDrawn = computed(() => existingLineLayers.value.length > 0)
+  /**
+   * Whether the active player has track they may still tear up.
+   *
+   * Read from the track store rather than from the layers drawn this session,
+   * so it is right in both directions: a player who reloads mid-turn can still
+   * reach the refund for track they have already paid for, and a player who
+   * has built nothing is not offered a Remove button for the previous
+   * player's track.
+   */
+  const hasRemovableTrack = computed(
+    () => trackStore.segmentsBuiltOn(playerStore.activePlayer?.id, gameStore.turn).length > 0
+  )
+
+  /**
+   * What the active player can still put into track — whichever of cash on hand
+   * and this turn's build allowance runs out first.
+   */
+  const availableToSpend = computed(() =>
+    playerStore.availableForTrack(playerStore.activePlayer?.id)
+  )
+
+  /**
+   * Cost of the line being drawn, including the leg the cursor is part way
+   * through. `totalCost` alone only counts legs already committed by a vertex,
+   * so it lags the cursor by a whole leg and would warn a player too late.
+   */
+  const pendingCost = computed(() => totalCost.value + runningCost.value)
+
+  /**
+   * True while the line in progress costs more than the player can pay for.
+   * Only meaningful mid-draw: once a section is built its cost has already come
+   * out of `availableToSpend`, and comparing the two would flag every build
+   * that spent the last of the allowance.
+   */
+  const isOverBudget = computed(
+    () => isDrawingActive.value && pendingCost.value > availableToSpend.value
+  )
 
   // ================== TURN HANDLING ==================
 
@@ -94,24 +131,24 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     props.map.pm.toggleGlobalRemovalMode()
   }
 
-  /**
-   * Enables edit mode for modifying existing lines.
-   */
-  function enableEditing() {
-    props.map.eachLayer((layer) => {
-      if (layer.pm?.toggleEdit) layer.pm.toggleEdit()
-    })
-  }
-
   // ================== DRAWING CONTROL FUNCTIONS ==================
 
   /**
    * Initiates line drawing mode on the map.
    */
   function startDrawingLine() {
+    resetLineTracking()
+
+    // Cost comes from the grid cells a line crosses, so with no grid every
+    // line prices at zero and is built for nothing. Refuse rather than give
+    // the map away.
+    if (!grid.value?.length) {
+      buildError.value = 'The map has not finished loading, so track cannot be priced yet.'
+      return
+    }
+
     props.map.pm.enableDraw('Line')
     mapStore.setIsDrawingActive(true)
-    resetLineTracking()
   }
 
   /**
@@ -120,6 +157,9 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   function cancelDrawing() {
     props.map.pm.disableDraw('Line')
     mapStore.setIsDrawingActive(false)
+    // Without this the handler stays held, the next drawing never rebinds one,
+    // and every leg of it prices at zero — free track
+    resetHintMarkerMoveHandler()
     workingLayer.value = null
   }
 
@@ -156,11 +196,10 @@ export default function useBuildTrack(props, grid, formatCurrency) {
       setupDrawingEvents()
     })
     props.map.on('pm:create', finalizeDrawing)
-    // Geoman's global removal and edit modes act on the layer, so the store has
-    // to be told; without this the map and the rail network drift apart (#83).
-    // Removal is re-fired on the map (`_fireRemove(this.map, layer)`) but an
-    // edit is not — `_fireUpdate` only ever fires on the layer itself — so the
-    // edit handler is bound per layer in `attachSegment` and `styleTracks`.
+    // Geoman's global removal mode acts on the layer, so the store has to be
+    // told; without this the map and the rail network drift apart (#83).
+    // Removal is re-fired on the map (`_fireRemove(this.map, layer)`), so one
+    // map-level listener catches every section.
     props.map.on('pm:remove', handleLayerRemoved)
   }
 
@@ -243,18 +282,44 @@ export default function useBuildTrack(props, grid, formatCurrency) {
       // in the accumulator. Flush it before the segment is priced.
       if (runningCost.value > 0) calculateSegmentCost()
 
-      // Record before styling: the layer has to carry its segment id from the
-      // moment it exists, or a removal cannot find what to un-record
-      const segment = recordSegment(e.layer)
-      if (!segment) {
-        // Track that nothing owns and no save records is worse than no track at
-        // all, so take it back off the map rather than leave a phantom line
-        props.map.removeLayer(e.layer)
-        resetHintMarkerMoveHandler()
-        workingLayer.value = null
+      const cost = totalCost.value
+      const builderId = playerStore.activePlayer?.id
+      const affordable = availableToSpend.value
+
+      // Charged before it is recorded: once a section is in the store it is
+      // indistinguishable from one that was paid for, so a build the player
+      // cannot cover has to be turned away here rather than unwound later
+      if (!playerStore.spendOnTrack(builderId, cost)) {
+        // The store's own message is in raw numbers and names the player, which
+        // is what a log wants and not what the person building wants to read
+        console.warn('Track section refused:', playerStore.error)
+        // `discardDrawnLayer` resets the drawing state, `buildError` included,
+        // so the explanation is written after it rather than before
+        discardDrawnLayer(e.layer)
+        // Money is only one of the ways the charge can fail; blaming the budget
+        // for a section that could not be priced at all would send the player
+        // looking for cash they already have
+        buildError.value = Number.isFinite(cost)
+          ? `That section costs ${formatCurrency(cost)} — more than the ${formatCurrency(affordable)} you have left to spend.`
+          : 'That section could not be priced, so it was not built.'
         return
       }
 
+      // Record before styling: the layer has to carry its segment id from the
+      // moment it exists, or a removal cannot find what to un-record
+      const segment = recordSegment(e.layer, cost)
+      if (!segment) {
+        // Nothing was built, so nothing stays charged for
+        playerStore.refundTrackSpend(builderId, cost)
+        // Track that nothing owns and no save records is worse than no track at
+        // all, so take it back off the map rather than leave a phantom line
+        discardDrawnLayer(e.layer)
+        // The line vanishing with no explanation reads as the game losing work
+        buildError.value = 'That section could not be recorded, so it was not built.'
+        return
+      }
+
+      buildError.value = ''
       attachSegment(e.layer, segment.id)
       existingLineLayers.value.push(markRaw(e.layer))
       updateLineEndpoints(e.layer)
@@ -265,15 +330,35 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   }
 
   /**
+   * Takes a just-drawn line back off the map and clears the drawing state that
+   * went with it. Used whenever a completed line is refused.
+   * @param {Object} layer - The layer Geoman just created
+   */
+  function discardDrawnLayer(layer) {
+    props.map.removeLayer(layer)
+    resetHintMarkerMoveHandler()
+    // The itemised costs describe a line that no longer exists, and leaving
+    // them up puts a total next to the message explaining it was not built
+    resetLineTracking()
+    workingLayer.value = null
+  }
+
+  /**
    * Writes a finished line into the track store as owned, priced game state.
+   *
+   * The price is passed in rather than read from `totalCost` again, so the
+   * amount the player was charged and the amount the segment records are the
+   * same number by construction — a refund pays back what the segment says.
+   *
    * @param {Object} layer - The completed Leaflet line layer
+   * @param {number} cost - What the player was charged for it
    * @returns {Object|null} The stored segment, or null if it was rejected
    */
-  function recordSegment(layer) {
+  function recordSegment(layer, cost) {
     const segment = trackStore.addSegment({
       ownerId: playerStore.activePlayer?.id,
       coordinates: layer.getLatLngs().map(({ lat, lng }) => ({ lat, lng })),
-      cost: totalCost.value,
+      cost,
       turn: gameStore.turn
     })
 
@@ -288,19 +373,13 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   // ================== MAP / STORE SYNCHRONISATION ==================
 
   /**
-   * Ties a Leaflet layer to the segment it draws, so a later removal or edit
-   * can find what to change in the store.
-   *
-   * The edit handler is bound here rather than on the map because Geoman fires
-   * `pm:update` on the layer alone — unlike `pm:remove`, it is never re-fired
-   * on the map, so a map-level listener would never run.
-   *
+   * Ties a Leaflet layer to the segment it draws, so a later removal can find
+   * what to take out of the store.
    * @param {Object} layer - The track layer
    * @param {number} segmentId - Id of the segment it draws
    */
   function attachSegment(layer, segmentId) {
     layer.segmentId = segmentId
-    layer.on('pm:update', handleLayerEdited)
   }
 
   /**
@@ -321,19 +400,19 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   }
 
   /**
-   * Whether the active player is allowed to change this segment.
+   * Whether the active player is allowed to tear up this segment.
    *
-   * Geoman's global modes offer up every track layer on the map, including
-   * other players' and earlier turns'. That was harmless while removal was
-   * cosmetic; now that it reaches the save, an unguarded removal would delete
-   * another player's network permanently.
+   * Geoman's global removal mode offers up every track layer on the map,
+   * including other players' and earlier turns'. That was harmless while
+   * removal was cosmetic; now that it reaches the save and refunds money, an
+   * unguarded removal would delete another player's network permanently and
+   * pay the wrong player for it.
    *
    * @param {Object|undefined} segment - The segment behind the layer
    * @returns {boolean} True if the segment is the active player's, built this turn
    */
-  function canModifySegment(segment) {
-    if (!segment) return false
-    return segment.ownerId === playerStore.activePlayer?.id && segment.turn === gameStore.turn
+  function canRemoveSegment(segment) {
+    return trackStore.isOwnedFromTurn(segment, playerStore.activePlayer?.id, gameStore.turn)
   }
 
   /**
@@ -346,7 +425,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     if (!layer) return
 
     const segment = trackStore.getSegment(layer.segmentId)
-    if (!canModifySegment(segment)) {
+    if (!canRemoveSegment(segment)) {
       // Geoman has already taken it off the map, so put it back rather than
       // let the map lose track the store still holds
       redrawLayer(layer, segment)
@@ -359,6 +438,12 @@ export default function useBuildTrack(props, grid, formatCurrency) {
       return
     }
 
+    // Only track built this turn by the active player gets here, so the money
+    // and the allowance both go back to the player who put them in
+    if (!playerStore.refundTrackSpend(segment.ownerId, segment.cost)) {
+      console.error('Could not refund track segment:', playerStore.error)
+    }
+
     // The rails and the line are one piece of track to the player, so removing
     // either has to take the other off the map with it
     removeStyling(layer)
@@ -366,41 +451,8 @@ export default function useBuildTrack(props, grid, formatCurrency) {
 
     existingLineLayers.value = existingLineLayers.value.filter((l) => l !== layer)
     restoredLineLayers.value = restoredLineLayers.value.filter((l) => l !== layer)
-    rebuildLineEndpoints()
-  }
-
-  /**
-   * Writes a reshaped layer's new geometry back to its segment, and redraws the
-   * rails to match.
-   *
-   * The player drags the rails, not the line, so the geometry is read from
-   * whichever layer the event fired on and the line underneath is caught up to
-   * it — reading the line's own points would silently discard the edit.
-   *
-   * @param {Object} e - Geoman update event
-   */
-  function handleLayerEdited(e) {
-    const editedLayer = e.layer
-    const layer = resolveTrackLayer(editedLayer)
-    if (!layer) return
-
-    const segment = trackStore.getSegment(layer.segmentId)
-    if (!canModifySegment(segment)) {
-      redrawLayer(layer, segment)
-      return
-    }
-
-    const coordinates = editedLayer.getLatLngs().map(({ lat, lng }) => ({ lat, lng }))
-    if (!trackStore.updateSegmentCoordinates(layer.segmentId, coordinates)) {
-      console.error('Could not update track segment:', trackStore.error)
-      // The store refused the new shape, so the map must not keep it either
-      redrawLayer(layer, segment)
-      return
-    }
-
-    layer.setLatLngs(editedLayer.getLatLngs())
-    removeStyling(layer)
-    styleTracks(layer)
+    // The panel was itemising the section just torn up
+    resetLineTracking()
     rebuildLineEndpoints()
   }
 
@@ -433,7 +485,12 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   // ================== COST TRACKING & TOOLTIP ==================
 
   /**
-   * Attaches a tooltip update handler to the hint marker to show running cost.
+   * Attaches the running-cost handler to the hint marker the player is dragging.
+   *
+   * This is what prices a line, so failing to bind it does not degrade the
+   * tooltip — it makes the track free. The guard below skips binding when a
+   * handler is already held, which is why `resetHintMarkerMoveHandler` has to
+   * run on every path that ends a drawing, cancellation included.
    */
   function addHintMarkerMoveHandler() {
     const hintMarker = props.map.pm.Draw.Line._hintMarker
@@ -442,19 +499,28 @@ export default function useBuildTrack(props, grid, formatCurrency) {
         (e) => updateRunningCostTooltip(e.latlng, hintMarker),
         100
       ) // Throttle to reduce lag
+      // Held so the handler can be taken off the marker it was put on, rather
+      // than off whichever marker happens to be current when it is released
+      costedHintMarker.value = markRaw(hintMarker)
       hintMarker.on('move', hintMarkerMoveHandler.value)
     }
   }
 
   /**
-   * Detaches the tooltip update handler from the hint marker after drawing completion.
+   * Releases the running-cost handler once a drawing ends, however it ended.
+   *
+   * Geoman builds a fresh hint marker on every `enable()` and never clears the
+   * old one, so the handler is unbound from the marker it was actually put on.
+   * The handler is dropped whether or not that marker is still around: holding
+   * a stale one would make `addHintMarkerMoveHandler` skip the next drawing,
+   * and every leg of it would then price at zero.
    */
   function resetHintMarkerMoveHandler() {
-    const hintMarker = props.map.pm.Draw.Line._hintMarker
-    if (hintMarker && hintMarkerMoveHandler.value) {
-      hintMarker.off('move', hintMarkerMoveHandler.value)
-      hintMarkerMoveHandler.value = null
+    if (costedHintMarker.value && hintMarkerMoveHandler.value) {
+      costedHintMarker.value.off('move', hintMarkerMoveHandler.value)
     }
+    costedHintMarker.value = null
+    hintMarkerMoveHandler.value = null
   }
 
   /**
@@ -464,7 +530,9 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    */
   function updateRunningCostTooltip(latlng, hintMarker) {
     const cell = getGridCellByLatLng(latlng)
-    if (cell && cell.id !== currentGridCellId.value && cell.cost !== null) {
+    // `Number.isFinite` rather than a null check: an undefined or NaN cell cost
+    // propagates into the running total and prices the whole line at NaN
+    if (cell && cell.id !== currentGridCellId.value && Number.isFinite(cell.cost)) {
       currentGridCellId.value = cell.id
       runningCost.value += cell.cost
       hintMarker.setTooltipContent(`Cost: ${formatCurrency(runningCost.value)}`)
@@ -500,6 +568,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     currentGridCellId.value = null
     runningCost.value = 0
     itemizedCosts.value = []
+    buildError.value = ''
   }
 
   function validateStartPoint(latlng) {
@@ -589,11 +658,8 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     tieLayer.addTo(props.map)
 
     // Link the decoration to the track it draws, in both directions, so a
-    // click or a drag on the visible rails still resolves to the segment behind
-    // them. The ties are rebuilt on every restyle, so this listener goes with
-    // the layer it is bound to rather than accumulating.
+    // click on the visible rails still resolves to the segment behind them.
     tieLayer.trackLayer = layer
-    tieLayer.on('pm:update', handleLayerEdited)
     layer.tieLayer = tieLayer
   }
 
@@ -705,10 +771,13 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   return {
     itemizedCosts,
     totalCost,
-    hasTrackBeenDrawn,
+    pendingCost,
+    availableToSpend,
+    isOverBudget,
+    buildError,
+    hasRemovableTrack,
     startDrawingLine,
     enableRemoveMode,
-    enableEditing,
     cancelDrawing
   }
 }

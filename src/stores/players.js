@@ -11,7 +11,8 @@
  *   cash: number,      // Current money (starts at 0 or specified amount)
  *   isTurn: boolean,   // True if it's this player's turn
  *   color: string,     // Player's chosen color
- *   position: number   // Board position (for future use)
+ *   position: number,  // Board position (for future use)
+ *   trackSpentThisTurn: number // Spent on track this turn, against the budget
  * }
  *
  * @module stores/players
@@ -19,6 +20,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { gameRules } from '@/config/game'
 
 export const usePlayerStore = defineStore('playerStore', () => {
   // STATE
@@ -103,7 +105,8 @@ export const usePlayerStore = defineStore('playerStore', () => {
         cash: player.cash || 0,
         isTurn: false,
         color: player.color,
-        position: 0
+        position: 0,
+        trackSpentThisTurn: 0
       })
       return true
     } catch (e) {
@@ -260,6 +263,164 @@ export const usePlayerStore = defineStore('playerStore', () => {
     }
   }
 
+  // MONEY
+
+  /**
+   * What a player has spent on track this turn.
+   *
+   * Read through a helper because a missing counter has to come back as 0
+   * rather than as undefined: `budget - undefined` is NaN, and every
+   * comparison against NaN is false, so a player carrying one would sail
+   * through the budget check with no limit at all.
+   *
+   * @param {Object} player The player.
+   * @returns {number} Amount spent on track this turn.
+   */
+  function spentOnTrack(player) {
+    return Number.isFinite(player.trackSpentThisTurn) ? player.trackSpentThisTurn : 0
+  }
+
+  /**
+   * How much of this turn's track allowance a player has left.
+   * @param {number} id The player's ID.
+   * @returns {number} Unspent allowance, never negative.
+   */
+  function trackBudgetRemaining(id) {
+    const player = players.value.find((p) => p.id === id)
+    if (!player) return 0
+
+    return Math.max(0, gameRules.trackBudgetPerTurn - spentOnTrack(player))
+  }
+
+  /**
+   * The most a player could spend on track right now.
+   *
+   * Cash and allowance bind separately, so the usable figure is whichever runs
+   * out first — this is the number the build controls compare a running cost
+   * against, and the one a rejected build is measured by.
+   *
+   * @param {number} id The player's ID.
+   * @returns {number} Spendable amount, never negative.
+   */
+  function availableForTrack(id) {
+    const player = players.value.find((p) => p.id === id)
+    if (!player) return 0
+
+    return Math.min(player.cash, trackBudgetRemaining(id))
+  }
+
+  /**
+   * Take money off a player.
+   *
+   * Refuses rather than clamps: a purchase a player cannot cover has to fail as
+   * a purchase, because silently charging them what little they have would hand
+   * them the goods anyway.
+   *
+   * @param {number} id The player's ID.
+   * @param {number} amount How much to deduct.
+   * @returns {boolean} True if the player was charged.
+   */
+  function spendCash(id, amount) {
+    error.value = null
+
+    const player = players.value.find((p) => p.id === id)
+    if (!player) {
+      error.value = `Player with ID ${id} not found`
+      return false
+    }
+
+    if (!Number.isFinite(amount) || amount < 0) {
+      error.value = 'Amount spent must be a non-negative number'
+      return false
+    }
+
+    if (amount > player.cash) {
+      error.value = `${player.name} has ${player.cash} and cannot spend ${amount}`
+      return false
+    }
+
+    player.cash -= amount
+    return true
+  }
+
+  /**
+   * Charge a player for track, against both their cash and this turn's budget.
+   * @param {number} id The player's ID.
+   * @param {number} amount What the track costs.
+   * @returns {boolean} True if the player was charged.
+   */
+  function spendOnTrack(id, amount) {
+    error.value = null
+
+    const player = players.value.find((p) => p.id === id)
+    if (!player) {
+      error.value = `Player with ID ${id} not found`
+      return false
+    }
+
+    if (!Number.isFinite(amount) || amount < 0) {
+      error.value = 'Amount spent must be a non-negative number'
+      return false
+    }
+
+    // Checked before the cash, so a player who can afford it but has used up
+    // the turn's allowance is told which limit they actually hit
+    if (amount > trackBudgetRemaining(id)) {
+      error.value = `${player.name} has ${trackBudgetRemaining(id)} left to build with this turn`
+      return false
+    }
+
+    // spendCash sets its own error if the player cannot cover it
+    if (!spendCash(id, amount)) return false
+
+    player.trackSpentThisTurn = spentOnTrack(player) + amount
+    return true
+  }
+
+  /**
+   * Give back what a section of track cost, when it is torn up on the same turn
+   * it was built. The allowance is returned along with the cash — the track was
+   * never built as far as the turn is concerned.
+   * @param {number} id The player's ID.
+   * @param {number} amount What the track cost.
+   * @returns {boolean} True if the player was refunded.
+   */
+  function refundTrackSpend(id, amount) {
+    error.value = null
+
+    const player = players.value.find((p) => p.id === id)
+    if (!player) {
+      error.value = `Player with ID ${id} not found`
+      return false
+    }
+
+    if (!Number.isFinite(amount) || amount < 0) {
+      error.value = 'Amount refunded must be a non-negative number'
+      return false
+    }
+
+    player.cash += amount
+    // A refund can only ever hand back what this turn's building took, so the
+    // counter floors at zero rather than going negative and quietly granting a
+    // larger allowance than the rules allow
+    player.trackSpentThisTurn = Math.max(0, spentOnTrack(player) - amount)
+    return true
+  }
+
+  /**
+   * Start a player's build allowance over. Called as their turn ends, so the
+   * budget they come back to is a full one.
+   * @param {number} id The player's ID.
+   * @returns {boolean} True if the player was found and reset.
+   */
+  function resetTrackSpend(id) {
+    const player = players.value.find((p) => p.id === id)
+    if (!player) return false
+
+    player.trackSpentThisTurn = 0
+    return true
+  }
+
   /**
    * Add an entry to the setup roster.
    * Drafts are not validated — the setup screen is where a name gets typed.
@@ -371,7 +532,14 @@ export const usePlayerStore = defineStore('playerStore', () => {
    */
   function setPlayers(playersArray) {
     if (Array.isArray(playersArray)) {
-      players.value = playersArray
+      // Saves written before track was charged for carry no spend counter, and
+      // an undefined one turns every later budget check into NaN
+      players.value = playersArray.map((player) => ({
+        ...player,
+        trackSpentThisTurn: Number.isFinite(player.trackSpentThisTurn)
+          ? player.trackSpentThisTurn
+          : 0
+      }))
     }
   }
 
@@ -391,6 +559,12 @@ export const usePlayerStore = defineStore('playerStore', () => {
     startGame,
     setActivePlayer,
     nextTurn,
+    trackBudgetRemaining,
+    availableForTrack,
+    spendCash,
+    spendOnTrack,
+    refundTrackSpend,
+    resetTrackSpend,
     addDraftPlayer,
     updateDraftPlayer,
     removeDraftPlayer,

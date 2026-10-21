@@ -13,6 +13,7 @@
 <script setup>
 import { ref } from 'vue'
 import { usePlayerStore } from '@/stores/players'
+import { gameRules } from '@/config/game'
 
 defineProps({
   players: {
@@ -29,12 +30,12 @@ const commitError = ref('')
 
 /**
  * Turns the setup roster into the game's players and initiates the first turn.
- * Starting cash is $20,000 per Empire Builder rules.
+ * Starting cash comes from the game rules.
  */
 function confirmPlayers() {
   commitError.value = ''
 
-  if (!playerStore.commitDraftPlayers({ cash: 20000 })) {
+  if (!playerStore.commitDraftPlayers({ cash: gameRules.startingCash })) {
     commitError.value = playerStore.error || 'Could not start the game with these players.'
     return
   }

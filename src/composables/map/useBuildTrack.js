@@ -115,8 +115,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    */
   onMounted(() => {
     initializeTownMarkers() // Set up events for clickable town markers
-    initializeMapEvents() // Set up general drawing events on the map
-    setupCursorValidation() // Enable cursor validation during drawing
+    props.map.on(mapEvents) // Listen for drawing, removal and cursor movement
     setGeomanOptions() // Configure Geoman drawing tool options
     restoreTrackLayers() // Redraw track carried in from a saved game
     initializeCaches() // Initialize town marker and line endpoint caches
@@ -136,10 +135,18 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   onBeforeUnmount(() => {
     // A drawing left open would carry on with no listener to price or record it
     if (isDrawingActive.value) cancelDrawing()
+    // Likewise removal mode: left on, it would let a player tear sections off
+    // the map with nothing listening to take them out of the store or refund
+    // them — the drift between map and save that #83 fixed
+    if (props.map.pm.globalRemovalModeEnabled()) props.map.pm.disableGlobalRemovalMode()
+    // The start-point check may have left a "not allowed" cursor on the map
+    props.map.getContainer().style.cursor = ''
 
-    removeMapEvents()
+    props.map.off(mapEvents)
     removeTownMarkerEvents()
-    removeTrackLayers()
+    allTrackLayers().forEach(removeTrackLayer)
+    existingLineLayers.value = []
+    restoredLineLayers.value = []
   })
 
   // ================== PUBLIC FUNCTIONS (EXPOSED) ==================
@@ -226,28 +233,23 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   }
 
   /**
-   * Sets up map-wide drawing events, including starting and completing a line.
+   * Every map-wide listener this composable needs, as one table that is handed
+   * to both `map.on` at mount and `map.off` at unmount. Keeping a single list
+   * means a listener cannot be added without also being removed — a missed
+   * removal is exactly how listeners stacked up across mounts.
+   *
+   * Leaflet's `off` only removes a listener when given the same function `on`
+   * was given, which is why every handler here is a named function.
    */
-  function initializeMapEvents() {
-    props.map.on('pm:drawstart', handleDrawStart)
-    props.map.on('pm:create', finalizeDrawing)
+  const mapEvents = {
+    'pm:drawstart': handleDrawStart,
+    'pm:create': finalizeDrawing,
     // Geoman's global removal mode acts on the layer, so the store has to be
     // told; without this the map and the rail network drift apart (#83).
     // Removal is re-fired on the map (`_fireRemove(this.map, layer)`), so one
     // map-level listener catches every section.
-    props.map.on('pm:remove', handleLayerRemoved)
-  }
-
-  /**
-   * Takes the map-wide drawing events back off. Leaflet's `off` only removes a
-   * listener when given the same function `on` was given, which is why every
-   * handler here is a named function rather than an inline one.
-   */
-  function removeMapEvents() {
-    props.map.off('pm:drawstart', handleDrawStart)
-    props.map.off('pm:create', finalizeDrawing)
-    props.map.off('pm:remove', handleLayerRemoved)
-    props.map.off('mousemove', handleCursorMove)
+    'pm:remove': handleLayerRemoved,
+    mousemove: handleCursorMove
   }
 
   /**
@@ -290,20 +292,27 @@ export default function useBuildTrack(props, grid, formatCurrency) {
   }
 
   /**
-   * Takes every track layer this composable drew off the map, rails included.
-   *
-   * The sections themselves stay in the track store, which is what the next
-   * mount redraws from. Leaving these layers up as well would put two copies of
-   * every section on the map, and the copy nobody holds a reference to could
-   * never be removed.
+   * Every track layer this composable has on the map: sections built since it
+   * mounted, plus those redrawn from the store when it mounted.
+   * @returns {Array} Track layers
    */
-  function removeTrackLayers() {
-    ;[...existingLineLayers.value, ...restoredLineLayers.value].forEach((layer) => {
-      removeStyling(layer)
-      props.map.removeLayer(layer)
-    })
-    existingLineLayers.value = []
-    restoredLineLayers.value = []
+  function allTrackLayers() {
+    return [...existingLineLayers.value, ...restoredLineLayers.value]
+  }
+
+  /**
+   * Takes one section's layer off the map, along with the rails drawn over it.
+   * The rails and the line are one piece of track to the player, so neither
+   * may be left behind without the other.
+   *
+   * Only the map changes here; whether the section also leaves the track store
+   * is up to the caller.
+   *
+   * @param {Object} layer - The track layer
+   */
+  function removeTrackLayer(layer) {
+    removeStyling(layer)
+    if (props.map.hasLayer(layer)) props.map.removeLayer(layer)
   }
 
   // ================== DRAWING EVENT HANDLERS ==================
@@ -517,10 +526,9 @@ export default function useBuildTrack(props, grid, formatCurrency) {
       console.error('Could not refund track segment:', playerStore.error)
     }
 
-    // The rails and the line are one piece of track to the player, so removing
-    // either has to take the other off the map with it
-    removeStyling(layer)
-    if (props.map.hasLayer(layer)) props.map.removeLayer(layer)
+    // Geoman removed whichever of the line or its rails was clicked; this takes
+    // off the other half too
+    removeTrackLayer(layer)
 
     existingLineLayers.value = existingLineLayers.value.filter((l) => l !== layer)
     restoredLineLayers.value = restoredLineLayers.value.filter((l) => l !== layer)
@@ -552,7 +560,7 @@ export default function useBuildTrack(props, grid, formatCurrency) {
    */
   function rebuildLineEndpoints() {
     lineEndpoints.value = []
-    ;[...existingLineLayers.value, ...restoredLineLayers.value].forEach(updateLineEndpoints)
+    allTrackLayers().forEach(updateLineEndpoints)
   }
 
   // ================== COST TRACKING & TOOLTIP ==================
@@ -678,13 +686,6 @@ export default function useBuildTrack(props, grid, formatCurrency) {
     if (isDrawingActive.value && !isFirstVertexAdded.value) {
       debouncedCursorValidation(e.latlng)
     }
-  }
-
-  /**
-   * Sets up cursor styles based on the validity of points during line drawing.
-   */
-  function setupCursorValidation() {
-    props.map.on('mousemove', handleCursorMove)
   }
 
   /**

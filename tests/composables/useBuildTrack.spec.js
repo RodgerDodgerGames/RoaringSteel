@@ -34,6 +34,7 @@ import { formatCurrency } from '@/composables/utils'
 function createFakeMap() {
   const map = new L.Evented()
   const layers = new Set()
+  const container = { style: {} }
 
   map.addLayer = (layer) => {
     layers.add(layer)
@@ -44,17 +45,28 @@ function createFakeMap() {
     return map
   }
   map.hasLayer = (layer) => layers.has(layer)
-  map.getContainer = () => ({ style: {} })
+  map.getContainer = () => container
+
+  /** @returns {Array} Every layer on the map, rail decorations included */
+  map.allLayers = () => [...layers]
 
   /** @returns {Array} Layers on the map that draw a recorded track segment */
   map.trackLayers = () => [...layers].filter((layer) => layer.segmentId != null)
 
+  // Geoman's removal mode, reduced to the on/off state the composable controls
+  let removalMode = false
   map.pm = {
     setLang: () => {},
     setGlobalOptions: () => {},
     enableDraw: () => {},
     disableDraw: () => {},
-    toggleGlobalRemovalMode: () => {},
+    toggleGlobalRemovalMode: () => {
+      removalMode = !removalMode
+    },
+    disableGlobalRemovalMode: () => {
+      removalMode = false
+    },
+    globalRemovalModeEnabled: () => removalMode,
     Draw: { Line: {} }
   }
 
@@ -65,16 +77,30 @@ function createFakeMap() {
  * Mounts a bare component that does nothing but run the composable, the way
  * the build controls do.
  * @param {Object} map - Fake map from `createFakeMap`
- * @returns {Object} The mounted wrapper
+ * @param {Object} [towns] - Layer group of town markers
+ * @returns {Object} The mounted wrapper, plus the composable's exposed API
  */
-function mountBuildTrack(map) {
+function mountBuildTrack(map, towns = L.layerGroup()) {
+  let api
   const Host = defineComponent({
     setup() {
-      useBuildTrack({ map, towns: ref(L.layerGroup()) }, ref([]), formatCurrency)
+      api = useBuildTrack({ map, towns: ref(towns) }, ref([]), formatCurrency)
       return () => null
     }
   })
-  return mount(Host)
+  const wrapper = mount(Host)
+  return { wrapper, api }
+}
+
+/** A saved section, as the track store holds one after a load */
+const savedSegment = {
+  ownerId: 1,
+  coordinates: [
+    { lat: 40, lng: -100 },
+    { lat: 41, lng: -101 }
+  ],
+  cost: 1000,
+  turn: 0
 }
 
 /**
@@ -107,7 +133,7 @@ describe('useBuildTrack', () => {
 
   describe('when the build controls are unmounted and mounted again', () => {
     it('should record a newly drawn section once', () => {
-      mountBuildTrack(map).unmount()
+      mountBuildTrack(map).wrapper.unmount()
       mountBuildTrack(map)
 
       map.fire('pm:create', { layer: createDrawnLine() })
@@ -116,17 +142,9 @@ describe('useBuildTrack', () => {
     })
 
     it('should draw each saved section once', () => {
-      trackStore.addSegment({
-        ownerId: 1,
-        coordinates: [
-          { lat: 40, lng: -100 },
-          { lat: 41, lng: -101 }
-        ],
-        cost: 1000,
-        turn: 0
-      })
+      trackStore.addSegment(savedSegment)
 
-      mountBuildTrack(map).unmount()
+      mountBuildTrack(map).wrapper.unmount()
       mountBuildTrack(map)
 
       expect(map.trackLayers()).toHaveLength(1)
@@ -135,11 +153,54 @@ describe('useBuildTrack', () => {
 
   describe('when unmounted', () => {
     it('should stop responding to sections drawn on the map', () => {
-      mountBuildTrack(map).unmount()
+      mountBuildTrack(map).wrapper.unmount()
 
       map.fire('pm:create', { layer: createDrawnLine() })
 
       expect(trackStore.segments).toHaveLength(0)
+    })
+
+    it('should leave no track or rails on the map', () => {
+      trackStore.addSegment(savedSegment)
+      const { wrapper } = mountBuildTrack(map)
+      map.fire('pm:create', { layer: createDrawnLine() })
+
+      wrapper.unmount()
+
+      expect(map.allLayers()).toHaveLength(0)
+    })
+
+    it('should keep the sections in the track store for the next mount to draw', () => {
+      trackStore.addSegment(savedSegment)
+
+      mountBuildTrack(map).wrapper.unmount()
+
+      expect(trackStore.segments).toHaveLength(1)
+    })
+
+    it('should stop listening for clicks on town markers', () => {
+      const town = L.marker([40, -100])
+      mountBuildTrack(map, L.layerGroup([town])).wrapper.unmount()
+
+      expect(town.listens('click')).toBe(false)
+    })
+
+    it('should switch off removal mode the player left on', () => {
+      const { wrapper, api } = mountBuildTrack(map)
+      api.enableRemoveMode()
+
+      wrapper.unmount()
+
+      expect(map.pm.globalRemovalModeEnabled()).toBe(false)
+    })
+
+    it('should clear any "not allowed" cursor left on the map', () => {
+      const { wrapper } = mountBuildTrack(map)
+      map.getContainer().style.cursor = 'not-allowed'
+
+      wrapper.unmount()
+
+      expect(map.getContainer().style.cursor).toBe('')
     })
   })
 })

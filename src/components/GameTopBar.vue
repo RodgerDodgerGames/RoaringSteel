@@ -7,6 +7,8 @@
   - the game's name
   - the round number (one round = every player taking a turn), and during
     the two opening rounds, that they are building rounds
+  - the switch between the map's Plan view (the whole region, with what each
+    town produces) and Build view (zoomed in to lay track)
   - every player in turn order, with their color and cash; the player whose
     turn it is stands out, like the player holding the dice
   - a Game menu with Save, Load and Settings
@@ -24,12 +26,23 @@ import LoadGameDialog from '@/components/dialogs/LoadGameDialog.vue'
 import SettingsDialog from '@/components/dialogs/SettingsDialog.vue'
 import { usePlayerStore } from '@/stores/players'
 import { useGameStore } from '@/stores/game'
+import { useMapStore } from '@/stores/map'
 import { formatCurrency } from '@/composables/utils'
 import { gameRules } from '@/config/game'
+import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 
 const { players } = storeToRefs(usePlayerStore())
 // The store counts rounds from 0; players count them from 1
 const { turn, isBuildingRound } = storeToRefs(useGameStore())
+
+const mapStore = useMapStore()
+const { viewMode } = storeToRefs(mapStore)
+
+/** The map's views, as the switch offers them */
+const mapViews = [
+  { view: PLAN_VIEW, label: 'Plan', icon: 'fa-map', title: 'See the whole map' },
+  { view: BUILD_VIEW, label: 'Build', icon: 'fa-hammer', title: 'Zoom in to build track' }
+]
 
 // Game menu: open state, and the element whose outside clicks close it
 const isMenuOpen = ref(false)
@@ -61,6 +74,22 @@ function openDialog(name) {
       </template>
       <template v-else>Round {{ turn + 1 }}</template>
     </span>
+
+    <!-- Plan / Build: which view of the map is showing -->
+    <div class="buttons has-addons top-bar__views" role="group" aria-label="Map view">
+      <button
+        v-for="option in mapViews"
+        :key="option.view"
+        class="button is-small top-bar__view-button"
+        :class="{ 'is-selected': viewMode === option.view }"
+        :aria-pressed="viewMode === option.view"
+        :title="option.title"
+        @click="mapStore.setViewMode(option.view)"
+      >
+        <span class="icon"><i class="fas" :class="option.icon" aria-hidden="true"></i></span>
+        <span>{{ option.label }}</span>
+      </button>
+    </div>
 
     <!-- Every player, in turn order -->
     <ol class="top-bar__players" aria-label="Players in turn order">
@@ -139,6 +168,32 @@ function openDialog(name) {
   text-transform: uppercase;
   white-space: nowrap;
   opacity: 0.85;
+}
+
+/* Bulma's `.buttons` leaves room below the group, and under each button, for
+   rows that wrap; this one never wraps. Its own rule is `.buttons:not(:last-child)`,
+   so the group is matched with `.buttons` too to outrank it. */
+.buttons.top-bar__views {
+  flex: none;
+  margin-bottom: 0;
+}
+
+.top-bar__views .button {
+  margin-bottom: 0;
+}
+
+.top-bar__view-button {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.6);
+  color: inherit;
+}
+
+/* The view showing: solid and light, like the active player's chip */
+.top-bar__view-button.is-selected {
+  background: var(--bulma-scheme-main);
+  border-color: var(--bulma-scheme-main);
+  color: var(--bulma-text-strong);
+  font-weight: 700;
 }
 
 /* Takes the space between round and menu; chips past the edge are clipped

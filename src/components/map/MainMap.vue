@@ -4,12 +4,15 @@
   The primary game map component built on Leaflet. Displays:
   - Stamen terrain background tiles
   - Town markers with size-based icons
+  - Each town's commodity icons, in the Plan view
   - Interactive popups for town information
 
   Integrates with:
   - mapStore: Stores map instance and view state
   - townsStore: Provides town data for markers
   - useTowns composable: Handles marker rendering
+  - useMapView composable: Puts the map in the Plan or Build view chosen in
+    the top bar (the game opens in Plan, showing the whole region)
 
   The map instance is made globally available via the map store
   so other components (like useBuildTrack) can access it.
@@ -20,11 +23,12 @@
 
 <script setup>
 import { storeToRefs } from 'pinia'
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useTowns } from '@/composables/map/useTowns'
+import { useMapView } from '@/composables/map/useMapView'
 import { useTownsStore } from '@/stores/towns'
 import { useMapStore } from '@/stores/map'
 
@@ -32,13 +36,15 @@ const townsStore = useTownsStore()
 const mapStore = useMapStore()
 // get towns from store
 const { towns } = storeToRefs(townsStore)
-const { map, mapZoom, mapCenter } = storeToRefs(mapStore)
+const { map } = storeToRefs(mapStore)
 
 const mapContainer = ref(null)
 const { addTownsToMap, townsLayer } = useTowns()
+const mapView = useMapView()
 
 onMounted(() => {
-  map.value = L.map(mapContainer.value).setView(mapCenter.value, mapZoom.value)
+  // No starting view: useMapView gives the map its view below
+  map.value = L.map(mapContainer.value)
 
   // add map to store
   mapStore.setMap(map.value)
@@ -51,6 +57,14 @@ onMounted(() => {
     ext: 'png'
   }).addTo(map.value)
 
+  // The commodity icons' license (CC BY) asks for a credit
+  map.value.attributionControl.addAttribution(
+    'Icons &copy; <a href="https://game-icons.net" target="_blank">game-icons.net</a> (CC BY 3.0)'
+  )
+
+  // Into the Plan view (or whichever the store holds) before the towns go on
+  mapView.attach(map.value)
+
   if (map.value) {
     // add towns to map
     addTownsToMap(map, towns)
@@ -59,24 +73,13 @@ onMounted(() => {
   }
 })
 
-// Watchers to keep the store updated with map state changes
-watch(mapZoom, (newZoom) => {
-  if (map.value) {
-    map.value.setZoom(newZoom)
-  }
-})
-
-watch(mapCenter, (newCenter) => {
-  if (map.value) {
-    map.value.setView(newCenter)
-  }
-})
-
 // Leaflet measures its container once and only re-measures when told. Without
 // this, growing the container (e.g. collapsing the demand strip) leaves a gray
-// band of unloaded tiles, and clicks land at the wrong coordinates.
+// band of unloaded tiles, and clicks land at the wrong coordinates. The Plan
+// view is then refitted so the region still fills the new size.
 useResizeObserver(mapContainer, () => {
   map.value?.invalidateSize()
+  mapView.refit()
 })
 </script>
 

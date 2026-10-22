@@ -44,3 +44,44 @@
 
 
   
+/* An industry's icon beside its name in the town popup. The rows are flex
+   rows that keep each icon on the same line as its name. */
+.town-popup li:has(.town-popup__icon) {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.town-popup__icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+}
+
+/*
+  A town's commodity icons in the Plan view (see useTowns). The marker is a
+  zero-sized point on the town, and each icon is placed around it.
+*/
+.commodity-icon {
+  position: absolute;
+  /* Pressing on an icon must not start the browser's own image drag */
+  -webkit-user-drag: none;
+  user-select: none;
+  /* Leaflet lifts the stylesheet's `max-width: 100%` only for images in its
+     own marker pane. These are in a pane of their own, inside a marker with
+     no width, and would otherwise shrink to nothing. */
+  max-width: none;
+  /* The icons are white on black squares; rounding and a pale rim keep them
+     from reading as holes in the map */
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);
+  /* The marker takes no clicks, but each icon names its commodity on hover */
+  pointer-events: auto;
+}
+
+/* A Plan view popup moved to stay inside the map (see planPopupOffset): its
+   tip would no longer point at its town, so it is hidden */
+.town-popup--no-tip .leaflet-popup-tip-container {
+  display: none;
+}

@@ -11,6 +11,7 @@ import { usePlayerStore } from '@/stores/players'
 import { useTrackStore } from '@/stores/track'
 import { useGameStore } from '@/stores/game'
 import { priceLine } from '@/composables/map/trackCost'
+import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 
 /**
  * Injection key for the one build-track instance a game view runs.
@@ -136,6 +137,25 @@ export default function useBuildTrack(grid, formatCurrency) {
     if (!canRemove) stopRemoving()
   })
 
+  /**
+   * Track is only built in the Build view. The Plan view shows the whole
+   * region fixed in place, too far out to place track accurately, so
+   * switching to it ends any drawing or removal in progress, as Escape does.
+   *
+   * Synchronous, so it runs on every switch: a deferred watcher sees only
+   * where the view ends up once the tick is over, and would miss a switch to
+   * Build and straight back.
+   */
+  watch(
+    () => mapStore.viewMode,
+    (view) => {
+      if (view !== PLAN_VIEW) return
+      if (isDrawingActive.value) cancelDrawing()
+      stopRemoving()
+    },
+    { flush: 'sync' }
+  )
+
   // ================== INITIAL SETUP ==================
 
   /**
@@ -214,6 +234,9 @@ export default function useBuildTrack(grid, formatCurrency) {
   function toggleRemoveMode() {
     // Drawing and removing both act on map clicks, so only one may be live
     if (isDrawingActive.value) cancelDrawing()
+    // Track is torn up in the Build view. Removal mode is only ever on in that
+    // view, so when this switches it off the view stays as it is.
+    mapStore.setViewMode(BUILD_VIEW)
     mapStore.map.pm.toggleGlobalRemovalMode()
   }
 
@@ -228,7 +251,8 @@ export default function useBuildTrack(grid, formatCurrency) {
   // ================== DRAWING CONTROL FUNCTIONS ==================
 
   /**
-   * Initiates line drawing mode on the map.
+   * Initiates line drawing mode on the map, switching the map to the Build
+   * view first if the player was looking at the Plan view.
    */
   function startDrawingLine() {
     resetLineTracking()
@@ -244,6 +268,9 @@ export default function useBuildTrack(grid, formatCurrency) {
       return
     }
 
+    // Before drawing starts, so the map is already zoomed in and limited to
+    // the Build view's range by the time the player places a first point
+    mapStore.setViewMode(BUILD_VIEW)
     mapStore.map.pm.enableDraw('Line', drawingLineStyles(playerStore.activePlayer?.id))
     mapStore.setIsDrawingActive(true)
   }

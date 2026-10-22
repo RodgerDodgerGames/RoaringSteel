@@ -7,14 +7,19 @@
  * unless told otherwise. Clicking a town while it was on used to take the town
  * off the map until the page was reloaded.
  *
+ * Each town's commodity icons are shown in the map's Plan view only, so the
+ * Build view stays clear for laying track.
+ *
  * These tests run against a real Leaflet map with Geoman attached, because
  * the behavior under test is Geoman's own removal mode.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import L from 'leaflet'
 import { useTowns } from '@/composables/map/useTowns'
+import { useMapStore } from '@/stores/map'
+import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 
 /** Two towns, enough to give the map bounds to fit */
 const towns = [
@@ -46,6 +51,37 @@ describe('useTowns', () => {
     addTownsToMap(map, ref(towns))
     return townsLayer.value.getLayers()
   }
+
+  describe('commodity icons', () => {
+    it('should be shown in the Plan view', () => {
+      const { commodityLayer, addTownsToMap } = useTowns()
+      addTownsToMap(map, ref(towns))
+
+      expect(map.value.hasLayer(commodityLayer.value)).toBe(true)
+    })
+
+    it('should be hidden in the Build view, and back in the Plan view', async () => {
+      const mapStore = useMapStore()
+      const { commodityLayer, addTownsToMap } = useTowns()
+      addTownsToMap(map, ref(towns))
+
+      mapStore.setViewMode(BUILD_VIEW)
+      await nextTick()
+      expect(map.value.hasLayer(commodityLayer.value)).toBe(false)
+
+      mapStore.setViewMode(PLAN_VIEW)
+      await nextTick()
+      expect(map.value.hasLayer(commodityLayer.value)).toBe(true)
+    })
+
+    it('should be drawn hidden when the towns are drawn in the Build view', () => {
+      useMapStore().setViewMode(BUILD_VIEW)
+      const { commodityLayer, addTownsToMap } = useTowns()
+      addTownsToMap(map, ref(towns))
+
+      expect(map.value.hasLayer(commodityLayer.value)).toBe(false)
+    })
+  })
 
   describe('in removal mode', () => {
     it('should leave a clicked town on the map', () => {

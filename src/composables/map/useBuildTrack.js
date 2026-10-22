@@ -247,7 +247,7 @@ export default function useBuildTrack(grid, formatCurrency) {
       return
     }
 
-    mapStore.map.pm.enableDraw('Line')
+    mapStore.map.pm.enableDraw('Line', drawingLineStyles(playerStore.activePlayer?.id))
     mapStore.setIsDrawingActive(true)
   }
 
@@ -371,7 +371,7 @@ export default function useBuildTrack(grid, formatCurrency) {
       // a proxy, and Geoman hands back the raw layer, so the two would never
       // compare equal and the cleanup filters below would never match
       restoredLineLayers.value.push(markRaw(layer))
-      styleTracks(layer)
+      styleTracks(layer, segment.ownerId)
     })
   }
 
@@ -489,7 +489,7 @@ export default function useBuildTrack(grid, formatCurrency) {
       attachSegment(e.layer, segment.id)
       existingLineLayers.value.push(markRaw(e.layer))
       updateLineEndpoints(e.layer)
-      styleTracks(e.layer)
+      styleTracks(e.layer, segment.ownerId)
     }
     resetHintMarkerMoveHandler()
     workingLayer.value = null
@@ -551,9 +551,10 @@ export default function useBuildTrack(grid, formatCurrency) {
   /**
    * Finds the track layer an event belongs to.
    *
-   * The rails a player actually sees and drags are the styled decoration, not
-   * the line itself — the line is set fully transparent by `styleTracks`. So an
-   * event can arrive on either, and both have to lead back to the same segment.
+   * A player sees and clicks two things for each section: the line itself,
+   * drawn by `styleTracks` as the band of the owner's colour, and the ties,
+   * which are a separate decoration layer laid over it. An event can arrive
+   * on either, and both have to lead back to the same segment.
    *
    * @param {Object} layer - The layer the Geoman event fired on
    * @returns {Object|null} The track layer carrying a segment id, if any
@@ -634,7 +635,7 @@ export default function useBuildTrack(grid, formatCurrency) {
     }
     if (!mapStore.map.hasLayer(layer)) layer.addTo(mapStore.map)
     removeStyling(layer)
-    styleTracks(layer)
+    styleTracks(layer, segment?.ownerId)
   }
 
   /**
@@ -788,31 +789,86 @@ export default function useBuildTrack(grid, formatCurrency) {
     mapStore.map.pm.setGlobalOptions({
       snappable: true,
       snapDistance: 50,
-      markerStyle: { draggable: true, color: 'red' },
-      pathOptions: { color: 'blue', fillColor: 'blue', fillOpacity: 0.4, weight: 3 }
+      // The line's own colours are not set here: they belong to whoever is
+      // drawing, so startDrawingLine passes them each time (drawingLineStyles)
+      markerStyle: { draggable: true, color: 'red' }
     })
   }
 
   // ================== TRACK STYLING ==================
 
-  // function to style layer like railroad tracks
-  function styleTracks(layer) {
+  /**
+   * How the band of colour under a player's rails is drawn. Wide enough to
+   * show either side of the black rails and ties, and slightly see-through so
+   * the terrain under the track still reads.
+   */
+  const OWNER_LINE_STYLE = { weight: 8, opacity: 0.8 }
+
+  /** Leaflet's own line blue, for a line drawn by a player with no colour */
+  const UNOWNED_DRAWING_COLOR = '#3388ff'
+
+  /**
+   * Geoman's styles for a line while it is being drawn, in the colour of the
+   * player drawing it, so it looks like their track from the first click.
+   *
+   * Three lines are involved: the legs already placed (`templineStyle`), the
+   * dashed leg following the cursor (`hintlineStyle`), and the finished line
+   * Geoman hands over before it is restyled as track (`pathOptions`). The hint
+   * line stays dashed, so the leg not yet placed still looks provisional; its
+   * dashes are longer than Geoman's, because at this width the line's rounded
+   * ends would close up short gaps.
+   *
+   * All three are always given, even for a player with no colour (who gets
+   * Leaflet's blue): Geoman keeps whatever styles it was last handed, so
+   * leaving one out would draw this player's line in the previous player's
+   * colour.
+   *
+   * @param {number} playerId - The player about to draw
+   * @returns {Object} Options for Geoman's `enableDraw`
+   */
+  function drawingLineStyles(playerId) {
+    const color = playerStore.colorOf(playerId) ?? UNOWNED_DRAWING_COLOR
+
+    return {
+      templineStyle: { color, ...OWNER_LINE_STYLE },
+      hintlineStyle: { color, dashArray: '12,16', ...OWNER_LINE_STYLE },
+      pathOptions: { color, ...OWNER_LINE_STYLE }
+    }
+  }
+
+  /**
+   * Draws a track layer as railway: black rails and ties, laid over a band of
+   * the owning player's colour, so each player's network can be told apart.
+   *
+   * Track whose owner is not a player in the game (a damaged save) is drawn
+   * as rails alone, with the band hidden.
+   *
+   * The band is the layer's own line; the rails and ties are text laid along
+   * it, which leaflet-textpath adds above every line on the map, so the black
+   * marks always sit on top of the colour.
+   *
+   * @param {Object} layer - A track layer
+   * @param {number} ownerId - Id of the player who built the track
+   */
+  function styleTracks(layer, ownerId) {
     const latlngs = layer.getLatLngs()
 
-    // Hide the original layer
-    layer.setStyle({
-      color: 'transparent', // Hide the original line
-      opacity: 0,
-      weight: 0
-    })
+    const color = playerStore.colorOf(ownerId)
+    layer.setStyle(
+      color ? { color, ...OWNER_LINE_STYLE } : { color: 'transparent', opacity: 0, weight: 0 }
+    )
 
-    // Add rails using text
+    // Add rails using text. Both the rails and the ties are centred on the
+    // line ('dominant-baseline: central'), so they run down the middle of the
+    // coloured band rather than along one edge of it.
     const railText = '-'
     const tieText = '|    '
     const options = {
       repeat: true,
-      offset: 0, // Adjust text placement
-      attributes: { fill: 'black', 'font-size': '16px' }
+      // A string, not the number 0: leaflet-textpath reads a falsy offset as
+      // "none given" and pushes the text off the line by the line's width
+      offset: '0',
+      attributes: { fill: 'black', 'font-size': '16px', 'dominant-baseline': 'central' }
     }
 
     // Apply text for rails
@@ -822,8 +878,7 @@ export default function useBuildTrack(grid, formatCurrency) {
     const tieLayer = L.polyline(latlngs, { color: 'transparent' })
     const tieOptions = {
       ...options,
-      offset: -1.5,
-      attributes: { fill: 'black', 'font-size': '10px' }
+      attributes: { ...options.attributes, 'font-size': '10px' }
     }
     tieLayer.setText(tieText, tieOptions)
     tieLayer.addTo(mapStore.map)

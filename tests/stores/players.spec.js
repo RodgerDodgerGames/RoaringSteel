@@ -406,6 +406,25 @@ describe('Player Store', () => {
     })
   })
 
+  describe('colorOf', () => {
+    beforeEach(() => {
+      playerStore.addPlayer({ name: 'Alice', color: '#FFC080' })
+      playerStore.addPlayer({ name: 'Bob', color: '#80FF80' })
+    })
+
+    it("should give each player's own colour, so their track is told apart", () => {
+      const [alice, bob] = playerStore.players
+
+      expect(playerStore.colorOf(alice.id)).toBe('#FFC080')
+      expect(playerStore.colorOf(bob.id)).toBe('#80FF80')
+    })
+
+    it('should give null for a player who is not in the game', () => {
+      expect(playerStore.colorOf(999)).toBeNull()
+      expect(playerStore.colorOf(undefined)).toBeNull()
+    })
+  })
+
   describe('nextPlayer getter', () => {
     it('should return undefined when there are no players', () => {
       expect(playerStore.nextPlayer).toBeUndefined()

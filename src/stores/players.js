@@ -75,6 +75,21 @@ export const usePlayerStore = defineStore('playerStore', () => {
    */
   const hasPlayers = computed(() => players.value.length > 0)
 
+  /**
+   * A player's colour, looked up by id. Used to paint each player's track in
+   * their colour, so anything on the map can be traced back to its owner.
+   *
+   * An unknown id gives null rather than throwing: track is drawn for every
+   * segment in a save, and a segment whose owner is missing (a damaged or
+   * hand-edited save) should still be drawn, just without an owner's colour.
+   *
+   * @param {number} id The player's ID.
+   * @returns {string|null} The player's colour, or null for an unknown player.
+   */
+  function colorOf(id) {
+    return players.value.find((player) => player.id === id)?.color ?? null
+  }
+
   // Actions
   /**
    * Add a new player to the game.
@@ -582,6 +597,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     activePlayer,
     nextPlayer,
     hasPlayers,
+    colorOf,
     // actions
     addPlayer,
     updatePlayer,

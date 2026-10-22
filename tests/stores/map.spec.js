@@ -6,9 +6,12 @@
  * - Zoom and center controls
  * - Drawing state management
  * - Towns layer management
+ * - Holding real Leaflet objects without leaking their listeners
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import L from 'leaflet'
+import '@geoman-io/leaflet-geoman-free'
 import { useMapStore } from '@/stores/map'
 
 describe('Map Store', () => {
@@ -41,12 +44,12 @@ describe('Map Store', () => {
   })
 
   describe('setMap', () => {
-    it('should set the map reference', () => {
+    it('should hand back the very map it was given, not a proxy of it', () => {
       const mockMap = { id: 'test-map', getZoom: () => 5 }
 
       mapStore.setMap(mockMap)
 
-      expect(mapStore.map).toEqual(mockMap)
+      expect(mapStore.map).toBe(mockMap)
     })
 
     it('should allow setting map to null', () => {
@@ -117,7 +120,7 @@ describe('Map Store', () => {
   })
 
   describe('setTownsLayer', () => {
-    it('should set the towns layer', () => {
+    it('should hand back the very towns layer it was given, not a proxy of it', () => {
       const mockLayer = {
         getLayers: () => [],
         addLayer: () => {},
@@ -126,7 +129,7 @@ describe('Map Store', () => {
 
       mapStore.setTownsLayer(mockLayer)
 
-      expect(mapStore.townsLayer).toEqual(mockLayer)
+      expect(mapStore.townsLayer).toBe(mockLayer)
     })
 
     it('should allow clearing the towns layer', () => {
@@ -134,6 +137,55 @@ describe('Map Store', () => {
       mapStore.setTownsLayer(null)
 
       expect(mapStore.townsLayer).toBeNull()
+    })
+  })
+
+  /**
+   * The store hands out the very Leaflet objects it was given, never a Vue
+   * proxy of them. Leaflet keys each event listener on the object that added
+   * it, so a layer added through a proxy but removed through the raw object
+   * (or the other way round) leaves its listeners behind. They then fire on a
+   * layer that is no longer on the map, and throw.
+   *
+   * These run against a real Leaflet map with Geoman attached, because the
+   * failure lives in how Leaflet and Geoman keep track of their listeners.
+   */
+  describe('holding Leaflet objects', () => {
+    let container
+    let map
+
+    /** One zoom step, announced to every layer the way a double-click zoom does */
+    const zoomIn = () => map.fire('zoomanim', { center: L.latLng(39, -105), zoom: 7 })
+
+    beforeEach(() => {
+      container = document.createElement('div')
+      document.body.appendChild(container)
+      map = L.map(container)
+      // happy-dom has no CSS 3D, so Leaflet turns zoom animation off and no
+      // layer listens for zoom steps. In a real browser it is on.
+      map._zoomAnimated = true
+      map.setView([39, -105], 6)
+    })
+
+    afterEach(() => {
+      map.remove()
+      container.remove()
+    })
+
+    it('should not leave the drawing cursor behind when a line is finished by double-click', () => {
+      mapStore.setMap(map)
+
+      // Building track switches Geoman's line drawing on through the store...
+      mapStore.map.pm.enableDraw('Line')
+      // The drawing cursor is now listening for zoom steps. If it weren't
+      // (e.g. Leaflet stopped honoring the zoom animation switch above), this
+      // test would pass whether or not the bug was there.
+      expect(map.listens('zoomanim')).toBe(true)
+      // ...and Geoman switches it off by itself when a double-click finishes
+      // the line. The same double-click then zooms the map in.
+      map.pm.disableDraw('Line')
+
+      expect(zoomIn).not.toThrow()
     })
   })
 

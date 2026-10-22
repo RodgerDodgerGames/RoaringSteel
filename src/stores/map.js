@@ -13,13 +13,22 @@
  */
 
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 
 export const useMapStore = defineStore('map', () => {
   // STATE
 
+  // The map and the towns layer are Leaflet objects, so they are held in
+  // shallowRefs: reading them back gives the object itself, not a Vue proxy.
+  // Leaflet keys each event listener on the object that added it. Geoman
+  // switches its own tools off through the raw object, so anything switched
+  // on through a proxy left its listeners behind. The drawing cursor did this
+  // when a line was finished by double-click, and the zoom that followed threw
+  // on a marker that was no longer on the map. Nothing inside a Leaflet object
+  // needs watching, so deep reactivity buys nothing here.
+
   /** Leaflet map instance reference */
-  const map = ref(null)
+  const map = shallowRef(null)
 
   /** Current map zoom level */
   const mapZoom = ref(3)
@@ -28,7 +37,7 @@ export const useMapStore = defineStore('map', () => {
   const mapCenter = ref([40, -100])
 
   /** Leaflet LayerGroup containing town markers */
-  const townsLayer = ref(null)
+  const townsLayer = shallowRef(null)
 
   /** Flag indicating if track drawing mode is active */
   const isDrawingActive = ref(false)

@@ -13,7 +13,7 @@
  * @module composables/map/useTowns
  */
 
-import { ref, onUnmounted } from 'vue'
+import { shallowRef, onUnmounted } from 'vue'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import '@geoman-io/leaflet-geoman-free'
@@ -28,7 +28,9 @@ import { useMapStore } from '@/stores/map'
  * @returns {Object} { townsLayer, addTownsToMap }
  */
 export function useTowns() {
-  const townsLayer = ref(null)
+  // A shallowRef keeps the layer a plain Leaflet object rather than a Vue
+  // proxy. This is the layer handed to the map store, which explains why.
+  const townsLayer = shallowRef(null)
 
   // get access to isDrawingActive from map store
   const mapStore = useMapStore()

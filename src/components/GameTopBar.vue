@@ -6,7 +6,7 @@
 
   - the game's name
   - the round number (one round = every player taking a turn)
-  - every player in turn order, with their colour and cash; the player whose
+  - every player in turn order, with their color and cash; the player whose
     turn it is stands out, like the player holding the dice
   - a Game menu with Save, Load and Settings
 

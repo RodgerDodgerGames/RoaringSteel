@@ -23,7 +23,7 @@ const isDialogOpen = ref(false)
   </button>
 
   <!-- Rendered at the end of the page, not inside the button's host, so the
-       host's styles (centred text, flex rows) don't leak into the dialog -->
+       host's styles (centered text, flex rows) don't leak into the dialog -->
   <Teleport to="body">
     <SettingsDialog v-if="isDialogOpen" @close="isDialogOpen = false" />
   </Teleport>

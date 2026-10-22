@@ -10,7 +10,7 @@
  *   name: string,      // Player display name
  *   cash: number,      // Current money (starts at 0 or specified amount)
  *   isTurn: boolean,   // True if it's this player's turn
- *   color: string,     // Player's chosen color
+ *   color: string,     // Player's chosen color, never shared with another player
  *   position: number,  // Board position (for future use)
  *   trackSpentThisTurn: number // Spent on track this turn, against the budget
  * }
@@ -21,6 +21,18 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { gameRules } from '@/config/game'
+import { playerColors } from '@/config/playerColors'
+
+/**
+ * Whether two color strings name the same color. Hex codes are compared
+ * without regard to case, so '#ff0000' and '#FF0000' count as one color.
+ * @param {string} a A color.
+ * @param {string} b Another color.
+ * @returns {boolean} True if they are the same color.
+ */
+function sameColor(a, b) {
+  return typeof a === 'string' && typeof b === 'string' && a.toLowerCase() === b.toLowerCase()
+}
 
 export const usePlayerStore = defineStore('playerStore', () => {
   // STATE
@@ -76,18 +88,39 @@ export const usePlayerStore = defineStore('playerStore', () => {
   const hasPlayers = computed(() => players.value.length > 0)
 
   /**
-   * A player's colour, looked up by id. Used to paint each player's track in
-   * their colour, so anything on the map can be traced back to its owner.
+   * A player's color, looked up by id. Used to paint each player's track in
+   * their color, so anything on the map can be traced back to its owner.
    *
    * An unknown id gives null rather than throwing: track is drawn for every
    * segment in a save, and a segment whose owner is missing (a damaged or
-   * hand-edited save) should still be drawn, just without an owner's colour.
+   * hand-edited save) should still be drawn, just without an owner's color.
    *
    * @param {number} id The player's ID.
-   * @returns {string|null} The player's colour, or null for an unknown player.
+   * @returns {string|null} The player's color, or null for an unknown player.
    */
   function colorOf(id) {
     return players.value.find((player) => player.id === id)?.color ?? null
+  }
+
+  /**
+   * The player in the game who has a color, other than the one asking.
+   * @param {string} color The color to look for.
+   * @param {number} [exceptId] A player to ignore — one changing their own
+   *   color may of course keep it.
+   * @returns {Object|null} The player holding the color, or null if it is free.
+   */
+  function playerHoldingColor(color, exceptId) {
+    return players.value.find((p) => p.id !== exceptId && sameColor(p.color, color)) ?? null
+  }
+
+  /**
+   * The error shown when a color is refused. Names who has it rather than
+   * giving a hex code, which means nothing to a player.
+   * @param {{name: string}} holder The player who already has the color.
+   * @returns {string} The message.
+   */
+  function colorTakenMessage(holder) {
+    return `${holder.name} already has that color`
   }
 
   // Actions
@@ -128,6 +161,15 @@ export const usePlayerStore = defineStore('playerStore', () => {
     )
     if (duplicateName) {
       error.value = `Player "${player.name}" already exists`
+      return false
+    }
+
+    // Check for duplicate colors. A player's color is how their track is told
+    // apart from everyone else's, so two players can never share one. The setup
+    // screen already stops this; this is the backstop if anything gets past it.
+    const colorHolder = playerHoldingColor(player.color)
+    if (colorHolder) {
+      error.value = colorTakenMessage(colorHolder)
       return false
     }
 
@@ -189,6 +231,16 @@ export const usePlayerStore = defineStore('playerStore', () => {
         )
         if (duplicateName) {
           error.value = `Player "${updates.name}" already exists`
+          return false
+        }
+      }
+
+      // A new color must not be one another player already has (keeping your
+      // own is fine)
+      if (updates.color !== undefined) {
+        const colorHolder = playerHoldingColor(updates.color, id)
+        if (colorHolder) {
+          error.value = colorTakenMessage(colorHolder)
           return false
         }
       }
@@ -466,13 +518,53 @@ export const usePlayerStore = defineStore('playerStore', () => {
   }
 
   /**
-   * Add an entry to the setup roster.
-   * Drafts are not validated — the setup screen is where a name gets typed.
-   * @param {{name?: string, color?: string}} draft The draft to add.
-   * @returns {Object} The stored draft, including its generated id.
+   * The setup roster entry that holds a color, other than the one asking.
+   * Behind every draft color check: refusing a taken color, and telling the
+   * picker which colors to dim and whose they are.
+   * @param {string} color The color to look for.
+   * @param {number} [exceptId] A draft to ignore — the row doing the picking,
+   *   which may of course keep its own color.
+   * @returns {Object|null} The draft holding the color, or null if it is free.
    */
-  function addDraftPlayer({ name = '', color = '' } = {}) {
-    const draft = { id: nextDraftId++, name, color }
+  function draftHoldingColor(color, exceptId) {
+    return draftPlayers.value.find((d) => d.id !== exceptId && sameColor(d.color, color)) ?? null
+  }
+
+  /**
+   * One row's color picker: every palette color, whether it is the row's own
+   * (`isSelected`), and which other row already has it (`holder`, null when
+   * the color is free to pick).
+   * @param {number} id The id of the draft doing the picking.
+   * @returns {{color: string, isSelected: boolean, holder: Object|null}[]}
+   *   One entry per palette color, in palette order.
+   */
+  function draftColorOptions(id) {
+    const own = draftPlayers.value.find((d) => d.id === id)?.color
+    return playerColors.map((color) => ({
+      color,
+      isSelected: sameColor(color, own),
+      holder: draftHoldingColor(color, id)
+    }))
+  }
+
+  /**
+   * Add an entry to the setup roster.
+   * Names are not validated — the setup screen is where a name gets typed —
+   * but colors are: no two rows ever share one.
+   *
+   * With no color given, the draft gets the first palette color no other
+   * draft has, so every new row starts with a color of its own.
+   *
+   * @param {{name?: string, color?: string}} draft The draft to add.
+   * @returns {Object|null} The stored draft, including its generated id, or
+   *   null if the color given is already taken, or none was given and every
+   *   palette color is.
+   */
+  function addDraftPlayer({ name = '', color } = {}) {
+    const assigned = color ?? playerColors.find((c) => !draftHoldingColor(c))
+    if (!assigned || draftHoldingColor(assigned)) return null
+
+    const draft = { id: nextDraftId++, name, color: assigned }
     draftPlayers.value.push(draft)
     return draft
   }
@@ -481,13 +573,16 @@ export const usePlayerStore = defineStore('playerStore', () => {
    * Update a setup roster entry.
    * @param {number} id The id of the draft to update.
    * @param {{name?: string, color?: string}} updates The fields to change.
-   * @returns {boolean} True if the draft was found and updated.
+   * @returns {boolean} True if the draft was found and updated; false, with
+   *   nothing changed, if the new color is one another row already has.
    */
   function updateDraftPlayer(id, updates) {
     if (!updates || typeof updates !== 'object') return false
 
     const draft = draftPlayers.value.find((d) => d.id === id)
     if (!draft) return false
+
+    if (updates.color !== undefined && draftHoldingColor(updates.color, id)) return false
 
     Object.assign(draft, updates)
     return true
@@ -598,6 +693,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     nextPlayer,
     hasPlayers,
     colorOf,
+    draftColorOptions,
     // actions
     addPlayer,
     updatePlayer,

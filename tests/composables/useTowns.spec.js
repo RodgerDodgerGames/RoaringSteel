@@ -8,7 +8,7 @@
  * off the map until the page was reloaded.
  *
  * These tests run against a real Leaflet map with Geoman attached, because
- * the behaviour under test is Geoman's own removal mode.
+ * the behavior under test is Geoman's own removal mode.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'

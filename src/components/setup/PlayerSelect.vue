@@ -10,7 +10,8 @@
 
   Features:
   - Add/remove players dynamically
-  - Color picker with 12 preset pastel colors
+  - Color picker over the shared player palette. Colors another player already
+    has are dimmed and can't be picked, so no two players share a color.
   - Name uniqueness validation
   - Notification system for validation errors
   - A Settings button, so settings can be chosen before the game starts
@@ -32,32 +33,16 @@ const showNotification = ref(false)
 /** Id of the draft whose color picker is open, or null. UI-only state. */
 const openColorPickerId = ref(null)
 
-/** Available pastel colors for player selection */
-const availableColors = [
-  '#FFC080',
-  '#80FF80',
-  '#8080FF',
-  '#FF80C9',
-  '#C980FF',
-  '#80FFFF',
-  '#FFFF80',
-  '#FFB380',
-  '#80FFD6',
-  '#B380FF',
-  '#FFD580',
-  '#8080C0'
-]
-
-/** Colour the first row starts with, before any of the palette is taken */
-const DEFAULT_FIRST_COLOR = '#FF5733'
-
 /** The setup roster lives in the store, so it survives leaving this screen. */
 const { draftPlayers: players } = storeToRefs(playerStore)
 
-/** Keep at least one row on screen, so the form is never a dead end. */
+/**
+ * Keep at least one row on screen, so the form is never a dead end. The store
+ * gives the row the first free palette color.
+ */
 function ensureOneRow() {
   if (players.value.length === 0) {
-    playerStore.addDraftPlayer({ color: DEFAULT_FIRST_COLOR })
+    playerStore.addDraftPlayer()
   }
 }
 
@@ -74,9 +59,12 @@ function addPlayer() {
     return
   }
 
-  const usedColors = players.value.map((player) => player.color)
-  const nextColor = availableColors.find((color) => !usedColors.includes(color)) || '#FFFFFF'
-  playerStore.addDraftPlayer({ color: nextColor })
+  // The store gives the new row the first color nobody has. With every color
+  // taken there is nothing to give it, and colors are never shared.
+  if (!playerStore.addDraftPlayer()) {
+    notificationMessage.value = 'Every color is taken. Remove a player to add another.'
+    showNotification.value = true
+  }
 }
 
 // Dismiss notification
@@ -97,10 +85,21 @@ const toggleColorPicker = (id) => {
   openColorPickerId.value = openColorPickerId.value === id ? null : id
 }
 
-// Select a color and close the picker
+/**
+ * What a taken swatch says when hovered or read aloud, naming who has it.
+ * @param {{holder: Object|null}} option A swatch from the store's picker options.
+ * @returns {string|null} "Taken by …", or null for a color that is free.
+ */
+const takenLabel = (option) =>
+  option.holder ? `Taken by ${option.holder.name.trim() || 'another player'}` : null
+
+// Select a color and close the picker. The store refuses a color another row
+// has, so clicking a taken (dimmed) swatch changes nothing and leaves the
+// picker open.
 const selectColor = (player, color) => {
-  playerStore.updateDraftPlayer(player.id, { color })
-  openColorPickerId.value = null
+  if (playerStore.updateDraftPlayer(player.id, { color })) {
+    openColorPickerId.value = null
+  }
 }
 
 /**
@@ -230,13 +229,15 @@ const handleDone = () => {
         <!-- Color Picker Grid -->
         <div v-if="openColorPickerId === player.id" class="color-picker-grid">
           <div
-            v-for="(color, colorIndex) in availableColors"
-            :key="colorIndex"
-            :class="['color-box', { 'is-selected': player.color === color }]"
-            :style="{ backgroundColor: color }"
-            @click="selectColor(player, color)"
+            v-for="option in playerStore.draftColorOptions(player.id)"
+            :key="option.color"
+            :class="['color-box', { 'is-selected': option.isSelected, 'is-taken': option.holder }]"
+            :style="{ backgroundColor: option.color }"
+            @click="selectColor(player, option.color)"
             role="button"
-            aria-label="Select this color"
+            :aria-label="takenLabel(option) ?? 'Select this color'"
+            :aria-disabled="Boolean(option.holder)"
+            :title="takenLabel(option) ?? ''"
             tabindex="0"
           ></div>
         </div>
@@ -292,5 +293,19 @@ const handleDone = () => {
 
 .color-box.is-selected {
   border-color: #000;
+}
+
+/* Another player's color: faded and struck through so it reads as
+   unavailable, while still showing which color it is */
+.color-box.is-taken {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background-image: linear-gradient(
+    to top right,
+    transparent calc(50% - 2px),
+    #fff calc(50% - 2px),
+    #fff calc(50% + 2px),
+    transparent calc(50% + 2px)
+  );
 }
 </style>

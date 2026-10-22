@@ -26,7 +26,11 @@ describe('useShownHand', () => {
 
   beforeEach(() => {
     playerStore = usePlayerStore()
-    ;['Ann', 'Bo', 'Cy'].forEach((name) => playerStore.addPlayer({ name, color: 'red', cash: 0 }))
+    ;[
+      ['Ann', 'red'],
+      ['Bo', 'blue'],
+      ['Cy', 'green']
+    ].forEach(([name, color]) => playerStore.addPlayer({ name, color, cash: 0 }))
     playerStore.startGame()
     ids = playerStore.players.map((p) => p.id)
 

@@ -18,6 +18,9 @@
   @prop badge      - Optional short note beside the title (e.g. "Not built yet")
 
   @slot default - The section's content
+  @slot actions - Optional controls shown at the right of the header, e.g.
+                  buttons that pick what the section shows. Kept outside the
+                  fold toggle, because a button may not sit inside another.
 -->
 
 <script setup>
@@ -45,18 +48,24 @@ const isCollapsed = useStorage(`roaringsteel_${props.storageKey}_collapsed`, fal
 
 <template>
   <section class="collapsible-section">
-    <!-- The whole header row is the toggle, so it is an easy target -->
-    <button
-      class="collapsible-section__toggle"
-      :aria-expanded="!isCollapsed"
-      @click="isCollapsed = !isCollapsed"
-    >
-      <span class="collapsible-section__title">{{ title }}</span>
-      <span v-if="badge" class="tag is-rounded">{{ badge }}</span>
-      <span class="icon collapsible-section__chevron" aria-hidden="true">
-        <i class="fas" :class="isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
-      </span>
-    </button>
+    <div class="collapsible-section__header">
+      <!-- The rest of the header row is the toggle, so it is an easy target -->
+      <button
+        class="collapsible-section__toggle"
+        :aria-expanded="!isCollapsed"
+        @click="isCollapsed = !isCollapsed"
+      >
+        <span class="collapsible-section__title">{{ title }}</span>
+        <span v-if="badge" class="tag is-rounded">{{ badge }}</span>
+        <span class="icon collapsible-section__chevron" aria-hidden="true">
+          <i class="fas" :class="isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
+        </span>
+      </button>
+
+      <div v-if="$slots.actions" class="collapsible-section__actions">
+        <slot name="actions" />
+      </div>
+    </div>
 
     <div v-show="!isCollapsed" class="collapsible-section__body">
       <slot />
@@ -65,12 +74,19 @@ const isCollapsed = useStorage(`roaringsteel_${props.storageKey}_collapsed`, fal
 </template>
 
 <style scoped>
+/* The fold toggle, with any actions beside it on the right */
+.collapsible-section__header {
+  display: flex;
+  align-items: center;
+}
+
 /* A plain header row that happens to be a button */
 .collapsible-section__toggle {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   gap: 0.5rem;
-  width: 100%;
+  min-width: 0;
   padding: 0.5rem 1rem;
   border: none;
   background: none;
@@ -95,6 +111,11 @@ const isCollapsed = useStorage(`roaringsteel_${props.storageKey}_collapsed`, fal
 .collapsible-section__chevron {
   margin-left: auto;
   color: var(--bulma-text-weak);
+}
+
+.collapsible-section__actions {
+  flex: none;
+  padding-right: 1rem;
 }
 
 .collapsible-section__body {

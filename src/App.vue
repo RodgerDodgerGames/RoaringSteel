@@ -15,6 +15,7 @@ import { useGameStore } from '@/stores/game'
 import { useTownsStore } from '@/stores/towns'
 import { useGridStore } from '@/stores/grid'
 import { useDemandCardsStore } from '@/stores/demandCards'
+import { usePlayerStore } from '@/stores/players'
 
 // import config
 import { gridConfig } from '@/config/grid'
@@ -27,6 +28,7 @@ const townsStore = useTownsStore()
 const gameStore = useGameStore()
 const gridStore = useGridStore()
 const demandCardsStore = useDemandCardsStore()
+const playerStore = usePlayerStore()
 
 // setup composables
 const { autoSave } = useGamePersistence()
@@ -83,8 +85,10 @@ async function handlePlayGameClick() {
   try {
     // run setup towns after the region is selected
     await townsStore.setupTowns(region.value.properties.STATE)
-    // generate demand cards
+    // build the demand deck, then deal every player their opening hand in
+    // turn order — the players were confirmed before the region was picked
     demandCardsStore.generateDemandCards()
+    demandCardsStore.dealHands(playerStore.players.map((player) => player.id))
     // run cost grid setup
     // generate grid using the selected region bounds
     const bounds = turf.bbox(region.value)

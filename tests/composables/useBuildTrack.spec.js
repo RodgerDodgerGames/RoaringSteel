@@ -13,9 +13,11 @@
  *
  * Modes: drawing and removing both act on map clicks, so at most one may be on,
  * and Escape backs out of either.
+ *
+ * Pricing: a line costs the grid cells it crosses, followed live as it is drawn.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { defineComponent, ref, nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import L from 'leaflet'
@@ -24,6 +26,8 @@ import { useMapStore } from '@/stores/map'
 import { usePlayerStore } from '@/stores/players'
 import { useTrackStore } from '@/stores/track'
 import { formatCurrency } from '@/composables/utils'
+import { gridConfig } from '@/config/grid'
+import { metersToLatitudeDegrees } from '@/composables/setup/useMapSupport'
 
 /**
  * A stand-in for the Leaflet map, with just enough surface for the
@@ -415,6 +419,85 @@ describe('useBuildTrack', () => {
         expect(map.allLayers()).toHaveLength(3)
       }
     )
+  })
+
+  /**
+   * A line is priced from the grid cells it crosses, while it is drawn and when
+   * it is built. Each test draws along a row of cells running east from a town.
+   */
+  describe('pricing a line', () => {
+    /** Degrees one grid cell spans, east-west and north-south at the equator */
+    const CELL = metersToLatitudeDegrees(gridConfig.cellSize)
+    /** A row of five cells along the equator, costing 100, 200, ... 500 */
+    const rowGrid = [100, 200, 300, 400, 500].map((cost, i) => ({
+      id: `0-${i}`,
+      centroid: { lat: 0, lng: (i + 0.5) * CELL },
+      cost
+    }))
+    /** The center of cell `i` of the row */
+    const centerOf = (i) => L.latLng(0, (i + 0.5) * CELL)
+
+    /**
+     * Starts a line at a town in the first cell, the way Geoman does it: the
+     * drawing starts, then the first vertex is placed and announced.
+     * @returns {Object} The composable's API and the hint marker that follows the cursor
+     */
+    function startLineAtTown() {
+      const hintMarker = L.marker(centerOf(0)).bindTooltip('')
+      map.pm.Draw.Line._hintMarker = hintMarker
+      const { api } = mountBuildTrack(map, L.layerGroup([L.marker(centerOf(0))]), rowGrid)
+      api.startDrawingLine()
+
+      const workingLayer = L.polyline([])
+      map.fire('pm:drawstart', { workingLayer })
+      workingLayer.addLatLng(centerOf(0))
+      workingLayer.fire('pm:vertexadded', { latlng: centerOf(0) })
+
+      return { api, hintMarker }
+    }
+
+    /**
+     * Moves the cursor, and waits out the debounce on repricing it.
+     * @param {Object} hintMarker - The marker Geoman moves with the cursor
+     * @param {Object} latlng - Where the cursor goes
+     */
+    function moveCursor(hintMarker, latlng) {
+      hintMarker.setLatLng(latlng)
+      vi.advanceTimersByTime(200)
+    }
+
+    beforeEach(() => vi.useFakeTimers())
+    afterEach(() => vi.useRealTimers())
+
+    it('should charge for the cell the line starts in', () => {
+      const { api } = startLineAtTown()
+
+      expect(api.pendingCost.value).toBe(100)
+    })
+
+    // The bug: each cell the cursor entered was added to the price and never
+    // taken off, so pulling a leg out and back left it costing the far end
+    it('should cost less again once the cursor comes back toward the start', () => {
+      const { api, hintMarker } = startLineAtTown()
+
+      moveCursor(hintMarker, centerOf(4))
+      expect(api.pendingCost.value).toBe(1500)
+
+      moveCursor(hintMarker, centerOf(1))
+      expect(api.pendingCost.value).toBe(300)
+    })
+
+    it('should charge the cells under the finished line, however the cursor wandered', () => {
+      const { hintMarker } = startLineAtTown()
+      moveCursor(hintMarker, centerOf(4))
+      moveCursor(hintMarker, centerOf(2))
+
+      const line = L.polyline([centerOf(0), centerOf(2)])
+      line.pm = { _shape: 'Line' }
+      map.fire('pm:create', { layer: line })
+
+      expect(trackStore.segments[0].cost).toBe(600)
+    })
   })
 
   describe('when the map never finished setting up', () => {

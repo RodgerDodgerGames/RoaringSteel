@@ -10,6 +10,7 @@ import { useMapStore } from '@/stores/map'
 import { usePlayerStore } from '@/stores/players'
 import { useTrackStore } from '@/stores/track'
 import { useGameStore } from '@/stores/game'
+import { priceLine } from '@/composables/map/trackCost'
 
 /**
  * Injection key for the one build-track instance a game view runs.
@@ -36,17 +37,22 @@ export const buildTrackKey = Symbol('buildTrack')
 export default function useBuildTrack(grid, formatCurrency) {
   // ================== STATE VARIABLES ==================
 
-  const itemizedCosts = ref([]) // Array to store individual segment costs
-  const runningCost = ref(0) // Accumulator for the ongoing segment cost
   const workingLayer = ref(null) // Reference to the currently drawn line layer
   const hintMarkerMoveHandler = ref(null) // Handler for hint marker movement
   const costedHintMarker = ref(null) // The hint marker that handler is bound to
   const existingLineLayers = ref([]) // Leaflet layers for track drawn in this session
   const restoredLineLayers = ref([]) // Leaflet layers redrawn from a saved game
-  const currentGridCellId = ref(null) // ID of the current grid cell for cost tracking
   const isFirstVertexAdded = ref(false) // Flag to track if the first vertex has been added
   const buildError = ref('') // Why the last section could not be built, if it could not
   const isRemoving = ref(false) // True while Geoman's removal mode is on
+
+  /**
+   * Cost of the line being drawn, out to the cursor: the vertices placed so
+   * far plus the leg the cursor is pulling out from the last one. Repriced
+   * from scratch each time (see `priceLine`), so it follows the cursor down as
+   * well as up.
+   */
+  const pendingCost = ref(0)
 
   // Caching town marker positions and endpoints for faster validation
   const townMarkerPositions = ref([])
@@ -69,8 +75,6 @@ export default function useBuildTrack(grid, formatCurrency) {
 
   // ================== COMPUTED PROPERTIES ==================
 
-  // total cost for all track segments
-  const totalCost = computed(() => itemizedCosts.value.reduce((acc, cost) => acc + cost, 0))
   /**
    * Whether the active player has track they may still tear up.
    *
@@ -93,13 +97,6 @@ export default function useBuildTrack(grid, formatCurrency) {
   )
 
   /**
-   * Cost of the line being drawn, including the leg the cursor is part way
-   * through. `totalCost` alone only counts legs already committed by a vertex,
-   * so it lags the cursor by a whole leg and would warn a player too late.
-   */
-  const pendingCost = computed(() => totalCost.value + runningCost.value)
-
-  /**
    * True while the line in progress costs more than the player can pay for.
    * Only meaningful mid-draw: once a section is built its cost has already come
    * out of `availableToSpend`, and comparing the two would flag every build
@@ -112,10 +109,10 @@ export default function useBuildTrack(grid, formatCurrency) {
   // ================== TURN HANDLING ==================
 
   /**
-   * Clear per-turn build state when play passes to another player, so the
-   * cost panel shows what the *current* player has spent rather than an
-   * ever-growing list. Any drawing or removal left in progress is ended first:
-   * neither may carry over into someone else's turn.
+   * Clear per-turn build state when play passes to another player, so no
+   * pending cost or build error from the last player's turn is left showing.
+   * Any drawing or removal left in progress is ended first: neither may carry
+   * over into someone else's turn.
    *
    * Completed track layers are deliberately left on the map; the segments
    * behind them are already recorded in the track store.
@@ -263,14 +260,6 @@ export default function useBuildTrack(grid, formatCurrency) {
     workingLayer.value = null
   }
 
-  /**
-   * Calculates and stores the cost for the current line segment, then resets the running cost.
-   */
-  function calculateSegmentCost() {
-    itemizedCosts.value.push(runningCost.value)
-    runningCost.value = 0
-  }
-
   // ================== MAP & MARKER INITIALIZATION ==================
 
   /**
@@ -406,11 +395,10 @@ export default function useBuildTrack(grid, formatCurrency) {
   // ================== DRAWING EVENT HANDLERS ==================
 
   /**
-   * Sets up events for adding vertices and tracking segment costs.
+   * Sets up events for adding vertices and pricing the line as it grows.
    * This is activated whenever a line drawing starts.
    */
   function setupDrawingEvents() {
-    let previousVertex = null // Store the last vertex for distance calculations
     isFirstVertexAdded.value = false // Reset flag for the first vertex
 
     workingLayer.value.on('pm:vertexadded', (evt) => {
@@ -421,14 +409,15 @@ export default function useBuildTrack(grid, formatCurrency) {
           cancelDrawing() // Cancel if the start point is invalid
           startDrawingLine()
         } else {
-          previousVertex = addedVertex
           isFirstVertexAdded.value = true
+          // The cell the line starts in is charged too, so the price starts there
+          repriceLine()
           addHintMarkerMoveHandler() // Add movement handler for cost tooltip
         }
       } else {
-        // Calculate cost for the current segment
-        calculateSegmentCost()
-        previousVertex = addedVertex
+        // Priced here from the vertex itself, not left to the cursor handler:
+        // that one is debounced, so it can still be a step behind the click
+        repriceLine()
 
         // Check if the added vertex is on a town marker
         const isOnTown = townMarkerPositions.value.some((townPos) => townPos.equals(addedVertex))
@@ -447,12 +436,10 @@ export default function useBuildTrack(grid, formatCurrency) {
   function finalizeDrawing(e) {
     mapStore.setIsDrawingActive(false)
     if (e.layer?.pm?._shape === 'Line') {
-      // A line finished by double-clicking rather than by landing on a town
-      // never fires a final `pm:vertexadded`, so the last leg is still sitting
-      // in the accumulator. Flush it before the segment is priced.
-      if (runningCost.value > 0) calculateSegmentCost()
-
-      const cost = totalCost.value
+      // Priced from the finished line itself, by the same rule as the live
+      // cost, so the charge matches what was shown however the drawing ended
+      // (town, double-click or the Finish tooltip)
+      const cost = priceLine(e.layer.getLatLngs(), grid.value)
       const builderId = playerStore.activePlayer?.id
       const affordable = availableToSpend.value
 
@@ -507,8 +494,8 @@ export default function useBuildTrack(grid, formatCurrency) {
   function discardDrawnLayer(layer) {
     mapStore.map.removeLayer(layer)
     resetHintMarkerMoveHandler()
-    // The itemized costs describe a line that no longer exists, and leaving
-    // them up puts a total next to the message explaining it was not built
+    // The pending cost describes a line that no longer exists, and leaving it
+    // up puts a total next to the message explaining it was not built
     resetLineTracking()
     workingLayer.value = null
   }
@@ -516,7 +503,7 @@ export default function useBuildTrack(grid, formatCurrency) {
   /**
    * Writes a finished line into the track store as owned, priced game state.
    *
-   * The price is passed in rather than read from `totalCost` again, so the
+   * The price is passed in rather than worked out again, so the
    * amount the player was charged and the amount the segment records are the
    * same number by construction — a refund pays back what the segment says.
    *
@@ -694,50 +681,45 @@ export default function useBuildTrack(grid, formatCurrency) {
   }
 
   /**
-   * Updates the tooltip on the hint marker with the current running cost.
+   * Sets `pendingCost` to the price of the line being drawn: the vertices
+   * placed so far, plus the leg out to the cursor when one is given. Every
+   * change to the line reprices it through here, so the cost shown can never
+   * be left describing an older shape of the line.
+   *
+   * @param {Object} [cursorLatLng] - Where the cursor is, if the leg to it counts
+   * @returns {number} What the leg to the cursor adds: the line's price with it
+   *   minus the price without, so a cell already paid for is not shown again
+   */
+  function repriceLine(cursorLatLng) {
+    const placed = workingLayer.value.getLatLngs()
+    const placedCost = priceLine(placed, grid.value)
+    pendingCost.value = cursorLatLng ? priceLine([...placed, cursorLatLng], grid.value) : placedCost
+    return pendingCost.value - placedCost
+  }
+
+  /**
+   * Reprices the line out to where the cursor is, and shows the leg the
+   * cursor is pulling out on the hint marker's tooltip.
    * @param {Object} latlng - Latitude and longitude of the hint marker
    * @param {Object} hintMarker - The hint marker element to update
    */
   function updateRunningCostTooltip(latlng, hintMarker) {
-    const cell = getGridCellByLatLng(latlng)
-    // `Number.isFinite` rather than a null check: an undefined or NaN cell cost
-    // propagates into the running total and prices the whole line at NaN
-    if (cell && cell.id !== currentGridCellId.value && Number.isFinite(cell.cost)) {
-      currentGridCellId.value = cell.id
-      runningCost.value += cell.cost
-      hintMarker.setTooltipContent(`Cost: ${formatCurrency(runningCost.value)}`)
-    }
+    // The handler is debounced, so a call can land after its drawing ended,
+    // or even after the next one began. Geoman gives every drawing a fresh
+    // hint marker, so a call from any marker but the current one is stale.
+    if (!workingLayer.value || hintMarker !== costedHintMarker.value) return
+    const legCost = repriceLine(latlng)
+    hintMarker.setTooltipContent(`Cost: ${formatCurrency(legCost)}`)
   }
 
   // ================== UTILITY FUNCTIONS ==================
-
-  /**
-   * Finds the closest grid cell based on a given latitude and longitude.
-   * Used for cost calculations as vertices are added to the line.
-   * @param {Object} latlng - Latitude and longitude of the point
-   * @returns {Object|null} - The closest grid cell or null if none found
-   */
-  function getGridCellByLatLng(latlng) {
-    let closestCell = null
-    let minDistance = Infinity
-    grid.value.forEach((cell) => {
-      const dist = mapStore.map.distance(latlng, L.latLng(cell.centroid.lat, cell.centroid.lng))
-      if (dist < minDistance) {
-        minDistance = dist
-        closestCell = cell
-      }
-    })
-    return closestCell
-  }
 
   /**
    * Resets variables tracking the state of the current line drawing.
    * Used when beginning or canceling a new drawing.
    */
   function resetLineTracking() {
-    currentGridCellId.value = null
-    runningCost.value = 0
-    itemizedCosts.value = []
+    pendingCost.value = 0
     buildError.value = ''
   }
 
@@ -792,7 +774,10 @@ export default function useBuildTrack(grid, formatCurrency) {
 
     mapStore.map.pm.setGlobalOptions({
       snappable: true,
-      snapDistance: 50,
+      // In screen pixels, so the same at every zoom: about a town icon's
+      // width, so the line catches a town or a track end once the cursor is
+      // on it, not from well outside it
+      snapDistance: 15,
       // The line's own colors are not set here: they belong to whoever is
       // drawing, so startDrawingLine passes them each time (drawingLineStyles)
       markerStyle: { draggable: true, color: 'red' },

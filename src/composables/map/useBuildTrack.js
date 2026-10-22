@@ -5,7 +5,6 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, markRaw } from 'vue'
 import { useDebounceFn, onKeyStroke } from '@vueuse/core'
 import L from 'leaflet'
-import 'leaflet-textpath'
 import { storeToRefs } from 'pinia'
 import { useMapStore } from '@/stores/map'
 import { usePlayerStore } from '@/stores/players'
@@ -160,6 +159,7 @@ export default function useBuildTrack(grid, formatCurrency) {
     initializeTownMarkers() // Set up events for clickable town markers
     mapStore.map.on(mapEvents) // Listen for drawing, removal and cursor movement
     setGeomanOptions() // Configure Geoman drawing tool options
+    createTrackPanes() // Make the panes track is drawn in, before any is drawn
     restoreTrackLayers() // Redraw track carried in from a saved game
     initializeCaches() // Initialize town marker and line endpoint caches
   })
@@ -365,7 +365,9 @@ export default function useBuildTrack(grid, formatCurrency) {
   function restoreTrackLayers() {
     trackStore.segments.forEach((segment) => {
       const latlngs = segment.coordinates.map((point) => L.latLng(point.lat, point.lng))
-      const layer = L.polyline(latlngs).addTo(mapStore.map)
+      // Created in the rail pane: the layer becomes the track's rail, and a
+      // line cannot change pane once it is on the map
+      const layer = L.polyline(latlngs, { pane: RAILS_PANE }).addTo(mapStore.map)
       attachSegment(layer, segment.id)
       // markRaw: a Leaflet layer read back out of a reactive array comes back as
       // a proxy, and Geoman hands back the raw layer, so the two would never
@@ -385,9 +387,9 @@ export default function useBuildTrack(grid, formatCurrency) {
   }
 
   /**
-   * Takes one section's layer off the map, along with the rails drawn over it.
-   * The rails and the line are one piece of track to the player, so neither
-   * may be left behind without the other.
+   * Takes one section's layer (its rail) off the map, along with the casing
+   * and ties drawn under it. The three are one piece of track to the player,
+   * so none may be left behind without the others.
    *
    * Only the map changes here; whether the section also leaves the track store
    * is up to the caller.
@@ -503,7 +505,7 @@ export default function useBuildTrack(grid, formatCurrency) {
   function discardDrawnLayer(layer) {
     mapStore.map.removeLayer(layer)
     resetHintMarkerMoveHandler()
-    // The itemised costs describe a line that no longer exists, and leaving
+    // The itemized costs describe a line that no longer exists, and leaving
     // them up puts a total next to the message explaining it was not built
     resetLineTracking()
     workingLayer.value = null
@@ -536,7 +538,7 @@ export default function useBuildTrack(grid, formatCurrency) {
     return segment
   }
 
-  // ================== MAP / STORE SYNCHRONISATION ==================
+  // ================== MAP / STORE SYNCHRONIZATION ==================
 
   /**
    * Ties a Leaflet layer to the segment it draws, so a later removal can find
@@ -551,9 +553,10 @@ export default function useBuildTrack(grid, formatCurrency) {
   /**
    * Finds the track layer an event belongs to.
    *
-   * The rails a player actually sees and drags are the styled decoration, not
-   * the line itself — the line is set fully transparent by `styleTracks`. So an
-   * event can arrive on either, and both have to lead back to the same segment.
+   * Track is drawn as three lines: the layer itself, which is the rail, and the
+   * casing and ties `styleTracks` lays under it. A click in removal mode can
+   * land on any of the three, depending on where on the track it falls, and
+   * all three have to lead back to the same segment.
    *
    * @param {Object} layer - The layer the Geoman event fired on
    * @returns {Object|null} The track layer carrying a segment id, if any
@@ -610,20 +613,20 @@ export default function useBuildTrack(grid, formatCurrency) {
       console.error('Could not refund track segment:', playerStore.error)
     }
 
-    // Geoman removed whichever of the line or its rails was clicked; this takes
-    // off the other half too
+    // Geoman removed whichever of the rail, casing or ties was clicked; this
+    // takes off the rest
     removeTrackLayer(layer)
 
     existingLineLayers.value = existingLineLayers.value.filter((l) => l !== layer)
     restoredLineLayers.value = restoredLineLayers.value.filter((l) => l !== layer)
-    // The panel was itemising the section just torn up
+    // The panel was itemizing the section just torn up
     resetLineTracking()
     rebuildLineEndpoints()
   }
 
   /**
    * Puts a layer back the way the store has it — on the map, in the stored
-   * shape, with fresh rails. Used whenever a change is refused, so a rejected
+   * shape, with a fresh casing and ties. Used whenever a change is refused, so a rejected
    * removal or edit cannot leave the map showing something the save does not.
    * @param {Object} layer - The track layer
    * @param {Object|undefined} segment - The segment it should match
@@ -790,7 +793,14 @@ export default function useBuildTrack(grid, formatCurrency) {
       snapDistance: 50,
       // The line's own colors are not set here: they belong to whoever is
       // drawing, so startDrawingLine passes them each time (drawingLineStyles)
-      markerStyle: { draggable: true, color: 'red' }
+      markerStyle: { draggable: true, color: 'red' },
+      // Geoman puts both the line being drawn and the finished line it hands
+      // over in its "layer pane", overriding any pane passed with the line's
+      // own options. Making that the rail pane does two jobs: the finished line
+      // is already where it belongs as the track's rail, and the line being
+      // drawn sits above the casing and ties of existing track, so it never
+      // disappears under them where it meets or crosses it.
+      panes: { layerPane: RAILS_PANE }
     })
   }
 
@@ -812,20 +822,90 @@ export default function useBuildTrack(grid, formatCurrency) {
   const UNOWNED_TRACK_COLOR = 'black'
 
   /**
-   * How the rail and tie characters are drawn: in the owner's color, set
-   * extra-bold so there is enough of each mark for the color to show, with
-   * a thin dark edge. Without the edge the paler player colors (light
-   * yellow, light cyan) all but vanish on the light map; with it every color
-   * reads, on any terrain.
+   * The dark gray that frames every player's track, so the paler player
+   * colors (yellow, lime) still stand out against the light map.
    */
-  const TRACK_MARK_STYLE = {
-    'font-weight': '900',
-    stroke: '#222',
-    'stroke-width': '1px',
-    'stroke-linejoin': 'round',
-    // Paint the edge first and the color over it, so the edge frames the
-    // mark rather than eating into it
-    'paint-order': 'stroke'
+  const TRACK_EDGE_COLOR = '#222'
+
+  /**
+   * The Leaflet panes finished track is drawn in, one per piece, lowest first.
+   *
+   * Track is three lines stacked on the same route: a dark casing, the ties,
+   * and the rail in the owner's color. Giving each piece its own pane puts
+   * every casing below every set of ties, and every set of ties below every
+   * rail, across all sections. With one shared pane, the newest section would
+   * be drawn entirely over the older ones, and its casing would cut a dark
+   * notch across the rail wherever two sections meet.
+   *
+   * The panes sit just above Leaflet's overlay pane (z-index 400) and below
+   * the town markers (600), so towns stay clickable on top of the track.
+   * Geoman draws in the rail pane too (see `setGeomanOptions`).
+   */
+  const TRACK_PANES = [
+    { name: 'trackCasing', zIndex: 410 },
+    { name: 'trackTies', zIndex: 420 },
+    { name: 'trackRails', zIndex: 430 }
+  ]
+  const [CASING_PANE, TIES_PANE, RAILS_PANE] = TRACK_PANES.map((pane) => pane.name)
+
+  /**
+   * The rail: a line in the owner's color running down the middle of the
+   * track. Round caps and joins keep bends smooth and close the gap where
+   * two sections meet end to end.
+   */
+  const RAIL_STYLE = { weight: 4, opacity: 1, lineCap: 'round', lineJoin: 'round' }
+
+  /**
+   * The casing: a dark line under the rail, wider than it, so the rail has a
+   * thin dark edge on both sides.
+   *
+   * The casing and ties are kept out of Geoman's snapping (`snapIgnore`):
+   * they follow the rail's route exactly, so they would only add duplicate
+   * snap targets for Geoman to check on every move of the cursor.
+   */
+  const CASING_STYLE = {
+    color: TRACK_EDGE_COLOR,
+    weight: 7,
+    opacity: 1,
+    lineCap: 'round',
+    lineJoin: 'round',
+    snapIgnore: true
+  }
+
+  /**
+   * The ties: a wide line drawn as short dashes. Each 2px dash crosses the
+   * rail like a tie, with an 8px gap to the next, so ties fall every 10px.
+   * Butt caps keep the dashes square; round ones would make them blobs. A
+   * bevel join does the same at bends: Leaflet's default round join turns a
+   * tie that lands on a corner into a dark blob as wide as the tie line.
+   */
+  const TIES_STYLE = {
+    color: TRACK_EDGE_COLOR,
+    weight: 13,
+    opacity: 1,
+    dashArray: '2, 8',
+    lineCap: 'butt',
+    lineJoin: 'bevel',
+    snapIgnore: true
+  }
+
+  /**
+   * Creates the panes finished track is drawn in, if this map does not have
+   * them yet. The panes belong to the map, not to this composable, so a later
+   * mount on the same map finds them already there.
+   *
+   * Each pane holds its own SVG covering the whole map, which would swallow
+   * every click meant for a pane below it. So the panes ignore the pointer,
+   * and only the lines inside take clicks: Leaflet's CSS turns pointer events
+   * back on for any interactive path, which is every track line here.
+   */
+  function createTrackPanes() {
+    TRACK_PANES.forEach(({ name, zIndex }) => {
+      if (mapStore.map.getPane(name)) return
+      const pane = mapStore.map.createPane(name)
+      pane.style.zIndex = zIndex
+      pane.style.pointerEvents = 'none'
+    })
   }
 
   /**
@@ -858,167 +938,41 @@ export default function useBuildTrack(grid, formatCurrency) {
   }
 
   /**
-   * Draws a track layer as railway: rails and ties in the owning player's
-   * color, each edged in dark gray, so each player's network can be told
-   * apart and pale colors still show up.
+   * Draws a track layer as railway: a rail in the owning player's color over
+   * dark ties and a dark casing, so each player's network can be told apart
+   * and pale colors still show up. Track whose owner is not a player in the
+   * game (a damaged save) has a black rail.
    *
-   * The rails and ties are text characters laid along the layer's line, and
-   * the line itself is hidden. Track whose owner is not a player in the game
-   * (a damaged save) is drawn in plain black.
+   * The layer itself becomes the rail. The casing and ties are two more lines
+   * on the same route, kept on the layer as its `decorations` and each linked
+   * back to it, so a click on any of the three finds the same section.
    *
-   * @param {Object} layer - A track layer
+   * @param {Object} layer - A track layer, created in the rail pane
    * @param {number} ownerId - Id of the player who built the track
    */
   function styleTracks(layer, ownerId) {
     const latlngs = layer.getLatLngs()
-    const color = playerStore.colorOf(ownerId) ?? UNOWNED_TRACK_COLOR
+    layer.setStyle({ color: playerStore.colorOf(ownerId) ?? UNOWNED_TRACK_COLOR, ...RAIL_STYLE })
 
-    // Hide the original layer
-    layer.setStyle({
-      color: 'transparent', // Hide the original line
-      opacity: 0,
-      weight: 0
+    layer.decorations = [
+      L.polyline(latlngs, { ...CASING_STYLE, pane: CASING_PANE }),
+      L.polyline(latlngs, { ...TIES_STYLE, pane: TIES_PANE })
+    ]
+    layer.decorations.forEach((decoration) => {
+      decoration.trackLayer = layer
+      decoration.addTo(mapStore.map)
     })
-
-    // Add rails using text. Both the rails and the ties are centered on the
-    // line ('dominant-baseline: central'), so the track sits on its route and
-    // the ties cross the rails in the middle.
-    const railText = '-'
-    const tieText = '|    '
-    const options = {
-      repeat: true,
-      // A string, not the number 0: leaflet-textpath reads a falsy offset as
-      // "none given" and moves the text off the line by the line's width.
-      // The rail line is 0 wide, but the tie line below keeps Leaflet's
-      // default width of 3, so its ties would sit 3px off the rails.
-      offset: '0',
-      attributes: {
-        fill: color,
-        ...TRACK_MARK_STYLE,
-        'font-size': '20px',
-        'dominant-baseline': 'central'
-      }
-    }
-
-    // Apply text for rails
-    layer.setText(railText, { ...options, below: false })
-
-    // Ties need a layer of their own: leaflet-textpath lays one text per line
-    const tieLayer = L.polyline(latlngs, { color: 'transparent' })
-    const tieOptions = {
-      ...options,
-      attributes: { ...options.attributes, 'font-size': '12px' }
-    }
-    tieLayer.setText(tieText, tieOptions)
-    tieLayer.addTo(mapStore.map)
-
-    // Link the decoration to the track it draws, in both directions, so a
-    // click on the visible rails still resolves to the segment behind them.
-    tieLayer.trackLayer = layer
-    layer.tieLayer = tieLayer
   }
 
   /**
-   * Takes the drawn rails off the map, leaving the underlying line alone.
-   * Used before redrawing after an edit, and when a section is removed.
-   *
-   * The rail text is cleared too: leaflet-textpath only drops its existing text
-   * node when `setText` is called with nothing, so restyling without this
-   * abandons a text node in the SVG on every edit.
+   * Takes a track layer's casing and ties off the map, leaving the rail (the
+   * layer itself) alone. Used before redrawing, and when a section is removed.
    *
    * @param {Object} layer - The track layer whose styling should be cleared
    */
   function removeStyling(layer) {
-    layer.setText(null)
-
-    if (layer.tieLayer) {
-      mapStore.map.removeLayer(layer.tieLayer)
-      layer.tieLayer = null
-    }
-  }
-
-  // function to add ties to railroad tracks
-  function addRailroadTies(map, latlngs, interval, tieLength) {
-    console.log('Adding ties to railroad tracks...')
-    console.log('latlngs:', latlngs)
-    console.log('interval:', interval)
-    console.log('tieLength:', tieLength)
-
-    for (let i = 1; i < latlngs.length; i++) {
-      const start = latlngs[i - 1]
-      const end = latlngs[i]
-
-      // Compute the number of ties based on segment length
-      const distance = map.distance(start, end)
-      const numTies = Math.floor(distance / interval)
-
-      console.log(`Segment from ${start} to ${end} is ${distance} meters, adding ${numTies} ties.`)
-
-      for (let j = 0; j < numTies; j++) {
-        const fraction = j / numTies
-        const midpoint = {
-          lat: start.lat + fraction * (end.lat - start.lat),
-          lng: start.lng + fraction * (end.lng - start.lng)
-        }
-
-        // Compute perpendicular tie positions
-        const angle = Math.atan2(end.lat - start.lat, end.lng - start.lng)
-        const tieOffsetLat = (tieLength * Math.cos(angle + Math.PI / 2)) / 2
-        const tieOffsetLng = (tieLength * Math.sin(angle + Math.PI / 2)) / 2
-
-        const tieCoords = [
-          { lat: midpoint.lat - tieOffsetLat, lng: midpoint.lng - tieOffsetLng },
-          { lat: midpoint.lat + tieOffsetLat, lng: midpoint.lng + tieOffsetLng }
-        ]
-
-        // Add tie to the map
-        L.polyline(tieCoords, {
-          color: 'brown',
-          weight: 2
-        }).addTo(map)
-      }
-    }
-  }
-
-  // function to create parallel rails
-  function createParallelLines(latlngs, offset) {
-    console.log('Creating parallel rails from latlngs:', latlngs)
-    console.log('Offset:', offset)
-
-    const leftRail = []
-    const rightRail = []
-
-    for (let i = 0; i < latlngs.length - 1; i++) {
-      const start = latlngs[i]
-      const end = latlngs[i + 1]
-
-      console.log('Segment from', start, 'to', end)
-
-      // Compute angle of the segment
-      const angle = Math.atan2(end.lat - start.lat, end.lng - start.lng)
-
-      console.log('Angle:', angle)
-
-      // Calculate offset positions
-      const offsetLat = offset * Math.cos(angle)
-      const offsetLng = offset * Math.sin(angle)
-
-      console.log('Offset positions:', offsetLat, offsetLng)
-
-      leftRail.push({ lat: start.lat + offsetLat, lng: start.lng - offsetLng })
-      rightRail.push({ lat: start.lat - offsetLat, lng: start.lng + offsetLng })
-
-      if (i === latlngs.length - 2) {
-        // Add the final points
-        leftRail.push({ lat: end.lat + offsetLat, lng: end.lng - offsetLng })
-        rightRail.push({ lat: end.lat - offsetLat, lng: end.lng + offsetLng })
-      }
-    }
-
-    console.log('Left rail:', leftRail)
-    console.log('Right rail:', rightRail)
-
-    return { leftRail, rightRail }
+    layer.decorations?.forEach((decoration) => mapStore.map.removeLayer(decoration))
+    layer.decorations = []
   }
 
   // ================== RETURN EXPOSED METHODS AND STATE ==================

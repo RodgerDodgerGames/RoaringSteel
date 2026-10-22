@@ -12,6 +12,7 @@ import { usePlayerStore } from '@/stores/players'
 import { useGameStore } from '@/stores/game'
 import { useTrackStore } from '@/stores/track'
 import { useDemandCardsStore } from '@/stores/demandCards'
+import { useSettingsStore } from '@/stores/settings'
 import { useGamePersistence } from '@/composables/useGamePersistence'
 
 describe('useGamePersistence', () => {
@@ -317,6 +318,35 @@ describe('useGamePersistence', () => {
       persistence.loadAutoSave(latest.index)
 
       playerIds().forEach((id) => expect(demandCardsStore.handOf(id)).toEqual([]))
+    })
+  })
+
+  describe('settings', () => {
+    let settingsStore
+
+    beforeEach(() => {
+      settingsStore = useSettingsStore()
+    })
+
+    it('should bring back the settings the game was saved with', () => {
+      settingsStore.settings.showDeckCount = true
+      persistence.autoSave()
+
+      settingsStore.settings.showDeckCount = false
+      const [latest] = persistence.getAutoSaves()
+      persistence.loadAutoSave(latest.index)
+
+      expect(settingsStore.settings.showDeckCount).toBe(true)
+    })
+
+    it("should leave the player's settings alone when the save has none", () => {
+      const save = persistence.serializeGameState()
+      delete save.settings // a save made before settings existed
+      settingsStore.settings.showDeckCount = true
+
+      expect(persistence.deserializeGameState(save)).toBe(true)
+
+      expect(settingsStore.settings.showDeckCount).toBe(true)
     })
   })
 })

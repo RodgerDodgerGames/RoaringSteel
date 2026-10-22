@@ -31,8 +31,8 @@ import { formatCurrency } from '@/composables/utils'
  * the game), a record of which layers are on it, and stubs for the Geoman
  * calls the composable makes.
  *
- * Layers added here never get a `_map`, so leaflet-textpath skips its SVG
- * work and the track styling runs without a renderer.
+ * Layers added here never get a `_map`, so they are never handed a renderer
+ * and the track styling runs without drawing any SVG.
  *
  * @returns {Object} Fake map
  */
@@ -40,6 +40,11 @@ function createFakeMap() {
   const map = new L.Evented()
   const layers = new Set()
   const container = { style: {} }
+  const panes = {}
+
+  // Panes are only ever styled by the composable, so a bare style object will do
+  map.getPane = (name) => panes[name]
+  map.createPane = (name) => (panes[name] = { style: {} })
 
   map.addLayer = (layer) => {
     layers.add(layer)
@@ -67,8 +72,11 @@ function createFakeMap() {
   }
 
   map.pm = {
+    // Kept, like the real thing, so a drawn line can be put in the pane
+    // Geoman would put it in (see `createDrawnLine`)
+    globalOptions: {},
     setLang: () => {},
-    setGlobalOptions: () => {},
+    setGlobalOptions: (options) => Object.assign(map.pm.globalOptions, options),
     enableDraw: () => {},
     disableDraw: () => {},
     toggleGlobalRemovalMode: () => setRemovalMode(!removalMode),
@@ -122,13 +130,20 @@ const savedSegment = {
 /**
  * Builds the layer Geoman hands over in `pm:create` when a player finishes
  * drawing a line.
+ *
+ * Geoman puts the finished line in the pane named by its global
+ * `panes.layerPane` option (Leaflet's overlay pane when none is set),
+ * whatever pane the line's own options asked for, so the fake does the same.
+ *
+ * @param {Object} map - Fake map from `createFakeMap`
  * @returns {Object} A line layer marked as Geoman's Line shape
  */
-function createDrawnLine() {
+function createDrawnLine(map) {
   const layer = L.polyline([
     [40, -100],
     [41, -101]
   ])
+  layer.options.pane = map.pm.globalOptions.panes?.layerPane || 'overlayPane'
   layer.pm = { _shape: 'Line' }
   return layer
 }
@@ -157,7 +172,7 @@ describe('useBuildTrack', () => {
       mountBuildTrack(map).wrapper.unmount()
       mountBuildTrack(map)
 
-      map.fire('pm:create', { layer: createDrawnLine() })
+      map.fire('pm:create', { layer: createDrawnLine(map) })
 
       expect(trackStore.segments).toHaveLength(1)
     })
@@ -176,7 +191,7 @@ describe('useBuildTrack', () => {
     it('should stop responding to sections drawn on the map', () => {
       mountBuildTrack(map).wrapper.unmount()
 
-      map.fire('pm:create', { layer: createDrawnLine() })
+      map.fire('pm:create', { layer: createDrawnLine(map) })
 
       expect(trackStore.segments).toHaveLength(0)
     })
@@ -184,7 +199,7 @@ describe('useBuildTrack', () => {
     it('should leave no track or rails on the map', () => {
       trackStore.addSegment(savedSegment)
       const { wrapper } = mountBuildTrack(map)
-      map.fire('pm:create', { layer: createDrawnLine() })
+      map.fire('pm:create', { layer: createDrawnLine(map) })
 
       wrapper.unmount()
 
@@ -316,6 +331,90 @@ describe('useBuildTrack', () => {
 
       expect(api.isRemoving.value).toBe(true)
     })
+  })
+
+  /**
+   * Track is drawn as three lines — rail, casing and ties — and a click in
+   * removal mode lands on whichever is under the cursor. Every one of them has
+   * to act on the whole section, or a click on the edge of the track would
+   * tear up only part of the drawing and leave the rest behind.
+   */
+  describe('a newly built section', () => {
+    /**
+     * The rail is the thinnest of the three lines, so if it is not on top the
+     * casing and ties cover it and the player's color never shows.
+     */
+    it('should draw its rail above its casing and ties', () => {
+      mountBuildTrack(map)
+      const line = createDrawnLine(map)
+
+      map.fire('pm:create', { layer: line })
+
+      // The fake map has no overlay pane of its own; Leaflet gives it z-index 400
+      const zIndexOf = (layer) => map.getPane(layer.options.pane)?.style.zIndex ?? 400
+      const decorations = map.allLayers().filter((layer) => layer !== line)
+      expect(decorations).toHaveLength(2)
+      decorations.forEach((decoration) =>
+        expect(zIndexOf(line)).toBeGreaterThan(zIndexOf(decoration))
+      )
+    })
+  })
+
+  describe('removing a section by clicking one of its lines', () => {
+    /** The pane each of a section's three lines is drawn in */
+    const linePanes = { rail: 'trackRails', casing: 'trackCasing', ties: 'trackTies' }
+
+    /**
+     * Finds the one line of the given kind on the map.
+     * @param {Object} map - Fake map
+     * @param {string} kind - 'rail', 'casing' or 'ties'
+     * @returns {Object} The layer
+     */
+    function lineOfKind(map, kind) {
+      return map.allLayers().find((layer) => layer.options.pane === linePanes[kind])
+    }
+
+    /**
+     * Clicks a line in removal mode the way Geoman handles it: the clicked
+     * layer comes off the map, then the removal is announced on the map.
+     * @param {Object} map - Fake map
+     * @param {Object} layer - The line clicked
+     */
+    function removeByClick(map, layer) {
+      map.removeLayer(layer)
+      map.fire('pm:remove', { layer })
+    }
+
+    it.each(['rail', 'casing', 'ties'])(
+      'should tear up the whole section when its %s is clicked',
+      (kind) => {
+        trackStore.addSegment(savedSegment)
+        mountBuildTrack(map)
+
+        removeByClick(map, lineOfKind(map, kind))
+
+        expect(trackStore.segments).toHaveLength(0)
+        expect(map.allLayers()).toHaveLength(0)
+      }
+    )
+
+    it.each(['rail', 'casing', 'ties'])(
+      "should redraw another player's section once when its %s is clicked",
+      (kind) => {
+        // Owned by a player other than Ann, whose turn it is
+        trackStore.addSegment({ ...savedSegment, ownerId: 2 })
+        mountBuildTrack(map)
+
+        removeByClick(map, lineOfKind(map, kind))
+
+        expect(trackStore.segments).toHaveLength(1)
+        // One rail, one casing and one set of ties: nothing lost, nothing doubled
+        expect(map.allLayers().map((layer) => layer.options.pane)).toEqual(
+          expect.arrayContaining(Object.values(linePanes))
+        )
+        expect(map.allLayers()).toHaveLength(3)
+      }
+    )
   })
 
   describe('when the map never finished setting up', () => {

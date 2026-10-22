@@ -80,6 +80,13 @@ export function useTowns() {
 
         const marker = L.marker(latlng, { icon: icon })
 
+        // Towns are part of the board, so no map tool may delete them. Geoman's
+        // removal mode — switched on to tear up track — otherwise takes any
+        // layer that is clicked, and a clicked town vanished until a reload.
+        // `allowRemoval` rather than `pmIgnore`: ignoring the marker outright
+        // would also stop track from snapping to the town.
+        marker.pm.setOptions({ allowRemoval: false })
+
         // Bind a tooltip to display the town's name
         marker.bindTooltip(feature.properties.name.split('-')[0], {
           permanent: true, // Make the tooltip always visible

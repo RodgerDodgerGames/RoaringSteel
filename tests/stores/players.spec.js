@@ -406,6 +406,45 @@ describe('Player Store', () => {
     })
   })
 
+  describe('nextPlayer getter', () => {
+    it('should return undefined when there are no players', () => {
+      expect(playerStore.nextPlayer).toBeUndefined()
+    })
+
+    describe('with players', () => {
+      beforeEach(() => {
+        playerStore.addPlayer({ name: 'Alice', color: 'red' })
+        playerStore.addPlayer({ name: 'Bob', color: 'blue' })
+        playerStore.addPlayer({ name: 'Cara', color: 'green' })
+      })
+
+      it('should return the first player when nobody holds the turn', () => {
+        expect(playerStore.nextPlayer.name).toBe('Alice')
+      })
+
+      it('should return the player after the active one', () => {
+        playerStore.players[0].isTurn = true
+
+        expect(playerStore.nextPlayer.name).toBe('Bob')
+      })
+
+      it('should wrap from the last player back to the first', () => {
+        playerStore.players[2].isTurn = true
+
+        expect(playerStore.nextPlayer.name).toBe('Alice')
+      })
+
+      it('should name the player nextTurn then hands the turn to', () => {
+        playerStore.players[1].isTurn = true
+        const named = playerStore.nextPlayer.name
+
+        playerStore.nextTurn()
+
+        expect(playerStore.activePlayer.name).toBe(named)
+      })
+    })
+  })
+
   describe('money', () => {
     beforeEach(() => {
       playerStore.addPlayer({ name: 'Alice', color: 'red', cash: gameRules.startingCash })
@@ -574,6 +613,36 @@ describe('Player Store', () => {
 
       it('should be zero for an unknown player', () => {
         expect(playerStore.availableForTrack(999)).toBe(0)
+      })
+    })
+
+    describe('trackSpendThisTurn', () => {
+      it('should be zero at the start of a turn', () => {
+        expect(playerStore.trackSpendThisTurn(1)).toBe(0)
+      })
+
+      it('should add up everything built this turn', () => {
+        playerStore.spendOnTrack(1, 5000)
+        playerStore.spendOnTrack(1, 2500)
+
+        expect(playerStore.trackSpendThisTurn(1)).toBe(7500)
+      })
+
+      it('should drop by what a removed section refunds', () => {
+        playerStore.spendOnTrack(1, 5000)
+        playerStore.refundTrackSpend(1, 2000)
+
+        expect(playerStore.trackSpendThisTurn(1)).toBe(3000)
+      })
+
+      it('should treat a missing counter from an old save as zero', () => {
+        playerStore.updatePlayer(1, { trackSpentThisTurn: undefined })
+
+        expect(playerStore.trackSpendThisTurn(1)).toBe(0)
+      })
+
+      it('should be zero for an unknown player', () => {
+        expect(playerStore.trackSpendThisTurn(999)).toBe(0)
       })
     })
 

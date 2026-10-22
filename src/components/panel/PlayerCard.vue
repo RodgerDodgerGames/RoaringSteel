@@ -1,10 +1,14 @@
 <!--
   PlayerCard.vue
 
-  Identity card for the player whose turn it is, shown above the side panel
-  tabs so it stays visible no matter which tab is open.
+  The head of the player dock: whose turn it is and how much cash they have.
+  Everything below it in the dock is about this player, so this is the first
+  thing read.
 
-  Shows the active player's name and cash on hand, on their chosen color.
+  The player's colour is shown as a thick stripe rather than as the card's
+  background, so the name stays readable whatever colour was picked — black
+  text on a dark blue or purple was unreadable.
+
   Renders nothing until a player holds the turn, so it stays out of the way
   during setup.
 -->
@@ -19,18 +23,63 @@ const { activePlayer } = storeToRefs(playerStore)
 </script>
 
 <template>
-  <div v-if="activePlayer" class="card player-card mb-3">
-    <div class="card-content" :style="{ backgroundColor: activePlayer.color }">
-      <div class="is-flex is-align-items-center is-justify-content-space-between">
-        <span class="is-size-5 has-text-weight-bold has-text-black">{{ activePlayer.name }}</span>
-        <span class="is-size-5 has-text-black">{{ formatCurrency(activePlayer.cash) }}</span>
-      </div>
+  <div v-if="activePlayer" class="player-card" :style="{ '--player-color': activePlayer.color }">
+    <div class="player-card__who">
+      <span class="player-card__label">Your turn</span>
+      <span class="player-card__name">{{ activePlayer.name }}</span>
+    </div>
+    <div class="player-card__cash">
+      <span class="player-card__label">Cash</span>
+      <span class="player-card__amount">{{ formatCurrency(activePlayer.cash) }}</span>
     </div>
   </div>
 </template>
 
 <style scoped>
-.card-content {
-  padding: 0.75rem 1rem;
+.player-card {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem 0.8rem;
+  border-left: 0.5rem solid var(--player-color);
+  border-bottom: 1px solid var(--bulma-border-weak);
+  background: var(--bulma-scheme-main);
+}
+
+.player-card__who,
+.player-card__cash {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.player-card__cash {
+  align-items: flex-end;
+}
+
+.player-card__label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bulma-text-weak);
+}
+
+.player-card__name {
+  overflow: hidden;
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--bulma-text-strong);
+}
+
+.player-card__amount {
+  font-size: 1.4rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  color: var(--bulma-text-strong);
 }
 </style>

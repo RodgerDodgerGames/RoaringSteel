@@ -13,11 +13,15 @@
 
   The map instance is made globally available via the map store
   so other components (like useBuildTrack) can access it.
+
+  The map fills whatever box its parent gives it, and follows that box as it
+  changes size (the demand strip below it collapsing, the window resizing).
 -->
 
 <script setup>
 import { storeToRefs } from 'pinia'
 import { onMounted, ref, watch } from 'vue'
+import { useResizeObserver } from '@vueuse/core'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useTowns } from '@/composables/map/useTowns'
@@ -51,7 +55,7 @@ onMounted(() => {
     // add towns to map
     addTownsToMap(map, towns)
     // add townsLayer to store
-    mapStore.setTownsLayer(townsLayer)
+    mapStore.setTownsLayer(townsLayer.value)
   }
 })
 
@@ -67,17 +71,22 @@ watch(mapCenter, (newCenter) => {
     map.value.setView(newCenter)
   }
 })
+
+// Leaflet measures its container once and only re-measures when told. Without
+// this, growing the container (e.g. collapsing the demand strip) leaves a grey
+// band of unloaded tiles, and clicks land at the wrong coordinates.
+useResizeObserver(mapContainer, () => {
+  map.value?.invalidateSize()
+})
 </script>
 
 <template>
-  <div>
-    <div ref="mapContainer" class="map-container"></div>
-  </div>
+  <div ref="mapContainer" class="game-map"></div>
 </template>
 
-<style>
-.map-container {
-  height: 100vh;
+<style scoped>
+.game-map {
+  height: 100%;
   width: 100%;
 }
 </style>

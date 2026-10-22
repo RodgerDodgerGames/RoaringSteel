@@ -1,76 +1,97 @@
 <!--
   DemandCard.vue
 
-  Displays demand cards showing delivery contracts.
-  Each card shows destination, payoff amount, and required industry.
-  Multiple cards can be displayed in a horizontal row.
+  One demand card. Each card offers three contracts: deliver a load of a
+  commodity to a destination town for a payoff. A player fulfils at most one
+  contract per card, so the three are listed together as alternatives.
 
-  @prop cards - Array of card arrays, each containing demand objects
-                with destination, payoff, and industry fields
+  Each contract is one line — destination, commodity, payoff — so a whole card
+  reads at a glance, and the strip of cards stays short enough to leave the
+  map most of the screen. Long names are cut short with an ellipsis and shown
+  in full on hover.
+
+  @prop demands - The card's contracts: [{ destination, industry, payoff }, ...]
+  @prop label   - Name for the card, e.g. "Card 1"
 -->
 
-<template>
-  <div class="cards-container">
-    <div class="demand-card" v-for="(card, cardIndex) in cards" :key="cardIndex">
-      <div class="demand-row" v-for="(demand, demandIndex) in card" :key="demandIndex">
-        <div class="destination">{{ demand.destination }}</div>
-        <div class="payoff">${{ demand.payoff.toLocaleString() }}</div>
-        <div class="industry">{{ demand.industry }}</div>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup>
+import { formatCurrency } from '@/composables/utils'
+
 defineProps({
-  cards: {
+  demands: {
     type: Array,
+    required: true
+  },
+  label: {
+    type: String,
     required: true
   }
 })
 </script>
 
+<template>
+  <article class="demand-card" :aria-label="label">
+    <ul class="demand-card__list">
+      <li v-for="(demand, index) in demands" :key="index" class="demand-card__row">
+        <span class="demand-card__destination" :title="demand.destination">
+          {{ demand.destination }}
+        </span>
+        <span class="demand-card__commodity" :title="demand.industry">{{ demand.industry }}</span>
+        <span class="demand-card__payoff">{{ formatCurrency(demand.payoff) }}</span>
+      </li>
+    </ul>
+  </article>
+</template>
+
 <style scoped>
-.cards-container {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  gap: 30px;
-}
-
 .demand-card {
-  width: 270px;
-  border: 2px solid black;
-  border-radius: 10px;
-  background: #f8f8f8; /* Light gray background */
-  padding: 10px;
-  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
-  text-align: center;
+  border: 1px solid var(--bulma-border);
+  border-radius: var(--bulma-radius-large);
+  background: var(--bulma-scheme-main);
+  box-shadow: var(--bulma-shadow);
 }
 
-.demand-row {
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  background: white;
+.demand-card__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.destination {
-  font-size: 16px;
-  font-weight: bold;
-  color: #333;
+/* Destination | commodity | payoff, with the payoff column sized to fit */
+.demand-card__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.9rem;
 }
 
-.payoff {
-  font-size: 14px;
-  margin-top: 5px;
-  color: #007b00; /* Green color for payoff */
+/* A rule between contracts, as on the printed cards */
+.demand-card__row + .demand-card__row {
+  border-top: 1px dashed var(--bulma-border-weak);
 }
 
-.industry {
-  font-size: 12px;
-  margin-top: 5px;
-  color: #555;
+.demand-card__destination,
+.demand-card__commodity {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.demand-card__destination {
+  font-weight: 700;
+  color: var(--bulma-text-strong);
+}
+
+.demand-card__commodity {
   font-style: italic;
+  color: var(--bulma-text-weak);
+}
+
+.demand-card__payoff {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--bulma-success-on-scheme);
 }
 </style>

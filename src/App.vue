@@ -9,6 +9,7 @@ import AreaSelectView from '@/views/AreaSelectView.vue'
 import GameView from './views/GameView.vue'
 import WelcomeView from './views/WelcomeView.vue'
 import GridProgressModal from './components/setup/GridProgressModal.vue'
+import SettingsButton from '@/components/SettingsButton.vue'
 
 // import stores
 import { useGameStore } from '@/stores/game'
@@ -136,6 +137,8 @@ function handleSetupCancel() {
       @game-loaded="handleGameLoaded"
       @play-game="handlePlayGameClick"
     />
+    <!-- Settings cog for the setup screens; in the game it is in the Game menu -->
+    <SettingsButton v-if="currentView !== 'game'" />
     <!-- Grid Progress Modal -->
     <GridProgressModal
       :is-active="showProgressModal"

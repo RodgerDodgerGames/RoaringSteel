@@ -8,7 +8,7 @@
   - the round number (one round = every player taking a turn)
   - every player in turn order, with their colour and cash; the player whose
     turn it is stands out, like the player holding the dice
-  - a Game menu with Save and Load
+  - a Game menu with Save, Load and Settings
 
   Actions that belong to the current turn (building, End Turn) are not here;
   they live in the player dock, next to the information they depend on.
@@ -20,6 +20,7 @@ import { storeToRefs } from 'pinia'
 import { onClickOutside } from '@vueuse/core'
 import SaveGameDialog from '@/components/dialogs/SaveGameDialog.vue'
 import LoadGameDialog from '@/components/dialogs/LoadGameDialog.vue'
+import SettingsDialog from '@/components/dialogs/SettingsDialog.vue'
 import { usePlayerStore } from '@/stores/players'
 import { useGameStore } from '@/stores/game'
 import { formatCurrency } from '@/composables/utils'
@@ -35,12 +36,12 @@ onClickOutside(menuRef, () => {
   isMenuOpen.value = false
 })
 
-// Which dialog is showing: 'save', 'load', or null for neither
+// Which dialog is showing: 'save', 'load', 'settings', or null for none
 const openDialogName = ref(null)
 
 /**
  * Opens one of the game dialogs from the menu, closing the menu behind it.
- * @param {'save'|'load'} name - The dialog to open
+ * @param {'save'|'load'|'settings'} name - The dialog to open
  */
 function openDialog(name) {
   isMenuOpen.value = false
@@ -87,6 +88,13 @@ function openDialog(name) {
         <div class="dropdown-content">
           <a class="dropdown-item" role="menuitem" @click="openDialog('save')">Save game</a>
           <a class="dropdown-item" role="menuitem" @click="openDialog('load')">Load game</a>
+          <hr class="dropdown-divider" />
+          <a class="dropdown-item" role="menuitem" @click="openDialog('settings')">
+            <span class="icon-text">
+              <span class="icon"><i class="fas fa-gear" aria-hidden="true"></i></span>
+              <span>Settings</span>
+            </span>
+          </a>
         </div>
       </div>
     </div>
@@ -94,6 +102,7 @@ function openDialog(name) {
 
   <SaveGameDialog v-if="openDialogName === 'save'" @close="openDialogName = null" />
   <LoadGameDialog v-if="openDialogName === 'load'" @close="openDialogName = null" />
+  <SettingsDialog v-if="openDialogName === 'settings'" @close="openDialogName = null" />
 </template>
 
 <style scoped>

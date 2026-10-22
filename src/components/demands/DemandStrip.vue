@@ -14,18 +14,23 @@
 
   The strip folds down to its header line when the player wants more map;
   that choice is remembered in the browser. The map resizes to fill the space.
+
+  How many cards are left in the deck shows in the header only when the
+  player has turned that on in Settings; it is off by default.
 -->
 
 <script setup>
 import { storeToRefs } from 'pinia'
 import { useDemandCardsStore } from '@/stores/demandCards'
 import { usePlayerStore } from '@/stores/players'
+import { useSettingsStore } from '@/stores/settings'
 import { useShownHand } from '@/composables/useShownHand'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import DemandCard from '@/components/demands/DemandCard.vue'
 
 const { drawPile } = storeToRefs(useDemandCardsStore())
 const { players, activePlayer } = storeToRefs(usePlayerStore())
+const { settings } = storeToRefs(useSettingsStore())
 
 // Whose hand is on screen, and switching between hands
 const { shownPlayer, cards, showHandOf } = useShownHand()
@@ -37,7 +42,7 @@ const { shownPlayer, cards, showHandOf } = useShownHand()
     aria-label="Demand cards"
     title="Demand cards"
     storage-key="demand_strip"
-    :badge="`Deck: ${drawPile.length} left`"
+    :badge="settings.showDeckCount ? `Deck: ${drawPile.length} left` : ''"
   >
     <template #actions>
       <div class="buttons are-small has-addons" role="group" aria-label="Show the hand of">

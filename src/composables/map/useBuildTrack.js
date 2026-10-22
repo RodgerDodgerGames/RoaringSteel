@@ -551,10 +551,9 @@ export default function useBuildTrack(grid, formatCurrency) {
   /**
    * Finds the track layer an event belongs to.
    *
-   * A player sees and clicks two things for each section: the line itself,
-   * drawn by `styleTracks` as the band of the owner's colour, and the ties,
-   * which are a separate decoration layer laid over it. An event can arrive
-   * on either, and both have to lead back to the same segment.
+   * The rails a player actually sees and drags are the styled decoration, not
+   * the line itself — the line is set fully transparent by `styleTracks`. So an
+   * event can arrive on either, and both have to lead back to the same segment.
    *
    * @param {Object} layer - The layer the Geoman event fired on
    * @returns {Object|null} The track layer carrying a segment id, if any
@@ -798,14 +797,36 @@ export default function useBuildTrack(grid, formatCurrency) {
   // ================== TRACK STYLING ==================
 
   /**
-   * How the band of colour under a player's rails is drawn. Wide enough to
-   * show either side of the black rails and ties, and slightly see-through so
-   * the terrain under the track still reads.
+   * How the line being drawn looks: solid enough to see the player's colour
+   * against the map, without hiding the terrain the player is pricing.
    */
-  const OWNER_LINE_STYLE = { weight: 8, opacity: 0.8 }
+  const DRAWING_LINE_STYLE = { weight: 4, opacity: 0.9 }
 
   /** Leaflet's own line blue, for a line drawn by a player with no colour */
   const UNOWNED_DRAWING_COLOR = '#3388ff'
+
+  /**
+   * What finished track is drawn in when its owner has no colour (a damaged
+   * save): plain black, the way all track looked before it was coloured.
+   */
+  const UNOWNED_TRACK_COLOR = 'black'
+
+  /**
+   * How the rail and tie characters are drawn: in the owner's colour, set
+   * extra-bold so there is enough of each mark for the colour to show, with
+   * a thin dark edge. Without the edge the paler player colours (light
+   * yellow, light cyan) all but vanish on the light map; with it every colour
+   * reads, on any terrain.
+   */
+  const TRACK_MARK_STYLE = {
+    'font-weight': '900',
+    stroke: '#222',
+    'stroke-width': '1px',
+    'stroke-linejoin': 'round',
+    // Paint the edge first and the colour over it, so the edge frames the
+    // mark rather than eating into it
+    'paint-order': 'stroke'
+  }
 
   /**
    * Geoman's styles for a line while it is being drawn, in the colour of the
@@ -830,55 +851,63 @@ export default function useBuildTrack(grid, formatCurrency) {
     const color = playerStore.colorOf(playerId) ?? UNOWNED_DRAWING_COLOR
 
     return {
-      templineStyle: { color, ...OWNER_LINE_STYLE },
-      hintlineStyle: { color, dashArray: '12,16', ...OWNER_LINE_STYLE },
-      pathOptions: { color, ...OWNER_LINE_STYLE }
+      templineStyle: { color, ...DRAWING_LINE_STYLE },
+      hintlineStyle: { color, dashArray: '8,10', ...DRAWING_LINE_STYLE },
+      pathOptions: { color, ...DRAWING_LINE_STYLE }
     }
   }
 
   /**
-   * Draws a track layer as railway: black rails and ties, laid over a band of
-   * the owning player's colour, so each player's network can be told apart.
+   * Draws a track layer as railway: rails and ties in the owning player's
+   * colour, each edged in dark grey, so each player's network can be told
+   * apart and pale colours still show up.
    *
-   * Track whose owner is not a player in the game (a damaged save) is drawn
-   * as rails alone, with the band hidden.
-   *
-   * The band is the layer's own line; the rails and ties are text laid along
-   * it, which leaflet-textpath adds above every line on the map, so the black
-   * marks always sit on top of the colour.
+   * The rails and ties are text characters laid along the layer's line, and
+   * the line itself is hidden. Track whose owner is not a player in the game
+   * (a damaged save) is drawn in plain black.
    *
    * @param {Object} layer - A track layer
    * @param {number} ownerId - Id of the player who built the track
    */
   function styleTracks(layer, ownerId) {
     const latlngs = layer.getLatLngs()
+    const color = playerStore.colorOf(ownerId) ?? UNOWNED_TRACK_COLOR
 
-    const color = playerStore.colorOf(ownerId)
-    layer.setStyle(
-      color ? { color, ...OWNER_LINE_STYLE } : { color: 'transparent', opacity: 0, weight: 0 }
-    )
+    // Hide the original layer
+    layer.setStyle({
+      color: 'transparent', // Hide the original line
+      opacity: 0,
+      weight: 0
+    })
 
     // Add rails using text. Both the rails and the ties are centred on the
-    // line ('dominant-baseline: central'), so they run down the middle of the
-    // coloured band rather than along one edge of it.
+    // line ('dominant-baseline: central'), so the track sits on its route and
+    // the ties cross the rails in the middle.
     const railText = '-'
     const tieText = '|    '
     const options = {
       repeat: true,
       // A string, not the number 0: leaflet-textpath reads a falsy offset as
-      // "none given" and pushes the text off the line by the line's width
+      // "none given" and moves the text off the line by the line's width.
+      // The rail line is 0 wide, but the tie line below keeps Leaflet's
+      // default width of 3, so its ties would sit 3px off the rails.
       offset: '0',
-      attributes: { fill: 'black', 'font-size': '16px', 'dominant-baseline': 'central' }
+      attributes: {
+        fill: color,
+        ...TRACK_MARK_STYLE,
+        'font-size': '20px',
+        'dominant-baseline': 'central'
+      }
     }
 
     // Apply text for rails
     layer.setText(railText, { ...options, below: false })
 
-    // Optionally, add ties using another layer
+    // Ties need a layer of their own: leaflet-textpath lays one text per line
     const tieLayer = L.polyline(latlngs, { color: 'transparent' })
     const tieOptions = {
       ...options,
-      attributes: { ...options.attributes, 'font-size': '10px' }
+      attributes: { ...options.attributes, 'font-size': '12px' }
     }
     tieLayer.setText(tieText, tieOptions)
     tieLayer.addTo(mapStore.map)

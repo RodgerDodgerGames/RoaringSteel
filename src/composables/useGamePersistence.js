@@ -54,7 +54,12 @@ export function useGamePersistence() {
       },
       towns: townsStore.towns,
       grid: gridStore.grid,
-      demandCards: demandCardsStore.demandCards,
+      // The undealt deck and every player's hand. Saves from before hands
+      // existed held only the deck, under `demandCards`.
+      demandDeck: {
+        drawPile: demandCardsStore.drawPile,
+        hands: demandCardsStore.hands
+      },
       track: trackStore.segments
     }
   }
@@ -93,7 +98,7 @@ export function useGamePersistence() {
       }
       if (data.towns) townsStore.setTowns(data.towns)
       if (data.grid) gridStore.setGrid(data.grid)
-      if (data.demandCards) demandCardsStore.setDemandCards(data.demandCards)
+      restoreDemandDeck(data)
       // Saves written before track was persisted have no `track` field; that is
       // a game with no track, not a broken save
       if (data.track) trackStore.setTrack(data.track)
@@ -104,6 +109,38 @@ export function useGamePersistence() {
     } catch (e) {
       console.error('Error deserializing game state:', e)
       return false
+    }
+  }
+
+  /**
+   * Restores the demand deck and hands, from whichever format the save uses.
+   *
+   * A current save is restored exactly as it was written, short hands and
+   * all, so saving and loading never changes who holds what.
+   *
+   * A save written before hands existed carries only the deck, as a bare list
+   * under `demandCards`. Its players are dealt their hands here, so an old
+   * game picks up with hands like a new one. Players are restored before this
+   * runs, so the deal follows their turn order.
+   *
+   * A damaged deck does not stop the load — the rest of the game is still
+   * playable — but it is logged, since every hand will come up empty.
+   *
+   * @param {Object} data - Saved game data
+   */
+  function restoreDemandDeck(data) {
+    const isOldSave = !data.demandDeck
+    const deck = isOldSave ? { drawPile: data.demandCards } : data.demandDeck
+    // A save from before demand cards existed at all has neither field
+    if (isOldSave && !data.demandCards) return
+
+    if (!demandCardsStore.setDeck(deck)) {
+      console.warn('Save data warning: the demand deck could not be read, so no cards are dealt')
+      return
+    }
+
+    if (isOldSave) {
+      demandCardsStore.dealHands(playerStore.players.map((player) => player.id))
     }
   }
 

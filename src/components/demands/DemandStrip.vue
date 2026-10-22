@@ -6,27 +6,29 @@
   reading the cards against the map, so the cards sit right under it and stay
   visible — not behind a button.
 
+  It shows the hand of the player whose turn it is. In Empire Builder hands
+  are dealt face up, so anyone may look at anyone's cards: the player chips in
+  the header switch the strip to another player's hand, to see what they are
+  chasing. When the turn passes, the strip goes back to the new active
+  player's hand, so nobody starts their turn looking at someone else's cards.
+
   The strip folds down to its header line when the player wants more map;
   that choice is remembered in the browser. The map resizes to fill the space.
-
-  For now these are the top three cards of the shared deck — players are not
-  dealt their own hands yet — and the header says so.
 -->
 
 <script setup>
-import { computed } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useDemandCardsStore } from '@/stores/demandCards'
+import { usePlayerStore } from '@/stores/players'
+import { useShownHand } from '@/composables/useShownHand'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import DemandCard from '@/components/demands/DemandCard.vue'
 
-/** How many cards a player holds in Empire Builder */
-const HAND_SIZE = 3
+const { drawPile } = storeToRefs(useDemandCardsStore())
+const { players, activePlayer } = storeToRefs(usePlayerStore())
 
-const demandCardsStore = useDemandCardsStore()
-
-// Computed rather than sliced once, so the strip follows the deck — a loaded
-// game brings a different deck with it
-const cards = computed(() => demandCardsStore.demandCards.slice(0, HAND_SIZE))
+// Whose hand is on screen, and switching between hands
+const { shownPlayer, cards, showHandOf } = useShownHand()
 </script>
 
 <template>
@@ -35,16 +37,36 @@ const cards = computed(() => demandCardsStore.demandCards.slice(0, HAND_SIZE))
     aria-label="Demand cards"
     title="Demand cards"
     storage-key="demand_strip"
-    badge="Shared deck · hands not dealt yet"
+    :badge="`Deck: ${drawPile.length} left`"
   >
-    <div class="demand-strip__cards">
+    <template #actions>
+      <div class="buttons are-small has-addons" role="group" aria-label="Show the hand of">
+        <button
+          v-for="player in players"
+          :key="player.id"
+          class="button"
+          :class="{ 'is-selected is-primary': player.id === shownPlayer?.id }"
+          :aria-pressed="player.id === shownPlayer?.id"
+          :title="player.id === activePlayer?.id ? `${player.name} (their turn)` : player.name"
+          @click="showHandOf(player.id)"
+        >
+          <span class="demand-strip__swatch" :style="{ background: player.color }"></span>
+          <span>{{ player.name }}</span>
+        </button>
+      </div>
+    </template>
+
+    <div v-if="cards.length" class="demand-strip__cards">
       <DemandCard
         v-for="(card, index) in cards"
-        :key="index"
-        :demands="card"
-        :label="`Card ${index + 1}`"
+        :key="card.id"
+        :demands="card.demands"
+        :label="`${shownPlayer.name}'s card ${index + 1}`"
       />
     </div>
+    <p v-else class="demand-strip__empty">
+      {{ shownPlayer ? `${shownPlayer.name} holds no demand cards.` : 'No hand to show.' }}
+    </p>
   </CollapsibleSection>
 </template>
 
@@ -55,11 +77,32 @@ const cards = computed(() => demandCardsStore.demandCards.slice(0, HAND_SIZE))
   background: var(--bulma-scheme-main-bis);
 }
 
+/* Bulma's button group carries a bottom margin meant for stacked rows */
+.demand-strip .buttons,
+.demand-strip .buttons .button {
+  margin-bottom: 0;
+}
+
+/* The player's colour, as on their chip in the top bar */
+.demand-strip__swatch {
+  display: inline-block;
+  width: 0.65rem;
+  height: 0.65rem;
+  margin-right: 0.4rem;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--bulma-border);
+}
+
 /* Three equal cards side by side, filling the width under the map */
 .demand-strip__cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.75rem;
+}
+
+.demand-strip__empty {
+  font-size: 0.9rem;
+  color: var(--bulma-text-weak);
 }
 
 @media (max-width: 1023px) {

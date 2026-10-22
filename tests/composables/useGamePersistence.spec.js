@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { usePlayerStore } from '@/stores/players'
 import { useGameStore } from '@/stores/game'
 import { useTrackStore } from '@/stores/track'
+import { useDemandCardsStore } from '@/stores/demandCards'
 import { useGamePersistence } from '@/composables/useGamePersistence'
 
 describe('useGamePersistence', () => {
@@ -230,6 +231,92 @@ describe('useGamePersistence', () => {
       persistence.loadAutoSave(latest.index)
 
       expect(trackStore.segments).toEqual([])
+    })
+  })
+
+  describe('demand cards', () => {
+    /**
+     * A deck of cards numbered 1..count, each with one placeholder contract.
+     * @param {number} count - How many cards
+     * @returns {Array} The cards, top of the deck first
+     */
+    const deckOf = (count) =>
+      Array.from({ length: count }, (_, i) => ({
+        id: i + 1,
+        demands: [{ destination: 'Duluth', industry: 'Iron', payoff: 10 }]
+      }))
+
+    /** Ids of every player, in turn order */
+    const playerIds = () => playerStore.players.map((p) => p.id)
+
+    /** Ids of the cards a player holds */
+    const handIds = (playerId) => demandCardsStore.handOf(playerId).map((c) => c.id)
+
+    let demandCardsStore
+
+    beforeEach(() => {
+      demandCardsStore = useDemandCardsStore()
+    })
+
+    it('should carry every hand and the rest of the deck through a save and reload', () => {
+      demandCardsStore.setDeck({ drawPile: deckOf(12) })
+      demandCardsStore.dealHands(playerIds())
+      const handsBefore = playerIds().map(handIds)
+      persistence.autoSave()
+
+      demandCardsStore.reset()
+      const [latest] = persistence.getAutoSaves()
+      expect(persistence.loadAutoSave(latest.index)).toBe(true)
+
+      expect(playerIds().map(handIds)).toEqual(handsBefore)
+      expect(demandCardsStore.drawPile.map((c) => c.id)).toEqual([10, 11, 12])
+    })
+
+    it('should deal hands when loading a save made before hands existed', () => {
+      const save = persistence.serializeGameState()
+      delete save.demandDeck
+      // Old saves held the deck under `demandCards`, each card a bare list of
+      // its contracts with no id
+      save.demandCards = deckOf(12).map((c) => c.demands)
+
+      expect(persistence.deserializeGameState(save)).toBe(true)
+
+      playerIds().forEach((id) => expect(demandCardsStore.handOf(id)).toHaveLength(3))
+      expect(demandCardsStore.drawPile).toHaveLength(3)
+    })
+
+    it('should load a short hand exactly as saved rather than dealing to it', () => {
+      const [firstId] = playerIds()
+      demandCardsStore.setDeck({ drawPile: deckOf(5), hands: { [firstId]: deckOf(1) } })
+      persistence.autoSave()
+
+      const [latest] = persistence.getAutoSaves()
+      persistence.loadAutoSave(latest.index)
+
+      expect(handIds(firstId)).toEqual([1])
+      expect(demandCardsStore.drawPile).toHaveLength(5)
+    })
+
+    it('should still load a save whose deck is damaged, and say so', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const save = persistence.serializeGameState()
+      save.demandDeck = { hands: {} } // no draw pile
+
+      expect(persistence.deserializeGameState(save)).toBe(true)
+
+      expect(demandCardsStore.drawPile).toEqual([])
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('demand deck could not be read'))
+    })
+
+    it('should clear hands left over from the previous game on load', () => {
+      persistence.autoSave() // a save taken before any cards were dealt
+      demandCardsStore.setDeck({ drawPile: deckOf(9) })
+      demandCardsStore.dealHands(playerIds())
+
+      const [latest] = persistence.getAutoSaves()
+      persistence.loadAutoSave(latest.index)
+
+      playerIds().forEach((id) => expect(demandCardsStore.handOf(id)).toEqual([]))
     })
   })
 })

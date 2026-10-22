@@ -1,18 +1,69 @@
+/**
+ * Demand Cards Store (demandCards.js)
+ *
+ * The demand deck and the hand each player holds.
+ *
+ * A demand card offers three contracts — deliver a commodity to a town for a
+ * payoff — and a player may fulfil at most one of them. As in Empire Builder,
+ * every player holds a hand of three cards, dealt face up from the deck: hands
+ * are public information, not secret.
+ *
+ * Card shape:
+ * {
+ *   id: number,                                  // Unique within the deck
+ *   demands: [{ destination, industry, payoff }] // The card's three contracts
+ * }
+ *
+ * @module stores/demandCards
+ */
+
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as turf from '@turf/turf'
 import { useTownsStore } from './towns'
 
+/** How many demand cards each player holds, per the Empire Builder rules */
+export const HAND_SIZE = 3
+
 export const useDemandCardsStore = defineStore('demandCards', () => {
   const townsStore = useTownsStore()
   const towns = computed(() => townsStore.towns)
 
-  // State: Reactive list of generated demand cards
-  const demandCards = ref([])
+  // STATE
 
-  // Function to generate demand cards
+  /** Cards not yet dealt, top of the deck first */
+  const drawPile = ref([])
+
+  /**
+   * Each player's hand, keyed by player id. A plain object rather than a Map
+   * so it goes into a save file as-is; JSON turns the numeric ids into string
+   * keys, which JavaScript property lookup treats the same.
+   */
+  const hands = ref({})
+
+  // GETTERS
+
+  /**
+   * The hand a player holds.
+   * @param {number} playerId - The player's id
+   * @returns {Array} Their cards; empty if they have not been dealt any
+   */
+  function handOf(playerId) {
+    return hands.value[playerId] ?? []
+  }
+
+  // ACTIONS
+
+  /**
+   * Builds a fresh deck from the towns in play and clears every hand.
+   * Deals nothing — `dealHands` does that once the deck exists.
+   */
   const generateDemandCards = () => {
     console.log('Generating demand cards...')
+
+    // A new deck means a new game, so the last game's cards go first — even if
+    // no new deck can be built, the old one must not be dealt from
+    reset()
 
     const townsData = towns.value
     if (!townsData || townsData.length === 0) {
@@ -125,13 +176,42 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
         })
       }
 
-      options.push(demandOptions)
+      // Numbered in deck order; the id is what tells two cards apart once they
+      // are spread across the draw pile and players' hands
+      options.push({ id: options.length + 1, demands: demandOptions })
     }
 
-    demandCards.value = options
+    drawPile.value = options
 
     // Summarize the demand cards
     console.log('demand card generated', summarizeDemandCards(options))
+  }
+
+  /**
+   * Tops every listed player's hand up to `HAND_SIZE` from the top of the
+   * deck, one card per player per pass round the table — the way cards are
+   * dealt at a real table, so a short deck shortchanges everyone by at most
+   * one card rather than leaving the last player with nothing.
+   *
+   * Players who already hold a full hand are skipped, so this is safe to call
+   * on a game in progress: it is how a save made before hands existed gets
+   * its hands dealt when it loads.
+   *
+   * @param {Array<number>} playerIds - Ids of the players to deal to, in turn order
+   */
+  function dealHands(playerIds) {
+    for (let pass = 0; pass < HAND_SIZE; pass++) {
+      playerIds.forEach((playerId) => {
+        const hand = handOf(playerId)
+        if (hand.length >= HAND_SIZE || drawPile.value.length === 0) return
+        // Assigned as a new array so a player with no hand yet gets an entry
+        hands.value[playerId] = [...hand, drawPile.value.shift()]
+      })
+    }
+
+    if (playerIds.some((playerId) => handOf(playerId).length < HAND_SIZE)) {
+      console.warn('The demand deck ran out before every hand was full')
+    }
   }
 
   // Helper to pick a random index based on weights
@@ -159,38 +239,55 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
    * Resets the demand cards store to initial state.
    */
   function reset() {
-    demandCards.value = []
+    drawPile.value = []
+    hands.value = {}
   }
 
   /**
-   * Sets the complete demand cards array (used for loading saved games).
-   * @param {Array} cardsArray - Array of demand card objects
+   * Restores the deck and hands from a saved game.
+   *
+   * Saves written before hands existed hold the deck as a bare list of cards,
+   * each a bare list of three demands with no id. Those cards are given ids
+   * by their place in the deck, which is unique because such a save has no
+   * hands to collide with. The caller deals those players their hands.
+   *
+   * @param {Object} deck - Saved deck state
+   * @param {Array} deck.drawPile - Cards not yet dealt
+   * @param {Object} [deck.hands] - Each player's hand, keyed by player id
+   * @returns {boolean} True if the deck was restored
    */
-  function setDemandCards(cardsArray) {
-    if (Array.isArray(cardsArray)) {
-      demandCards.value = cardsArray
-    }
+  function setDeck(deck) {
+    if (!Array.isArray(deck?.drawPile)) return false
+
+    drawPile.value = deck.drawPile.map((card, index) =>
+      Array.isArray(card) ? { id: index + 1, demands: card } : card
+    )
+    hands.value = deck.hands ?? {}
+    return true
   }
 
   return {
-    demandCards,
+    drawPile,
+    hands,
+    handOf,
     generateDemandCards,
+    dealHands,
     reset,
-    setDemandCards
+    setDeck
   }
 
   /**
    * Summarizes demand card data.
-   * @param {Array} demandCards - Array of demand options grouped into cards.
+   * @param {Array} cards - The deck, as built by `generateDemandCards`
    * @returns {Object} Summary of demand card data.
    */
-  function summarizeDemandCards(demandCards) {
+  function summarizeDemandCards(cards) {
     const townCounts = {}
     const industryCounts = {}
     const payoffValues = []
 
     // Flatten demand cards into a single list of demand options
-    const allDemandOptions = demandCards.flat()
+    const allDemandOptions = cards.flatMap((card) => card.demands)
 
     // Count occurrences of towns and industries, and collect payoff values
     allDemandOptions.forEach(({ destination, industry, payoff }) => {

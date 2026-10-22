@@ -1,20 +1,20 @@
 /**
- * Player Colours (playerColors.js)
+ * Player Colors (playerColors.js)
  *
- * The colours a player can pick on the setup screen. A player's colour is
+ * The colors a player can pick on the setup screen. A player's color is
  * how everything they own is told apart — their track on the map, their chip
  * in the top bar, their card in the side panel — so no two players may share
- * one, and the colours themselves have to be easy to tell apart at a glance.
+ * one, and the colors themselves have to be easy to tell apart at a glance.
  *
- * Each hue is well away from its neighbours on the colour wheel, so no two
+ * Each hue is well away from its neighbors on the color wheel, so no two
  * are easily mistaken for each other. They are also chosen to work in both
- * places a colour is shown:
+ * places a color is shown:
  * - behind black text (setup buttons, the confirm cards, player chips), so
  *   none is dark;
  * - as track on the terrain map, drawn with a dark outline, so none is so pale
  *   it washes out against the light background.
  *
- * Order matters: a new setup row is given the first colour nobody has yet, so
+ * Order matters: a new setup row is given the first color nobody has yet, so
  * the first few are the most distinct from each other.
  *
  * @module config/playerColors

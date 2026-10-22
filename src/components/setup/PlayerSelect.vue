@@ -10,8 +10,8 @@
 
   Features:
   - Add/remove players dynamically
-  - Color picker over the shared player palette. Colours another player already
-    has are dimmed and can't be picked, so no two players share a colour.
+  - Color picker over the shared player palette. Colors another player already
+    has are dimmed and can't be picked, so no two players share a color.
   - Name uniqueness validation
   - Notification system for validation errors
   - A Settings button, so settings can be chosen before the game starts
@@ -38,7 +38,7 @@ const { draftPlayers: players } = storeToRefs(playerStore)
 
 /**
  * Keep at least one row on screen, so the form is never a dead end. The store
- * gives the row the first free palette colour.
+ * gives the row the first free palette color.
  */
 function ensureOneRow() {
   if (players.value.length === 0) {
@@ -59,10 +59,10 @@ function addPlayer() {
     return
   }
 
-  // The store gives the new row the first colour nobody has. With every colour
-  // taken there is nothing to give it, and colours are never shared.
+  // The store gives the new row the first color nobody has. With every color
+  // taken there is nothing to give it, and colors are never shared.
   if (!playerStore.addDraftPlayer()) {
-    notificationMessage.value = 'Every colour is taken. Remove a player to add another.'
+    notificationMessage.value = 'Every color is taken. Remove a player to add another.'
     showNotification.value = true
   }
 }
@@ -88,12 +88,12 @@ const toggleColorPicker = (id) => {
 /**
  * What a taken swatch says when hovered or read aloud, naming who has it.
  * @param {{holder: Object|null}} option A swatch from the store's picker options.
- * @returns {string|null} "Taken by …", or null for a colour that is free.
+ * @returns {string|null} "Taken by …", or null for a color that is free.
  */
 const takenLabel = (option) =>
   option.holder ? `Taken by ${option.holder.name.trim() || 'another player'}` : null
 
-// Select a color and close the picker. The store refuses a colour another row
+// Select a color and close the picker. The store refuses a color another row
 // has, so clicking a taken (dimmed) swatch changes nothing and leaves the
 // picker open.
 const selectColor = (player, color) => {
@@ -295,8 +295,8 @@ const handleDone = () => {
   border-color: #000;
 }
 
-/* Another player's colour: faded and struck through so it reads as
-   unavailable, while still showing which colour it is */
+/* Another player's color: faded and struck through so it reads as
+   unavailable, while still showing which color it is */
 .color-box.is-taken {
   opacity: 0.4;
   cursor: not-allowed;

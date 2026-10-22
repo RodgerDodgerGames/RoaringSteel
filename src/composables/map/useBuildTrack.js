@@ -788,7 +788,7 @@ export default function useBuildTrack(grid, formatCurrency) {
     mapStore.map.pm.setGlobalOptions({
       snappable: true,
       snapDistance: 50,
-      // The line's own colours are not set here: they belong to whoever is
+      // The line's own colors are not set here: they belong to whoever is
       // drawing, so startDrawingLine passes them each time (drawingLineStyles)
       markerStyle: { draggable: true, color: 'red' }
     })
@@ -797,25 +797,25 @@ export default function useBuildTrack(grid, formatCurrency) {
   // ================== TRACK STYLING ==================
 
   /**
-   * How the line being drawn looks: solid enough to see the player's colour
+   * How the line being drawn looks: solid enough to see the player's color
    * against the map, without hiding the terrain the player is pricing.
    */
   const DRAWING_LINE_STYLE = { weight: 4, opacity: 0.9 }
 
-  /** Leaflet's own line blue, for a line drawn by a player with no colour */
+  /** Leaflet's own line blue, for a line drawn by a player with no color */
   const UNOWNED_DRAWING_COLOR = '#3388ff'
 
   /**
-   * What finished track is drawn in when its owner has no colour (a damaged
-   * save): plain black, the way all track looked before it was coloured.
+   * What finished track is drawn in when its owner has no color (a damaged
+   * save): plain black, the way all track looked before it was colored.
    */
   const UNOWNED_TRACK_COLOR = 'black'
 
   /**
-   * How the rail and tie characters are drawn: in the owner's colour, set
-   * extra-bold so there is enough of each mark for the colour to show, with
-   * a thin dark edge. Without the edge the paler player colours (light
-   * yellow, light cyan) all but vanish on the light map; with it every colour
+   * How the rail and tie characters are drawn: in the owner's color, set
+   * extra-bold so there is enough of each mark for the color to show, with
+   * a thin dark edge. Without the edge the paler player colors (light
+   * yellow, light cyan) all but vanish on the light map; with it every color
    * reads, on any terrain.
    */
   const TRACK_MARK_STYLE = {
@@ -823,13 +823,13 @@ export default function useBuildTrack(grid, formatCurrency) {
     stroke: '#222',
     'stroke-width': '1px',
     'stroke-linejoin': 'round',
-    // Paint the edge first and the colour over it, so the edge frames the
+    // Paint the edge first and the color over it, so the edge frames the
     // mark rather than eating into it
     'paint-order': 'stroke'
   }
 
   /**
-   * Geoman's styles for a line while it is being drawn, in the colour of the
+   * Geoman's styles for a line while it is being drawn, in the color of the
    * player drawing it, so it looks like their track from the first click.
    *
    * Three lines are involved: the legs already placed (`templineStyle`), the
@@ -839,10 +839,10 @@ export default function useBuildTrack(grid, formatCurrency) {
    * dashes are longer than Geoman's, because at this width the line's rounded
    * ends would close up short gaps.
    *
-   * All three are always given, even for a player with no colour (who gets
+   * All three are always given, even for a player with no color (who gets
    * Leaflet's blue): Geoman keeps whatever styles it was last handed, so
    * leaving one out would draw this player's line in the previous player's
-   * colour.
+   * color.
    *
    * @param {number} playerId - The player about to draw
    * @returns {Object} Options for Geoman's `enableDraw`
@@ -859,8 +859,8 @@ export default function useBuildTrack(grid, formatCurrency) {
 
   /**
    * Draws a track layer as railway: rails and ties in the owning player's
-   * colour, each edged in dark grey, so each player's network can be told
-   * apart and pale colours still show up.
+   * color, each edged in dark gray, so each player's network can be told
+   * apart and pale colors still show up.
    *
    * The rails and ties are text characters laid along the layer's line, and
    * the line itself is hidden. Track whose owner is not a player in the game
@@ -880,7 +880,7 @@ export default function useBuildTrack(grid, formatCurrency) {
       weight: 0
     })
 
-    // Add rails using text. Both the rails and the ties are centred on the
+    // Add rails using text. Both the rails and the ties are centered on the
     // line ('dominant-baseline: central'), so the track sits on its route and
     // the ties cross the rails in the middle.
     const railText = '-'

@@ -88,7 +88,7 @@ const { shownPlayer, cards, showHandOf } = useShownHand()
   margin-bottom: 0;
 }
 
-/* The player's colour, as on their chip in the top bar */
+/* The player's color, as on their chip in the top bar */
 .demand-strip__swatch {
   display: inline-block;
   width: 0.65rem;

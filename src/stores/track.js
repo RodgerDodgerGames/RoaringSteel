@@ -81,7 +81,7 @@ export const useTrackStore = defineStore('track', () => {
       return null
     }
 
-    // Track with no owner cannot be charged for, coloured, or run on, so an
+    // Track with no owner cannot be charged for, colored, or run on, so an
     // unattributed segment is a bug rather than something to store and fix later
     if (!Number.isInteger(segment.ownerId)) {
       error.value = 'Track segment must have an owner'
@@ -184,7 +184,7 @@ export const useTrackStore = defineStore('track', () => {
    * This is the rule for what a player may tear up: their own track, from the
    * turn in progress. It lives here rather than in the map code because the
    * same question decides both whether the Remove control is offered and
-   * whether a removal is honoured, and those two must never disagree.
+   * whether a removal is honored, and those two must never disagree.
    *
    * @param {Object|undefined} segment - The segment to test.
    * @param {number} ownerId - The player's id.

@@ -73,7 +73,7 @@ watch(mapCenter, (newCenter) => {
 })
 
 // Leaflet measures its container once and only re-measures when told. Without
-// this, growing the container (e.g. collapsing the demand strip) leaves a grey
+// this, growing the container (e.g. collapsing the demand strip) leaves a gray
 // band of unloaded tiles, and clicks land at the wrong coordinates.
 useResizeObserver(mapContainer, () => {
   map.value?.invalidateSize()

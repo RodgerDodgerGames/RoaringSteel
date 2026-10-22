@@ -217,7 +217,7 @@ describe('fetchWithTimeout', () => {
     await assertion
   })
 
-  it('should still honour a signal the caller supplied', async () => {
+  it('should still honor a signal the caller supplied', async () => {
     // The helper installs a signal of its own; dropping the caller's would make
     // a future cancel button silently do nothing.
     const caller = new AbortController()

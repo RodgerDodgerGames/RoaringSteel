@@ -5,8 +5,8 @@
   Everything below it in the dock is about this player, so this is the first
   thing read.
 
-  The player's colour is shown as a thick stripe rather than as the card's
-  background, so the name stays readable whatever colour was picked — black
+  The player's color is shown as a thick stripe rather than as the card's
+  background, so the name stays readable whatever color was picked — black
   text on a dark blue or purple was unreadable.
 
   Renders nothing until a player holds the turn, so it stays out of the way

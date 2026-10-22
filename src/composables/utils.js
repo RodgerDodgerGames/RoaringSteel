@@ -65,7 +65,7 @@ export async function fetchWithTimeout(
   const expiresAt = Date.now() + timeoutMs
 
   // A caller's own signal still cancels. Without this it would be dropped in
-  // favour of the one this helper installs, silently, and a future cancel
+  // favor of the one this helper installs, silently, and a future cancel
   // button would do nothing.
   if (signal) signal.addEventListener('abort', () => controller.abort(), { once: true })
 

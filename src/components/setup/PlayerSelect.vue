@@ -13,6 +13,7 @@
   - Color picker with 12 preset pastel colors
   - Name uniqueness validation
   - Notification system for validation errors
+  - A Settings button, so settings can be chosen before the game starts
 
   @emits done - Array of player objects when validation passes
 -->
@@ -21,6 +22,7 @@
 import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { usePlayerStore } from '@/stores/players'
+import SettingsButton from '@/components/SettingsButton.vue'
 
 const playerStore = usePlayerStore()
 
@@ -246,6 +248,11 @@ const handleDone = () => {
       <!-- Add Player Button -->
       <p class="control">
         <button @click="addPlayer" class="button is-primary">Add Player</button>
+      </p>
+
+      <!-- Settings button -->
+      <p class="control">
+        <SettingsButton />
       </p>
 
       <!-- Done button -->

@@ -1,11 +1,13 @@
 <!--
   SettingsDialog.vue
 
-  Modal dialog for the player's display preferences. It opens from the cog on
-  the setup screens (SettingsButton) and from the Game menu during play.
+  Modal dialog for the player's display preferences. It opens from the
+  Settings button on the New Game steps (SettingsButton) and from the Game
+  menu during play.
 
   Each setting takes effect the moment it is changed and is remembered in this
-  browser, so there is no Save button — only Close.
+  browser (and written into the next save), so there is no Save button — only
+  Close.
 
   @emits close - Emitted when the player clicks Close, the X, or the background
 -->
@@ -39,7 +41,9 @@ const { settings } = storeToRefs(useSettingsStore())
           <p class="help">The count appears in the header of the demand card strip.</p>
         </div>
 
-        <p class="is-size-7 has-text-grey mt-5">Settings are remembered in this browser.</p>
+        <p class="is-size-7 has-text-grey mt-5">
+          Settings are remembered in this browser and saved with your game.
+        </p>
       </section>
 
       <footer class="modal-card-foot">

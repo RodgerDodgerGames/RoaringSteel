@@ -46,11 +46,53 @@ describe('settings store', () => {
     expect(settingsAfterReload()).toEqual(DEFAULT_SETTINGS)
   })
 
+  it('should use the default for a stored setting of the wrong kind', () => {
+    // Text "false" is truthy: kept as-is, it would show the count while the
+    // checkbox showed unticked
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ showDeckCount: 'false' }))
+
+    expect(settingsAfterReload()).toEqual(DEFAULT_SETTINGS)
+  })
+
   it('should fall back to the defaults when the stored settings are damaged', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
     localStorage.setItem(SETTINGS_STORAGE_KEY, '{not json')
 
     expect(settingsAfterReload()).toEqual(DEFAULT_SETTINGS)
     expect(error).toHaveBeenCalled()
+  })
+
+  describe('applySettings', () => {
+    it("should take on a loaded save's settings and remember them", async () => {
+      useSettingsStore().applySettings({ showDeckCount: true })
+      await nextTick()
+
+      expect(settingsAfterReload().showDeckCount).toBe(true)
+    })
+
+    it('should ignore settings this version of the game does not know', () => {
+      const store = useSettingsStore()
+
+      store.applySettings({ showDeckCount: true, showSecretHands: true })
+
+      expect(store.settings).toEqual({ showDeckCount: true })
+    })
+
+    it('should ignore a saved value of the wrong kind', () => {
+      const store = useSettingsStore()
+
+      store.applySettings({ showDeckCount: 'yes' })
+
+      expect(store.settings.showDeckCount).toBe(false)
+    })
+
+    it('should keep the current value of a setting the save does not mention', () => {
+      const store = useSettingsStore()
+      store.settings.showDeckCount = true
+
+      store.applySettings({})
+
+      expect(store.settings.showDeckCount).toBe(true)
+    })
   })
 })

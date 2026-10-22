@@ -3,7 +3,8 @@
 
   Control panel for the area selection screen. Displays the currently
   selected region and provides a "Play Game" button to proceed.
-  Button is disabled until a region is selected.
+  Button is disabled until a region is selected. A Settings button beside it
+  lets settings be chosen before the game starts.
 
   @prop region - GeoJSON feature of the selected state
   @emits play-game - Triggered when user clicks Play Game button
@@ -14,14 +15,18 @@
     <p>Where would you like to play?</p>
     <!-- make message class danger if no region is selected -->
     <p :class="{ 'has-text-info': props.region, 'has-text-danger': !props.region }">{{ msg }}</p>
-    <button class="button is-primary" @click="emit('play-game')" :disabled="!props.region">
-      Play Game
-    </button>
+    <div class="buttons">
+      <SettingsButton />
+      <button class="button is-primary" @click="emit('play-game')" :disabled="!props.region">
+        Play Game
+      </button>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import SettingsButton from '@/components/SettingsButton.vue'
 // Props to receive the selected region
 const props = defineProps({
   region: Object

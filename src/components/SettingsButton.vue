@@ -1,11 +1,12 @@
 <!--
   SettingsButton.vue
 
-  The cog in the top-right corner of the setup screens (welcome, player setup,
-  area select), which opens the Settings dialog. It is fixed to the window so
-  it stays in the same place as the screens change underneath it.
+  A "Settings" button that opens the Settings dialog, for the New Game steps
+  ("Who is playing?" and choosing the area). It sits alongside each step's own
+  buttons, so a player can set things up before the game starts.
 
-  During play there is no cog: settings open from the Game menu in the top bar.
+  During play there is no button: settings open from the Game menu in the
+  top bar.
 -->
 
 <script setup>
@@ -16,24 +17,14 @@ const isDialogOpen = ref(false)
 </script>
 
 <template>
-  <button
-    class="button is-rounded settings-button"
-    aria-label="Settings"
-    title="Settings"
-    @click="isDialogOpen = true"
-  >
+  <button class="button" @click="isDialogOpen = true">
     <span class="icon"><i class="fas fa-gear" aria-hidden="true"></i></span>
+    <span>Settings</span>
   </button>
 
-  <SettingsDialog v-if="isDialogOpen" @close="isDialogOpen = false" />
+  <!-- Rendered at the end of the page, not inside the button's host, so the
+       host's styles (centred text, flex rows) don't leak into the dialog -->
+  <Teleport to="body">
+    <SettingsDialog v-if="isDialogOpen" @close="isDialogOpen = false" />
+  </Teleport>
 </template>
-
-<style scoped>
-/* Above the area-select map and its controls (Leaflet reaches 1000) */
-.settings-button {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  z-index: 1100;
-}
-</style>

@@ -18,6 +18,7 @@ import { useGridStore } from '@/stores/grid'
 import { useDemandCardsStore } from '@/stores/demandCards'
 import { useMapStore } from '@/stores/map'
 import { useTrackStore } from '@/stores/track'
+import { useSettingsStore } from '@/stores/settings'
 
 const SAVE_VERSION = '1.0.0'
 const AUTOSAVE_PREFIX = 'roaringsteel_autosave_'
@@ -32,6 +33,7 @@ export function useGamePersistence() {
   const demandCardsStore = useDemandCardsStore()
   const mapStore = useMapStore()
   const trackStore = useTrackStore()
+  const settingsStore = useSettingsStore()
 
   /**
    * Serializes the current game state into a JSON-safe object.
@@ -60,7 +62,10 @@ export function useGamePersistence() {
         drawPile: demandCardsStore.drawPile,
         hands: demandCardsStore.hands
       },
-      track: trackStore.segments
+      track: trackStore.segments,
+      // The player's display settings at the time of saving. Copied, so the
+      // snapshot doesn't follow later changes to the live settings.
+      settings: { ...settingsStore.settings }
     }
   }
 
@@ -103,6 +108,10 @@ export function useGamePersistence() {
       // a game with no track, not a broken save
       if (data.track) trackStore.setTrack(data.track)
       if (data.mapView) mapStore.setMapView(data.mapView)
+      // A save's settings replace the browser's (the player chose this: a game
+      // picks up looking as it was saved). Settings are not reset above, so a
+      // save from before settings existed leaves the player's own in place.
+      if (data.settings) settingsStore.applySettings(data.settings)
 
       console.log('Game state restored successfully')
       return true

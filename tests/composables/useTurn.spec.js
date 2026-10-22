@@ -2,8 +2,10 @@
  * Turn Composable Tests
  *
  * Tests for ending a turn, including:
- * - Passing play to the next player
- * - Advancing the game turn only on wrap-around
+ * - Passing play to the next player, in the switchback order of the two
+ *   opening building rounds and in order after that
+ * - Advancing the game turn when a round ends
+ * - Naming who is up next
  * - Auto-saving after each turn
  * - Clearing the finishing player's track building allowance
  */
@@ -58,7 +60,7 @@ describe('useTurn', () => {
       expect(gameStore.turn).toBe(0)
     })
 
-    it('should advance the game turn when the last player ends their turn', () => {
+    it('should advance the game turn when the last player of the round ends their turn', () => {
       seedPlayers()
       const { endTurn } = useTurn()
 
@@ -67,9 +69,9 @@ describe('useTurn', () => {
 
       expect(gameStore.turn).toBe(0)
 
-      endTurn() // Charlie -> Alice, round complete
+      endTurn() // Charlie -> Charlie, who opens the second building round
 
-      expect(playerStore.activePlayer.name).toBe('Alice')
+      expect(playerStore.activePlayer.name).toBe('Charlie')
       expect(gameStore.turn).toBe(1)
     })
 
@@ -77,7 +79,8 @@ describe('useTurn', () => {
       seedPlayers()
       const { endTurn } = useTurn()
 
-      // Three full rounds of three players
+      // Three full rounds of three players: both building rounds and the
+      // first normal one
       for (let i = 0; i < 9; i++) {
         endTurn()
       }
@@ -148,6 +151,7 @@ describe('useTurn', () => {
       const { endTurn } = useTurn()
 
       endTurn() // Alice -> Bob
+      endTurn() // Bob -> Bob, round two
       endTurn() // Bob -> Alice
 
       expect(playerStore.availableForTrack(1)).toBe(gameRules.trackBudgetPerTurn)
@@ -169,6 +173,88 @@ describe('useTurn', () => {
       endTurn()
 
       expect(autoSave).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('the switchback start', () => {
+    it('should play the building rounds out and back, then normal rounds in order', () => {
+      seedPlayers()
+      const { endTurn } = useTurn()
+      const played = []
+
+      // Who plays each turn, and in which round, across the first three rounds
+      for (let i = 0; i < 9; i++) {
+        played.push(`${gameStore.turn}:${playerStore.activePlayer.name}`)
+        endTurn()
+      }
+
+      expect(played).toEqual([
+        '0:Alice',
+        '0:Bob',
+        '0:Charlie',
+        '1:Charlie',
+        '1:Bob',
+        '1:Alice',
+        '2:Alice',
+        '2:Bob',
+        '2:Charlie'
+      ])
+    })
+
+    it('should give a player who goes twice in a row a fresh allowance for the second turn', () => {
+      seedPlayers()
+      playerStore.updatePlayer(3, { cash: 100000 })
+      playerStore.setActivePlayer(3)
+      playerStore.spendOnTrack(3, gameRules.trackBudgetPerTurn)
+      const { endTurn } = useTurn()
+
+      endTurn() // Charlie -> Charlie, round two
+
+      expect(playerStore.activePlayer.name).toBe('Charlie')
+      expect(playerStore.availableForTrack(3)).toBe(gameRules.trackBudgetPerTurn)
+    })
+  })
+
+  describe('nextPlayer', () => {
+    it('should name nobody with no players', () => {
+      const { nextPlayer } = useTurn()
+
+      expect(nextPlayer.value).toBeUndefined()
+    })
+
+    it('should name the player endTurn then hands the turn to, every turn', () => {
+      seedPlayers()
+      const { nextPlayer, endTurn } = useTurn()
+
+      // Through both building rounds and into normal play, where the order
+      // changes direction twice and two players go twice in a row
+      for (let i = 0; i < 9; i++) {
+        const named = nextPlayer.value.name
+        endTurn()
+        expect(playerStore.activePlayer.name).toBe(named)
+      }
+    })
+  })
+
+  describe('playsAgain', () => {
+    it('should be true only when the active player also plays the next turn', () => {
+      seedPlayers()
+      const { playsAgain, endTurn } = useTurn()
+      const again = []
+
+      for (let i = 0; i < 9; i++) {
+        again.push(playsAgain.value)
+        endTurn()
+      }
+
+      // Charlie at the end of round 1, Alice at the end of round 2
+      expect(again).toEqual([false, false, true, false, false, true, false, false, false])
+    })
+
+    it('should be false with no players', () => {
+      const { playsAgain } = useTurn()
+
+      expect(playsAgain.value).toBe(false)
     })
   })
 })

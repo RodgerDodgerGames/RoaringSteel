@@ -10,6 +10,8 @@
        1. move the train                  — not built yet
        2. build track OR upgrade the train — the Empire Builder rule: a player
           spends their turn's money on one or the other, never both
+     In the two opening building rounds trains do not run, so step 1 gives
+     way to a note saying so, and building is the whole turn.
   4. End Turn, pinned to the bottom so it is always in the same place
 
   The middle scrolls on its own if it outgrows the window, so the player card
@@ -22,11 +24,12 @@ import PlayerCard from '@/components/panel/PlayerCard.vue'
 import TrainPanel from '@/components/panel/TrainPanel.vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import BuildControls from '@/components/panel/BuildControls.vue'
-import { usePlayerStore } from '@/stores/players'
+import { useGameStore } from '@/stores/game'
 import { useTurn } from '@/composables/useTurn'
+import { gameRules } from '@/config/game'
 
-const { nextPlayer } = storeToRefs(usePlayerStore())
-const { endTurn } = useTurn()
+const { isBuildingRound } = storeToRefs(useGameStore())
+const { nextPlayer, playsAgain, endTurn } = useTurn()
 </script>
 
 <template>
@@ -37,9 +40,15 @@ const { endTurn } = useTurn()
       <TrainPanel />
 
       <CollapsibleSection title="This turn" storage-key="dock_turn">
+        <!-- Opening rounds: no train movement, so no step 1 -->
+        <p v-if="isBuildingRound" class="turn-steps__opening">
+          Building round: lay track to get started. Trains start running in round
+          {{ gameRules.buildingRounds + 1 }}.
+        </p>
+
         <ol class="turn-steps">
           <!-- Step 1: placeholder until trains can move -->
-          <li class="turn-step is-placeholder">
+          <li v-if="!isBuildingRound" class="turn-step is-placeholder">
             <div class="turn-step__heading">
               <span class="turn-step__number">1</span>
               <span>Move your train</span>
@@ -53,7 +62,7 @@ const { endTurn } = useTurn()
           <!-- Step 2: build or upgrade -->
           <li class="turn-step">
             <div class="turn-step__heading">
-              <span class="turn-step__number">2</span>
+              <span class="turn-step__number">{{ isBuildingRound ? 1 : 2 }}</span>
               <span>Build track <em>or</em> upgrade your train</span>
             </div>
 
@@ -74,7 +83,9 @@ const { endTurn } = useTurn()
 
     <footer class="player-dock__footer">
       <button class="button is-primary is-medium is-fullwidth" @click="endTurn">End turn</button>
-      <p v-if="nextPlayer" class="player-dock__next">Next up: {{ nextPlayer.name }}</p>
+      <p v-if="nextPlayer" class="player-dock__next">
+        Next up: {{ nextPlayer.name }}{{ playsAgain ? ' again' : '' }}
+      </p>
     </footer>
   </aside>
 </template>
@@ -99,6 +110,13 @@ const { endTurn } = useTurn()
    them without :deep. */
 .player-dock__body > section {
   border-bottom: 1px solid var(--bulma-border-weak);
+}
+
+/* The note that stands in for the movement step in the opening rounds */
+.turn-steps__opening {
+  margin-bottom: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--bulma-text-weak);
 }
 
 .turn-steps {

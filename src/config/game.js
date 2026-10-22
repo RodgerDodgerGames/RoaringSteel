@@ -20,5 +20,14 @@ export const gameRules = {
    * starts equal to `startingCash` only by coincidence — the first turn is the
    * one turn a player could otherwise spend everything at once.
    */
-  trackBudgetPerTurn: 20000
+  trackBudgetPerTurn: 20000,
+
+  /**
+   * How many rounds open the game with building only — Empire Builder's
+   * "switchback start". Trains do not run in these rounds: each player just
+   * lays track (or upgrades their train) with that turn's allowance. The
+   * rounds alternate direction, first player to last and then back again,
+   * so the order is fair on the way out and the way back (see turnOrder.js).
+   */
+  buildingRounds: 2
 }

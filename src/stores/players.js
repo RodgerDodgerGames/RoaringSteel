@@ -1,8 +1,9 @@
 /**
  * Player Store (players.js)
  *
- * Manages player data and turn order for the game.
- * Handles player creation, updates, removal, and turn cycling.
+ * Manages player data for the game: creating, updating and removing
+ * players, and which of them holds the turn. The order players are added in
+ * is turn order; who plays next is decided by useTurn (see turnOrder.js).
  *
  * Player Object Structure:
  * {
@@ -62,24 +63,6 @@ export const usePlayerStore = defineStore('playerStore', () => {
    * @returns {Object} The active player object.
    */
   const activePlayer = computed(() => players.value.find((player) => player.isTurn))
-
-  /**
-   * The player who gets the turn when the active player ends theirs: the next
-   * one in turn order, wrapping from the last back to the first. If nobody
-   * holds the turn yet, that is the first player.
-   *
-   * `nextTurn` hands the turn to exactly this player, so anything that names
-   * who is up next (the End Turn button) cannot disagree with what happens.
-   *
-   * @returns {Object|undefined} The next player, or undefined with no players.
-   */
-  const nextPlayer = computed(() => {
-    if (players.value.length === 0) return undefined
-
-    // -1 when nobody holds the turn, which the +1 below turns into the first
-    const activeIndex = players.value.findIndex((player) => player.isTurn)
-    return players.value[(activeIndex + 1) % players.value.length]
-  })
 
   /**
    * Check if there are any players in the game.
@@ -303,7 +286,8 @@ export const usePlayerStore = defineStore('playerStore', () => {
 
   /**
    * Give one specific player the turn, clearing it from everyone else.
-   * Used when restoring a save and when repairing inconsistent turn state.
+   * Used to pass the turn on, when restoring a save, and when repairing
+   * inconsistent turn state.
    * @param {number} id The ID of the player who should have the turn.
    * @returns {boolean} True if the turn was assigned successfully.
    */
@@ -320,32 +304,6 @@ export const usePlayerStore = defineStore('playerStore', () => {
       player.isTurn = player.id === id
     })
     return true
-  }
-
-  /**
-   * End the current player's turn and switch to the next one.
-   * @returns {boolean} True if turn was advanced successfully.
-   */
-  function nextTurn() {
-    error.value = null
-
-    if (players.value.length === 0) {
-      error.value = 'No players in game'
-      return false
-    }
-
-    try {
-      // Read before any flag changes: clearing the current turn first would
-      // make nextPlayer answer "the first player" instead
-      const next = nextPlayer.value
-      players.value.forEach((player) => {
-        player.isTurn = player === next
-      })
-      return true
-    } catch (e) {
-      error.value = `Failed to advance turn: ${e.message}`
-      return false
-    }
   }
 
   // MONEY
@@ -690,7 +648,6 @@ export const usePlayerStore = defineStore('playerStore', () => {
     error,
     // getters
     activePlayer,
-    nextPlayer,
     hasPlayers,
     colorOf,
     draftColorOptions,
@@ -700,7 +657,6 @@ export const usePlayerStore = defineStore('playerStore', () => {
     removePlayer,
     startGame,
     setActivePlayer,
-    nextTurn,
     trackSpendThisTurn,
     trackBudgetRemaining,
     availableForTrack,

@@ -341,7 +341,9 @@ export default function useBuildTrack(grid, formatCurrency) {
    * @param {Object} e - Geoman draw-start event carrying the line being drawn
    */
   function handleDrawStart({ workingLayer: layer }) {
-    workingLayer.value = layer
+    // markRaw: Geoman fires this line's events on the raw layer, so it is kept
+    // raw here too rather than wrapped in a Vue proxy (see the map store)
+    workingLayer.value = markRaw(layer)
     setupDrawingEvents()
   }
 

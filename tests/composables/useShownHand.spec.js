@@ -61,7 +61,7 @@ describe('useShownHand', () => {
     const { shownPlayer, showHandOf } = useShownHand()
     showHandOf(ids[2])
 
-    playerStore.nextTurn()
+    playerStore.setActivePlayer(ids[1])
     await nextTick()
 
     expect(shownPlayer.value.name).toBe('Bo')
@@ -71,7 +71,7 @@ describe('useShownHand', () => {
     const { shownPlayer, showHandOf } = useShownHand()
     showHandOf(ids[0]) // Ann, whose turn it is
 
-    playerStore.nextTurn()
+    playerStore.setActivePlayer(ids[1])
     await nextTick()
 
     // Not pinned to Ann: picking the active player means "follow the turn"

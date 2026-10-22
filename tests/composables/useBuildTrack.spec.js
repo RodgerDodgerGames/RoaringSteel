@@ -307,7 +307,7 @@ describe('useBuildTrack', () => {
       const { api } = mountBuildTrack(map)
       api.toggleRemoveMode()
 
-      playerStore.nextTurn()
+      playerStore.setActivePlayer(2)
       await nextTick()
 
       expect(api.isRemoving.value).toBe(false)

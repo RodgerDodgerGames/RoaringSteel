@@ -19,6 +19,7 @@ import { useDemandCardsStore } from '@/stores/demandCards'
 import { useMapStore } from '@/stores/map'
 import { useTrackStore } from '@/stores/track'
 import { useSettingsStore } from '@/stores/settings'
+import { turnAfter } from '@/composables/turnOrder'
 
 const SAVE_VERSION = '1.0.0'
 const AUTOSAVE_PREFIX = 'roaringsteel_autosave_'
@@ -197,8 +198,10 @@ export function useGamePersistence() {
 
   /**
    * Repairs turn state after a restore so exactly one player is active.
-   * Falls back to the earliest player already flagged, or the first player in
-   * turn order when the save recorded nobody.
+   * Falls back to the earliest player already flagged, or, when the save
+   * recorded nobody, the player who starts the round the save is in. That is
+   * usually the first player, but the second building round is played from
+   * the last player back (see turnOrder.js).
    */
   function ensureSingleActivePlayer() {
     const players = playerStore.players
@@ -212,8 +215,10 @@ export function useGamePersistence() {
       console.warn(`Repairing turn state: resuming play with ${firstActive.name}`)
       playerStore.setActivePlayer(firstActive.id)
     } else {
-      console.warn('Save recorded no active player: resuming play with the first player')
-      playerStore.startGame()
+      // Game state is restored before players, so this is the saved round
+      const opener = players[turnAfter(-1, players.length, gameStore.turn).nextPlace]
+      console.warn(`Save recorded no active player: resuming play with ${opener.name}`)
+      playerStore.setActivePlayer(opener.id)
     }
   }
 

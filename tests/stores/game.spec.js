@@ -110,6 +110,18 @@ describe('Game Store', () => {
     })
   })
 
+  describe('isBuildingRound', () => {
+    it('should be a building round for the first two rounds only', () => {
+      expect(gameStore.isBuildingRound).toBe(true)
+
+      gameStore.advanceTurn()
+      expect(gameStore.isBuildingRound).toBe(true)
+
+      gameStore.advanceTurn()
+      expect(gameStore.isBuildingRound).toBe(false)
+    })
+  })
+
   describe('State Persistence', () => {
     it('should maintain region and turn independently', () => {
       gameStore.setRegion({ name: 'Midwest' })

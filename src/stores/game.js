@@ -8,7 +8,8 @@
  */
 
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import * as turnOrder from '@/composables/turnOrder'
 
 export const useGameStore = defineStore('gameStore', () => {
   // STATE
@@ -18,6 +19,14 @@ export const useGameStore = defineStore('gameStore', () => {
 
   /** Current game turn number (starts at 0) */
   const turn = ref(0)
+
+  // GETTERS
+
+  /**
+   * Whether this is one of the opening rounds, when players only build track
+   * (the switchback start). Trains do not run until these are over.
+   */
+  const isBuildingRound = computed(() => turnOrder.isBuildingRound(turn.value))
 
   // ACTIONS
 
@@ -59,6 +68,8 @@ export const useGameStore = defineStore('gameStore', () => {
     // STATE
     region,
     turn,
+    // GETTERS
+    isBuildingRound,
     // ACTIONS
     setRegion,
     advanceTurn,

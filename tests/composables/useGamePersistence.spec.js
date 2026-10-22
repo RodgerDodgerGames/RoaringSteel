@@ -39,7 +39,7 @@ describe('useGamePersistence', () => {
 
   describe('turn state', () => {
     it('should record which player is active in the serialized state', () => {
-      playerStore.nextTurn()
+      playerStore.setActivePlayer(2)
 
       const state = persistence.serializeGameState()
 
@@ -58,7 +58,7 @@ describe('useGamePersistence', () => {
     })
 
     it('should restore the active player so the right player resumes play', () => {
-      playerStore.nextTurn() // Bob is mid-turn when the game is saved
+      playerStore.setActivePlayer(2) // Bob is mid-turn when the game is saved
       persistence.autoSave()
 
       playerStore.reset()
@@ -73,8 +73,7 @@ describe('useGamePersistence', () => {
     })
 
     it('should restore the turn number alongside the active player', () => {
-      playerStore.nextTurn()
-      playerStore.nextTurn()
+      playerStore.setActivePlayer(3)
       gameStore.advanceTurn()
       persistence.autoSave()
 
@@ -85,6 +84,20 @@ describe('useGamePersistence', () => {
       persistence.loadAutoSave(latest.index)
 
       expect(gameStore.turn).toBe(1)
+      expect(playerStore.activePlayer.name).toBe('Charlie')
+    })
+
+    // The second building round is played from the last player back to the
+    // first, so restarting it with the first player would end it at once and
+    // skip everyone else's second building turn
+    it("should resume a save with no active player at the round's first player", () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      gameStore.advanceTurn() // the second building round
+      const save = persistence.serializeGameState()
+      save.players = save.players.map((p) => ({ ...p, isTurn: false }))
+
+      persistence.deserializeGameState(save)
+
       expect(playerStore.activePlayer.name).toBe('Charlie')
     })
 

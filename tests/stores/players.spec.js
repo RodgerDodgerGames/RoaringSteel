@@ -219,47 +219,6 @@ describe('Player Store', () => {
     })
   })
 
-  describe('nextTurn', () => {
-    beforeEach(() => {
-      playerStore.addPlayer({ name: 'Alice', color: 'red' })
-      playerStore.addPlayer({ name: 'Bob', color: 'blue' })
-      playerStore.addPlayer({ name: 'Charlie', color: 'green' })
-      // Set first player's turn
-      playerStore.players[0].isTurn = true
-    })
-
-    it('should advance turn to the next player', () => {
-      playerStore.nextTurn()
-
-      expect(playerStore.players[0].isTurn).toBe(false)
-      expect(playerStore.players[1].isTurn).toBe(true)
-    })
-
-    it('should wrap around to the first player', () => {
-      // Move to last player
-      playerStore.players[0].isTurn = false
-      playerStore.players[2].isTurn = true
-
-      playerStore.nextTurn()
-
-      expect(playerStore.players[2].isTurn).toBe(false)
-      expect(playerStore.players[0].isTurn).toBe(true)
-    })
-
-    it('should cycle through all players correctly', () => {
-      const turnOrder = []
-
-      for (let i = 0; i < 6; i++) {
-        const activeIdx = playerStore.players.findIndex((p) => p.isTurn)
-        turnOrder.push(activeIdx)
-        playerStore.nextTurn()
-      }
-
-      // Should cycle: 0 -> 1 -> 2 -> 0 -> 1 -> 2
-      expect(turnOrder).toEqual([0, 1, 2, 0, 1, 2])
-    })
-  })
-
   describe('draft players', () => {
     it('should start with an empty draft roster', () => {
       expect(playerStore.draftPlayers).toEqual([])
@@ -500,7 +459,7 @@ describe('Player Store', () => {
 
       expect(playerStore.activePlayer.name).toBe('Alice')
 
-      playerStore.nextTurn()
+      playerStore.setActivePlayer(2)
 
       expect(playerStore.activePlayer.name).toBe('Bob')
     })
@@ -522,45 +481,6 @@ describe('Player Store', () => {
     it('should give null for a player who is not in the game', () => {
       expect(playerStore.colorOf(999)).toBeNull()
       expect(playerStore.colorOf(undefined)).toBeNull()
-    })
-  })
-
-  describe('nextPlayer getter', () => {
-    it('should return undefined when there are no players', () => {
-      expect(playerStore.nextPlayer).toBeUndefined()
-    })
-
-    describe('with players', () => {
-      beforeEach(() => {
-        playerStore.addPlayer({ name: 'Alice', color: 'red' })
-        playerStore.addPlayer({ name: 'Bob', color: 'blue' })
-        playerStore.addPlayer({ name: 'Cara', color: 'green' })
-      })
-
-      it('should return the first player when nobody holds the turn', () => {
-        expect(playerStore.nextPlayer.name).toBe('Alice')
-      })
-
-      it('should return the player after the active one', () => {
-        playerStore.players[0].isTurn = true
-
-        expect(playerStore.nextPlayer.name).toBe('Bob')
-      })
-
-      it('should wrap from the last player back to the first', () => {
-        playerStore.players[2].isTurn = true
-
-        expect(playerStore.nextPlayer.name).toBe('Alice')
-      })
-
-      it('should name the player nextTurn then hands the turn to', () => {
-        playerStore.players[1].isTurn = true
-        const named = playerStore.nextPlayer.name
-
-        playerStore.nextTurn()
-
-        expect(playerStore.activePlayer.name).toBe(named)
-      })
     })
   })
 

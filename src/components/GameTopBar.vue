@@ -5,7 +5,8 @@
   can see at a glance:
 
   - the game's name
-  - the round number (one round = every player taking a turn)
+  - the round number (one round = every player taking a turn), and during
+    the two opening rounds, that they are building rounds
   - every player in turn order, with their color and cash; the player whose
     turn it is stands out, like the player holding the dice
   - a Game menu with Save, Load and Settings
@@ -24,10 +25,11 @@ import SettingsDialog from '@/components/dialogs/SettingsDialog.vue'
 import { usePlayerStore } from '@/stores/players'
 import { useGameStore } from '@/stores/game'
 import { formatCurrency } from '@/composables/utils'
+import { gameRules } from '@/config/game'
 
 const { players } = storeToRefs(usePlayerStore())
 // The store counts rounds from 0; players count them from 1
-const { turn } = storeToRefs(useGameStore())
+const { turn, isBuildingRound } = storeToRefs(useGameStore())
 
 // Game menu: open state, and the element whose outside clicks close it
 const isMenuOpen = ref(false)
@@ -53,7 +55,12 @@ function openDialog(name) {
   <header class="top-bar">
     <span class="top-bar__brand">Roaring Steel</span>
 
-    <span class="top-bar__round">Round {{ turn + 1 }}</span>
+    <span class="top-bar__round">
+      <template v-if="isBuildingRound">
+        Building round {{ turn + 1 }} of {{ gameRules.buildingRounds }}
+      </template>
+      <template v-else>Round {{ turn + 1 }}</template>
+    </span>
 
     <!-- Every player, in turn order -->
     <ol class="top-bar__players" aria-label="Players in turn order">

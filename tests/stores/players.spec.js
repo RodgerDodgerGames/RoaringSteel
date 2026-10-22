@@ -12,6 +12,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { usePlayerStore } from '@/stores/players'
 import { gameRules } from '@/config/game'
+import { playerColors } from '@/config/playerColors'
 
 describe('Player Store', () => {
   let playerStore
@@ -67,6 +68,14 @@ describe('Player Store', () => {
       expect(playerStore.players[0].name).toBe('Alice')
       expect(playerStore.players[1].name).toBe('Bob')
     })
+
+    it('should reject a colour another player already has, whatever its case', () => {
+      playerStore.addPlayer({ name: 'Alice', color: '#E8504A' })
+
+      expect(playerStore.addPlayer({ name: 'Bob', color: '#e8504a' })).toBe(false)
+      expect(playerStore.error).toBe('Alice already has that colour')
+      expect(playerStore.players).toHaveLength(1)
+    })
   })
 
   describe('updatePlayer', () => {
@@ -106,6 +115,19 @@ describe('Player Store', () => {
       playerStore.updatePlayer(999, { cash: 1000 })
 
       expect(playerStore.players).toEqual(originalPlayers)
+    })
+
+    it('should refuse a colour another player already has', () => {
+      playerStore.addPlayer({ name: 'Bob', color: 'blue' })
+
+      expect(playerStore.updatePlayer(2, { color: 'RED' })).toBe(false)
+      expect(playerStore.error).toBe('Alice already has that colour')
+      expect(playerStore.players[1].color).toBe('blue')
+    })
+
+    it('should let a player keep their own colour', () => {
+      expect(playerStore.updatePlayer(1, { color: 'red', cash: 50 })).toBe(true)
+      expect(playerStore.players[0].cash).toBe(50)
     })
   })
 
@@ -368,6 +390,84 @@ describe('Player Store', () => {
 
       expect(playerStore.commitDraftPlayers({ cash: 20000 })).toBe(false)
       expect(playerStore.players).toEqual([])
+    })
+
+    it('should refuse a draft whose colour another draft has, whatever its case', () => {
+      playerStore.addDraftPlayer({ name: 'Alice', color: '#FF5733' })
+
+      expect(playerStore.addDraftPlayer({ name: 'Bob', color: '#ff5733' })).toBeNull()
+      expect(playerStore.draftPlayers).toHaveLength(1)
+    })
+
+    it("should refuse to change a draft's colour to one another draft has", () => {
+      playerStore.addDraftPlayer({ name: 'Alice', color: '#FF5733' })
+      const bob = playerStore.addDraftPlayer({ name: 'Bob', color: '#80FF80' })
+
+      expect(playerStore.updateDraftPlayer(bob.id, { name: 'Bobby', color: '#FF5733' })).toBe(false)
+      // Nothing changes, not even the name sent along with the colour
+      expect(playerStore.draftPlayers[1]).toMatchObject({ name: 'Bob', color: '#80FF80' })
+    })
+
+    it('should let a draft move to a free colour or keep its own', () => {
+      const alice = playerStore.addDraftPlayer({ name: 'Alice', color: '#FF5733' })
+
+      expect(playerStore.updateDraftPlayer(alice.id, { color: '#FF5733' })).toBe(true)
+      expect(playerStore.updateDraftPlayer(alice.id, { color: '#8080FF' })).toBe(true)
+      expect(playerStore.draftPlayers[0].color).toBe('#8080FF')
+    })
+
+    it('should give a draft with no colour the first palette colour', () => {
+      const draft = playerStore.addDraftPlayer({ name: 'Alice' })
+
+      expect(draft.color).toBe(playerColors[0])
+    })
+
+    it('should skip palette colours other drafts already have', () => {
+      playerStore.addDraftPlayer({ color: playerColors[0] })
+      playerStore.addDraftPlayer({ color: playerColors[2] })
+
+      expect(playerStore.addDraftPlayer().color).toBe(playerColors[1])
+      expect(playerStore.addDraftPlayer().color).toBe(playerColors[3])
+    })
+
+    it('should reuse a colour once the draft holding it is removed', () => {
+      const first = playerStore.addDraftPlayer()
+      playerStore.addDraftPlayer()
+
+      playerStore.removeDraftPlayer(first.id)
+
+      expect(playerStore.addDraftPlayer().color).toBe(playerColors[0])
+    })
+
+    it('should add no draft once every palette colour is taken', () => {
+      playerColors.forEach(() => playerStore.addDraftPlayer())
+
+      expect(playerStore.addDraftPlayer()).toBeNull()
+      expect(playerStore.draftPlayers).toHaveLength(playerColors.length)
+    })
+
+    it("should list a row's picker colours as its own, taken by another row, or free", () => {
+      // Alice's colour is stored in lower case, to show case is ignored
+      const alice = playerStore.addDraftPlayer({
+        name: 'Alice',
+        color: playerColors[0].toLowerCase()
+      })
+      const bob = playerStore.addDraftPlayer({ name: 'Bob', color: playerColors[1] })
+
+      const bobsPicker = playerStore.draftColorOptions(bob.id)
+      expect(bobsPicker.map((option) => option.color)).toEqual(playerColors)
+      // Alice's colour is taken, and by Alice
+      expect(bobsPicker[0]).toMatchObject({ isSelected: false, holder: { name: 'Alice' } })
+      // Bob's own colour is selected, not taken
+      expect(bobsPicker[1]).toMatchObject({ isSelected: true, holder: null })
+      // Nobody has the rest
+      expect(bobsPicker[2]).toMatchObject({ isSelected: false, holder: null })
+
+      // From Alice's side, her own colour is selected despite the case difference
+      expect(playerStore.draftColorOptions(alice.id)[0]).toMatchObject({
+        isSelected: true,
+        holder: null
+      })
     })
 
     it('should clear drafts on reset', () => {

@@ -4,11 +4,16 @@
  * A line of track costs the sum of the grid cells it passes through, each
  * charged once. The price depends only on the line's vertices, so it can go
  * down as well as up while a leg is being placed.
+ *
+ * Water cells are bridged instead: each water cell in a row costs more than
+ * the one before, whatever the cell's own cost.
  */
 
 import { describe, it, expect } from 'vitest'
-import { findCell, cellsAlongLine, priceLine } from '@/composables/map/trackCost'
+import { findCell, cellsAlongLine, priceLine, linePrice } from '@/composables/map/trackCost'
 import { gridConfig } from '@/config/grid'
+import { gameRules } from '@/config/game'
+import { nlcdCostMap } from '@/config/nlcd'
 import { metersToLatitudeDegrees } from '@/composables/setup/useMapSupport'
 
 /** Degrees of latitude one grid cell spans */
@@ -105,6 +110,55 @@ describe('trackCost', () => {
 
     it('should charge nothing for a line with no vertices', () => {
       expect(priceLine([], rowOfCells([100]))).toBe(0)
+    })
+  })
+
+  describe('bridges', () => {
+    const BRIDGE = gameRules.bridges.costPerCell
+
+    /**
+     * A row of cells where 'W' is a water cell (with the high cost the grid
+     * gives water) and a number is a land cell costing that much.
+     */
+    function rowWithWater(cells) {
+      return rowOfCells(cells.map((cell) => (cell === 'W' ? 10000 : cell))).map((cell, i) =>
+        cells[i] === 'W' ? { ...cell, landCover: nlcdCostMap[11] } : { ...cell, landCover: 150 }
+      )
+    }
+
+    it("should charge a bridge for a water cell instead of the cell's own cost", () => {
+      const grid = rowWithWater([100, 'W', 300])
+
+      expect(priceLine([centerOf(0), centerOf(2)], grid)).toBe(100 + BRIDGE + 300)
+    })
+
+    it('should charge more for each water cell further into a crossing', () => {
+      const grid = rowWithWater([100, 'W', 'W', 300])
+
+      expect(priceLine([centerOf(0), centerOf(3)], grid)).toBe(100 + BRIDGE + 2 * BRIDGE + 300)
+    })
+
+    it('should start each separate crossing at the first price again', () => {
+      const grid = rowWithWater([100, 'W', 200, 'W', 300])
+
+      expect(priceLine([centerOf(0), centerOf(4)], grid)).toBe(100 + BRIDGE + 200 + BRIDGE + 300)
+    })
+
+    // Following a shore can take a line back over land it has crossed already;
+    // the water either side of that land is two crossings, not one long one
+    it('should count water either side of land crossed twice as two crossings', () => {
+      const grid = rowWithWater(['W', 100, 'W'])
+
+      expect(priceLine([centerOf(1), centerOf(0), centerOf(2)], grid)).toBe(100 + BRIDGE + BRIDGE)
+    })
+
+    it('should say how much of the price is bridges', () => {
+      const grid = rowWithWater([100, 'W', 'W', 300])
+
+      expect(linePrice([centerOf(0), centerOf(3)], grid)).toEqual({
+        total: 400 + 3 * BRIDGE,
+        bridges: 3 * BRIDGE
+      })
     })
   })
 })

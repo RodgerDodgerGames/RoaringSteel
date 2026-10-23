@@ -5,6 +5,9 @@
  * line crosses is charged once, at that cell's cost — the cell the line starts
  * in included — however many of the line's legs pass through it.
  *
+ * Water is the exception: a water cell is bridged, and its price is the
+ * bridge's, which climbs with each water cell in a row (see water.js).
+ *
  * The price depends only on where the line's vertices are, never on the path
  * the cursor took to get there. Pricing used to add a cell each time the
  * cursor entered one, so wandering out and back while placing a leg kept
@@ -16,9 +19,12 @@
  */
 
 import { gridConfig } from '@/config/grid'
+import { isWaterCell, bridgeCellCost } from '@/composables/map/water'
 import {
   latitudeDegreesToMeters,
-  longitudeDegreesToMeters
+  longitudeDegreesToMeters,
+  metersToLatitudeDegrees,
+  metersToLongitudeDegrees
 } from '@/composables/setup/useMapSupport'
 
 /**
@@ -54,6 +60,19 @@ export function findCell(latlng, grid) {
     }
   })
   return closestCell
+}
+
+/**
+ * The edges of a grid cell: half a cell's width each way from its center.
+ * @param {Object} cell - Grid cell with a `centroid`
+ * @returns {{south: number, west: number, north: number, east: number}} The
+ *   cell's edges, in degrees
+ */
+export function cellBounds({ centroid: { lat, lng } }) {
+  const halfSize = gridConfig.cellSize / 2
+  const dLat = metersToLatitudeDegrees(halfSize)
+  const dLng = metersToLongitudeDegrees(halfSize, lat)
+  return { south: lat - dLat, west: lng - dLng, north: lat + dLat, east: lng + dLng }
 }
 
 /**
@@ -102,27 +121,75 @@ export function pointsAlongLine(latlngs) {
  * @returns {Array<Object>} The cells crossed
  */
 export function cellsAlongLine(latlngs, grid) {
-  const cells = new Map()
-  pointsAlongLine(latlngs).forEach((point) => {
-    const cell = findCell(point, grid)
-    if (cell && !cells.has(cell.id)) cells.set(cell.id, cell)
-  })
-  return [...cells.values()]
+  return [...new Set(cellPath(latlngs, grid))]
 }
 
 /**
- * What a line of track costs to build: the sum of the costs of the cells it
- * passes through.
+ * The grid cells a line passes through, in the order it passes through them.
+ * A cell the line comes back to later is listed again, so the path shows
+ * where the line goes in and out of water; it is only listed once for as long
+ * as the line stays in it.
+ * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
+ * @param {Array<Object>} grid - Grid cells
+ * @returns {Array<Object>} The cells, in order along the line
+ */
+export function cellPath(latlngs, grid) {
+  const path = []
+  pointsAlongLine(latlngs).forEach((point) => {
+    const cell = findCell(point, grid)
+    if (cell && cell !== path.at(-1)) path.push(cell)
+  })
+  return path
+}
+
+/**
+ * What a line of track costs to build, and how much of that is bridges.
  *
- * A cell whose cost is missing (its terrain data failed to load) adds nothing
- * rather than making the whole line unpriceable.
+ * Each land cell the line passes through adds its own cost. Each water cell
+ * adds a bridge instead, priced by how far into its crossing it is: the line
+ * is followed cell by cell (see `cellPath`), and the water cells it passes
+ * through between one land cell and the next are one crossing.
  *
+ * A land cell whose cost is missing (its terrain data failed to load) adds
+ * nothing rather than making the whole line unpriceable.
+ *
+ * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
+ * @param {Array<Object>} grid - Grid cells
+ * @returns {{total: number, bridges: number}} The price, and the part of it
+ *   that is bridges
+ */
+export function linePrice(latlngs, grid) {
+  let total = 0
+  let bridges = 0
+  // Cells already paid for: each is charged once, however often it is crossed
+  const charged = new Set()
+  // The water cells of the crossing the line is on, if it is on one
+  const crossing = new Set()
+
+  cellPath(latlngs, grid).forEach((cell) => {
+    if (!isWaterCell(cell)) {
+      crossing.clear()
+      if (!charged.has(cell) && Number.isFinite(cell.cost)) total += cell.cost
+      charged.add(cell)
+      return
+    }
+    crossing.add(cell)
+    if (charged.has(cell)) return
+    charged.add(cell)
+    // Priced by how far into its crossing the cell is
+    const bridge = bridgeCellCost(crossing.size)
+    bridges += bridge
+    total += bridge
+  })
+  return { total, bridges }
+}
+
+/**
+ * What a line of track costs to build (see `linePrice`).
  * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
  * @param {Array<Object>} grid - Grid cells
  * @returns {number} The price
  */
 export function priceLine(latlngs, grid) {
-  return cellsAlongLine(latlngs, grid)
-    .filter((cell) => Number.isFinite(cell.cost))
-    .reduce((total, cell) => total + cell.cost, 0)
+  return linePrice(latlngs, grid).total
 }

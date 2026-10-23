@@ -30,6 +30,7 @@ import {
   TIES_STYLE
 } from '@/composables/map/trackStyles'
 import { PIN_COLORS } from '@/config/demands'
+import { MAX_BRIDGE_KM } from '@/composables/map/water'
 
 const { towns } = storeToRefs(useTownsStore())
 const playerStore = usePlayerStore()
@@ -108,6 +109,12 @@ const commodities = computed(() => legendCommodities(towns.value))
 
       <h3 class="map-legend__heading">On the map</h3>
       <ul>
+        <li class="map-legend__row">
+          <span class="map-legend__symbol">
+            <span class="map-legend__water"></span>
+          </span>
+          Water: bridged at extra cost, up to {{ MAX_BRIDGE_KM }} km
+        </li>
         <li class="map-legend__row">
           <!-- A short piece of track, drawn the way the map draws it: a dark
                casing and ties under a rail in the builder's color -->
@@ -252,6 +259,14 @@ const commodities = computed(() => legendCommodities(towns.value))
 
 .map-legend__halo {
   border-radius: 50%;
+}
+
+/* A water square, shaded as the map shades one (see waterMask.js) */
+.map-legend__water {
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(31, 111, 178, 0.6);
+  background: rgba(31, 111, 178, 0.3);
 }
 
 /* Drawn as the map draws them: white on a dark rounded square */

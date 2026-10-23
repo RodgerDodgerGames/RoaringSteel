@@ -10,8 +10,17 @@ import { useMapStore } from '@/stores/map'
 import { usePlayerStore } from '@/stores/players'
 import { useTrackStore } from '@/stores/track'
 import { useGameStore } from '@/stores/game'
+import { useTownsStore } from '@/stores/towns'
 import { priceLine } from '@/composables/map/trackCost'
+import { lineBlock, blockMessage, townCells } from '@/composables/map/buildRules'
+import { regionTest } from '@/composables/map/region'
 import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
+import {
+  UNOWNED_TRACK_COLOR,
+  RAIL_STYLE,
+  CASING_STYLE,
+  TIES_STYLE
+} from '@/composables/map/trackStyles'
 
 /**
  * Injection key for the one build-track instance a game view runs.
@@ -73,8 +82,19 @@ export default function useBuildTrack(grid, formatCurrency) {
   // completed track is game state, not a map layer, so it lives in its own store
   const trackStore = useTrackStore()
   const gameStore = useGameStore()
+  const townsStore = useTownsStore()
 
   // ================== COMPUTED PROPERTIES ==================
+
+  /**
+   * What every line is checked against before it is built (see buildRules.js):
+   * the region being played, and the cells the towns sit in. Kept as one
+   * computed so both are worked out once, not on every move of the cursor.
+   */
+  const buildRules = computed(() => ({
+    isInRegion: regionTest(gameStore.region),
+    townCells: townCells(townsStore.towns, grid.value ?? [])
+  }))
 
   /**
    * Whether the active player has track they may still tear up.
@@ -442,6 +462,22 @@ export default function useBuildTrack(grid, formatCurrency) {
           addHintMarkerMoveHandler() // Add movement handler for cost tooltip
         }
       } else {
+        // A leg that breaks a build rule is taken straight back off, so the
+        // line never holds track that could not be built; the player is told
+        // why, and carries on from the vertex before
+        const message = whyNotBuildable(workingLayer.value.getLatLngs().slice(-2))
+        if (message) {
+          const drawing = mapStore.map.pm.Draw.Line
+          drawing._removeLastVertex()
+          // Geoman puts its own "click to finish" text back on the cursor as it
+          // takes the vertex off; the reason is what the player needs there
+          drawing._hintMarker?.setTooltipContent(message)
+          repriceLine()
+          buildError.value = message
+          return
+        }
+        buildError.value = ''
+
         // Priced here from the vertex itself, not left to the cursor handler:
         // that one is debounced, so it can still be a step behind the click
         repriceLine()
@@ -463,6 +499,15 @@ export default function useBuildTrack(grid, formatCurrency) {
   function finalizeDrawing(e) {
     mapStore.setIsDrawingActive(false)
     if (e.layer?.pm?._shape === 'Line') {
+      // Checked again as a whole, however the drawing ended: each leg was
+      // checked as it was placed, but a finished line is what gets built
+      const blocked = whyNotBuildable(e.layer.getLatLngs())
+      if (blocked) {
+        discardDrawnLayer(e.layer)
+        buildError.value = `${blocked} That section was not built.`
+        return
+      }
+
       // Priced from the finished line itself, by the same rule as the live
       // cost, so the charge matches what was shown however the drawing ended
       // (town, double-click or the Finish tooltip)
@@ -735,8 +780,31 @@ export default function useBuildTrack(grid, formatCurrency) {
     // or even after the next one began. Geoman gives every drawing a fresh
     // hint marker, so a call from any marker but the current one is stale.
     if (!workingLayer.value || hintMarker !== costedHintMarker.value) return
-    const legCost = repriceLine(latlng)
-    hintMarker.setTooltipContent(`Cost: ${formatCurrency(legCost)}`)
+
+    // A leg that could not be built says so instead of giving a price, and the
+    // dashed line out to the cursor turns red. Its cost is left out of the
+    // line's running total: counted, it could push the total over budget, and
+    // the panel would blame money for a leg the border rules out.
+    const message = whyNotBuildable([workingLayer.value.getLatLngs().at(-1), latlng])
+    const legCost = repriceLine(message ? undefined : latlng)
+    hintMarker.setTooltipContent(message ?? `Cost: ${formatCurrency(legCost)}`)
+    const hintLine = mapStore.map.pm.Draw.Line._hintline
+    hintLine?.setStyle({
+      color: message
+        ? BLOCKED_LEG_COLOR
+        : drawingLineStyles(playerStore.activePlayer?.id).hintlineStyle.color
+    })
+  }
+
+  /**
+   * Why a line, or a leg of one, may not be built, in words for the player;
+   * null if it may.
+   * @param {Array<Object>} latlngs - The line's vertices
+   * @returns {string|null} The reason, or null
+   */
+  function whyNotBuildable(latlngs) {
+    const block = lineBlock(latlngs, buildRules.value)
+    return block && blockMessage(block, gameStore.region?.properties?.NAME)
   }
 
   // ================== UTILITY FUNCTIONS ==================
@@ -826,20 +894,14 @@ export default function useBuildTrack(grid, formatCurrency) {
    */
   const DRAWING_LINE_STYLE = { weight: 4, opacity: 0.9 }
 
+  /**
+   * The color the leg out to the cursor turns while it could not be built.
+   * Bulma's danger red, darker than the red a player can pick.
+   */
+  const BLOCKED_LEG_COLOR = '#cc0f35'
+
   /** Leaflet's own line blue, for a line drawn by a player with no color */
   const UNOWNED_DRAWING_COLOR = '#3388ff'
-
-  /**
-   * What finished track is drawn in when its owner has no color (a damaged
-   * save): plain black, the way all track looked before it was colored.
-   */
-  const UNOWNED_TRACK_COLOR = 'black'
-
-  /**
-   * The dark gray that frames every player's track, so the paler player
-   * colors (yellow, lime) still stand out against the light map.
-   */
-  const TRACK_EDGE_COLOR = '#222'
 
   /**
    * The Leaflet panes finished track is drawn in, one per piece, lowest first.
@@ -861,47 +923,6 @@ export default function useBuildTrack(grid, formatCurrency) {
     { name: 'trackRails', zIndex: 430 }
   ]
   const [CASING_PANE, TIES_PANE, RAILS_PANE] = TRACK_PANES.map((pane) => pane.name)
-
-  /**
-   * The rail: a line in the owner's color running down the middle of the
-   * track. Round caps and joins keep bends smooth and close the gap where
-   * two sections meet end to end.
-   */
-  const RAIL_STYLE = { weight: 4, opacity: 1, lineCap: 'round', lineJoin: 'round' }
-
-  /**
-   * The casing: a dark line under the rail, wider than it, so the rail has a
-   * thin dark edge on both sides.
-   *
-   * The casing and ties are kept out of Geoman's snapping (`snapIgnore`):
-   * they follow the rail's route exactly, so they would only add duplicate
-   * snap targets for Geoman to check on every move of the cursor.
-   */
-  const CASING_STYLE = {
-    color: TRACK_EDGE_COLOR,
-    weight: 7,
-    opacity: 1,
-    lineCap: 'round',
-    lineJoin: 'round',
-    snapIgnore: true
-  }
-
-  /**
-   * The ties: a wide line drawn as short dashes. Each 2px dash crosses the
-   * rail like a tie, with an 8px gap to the next, so ties fall every 10px.
-   * Butt caps keep the dashes square; round ones would make them blobs. A
-   * bevel join does the same at bends: Leaflet's default round join turns a
-   * tie that lands on a corner into a dark blob as wide as the tie line.
-   */
-  const TIES_STYLE = {
-    color: TRACK_EDGE_COLOR,
-    weight: 13,
-    opacity: 1,
-    dashArray: '2, 8',
-    lineCap: 'butt',
-    lineJoin: 'bevel',
-    snapIgnore: true
-  }
 
   /**
    * Creates the panes finished track is drawn in, if this map does not have

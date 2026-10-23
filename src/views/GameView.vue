@@ -31,6 +31,7 @@ import { storeToRefs } from 'pinia'
 import GameTopBar from '@/components/GameTopBar.vue'
 import MainMap from '@/components/map/MainMap.vue'
 import MapModeHint from '@/components/map/MapModeHint.vue'
+import MapLegend from '@/components/map/MapLegend.vue'
 import PlayerDock from '@/components/panel/PlayerDock.vue'
 import DemandStrip from '@/components/demands/DemandStrip.vue'
 
@@ -72,6 +73,8 @@ onBeforeUnmount(() => document.documentElement.classList.remove(PAGE_CLASS))
         <MainMap />
         <!-- Says which mode the map is in while drawing or removing track -->
         <MapModeHint :is-drawing="isDrawingActive" :is-removing="isRemoving" />
+        <!-- What the towns, track and icons on the map mean -->
+        <MapLegend />
       </div>
       <DemandStrip />
     </main>

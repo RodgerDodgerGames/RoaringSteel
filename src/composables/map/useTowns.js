@@ -87,7 +87,7 @@ const HALO_RING = 3
  * @param {Array<string>} colors - The marked lines' colors, at least one
  * @returns {string} A box-shadow value
  */
-function haloShadow(colors) {
+export function haloShadow(colors) {
   const rings = colors.map((color, i) => `0 0 0 ${HALO_RIM + HALO_RING * (i + 1)}px ${color}`)
   const outer = HALO_RIM + HALO_RING * colors.length
   return [`0 0 0 ${HALO_RIM}px #fff`, ...rings, `0 0 8px ${outer}px ${colors.at(-1)}`].join(', ')

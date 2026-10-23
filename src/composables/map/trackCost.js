@@ -80,6 +80,20 @@ function pointsAlongLeg(from, to) {
 }
 
 /**
+ * The points a line is checked at, a quarter of a cell apart along each leg,
+ * every vertex included. Pricing and the build rules both look at the line
+ * through these, so they always agree on where it goes.
+ * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
+ * @returns {Array<{lat: number, lng: number}>} The points, in order
+ */
+export function pointsAlongLine(latlngs) {
+  // A single vertex is a line that has only just started: it sits in one cell
+  return latlngs.length === 1
+    ? [latlngs[0]]
+    : latlngs.slice(1).flatMap((to, i) => pointsAlongLeg(latlngs[i], to))
+}
+
+/**
  * Every grid cell a line passes through, each listed once, in the order the
  * line reaches them. The line is checked at points a quarter of a cell apart,
  * so a cell whose corner it clips by less than that may be left out.
@@ -88,14 +102,8 @@ function pointsAlongLeg(from, to) {
  * @returns {Array<Object>} The cells crossed
  */
 export function cellsAlongLine(latlngs, grid) {
-  // A single vertex is a line that has only just started: it sits in one cell
-  const points =
-    latlngs.length === 1
-      ? [latlngs[0]]
-      : latlngs.slice(1).flatMap((to, i) => pointsAlongLeg(latlngs[i], to))
-
   const cells = new Map()
-  points.forEach((point) => {
+  pointsAlongLine(latlngs).forEach((point) => {
     const cell = findCell(point, grid)
     if (cell && !cells.has(cell.id)) cells.set(cell.id, cell)
   })

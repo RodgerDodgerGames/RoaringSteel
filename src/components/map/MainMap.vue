@@ -3,6 +3,7 @@
 
   The primary game map component built on Leaflet. Displays:
   - Stamen terrain background tiles
+  - Everything outside the region being played grayed out (regionMask.js)
   - Town markers with size-based icons
   - Each town's commodity icons, in the Plan view
   - Interactive popups for town information
@@ -31,6 +32,7 @@ import { useTowns } from '@/composables/map/useTowns'
 import { useMapView } from '@/composables/map/useMapView'
 import { useTownsStore } from '@/stores/towns'
 import { useMapStore } from '@/stores/map'
+import { useRegionMask } from '@/composables/map/regionMask'
 
 const townsStore = useTownsStore()
 const mapStore = useMapStore()
@@ -41,6 +43,7 @@ const { map } = storeToRefs(mapStore)
 const mapContainer = ref(null)
 const { addTownsToMap, townsLayer } = useTowns()
 const mapView = useMapView()
+const regionMask = useRegionMask()
 
 onMounted(() => {
   // No starting view: useMapView gives the map its view below
@@ -66,6 +69,8 @@ onMounted(() => {
   mapView.attach(map.value)
 
   if (map.value) {
+    // The edge of the board: track may not be built in the gray
+    regionMask.attach(map.value)
     // add towns to map
     addTownsToMap(map, towns)
     // add townsLayer to store

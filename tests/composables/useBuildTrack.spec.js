@@ -16,6 +16,9 @@
  * either switches the map to it, and switching to the Plan view ends them.
  *
  * Pricing: a line costs the grid cells it crosses, followed live as it is drawn.
+ *
+ * The region: track stays inside the state being played. A leg placed outside
+ * it is taken back, and a finished line that leaves it is not built.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -27,6 +30,7 @@ import { useMapStore } from '@/stores/map'
 import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 import { usePlayerStore } from '@/stores/players'
 import { useTrackStore } from '@/stores/track'
+import { useGameStore } from '@/stores/game'
 import { formatCurrency } from '@/composables/utils'
 import { gridConfig } from '@/config/grid'
 import { metersToLatitudeDegrees } from '@/composables/setup/useMapSupport'
@@ -499,6 +503,117 @@ describe('useBuildTrack', () => {
       map.fire('pm:create', { layer: line })
 
       expect(trackStore.segments[0].cost).toBe(600)
+    })
+  })
+
+  describe('keeping track inside the region', () => {
+    /** Degrees one grid cell spans along the equator */
+    const CELL = metersToLatitudeDegrees(gridConfig.cellSize)
+    /** A row of five cells along the equator, each costing 100 */
+    const rowGrid = [0, 1, 2, 3, 4].map((i) => ({
+      id: `0-${i}`,
+      centroid: { lat: 0, lng: (i + 0.5) * CELL },
+      cost: 100
+    }))
+    const centerOf = (i) => L.latLng(0, (i + 0.5) * CELL)
+    /** A region covering the first three cells of the row, and not the last two */
+    const region = {
+      type: 'Feature',
+      properties: { NAME: 'Testland' },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [0, -CELL],
+            [3 * CELL, -CELL],
+            [3 * CELL, CELL],
+            [0, CELL],
+            [0, -CELL]
+          ]
+        ]
+      }
+    }
+
+    /**
+     * Starts a line at a town in the first cell, as Geoman does, with Geoman's
+     * undo for the last vertex standing by.
+     * @returns {Object} The API, the line being drawn and the cursor's marker
+     */
+    function startLineAtTown() {
+      useGameStore().setRegion(region)
+      const hintMarker = L.marker(centerOf(0)).bindTooltip('')
+      const workingLayer = L.polyline([])
+      map.pm.Draw.Line._hintMarker = hintMarker
+      map.pm.Draw.Line._removeLastVertex = vi.fn(() =>
+        workingLayer.setLatLngs(workingLayer.getLatLngs().slice(0, -1))
+      )
+      const { api } = mountBuildTrack(map, L.layerGroup([L.marker(centerOf(0))]), rowGrid)
+      api.startDrawingLine()
+
+      map.fire('pm:drawstart', { workingLayer })
+      placeVertex(workingLayer, centerOf(0))
+      return { api, workingLayer, hintMarker }
+    }
+
+    /** Places a vertex on the line, as Geoman does on a click */
+    function placeVertex(workingLayer, latlng) {
+      workingLayer.addLatLng(latlng)
+      workingLayer.fire('pm:vertexadded', { latlng })
+    }
+
+    beforeEach(() => vi.useFakeTimers())
+    afterEach(() => vi.useRealTimers())
+
+    it('should keep a vertex placed inside the region', () => {
+      const { api, workingLayer } = startLineAtTown()
+
+      placeVertex(workingLayer, centerOf(2))
+
+      expect(workingLayer.getLatLngs()).toHaveLength(2)
+      expect(api.buildError.value).toBe('')
+    })
+
+    it('should take back a vertex placed outside the region, and say why', () => {
+      const { api, workingLayer } = startLineAtTown()
+
+      placeVertex(workingLayer, centerOf(4))
+
+      expect(workingLayer.getLatLngs()).toHaveLength(1)
+      expect(api.buildError.value).toBe("Track can't go outside Testland.")
+      // Priced as the line now stands, without the leg taken back
+      expect(api.pendingCost.value).toBe(100)
+    })
+
+    it('should say so on the cursor instead of a price while the leg leaves the region', () => {
+      const { hintMarker } = startLineAtTown()
+
+      hintMarker.setLatLng(centerOf(4))
+      vi.advanceTimersByTime(200)
+
+      expect(hintMarker.getTooltip().getContent()).toBe("Track can't go outside Testland.")
+    })
+
+    it('should not build or charge for a finished line that leaves the region', () => {
+      const { api } = startLineAtTown()
+      const cashBefore = playerStore.activePlayer.cash
+
+      const line = L.polyline([centerOf(0), centerOf(4)])
+      line.pm = { _shape: 'Line' }
+      map.fire('pm:create', { layer: line })
+
+      expect(trackStore.segments).toHaveLength(0)
+      expect(playerStore.activePlayer.cash).toBe(cashBefore)
+      expect(api.buildError.value).toMatch(/outside Testland/)
+    })
+
+    it('should build a finished line that stays inside the region', () => {
+      startLineAtTown()
+
+      const line = L.polyline([centerOf(0), centerOf(2)])
+      line.pm = { _shape: 'Line' }
+      map.fire('pm:create', { layer: line })
+
+      expect(trackStore.segments).toHaveLength(1)
     })
   })
 

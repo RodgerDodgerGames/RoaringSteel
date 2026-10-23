@@ -11,7 +11,7 @@ import { usePlayerStore } from '@/stores/players'
 import { useTrackStore } from '@/stores/track'
 import { useGameStore } from '@/stores/game'
 import { useTownsStore } from '@/stores/towns'
-import { priceLine } from '@/composables/map/trackCost'
+import { priceLine, linePrice } from '@/composables/map/trackCost'
 import { lineBlock, blockMessage, townCells } from '@/composables/map/buildRules'
 import { regionTest } from '@/composables/map/region'
 import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
@@ -88,10 +88,12 @@ export default function useBuildTrack(grid, formatCurrency) {
 
   /**
    * What every line is checked against before it is built (see buildRules.js):
-   * the region being played, and the cells the towns sit in. Kept as one
-   * computed so both are worked out once, not on every move of the cursor.
+   * the grid, the region being played, and the cells the towns sit in. Kept
+   * as one computed so these are worked out once, not on every move of the
+   * cursor.
    */
   const buildRules = computed(() => ({
+    grid: grid.value ?? [],
     isInRegion: regionTest(gameStore.region),
     townCells: townCells(townsStore.towns, grid.value ?? [])
   }))
@@ -759,14 +761,16 @@ export default function useBuildTrack(grid, formatCurrency) {
    * be left describing an older shape of the line.
    *
    * @param {Object} [cursorLatLng] - Where the cursor is, if the leg to it counts
-   * @returns {number} What the leg to the cursor adds: the line's price with it
-   *   minus the price without, so a cell already paid for is not shown again
+   * @returns {{cost: number, bridges: number}} What the leg to the cursor adds,
+   *   and how much of that is bridges: the line's price with the leg minus
+   *   the price without, so a cell already paid for is not shown again
    */
   function repriceLine(cursorLatLng) {
     const placed = workingLayer.value.getLatLngs()
-    const placedCost = priceLine(placed, grid.value)
-    pendingCost.value = cursorLatLng ? priceLine([...placed, cursorLatLng], grid.value) : placedCost
-    return pendingCost.value - placedCost
+    const without = linePrice(placed, grid.value)
+    const withLeg = cursorLatLng ? linePrice([...placed, cursorLatLng], grid.value) : without
+    pendingCost.value = withLeg.total
+    return { cost: withLeg.total - without.total, bridges: withLeg.bridges - without.bridges }
   }
 
   /**
@@ -786,14 +790,25 @@ export default function useBuildTrack(grid, formatCurrency) {
     // line's running total: counted, it could push the total over budget, and
     // the panel would blame money for a leg the border rules out.
     const message = whyNotBuildable([workingLayer.value.getLatLngs().at(-1), latlng])
-    const legCost = repriceLine(message ? undefined : latlng)
-    hintMarker.setTooltipContent(message ?? `Cost: ${formatCurrency(legCost)}`)
+    const leg = repriceLine(message ? undefined : latlng)
+    hintMarker.setTooltipContent(message ?? legTooltip(leg))
     const hintLine = mapStore.map.pm.Draw.Line._hintline
     hintLine?.setStyle({
       color: message
         ? BLOCKED_LEG_COLOR
         : drawingLineStyles(playerStore.activePlayer?.id).hintlineStyle.color
     })
+  }
+
+  /**
+   * The cursor's tooltip for a leg that can be built: its cost, and how much
+   * of that is bridges when it crosses water, so a costly leg says why.
+   * @param {{cost: number, bridges: number}} leg - From `repriceLine`
+   * @returns {string} The tooltip's text
+   */
+  function legTooltip({ cost, bridges }) {
+    const price = `Cost: ${formatCurrency(cost)}`
+    return bridges > 0 ? `${price} (bridge ${formatCurrency(bridges)})` : price
   }
 
   /**

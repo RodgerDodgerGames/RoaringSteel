@@ -19,6 +19,9 @@
  *
  * The region: track stays inside the state being played. A leg placed outside
  * it is taken back, and a finished line that leaves it is not built.
+ *
+ * Water: track crosses it on a bridge, whose cost the cursor shows, and a
+ * crossing too long to bridge is refused like a leg out of the region.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -34,6 +37,8 @@ import { useGameStore } from '@/stores/game'
 import { formatCurrency } from '@/composables/utils'
 import { gridConfig } from '@/config/grid'
 import { metersToLatitudeDegrees } from '@/composables/setup/useMapSupport'
+import { gameRules } from '@/config/game'
+import { nlcdCostMap } from '@/config/nlcd'
 
 /**
  * A stand-in for the Leaflet map, with just enough surface for the
@@ -614,6 +619,60 @@ describe('useBuildTrack', () => {
       map.fire('pm:create', { layer: line })
 
       expect(trackStore.segments).toHaveLength(1)
+    })
+  })
+
+  describe('bridging water', () => {
+    const CELL = metersToLatitudeDegrees(gridConfig.cellSize)
+    const centerOf = (i) => L.latLng(0, (i + 0.5) * CELL)
+    /** Land, then more water cells in a row than a bridge may cross, then land */
+    const span = gameRules.bridges.maxCells + 1
+    const grid = Array.from({ length: span + 2 }, (_, i) => {
+      const isWater = i > 0 && i <= span
+      return {
+        id: `0-${i}`,
+        centroid: { lat: 0, lng: (i + 0.5) * CELL },
+        landCover: isWater ? nlcdCostMap[11] : 150,
+        cost: isWater ? 10000 : 100
+      }
+    })
+
+    function startLineAtTown() {
+      const hintMarker = L.marker(centerOf(0)).bindTooltip('')
+      const workingLayer = L.polyline([])
+      map.pm.Draw.Line._hintMarker = hintMarker
+      map.pm.Draw.Line._removeLastVertex = vi.fn(() =>
+        workingLayer.setLatLngs(workingLayer.getLatLngs().slice(0, -1))
+      )
+      const { api } = mountBuildTrack(map, L.layerGroup([L.marker(centerOf(0))]), grid)
+      api.startDrawingLine()
+      map.fire('pm:drawstart', { workingLayer })
+      workingLayer.addLatLng(centerOf(0))
+      workingLayer.fire('pm:vertexadded', { latlng: centerOf(0) })
+      return { api, workingLayer, hintMarker }
+    }
+
+    beforeEach(() => vi.useFakeTimers())
+    afterEach(() => vi.useRealTimers())
+
+    it("should show how much of a leg's cost is a bridge", () => {
+      const { hintMarker } = startLineAtTown()
+
+      hintMarker.setLatLng(centerOf(1))
+      vi.advanceTimersByTime(200)
+
+      const bridge = formatCurrency(gameRules.bridges.costPerCell)
+      expect(hintMarker.getTooltip().getContent()).toBe(`Cost: ${bridge} (bridge ${bridge})`)
+    })
+
+    it('should take back a leg that crosses more water than a bridge can', () => {
+      const { api, workingLayer } = startLineAtTown()
+
+      workingLayer.addLatLng(centerOf(span + 1))
+      workingLayer.fire('pm:vertexadded', { latlng: centerOf(span + 1) })
+
+      expect(workingLayer.getLatLngs()).toHaveLength(1)
+      expect(api.buildError.value).toMatch(/Too much water to bridge/)
     })
   })
 

@@ -4,12 +4,17 @@
  * Track stays inside the region being played, except into the grid cell a
  * town sits in, which may reach over the region's edge. A line breaking the
  * rule anywhere along it is refused, not just at its corners.
+ *
+ * Water may be bridged, but only so far: a crossing longer than the longest
+ * bridge allowed is refused.
  */
 
 import { describe, it, expect } from 'vitest'
 import { townCells, lineBlock, blockMessage } from '@/composables/map/buildRules'
 import { regionTest } from '@/composables/map/region'
 import { gridConfig } from '@/config/grid'
+import { gameRules } from '@/config/game'
+import { nlcdCostMap } from '@/config/nlcd'
 import { metersToLatitudeDegrees } from '@/composables/setup/useMapSupport'
 
 /** Degrees one grid cell spans along the equator, where these tests are set */
@@ -42,7 +47,7 @@ const grid = Array.from({ length: 8 }, (_, i) => ({
 /** The point in the middle of cell `i`, or `along` cells east of its west edge */
 const at = (i, along = 0.5) => ({ lat: CELL / 2, lng: (i + along) * CELL })
 
-const rules = { isInRegion: regionTest(islands), townCells: [] }
+const rules = { grid, isInRegion: regionTest(islands), townCells: [] }
 
 describe('townCells', () => {
   it('should give the cell each town sits in', () => {
@@ -89,7 +94,48 @@ describe('lineBlock', () => {
   })
 })
 
+describe('lineBlock over water', () => {
+  /** A region the whole row long, so only the water is in the way */
+  const longRegion = {
+    type: 'Feature',
+    geometry: { type: 'Polygon', coordinates: square(0, 8) }
+  }
+
+  /** The row of cells, with the cells listed made water */
+  const gridWithWater = (waterCells) =>
+    grid.map((cell, i) => ({
+      ...cell,
+      landCover: waterCells.includes(i) ? nlcdCostMap[11] : 150
+    }))
+
+  const rulesWith = (waterCells) => ({
+    grid: gridWithWater(waterCells),
+    isInRegion: regionTest(longRegion),
+    townCells: []
+  })
+
+  it('should let a line bridge as many water cells in a row as allowed', () => {
+    const water = Array.from({ length: gameRules.bridges.maxCells }, (_, i) => i + 1)
+
+    expect(lineBlock([at(0), at(water.length + 1)], rulesWith(water))).toBeNull()
+  })
+
+  it('should refuse a crossing longer than the longest bridge', () => {
+    const water = Array.from({ length: gameRules.bridges.maxCells + 1 }, (_, i) => i + 1)
+
+    expect(lineBlock([at(0), at(water.length + 1)], rulesWith(water))).toEqual({ reason: 'water' })
+  })
+
+  it('should let a line make several short crossings with land between', () => {
+    expect(lineBlock([at(0), at(6)], rulesWith([1, 2, 4, 5]))).toBeNull()
+  })
+})
+
 describe('blockMessage', () => {
+  it('should say how far a bridge can go', () => {
+    expect(blockMessage({ reason: 'water' })).toMatch(/water/)
+  })
+
   it('should name the region a line was kept inside', () => {
     expect(blockMessage({ reason: 'outside' }, 'Maryland')).toBe("Track can't go outside Maryland.")
   })

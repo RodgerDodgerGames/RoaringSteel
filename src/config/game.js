@@ -47,5 +47,22 @@ export const gameRules = {
   bridges: {
     costPerCell: 5000,
     maxCells: 2
+  },
+
+  /**
+   * How track may meet track already built. As in Empire Builder, where lines
+   * may cross at a milepost but never share the way between two, new track
+   * may cross built track but not run alongside it.
+   *
+   * New track is "beside" built track wherever it is within `nearKm` of it —
+   * half a grid cell, the width of the band a line runs down the middle
+   * of. It may be beside built track for at most `maxBesideKm` at a stretch. Crossing
+   * square on takes about 10 km of that (5 km each side); the stretch grows
+   * as the angle flattens, so 20 km lets a line cross at anything steeper
+   * than about 30°, and stops it running along, or weaving along, a line.
+   */
+  trackSpacing: {
+    nearKm: 5,
+    maxBesideKm: 20
   }
 }

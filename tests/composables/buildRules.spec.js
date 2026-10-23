@@ -7,10 +7,14 @@
  *
  * Water may be bridged, but only so far: a crossing longer than the longest
  * bridge allowed is refused.
+ *
+ * Track may cross track already built, but not run alongside it: a line may
+ * come close to built track only for the short stretch a crossing takes,
+ * except inside the cells towns sit in.
  */
 
 import { describe, it, expect } from 'vitest'
-import { townCells, lineBlock, blockMessage } from '@/composables/map/buildRules'
+import { townCells, builtLegs, lineBlock, blockMessage } from '@/composables/map/buildRules'
 import { regionTest } from '@/composables/map/region'
 import { gridConfig } from '@/config/grid'
 import { gameRules } from '@/config/game'
@@ -46,6 +50,9 @@ const grid = Array.from({ length: 8 }, (_, i) => ({
 
 /** The point in the middle of cell `i`, or `along` cells east of its west edge */
 const at = (i, along = 0.5) => ({ lat: CELL / 2, lng: (i + along) * CELL })
+
+/** A point `x` cells east and `y` cells north of where the row starts */
+const pt = (x, y) => ({ lat: y * CELL, lng: x * CELL })
 
 const rules = { grid, isInRegion: regionTest(islands), townCells: [] }
 
@@ -162,6 +169,93 @@ describe('lineBlock over water', () => {
     expect(
       lineBlock([at(0), at(1)], { ...rules, townCells: [rules.grid[1]] }, { isFinished: true })
     ).toBeNull()
+  })
+})
+
+describe('lineBlock beside track already built', () => {
+  /** A region far bigger than any line here, so only the track is in the way */
+  const everywhere = () => true
+
+  /** Bo's track: one straight line 8 cells (80 km) east along the equator */
+  const bosTrack = [{ coordinates: [pt(0, 0), pt(8, 0)] }]
+
+  const rules = (towns = []) => ({
+    grid,
+    isInRegion: everywhere,
+    townCells: towns,
+    builtLegs: builtLegs(bosTrack)
+  })
+
+  it('should let a line cross it square on', () => {
+    expect(lineBlock([pt(4, -3), pt(4, 3)], rules())).toBeNull()
+  })
+
+  it('should let a line cross it at an angle', () => {
+    expect(lineBlock([pt(1, -3), pt(7, 3)], rules())).toBeNull()
+  })
+
+  it('should refuse a crossing so shallow it runs beside the track for long', () => {
+    expect(lineBlock([pt(0, -0.5), pt(8, 0.5)], rules())).toEqual({ reason: 'alongside' })
+  })
+
+  it('should refuse a line running alongside it, close by', () => {
+    expect(lineBlock([pt(1, 0.2), pt(6, 0.2)], rules())).toEqual({ reason: 'alongside' })
+  })
+
+  it('should let a line run alongside it a cell away', () => {
+    expect(lineBlock([pt(1, 1), pt(6, 1)], rules())).toBeNull()
+  })
+
+  it('should refuse a line weaving back and forth across it', () => {
+    const zigzag = [0, 1, 2, 3, 4, 5, 6].map((x) => pt(x, x % 2 ? 0.3 : -0.3))
+
+    expect(lineBlock(zigzag, rules())).toEqual({ reason: 'alongside' })
+  })
+
+  it('should let a line carry on from its end', () => {
+    expect(lineBlock([pt(8, 0), pt(12, 0)], rules())).toBeNull()
+  })
+
+  it('should refuse a line that sets off back along it from its end', () => {
+    expect(lineBlock([pt(8, 0), pt(4, 0)], rules())).toEqual({ reason: 'alongside' })
+  })
+
+  it('should refuse a line that doubles back along itself', () => {
+    // Out 4 cells north of Bo's track, then back again 1 km beside itself
+    const line = [pt(1, 2), pt(5, 2), pt(1, 2.1)]
+
+    expect(lineBlock(line, rules())).toEqual({ reason: 'alongside' })
+  })
+
+  it('should let a line bend sharply', () => {
+    const line = [pt(1, 2), pt(5, 2), pt(1, 5)]
+
+    expect(lineBlock(line, rules())).toBeNull()
+  })
+
+  it("should not count the stretch inside a town's cell", () => {
+    // Out of a town along Bo's track for 24 km: 19 of them past the town's
+    // cell, which is within the limit
+    const town = { id: 'town', centroid: pt(0, 0) }
+    const line = [pt(0, 0.1), pt(2.4, 0.1)]
+
+    expect(lineBlock(line, rules())).toEqual({ reason: 'alongside' })
+    expect(lineBlock(line, rules([town]))).toBeNull()
+  })
+})
+
+describe('builtLegs', () => {
+  it('should give every straight leg of every built section', () => {
+    const segments = [
+      { coordinates: [pt(0, 0), pt(1, 0), pt(2, 0)] },
+      { coordinates: [pt(5, 0), pt(6, 0)] }
+    ]
+
+    expect(builtLegs(segments)).toEqual([
+      [pt(0, 0), pt(1, 0)],
+      [pt(1, 0), pt(2, 0)],
+      [pt(5, 0), pt(6, 0)]
+    ])
   })
 })
 

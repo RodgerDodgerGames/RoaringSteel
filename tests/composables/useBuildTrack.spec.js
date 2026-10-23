@@ -22,6 +22,8 @@
  *
  * Water: track crosses it on a bridge, whose cost the cursor shows, and a
  * crossing too long to bridge is refused like a leg out of the region.
+ *
+ * Track already built: a new line may cross it but not run alongside it.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -698,6 +700,49 @@ describe('useBuildTrack', () => {
 
       expect(workingLayer.getLatLngs()).toHaveLength(1)
       expect(api.buildError.value).toMatch(/Too much water to bridge/)
+    })
+  })
+
+  describe('beside track already built', () => {
+    const CELL = metersToLatitudeDegrees(gridConfig.cellSize)
+    /** A three-by-five block of cells north of the equator, each costing 100 */
+    const grid = [0, 1, 2].flatMap((row) =>
+      [0, 1, 2, 3, 4].map((col) => ({
+        id: `${row}-${col}`,
+        centroid: { lat: (row + 0.5) * CELL, lng: (col + 0.5) * CELL },
+        cost: 100
+      }))
+    )
+    const centerOf = (row, col) => L.latLng((row + 0.5) * CELL, (col + 0.5) * CELL)
+
+    /** Finishes a line along the given cell centers, as Geoman hands it over */
+    function finishLine(...centers) {
+      const line = L.polyline(centers)
+      line.pm = { _shape: 'Line' }
+      map.fire('pm:create', { layer: line })
+    }
+
+    beforeEach(() => {
+      // Bo's line along the middle row, built on an earlier turn
+      trackStore.addSegment({
+        ownerId: 2,
+        coordinates: [centerOf(1, 0), centerOf(1, 4)],
+        cost: 500,
+        turn: 0
+      })
+      mountBuildTrack(map, L.layerGroup(), grid)
+    })
+
+    it('should build a line that crosses it', () => {
+      finishLine(centerOf(0, 2), centerOf(2, 2))
+
+      expect(trackStore.segments).toHaveLength(2)
+    })
+
+    it('should not build a line that runs alongside it', () => {
+      finishLine(centerOf(1, 0), centerOf(1, 4))
+
+      expect(trackStore.segments).toHaveLength(1)
     })
   })
 

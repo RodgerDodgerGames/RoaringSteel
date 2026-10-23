@@ -76,6 +76,20 @@ export function cellBounds({ centroid: { lat, lng } }) {
 }
 
 /**
+ * The distance between two points, in km. Measured on a flat projection —
+ * longitude shrunk by the cosine of the latitude — which is close enough at
+ * the scale of a few grid cells.
+ * @param {{lat: number, lng: number}} a - A point
+ * @param {{lat: number, lng: number}} b - Another point
+ * @returns {number} Kilometers
+ */
+export function kmBetween(a, b) {
+  const north = latitudeDegreesToMeters(b.lat - a.lat)
+  const east = longitudeDegreesToMeters(b.lng - a.lng, a.lat)
+  return Math.hypot(north, east) / 1000
+}
+
+/**
  * Points spaced along one straight leg, both ends included.
  * @param {{lat: number, lng: number}} from - Where the leg starts
  * @param {{lat: number, lng: number}} to - Where the leg ends
@@ -84,12 +98,8 @@ export function cellBounds({ centroid: { lat, lng } }) {
 function pointsAlongLeg(from, to) {
   const dLat = to.lat - from.lat
   const dLng = to.lng - from.lng
-  // Rough length in meters, only used to decide how many points to take
-  const lengthMeters = Math.hypot(
-    latitudeDegreesToMeters(dLat),
-    longitudeDegreesToMeters(dLng, from.lat)
-  )
-  const steps = Math.max(1, Math.ceil(lengthMeters / SAMPLE_SPACING_METERS))
+  // Rough length, only used to decide how many points to take
+  const steps = Math.max(1, Math.ceil((kmBetween(from, to) * 1000) / SAMPLE_SPACING_METERS))
 
   const points = []
   for (let i = 0; i <= steps; i++) {

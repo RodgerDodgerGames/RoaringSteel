@@ -20,9 +20,17 @@
  * A line ending at a town is the exception: a town on the shore can have
  * its cell counted as water.
  *
+ * Last, track may cross track already built — anyone's, the builder's own
+ * included, and earlier legs of the same line — but not run alongside it
+ * (see `gameRules.trackSpacing`): a line may only come close to track for a
+ * short stretch, as it does when it crosses. Inside towns' cells this is
+ * waived, since every player builds into the same cities and their lines
+ * bunch up there.
+ *
  * A line is checked at the same points its price is worked out from (see
- * trackCost.js), a quarter of a cell apart, so a leg cannot slip across a
- * narrow neck of gray between two of them unnoticed by more than that.
+ * trackCost.js), a quarter of a cell apart, so a leg can slip across a narrow
+ * neck of gray, or skirt the edge of another line's band, by up to that much
+ * between two of them unnoticed.
  *
  * Pure functions over plain data, so the rules can be tested without a map.
  *
@@ -30,7 +38,19 @@
  */
 
 import { gameRules } from '@/config/game'
-import { findCell, pointsAlongLine, cellPath, cellBounds } from '@/composables/map/trackCost'
+import {
+  findCell,
+  pointsAlongLine,
+  cellPath,
+  cellBounds,
+  kmBetween
+} from '@/composables/map/trackCost'
+import {
+  latitudeDegreesToMeters,
+  longitudeDegreesToMeters,
+  metersToLatitudeDegrees,
+  metersToLongitudeDegrees
+} from '@/composables/setup/useMapSupport'
 import { isWaterCell, longestCrossing, MAX_BRIDGE_KM } from '@/composables/map/water'
 
 /**
@@ -57,7 +77,118 @@ export function townCells(towns, grid) {
 }
 
 /**
+ * Every straight leg of the track built so far, as pairs of points.
+ * @param {Array<Object>} segments - Every section built, each with its
+ *   `coordinates` (see the track store)
+ * @returns {Array<Array<{lat: number, lng: number}>>} [from, to] per leg
+ */
+export function builtLegs(segments) {
+  return segments.flatMap(({ coordinates }) =>
+    coordinates.slice(1).map((to, i) => [coordinates[i], to])
+  )
+}
+
+/**
+ * How far a point is from the nearest of some legs of track, in km.
+ * @param {{lat: number, lng: number}} point - The point
+ * @param {Array<Array<Object>>} legs - Legs, as [from, to] pairs
+ * @returns {number} Kilometers; Infinity when there are no legs
+ */
+function kmToTrack(point, legs) {
+  // Each leg is measured on a flat projection centered on the point
+  const toKm = ({ lat, lng }) => ({
+    x: longitudeDegreesToMeters(lng - point.lng, point.lat) / 1000,
+    y: latitudeDegreesToMeters(lat - point.lat) / 1000
+  })
+  let nearest = Infinity
+  legs.forEach(([from, to]) => {
+    const a = toKm(from)
+    const b = toKm(to)
+    const dx = b.x - a.x
+    const dy = b.y - a.y
+    const lengthSquared = dx * dx + dy * dy
+    // How far along the leg the point's nearest spot is, from 0 to 1
+    const t = lengthSquared ? Math.max(0, Math.min(1, -(a.x * dx + a.y * dy) / lengthSquared)) : 0
+    nearest = Math.min(nearest, Math.hypot(a.x + t * dx, a.y + t * dy))
+  })
+  return nearest
+}
+
+/**
+ * The legs of built track that come anywhere near a line: those whose
+ * bounding box, widened by `nearKm`, overlaps the line's. Only these can be
+ * beside the line, so the rest are left out before any distance is measured.
+ * @param {Array<Array<Object>>} legs - Built legs, as [from, to] pairs
+ * @param {Array<{lat: number, lng: number}>} points - The line's sample points
+ * @param {number} nearKm - How close counts as beside
+ * @returns {Array<Array<Object>>} The legs that may be near
+ */
+function legsNear(legs, points, nearKm) {
+  const lats = points.map(({ lat }) => lat)
+  const lngs = points.map(({ lng }) => lng)
+  const widestLat = Math.max(...lats.map(Math.abs))
+  const padLat = metersToLatitudeDegrees(nearKm * 1000)
+  const padLng = metersToLongitudeDegrees(nearKm * 1000, widestLat)
+  const south = Math.min(...lats) - padLat
+  const north = Math.max(...lats) + padLat
+  const west = Math.min(...lngs) - padLng
+  const east = Math.max(...lngs) + padLng
+  return legs.filter(
+    ([a, b]) =>
+      Math.max(a.lat, b.lat) >= south &&
+      Math.min(a.lat, b.lat) <= north &&
+      Math.max(a.lng, b.lng) >= west &&
+      Math.min(a.lng, b.lng) <= east
+  )
+}
+
+/**
+ * Whether a line runs alongside track for longer than a crossing takes.
+ *
+ * The line is walked point by point, keeping a running total of the
+ * distance it has been beside track — within `nearKm` of it — without a
+ * break. A step counts only when the points at both ends of it are beside,
+ * so the total is how far the line was beside, not one step more.
+ *
+ * Each leg is held up against the built track and against the line's own
+ * earlier legs, so a line cannot double back along itself either. A bend
+ * comes close to the leg before it for a few km, as a crossing does, and
+ * that is allowed for the same reason.
+ *
+ * @param {Array<Array<Object>>} legPoints - Each leg's sample points
+ * @param {Array<boolean>} inTown - Per sample point, in order, whether it is
+ *   in a town's cell, where being beside track does not count
+ * @param {Array<Array<Object>>} builtLegs - Built track, as [from, to] pairs
+ * @returns {boolean} True if the line runs alongside track
+ */
+function runsAlongside(legPoints, inTown, builtLegs) {
+  const { nearKm, maxBesideKm } = gameRules.trackSpacing
+  const nearby = legsNear(builtLegs, legPoints.flat(), nearKm)
+  const ownLegs = legPoints.map((points) => [points[0], points.at(-1)])
+
+  let besideKm = 0
+  let previous = null
+  let index = 0
+  for (const [leg, points] of legPoints.entries()) {
+    const track = [...nearby, ...ownLegs.slice(0, leg)]
+    for (const point of points) {
+      const isBeside = !inTown[index++] && kmToTrack(point, track) <= nearKm
+      if (!isBeside) besideKm = 0
+      else if (previous?.isBeside) besideKm += kmBetween(previous.point, point)
+      if (besideKm > maxBesideKm) return true
+      previous = { point, isBeside }
+    }
+  }
+  return false
+}
+
+/**
  * Why a line of track may not be built, or null if it may.
+ *
+ * The rules are checked in turn, and the first one broken is the answer.
+ * Ending on water is checked last, so a caller asking about a finished line
+ * hears of it only when nothing else is wrong — the cursor's tooltip treats
+ * it as a warning, not a refusal, while the line is still being drawn.
  *
  * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
  * @param {Object} rules - What the line is checked against
@@ -65,24 +196,39 @@ export function townCells(towns, grid) {
  * @param {Function} rules.isInRegion - Whether a point is inside the region
  *   being played (see `regionTest` in region.js)
  * @param {Array<Object>} rules.townCells - The cells towns sit in (see `townCells`)
+ * @param {Array<Array<Object>>} [rules.builtLegs] - The legs of the track
+ *   built so far (see `builtLegs`)
  * @param {Object} [options]
  * @param {boolean} [options.isFinished] - True for a finished line, which may
  *   not end on water; a line still being drawn may stop there for now
  * @returns {{reason: 'outside', point: {lat: number, lng: number}}|{reason:
- *   'water'|'endsOnWater'}|null} The rule broken — for the region, with the
- *   first point along the line that breaks it — or null if the line may be built
+ *   'water'|'alongside'|'endsOnWater'}|null} The rule broken — for the
+ *   region, with the first point along the line that breaks it — or null if
+ *   the line may be built
  */
-export function lineBlock(latlngs, { grid, isInRegion, townCells }, { isFinished = false } = {}) {
-  for (const point of pointsAlongLine(latlngs)) {
-    if (isInRegion(point)) continue
-    if (townCells.some((cell) => isInCell(point, cell))) continue
-    return { reason: 'outside', point }
-  }
+export function lineBlock(
+  latlngs,
+  { grid, isInRegion, townCells, builtLegs = [] },
+  { isFinished = false } = {}
+) {
+  // Each leg's sample points, and whether each point is in a town's cell,
+  // worked out once for every rule below
+  const legPoints =
+    latlngs.length === 1
+      ? [[latlngs[0]]]
+      : latlngs.slice(1).map((to, i) => pointsAlongLine([latlngs[i], to]))
+  const points = legPoints.flat()
+  const inTown = points.map((point) => townCells.some((cell) => isInCell(point, cell)))
+
+  const outside = points.findIndex((point, i) => !inTown[i] && !isInRegion(point))
+  if (outside !== -1) return { reason: 'outside', point: points[outside] }
 
   const path = cellPath(latlngs, grid)
   if (longestCrossing(path, townCells) > gameRules.bridges.maxCells) {
     return { reason: 'water' }
   }
+
+  if (runsAlongside(legPoints, inTown, builtLegs)) return { reason: 'alongside' }
 
   const end = path.at(-1)
   if (isFinished && end && isWaterCell(end) && !townCells.includes(end)) {
@@ -105,6 +251,10 @@ export function blockMessage(block, regionName) {
       return `Too much water to bridge: a bridge can span at most ${MAX_BRIDGE_KM} km.`
     case 'endsOnWater':
       return "Track can't end on water: a bridge has to reach land."
+    case 'alongside': {
+      const { nearKm } = gameRules.trackSpacing
+      return `Track can't run alongside track already built: cross it more squarely, or keep ${nearKm} km away.`
+    }
     default:
       return "Track can't go there."
   }

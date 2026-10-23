@@ -9,6 +9,10 @@
   2. playerSelect - Player name and color selection
   3. playerConfirm - Review and confirm player selections
 
+  @prop initialPane - The step to open on. A new game started from the
+                      Game menu skips the New Game / Load Game buttons and
+                      opens on player selection.
+
   @emits players-confirmed - When players are confirmed and ready to proceed
 -->
 
@@ -18,10 +22,17 @@ import PlayerSelect from '@/components/setup/PlayerSelect.vue'
 import PlayerConfirm from '@/components/setup/PlayerConfirm.vue'
 import LoadGameDialog from '@/components/dialogs/LoadGameDialog.vue'
 
+const props = defineProps({
+  initialPane: {
+    type: String,
+    default: 'gameButtons'
+  }
+})
+
 const emit = defineEmits(['players-confirmed', 'game-loaded'])
 
 // which pane should be shown
-const activePane = ref('gameButtons')
+const activePane = ref(props.initialPane)
 
 // Store selected players for confirmation
 const selectedPlayers = ref([])

@@ -6,6 +6,7 @@
  * - File export/import (JSON, uncompressed for compatibility)
  * - State serialization/deserialization
  * - Save data validation
+ * - Clearing the game away to start a new one
  *
  * @module composables/useGamePersistence
  */
@@ -86,14 +87,8 @@ export function useGamePersistence() {
         return false
       }
 
-      // Reset all stores first
-      gameStore.reset()
-      playerStore.reset()
-      townsStore.reset()
-      gridStore.reset()
-      demandCardsStore.reset()
-      mapStore.reset()
-      trackStore.reset()
+      // Clear the game being replaced first
+      resetGame()
 
       // Surface non-fatal problems without refusing the load
       validation.warnings.forEach((w) => console.warn('Save data warning:', w))
@@ -122,6 +117,48 @@ export function useGamePersistence() {
       console.error('Error deserializing game state:', e)
       return false
     }
+  }
+
+  /**
+   * Clears away every part of the game: region, turn, players, towns, grid,
+   * demand cards, map view and track. Used before a save is restored, and
+   * when the game is given up for a new one.
+   *
+   * The player's settings are not part of this: they belong to the person at
+   * the browser rather than to any one game, so they carry over.
+   */
+  function resetGame() {
+    gameStore.reset()
+    playerStore.reset()
+    townsStore.reset()
+    gridStore.reset()
+    demandCardsStore.reset()
+    mapStore.reset()
+    trackStore.reset()
+  }
+
+  /**
+   * Ends the game being played, ready for the setup of a new one.
+   *
+   * The game is cleared away (see `resetGame`), and the setup roster is filled
+   * with this game's players, names and colors, in turn order, so the same
+   * people can play again without typing everything in a second time. The
+   * roster can still be changed before the new game starts.
+   *
+   * A player whose color the roster refuses — one already taken, which only a
+   * damaged or hand-edited save could hold — is kept with the first color
+   * still free, rather than left out.
+   *
+   * Saving the old game first, if wanted, is up to the caller: this does not
+   * save anything.
+   */
+  function startNewGame() {
+    const roster = playerStore.players.map(({ name, color }) => ({ name, color }))
+    resetGame()
+    roster.forEach(
+      (draft) =>
+        playerStore.addDraftPlayer(draft) ?? playerStore.addDraftPlayer({ name: draft.name })
+    )
   }
 
   /**
@@ -400,6 +437,7 @@ export function useGamePersistence() {
     loadAutoSave,
     hasAutoSaves,
     exportToFile,
-    importFromFile
+    importFromFile,
+    startNewGame
   }
 }

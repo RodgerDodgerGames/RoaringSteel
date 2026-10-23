@@ -1,6 +1,6 @@
 <script setup>
 // IMPORTS
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import * as turf from '@turf/turf'
 
@@ -31,12 +31,20 @@ const demandCardsStore = useDemandCardsStore()
 const playerStore = usePlayerStore()
 
 // setup composables
-const { autoSave } = useGamePersistence()
+const { autoSave, startNewGame } = useGamePersistence()
 
 // STATE
 
 // which view should be shown (start with welcome)
 const currentView = ref('welcome')
+
+// which step the welcome view opens on (see WelcomeView's initialPane)
+const welcomePane = ref('gameButtons')
+
+// Props for the view showing; only the welcome view takes any
+const viewProps = computed(() =>
+  currentView.value === 'welcome' ? { initialPane: welcomePane.value } : {}
+)
 
 // track if the setup flow owns the screen (covers the modal, including the
 // error state after a failed attempt)
@@ -112,6 +120,23 @@ async function handlePlayGameClick() {
   }
 }
 
+/**
+ * The player gave up the game in progress for a new one, from the Game menu
+ * (having saved it first, if they wanted to). Goes straight to choosing the
+ * players, with this game's players filled in.
+ *
+ * The game screen is taken down before the game is cleared: cleared while
+ * the map and dock were still up, they would be left showing a game that no
+ * longer exists.
+ */
+async function handleNewGame() {
+  currentView.value = null
+  await nextTick()
+  startNewGame()
+  welcomePane.value = 'playerSelect'
+  currentView.value = 'welcome'
+}
+
 // Player asked to retry after a failed grid setup
 function handleSetupRetry() {
   // Drop the error first so the modal shows progress again straight away,
@@ -132,9 +157,12 @@ function handleSetupCancel() {
     <!-- Main Content Section. The game view brings its own top bar. -->
     <component
       :is="viewComponents[currentView]"
+      v-if="currentView"
+      v-bind="viewProps"
       @players-confirmed="handlePlayersConfirmed"
       @game-loaded="handleGameLoaded"
       @play-game="handlePlayGameClick"
+      @new-game="handleNewGame"
     />
     <!-- Grid Progress Modal -->
     <GridProgressModal

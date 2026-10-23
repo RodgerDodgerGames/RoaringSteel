@@ -5,10 +5,8 @@
  * Creates GeoJSON layers from town data with size-based icons,
  * tooltips showing town names, and popups showing industries.
  *
- * Icon sizes vary by town size class:
- * - Small: 24px
- * - Medium: 28px
- * - Large: 32px
+ * Each size of town has its own shape and size of icon (see townIcons.js);
+ * whatever its shape, the comments here call a town's icon its dot.
  *
  * In the map's Plan view each town also shows what it produces: its
  * commodity icons fan out over the top of its dot (see commodityIcons.js),
@@ -44,6 +42,7 @@ import {
   iconRingOffsets,
   iconRingRadius
 } from '@/composables/map/commodityIcons'
+import { townIcon, townNameOffset } from '@/composables/map/townIcons'
 
 /**
  * The map pane the commodity icons are drawn in: above track (panes 410–430)
@@ -205,9 +204,10 @@ export function useTowns() {
       // pointToLayer is called for each Point feature to create its marker
       pointToLayer: (feature, latlng) => {
         const size = feature.properties.size
+        const { url, size: iconSize } = townIcon(size)
         const icon = L.icon({
-          iconUrl: getIconUrl(size),
-          iconSize: [getIconSize(size), getIconSize(size)],
+          iconUrl: url,
+          iconSize: [iconSize, iconSize],
           className: 'marker'
         })
 
@@ -225,7 +225,7 @@ export function useTowns() {
           permanent: true, // Make the tooltip always visible
           direction: 'center',
           className: 'town-tooltip',
-          offset: [0, 20]
+          offset: townNameOffset(size)
         })
 
         // Add a click event handler to display town information
@@ -306,7 +306,7 @@ export function useTowns() {
    */
   const createCommodityMarker = (town) => {
     const count = town.industries.length
-    const offsets = iconRingOffsets(count, iconRingRadius(getIconSize(town.size), count))
+    const offsets = iconRingOffsets(count, iconRingRadius(townIcon(town.size).size, count))
     const half = COMMODITY_ICON_SIZE / 2
     const html = town.industries
       .map(({ name, industry }, i) => {
@@ -324,40 +324,6 @@ export function useTowns() {
       keyboard: false,
       pmIgnore: true
     })
-  }
-
-  /**
-   * Returns the icon URL for a given town size class.
-   * @param {string} size - Town size: "small", "medium", or "large"
-   * @returns {string} URL to the icon image
-   */
-  const getIconUrl = (size) => {
-    switch (size) {
-      case 'small':
-        return new URL('@/assets/icons/towns/small.png', import.meta.url).href
-      case 'medium':
-        return new URL('@/assets/icons/towns/medium.png', import.meta.url).href
-      case 'large':
-        return new URL('@/assets/icons/towns/large.png', import.meta.url).href
-      default:
-        return new URL('@/assets/icons/towns/small.png', import.meta.url).href
-    }
-  }
-
-  /**
-   * Returns the icon pixel size for a given town size class.
-   * @param {string} size - Town size: "small", "medium", or "large"
-   * @returns {number} Icon size in pixels
-   */
-  const getIconSize = (size) => {
-    switch (size) {
-      case 'small':
-        return 24
-      case 'medium':
-        return 28
-      case 'large':
-        return 32
-    }
   }
 
   onUnmounted(() => {

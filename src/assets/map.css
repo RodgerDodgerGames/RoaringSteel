@@ -10,10 +10,14 @@
 .town-tooltip {
   font-family: "Eutimia";
   font-size: 1rem;
-    background: none ;
-    border: none ;
-    box-shadow: none ;
-    padding: 0 ;
+  border: none;
+  box-shadow: none;
+  /* A pale backing, so track running under a name passes behind it rather
+     than through its letters, and the name stays readable on dark terrain */
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 3px;
+  padding: 0 0.25em;
+  line-height: 1.2;
 }
 
 /* town popup */
@@ -94,7 +98,8 @@
 /*
   Demand lines picked out on the cards (see useTowns). A marked town dot or
   commodity icon gets a halo, drawn as an inline box-shadow in the line's
-  colors; the dot is round, so its halo is too.
+  colors. A town's halo is round whatever the town's shape, a ring the
+  square or hexagon sits inside.
 */
 .marker.is-demand-marked {
   border-radius: 50%;

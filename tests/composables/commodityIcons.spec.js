@@ -15,6 +15,7 @@ import {
   iconRingOffsets,
   iconRingRadius
 } from '@/composables/map/commodityIcons'
+import { TOWN_ICONS } from '@/composables/map/townIcons'
 
 /**
  * The NAICS codes in one of the industry lists the industry store can load.
@@ -85,11 +86,12 @@ describe('commodityIcons', () => {
     })
 
     it('should space icons at least an icon apart around the smallest town, however many', () => {
-      // A small town's dot is 24px, the tightest ring the map draws. Towns
-      // with the highest employment in an industry are given it whatever
-      // they already have, so a town can hold any number of commodities.
+      // A small town's dot is the smallest, so its ring is the tightest the
+      // map draws. Towns with the highest employment in an industry are given
+      // it whatever they already have, so a town can hold any number of
+      // commodities.
       for (let count = 2; count <= 13; count++) {
-        const offsets = iconRingOffsets(count, iconRingRadius(24, count))
+        const offsets = iconRingOffsets(count, iconRingRadius(TOWN_ICONS.small.size, count))
         for (let i = 1; i < offsets.length; i++) {
           const gap = Math.hypot(offsets[i].x - offsets[i - 1].x, offsets[i].y - offsets[i - 1].y)
           expect(gap).toBeGreaterThanOrEqual(COMMODITY_ICON_SIZE)

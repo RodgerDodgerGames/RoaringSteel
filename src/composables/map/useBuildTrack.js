@@ -10,7 +10,9 @@ import { useMapStore } from '@/stores/map'
 import { usePlayerStore } from '@/stores/players'
 import { useTrackStore } from '@/stores/track'
 import { useGameStore } from '@/stores/game'
+import { useTownsStore } from '@/stores/towns'
 import { priceLine } from '@/composables/map/trackCost'
+import { lineBlock, blockMessage, townCellIds } from '@/composables/map/buildRules'
 import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 import {
   UNOWNED_TRACK_COLOR,
@@ -79,8 +81,21 @@ export default function useBuildTrack(grid, formatCurrency) {
   // completed track is game state, not a map layer, so it lives in its own store
   const trackStore = useTrackStore()
   const gameStore = useGameStore()
+  const townsStore = useTownsStore()
 
   // ================== COMPUTED PROPERTIES ==================
+
+  /**
+   * What every line is checked against before it is built (see buildRules.js):
+   * the grid, the region being played, and the cells the towns sit in. Kept
+   * as one computed so the town cells are looked up once, not on every move of
+   * the cursor.
+   */
+  const buildRules = computed(() => ({
+    grid: grid.value ?? [],
+    region: gameStore.region,
+    townCells: townCellIds(townsStore.towns, grid.value ?? [])
+  }))
 
   /**
    * Whether the active player has track they may still tear up.
@@ -448,6 +463,18 @@ export default function useBuildTrack(grid, formatCurrency) {
           addHintMarkerMoveHandler() // Add movement handler for cost tooltip
         }
       } else {
+        // A leg that breaks a build rule is taken straight back off, so the
+        // line never holds track that could not be built; the player is told
+        // why, and carries on from the vertex before
+        const message = whyNotBuildable(workingLayer.value.getLatLngs().slice(-2))
+        if (message) {
+          mapStore.map.pm.Draw.Line._removeLastVertex()
+          repriceLine()
+          buildError.value = message
+          return
+        }
+        buildError.value = ''
+
         // Priced here from the vertex itself, not left to the cursor handler:
         // that one is debounced, so it can still be a step behind the click
         repriceLine()
@@ -469,6 +496,15 @@ export default function useBuildTrack(grid, formatCurrency) {
   function finalizeDrawing(e) {
     mapStore.setIsDrawingActive(false)
     if (e.layer?.pm?._shape === 'Line') {
+      // Checked again as a whole, however the drawing ended: each leg was
+      // checked as it was placed, but a finished line is what gets built
+      const blocked = whyNotBuildable(e.layer.getLatLngs())
+      if (blocked) {
+        discardDrawnLayer(e.layer)
+        buildError.value = `${blocked} That section was not built.`
+        return
+      }
+
       // Priced from the finished line itself, by the same rule as the live
       // cost, so the charge matches what was shown however the drawing ended
       // (town, double-click or the Finish tooltip)
@@ -742,7 +778,28 @@ export default function useBuildTrack(grid, formatCurrency) {
     // hint marker, so a call from any marker but the current one is stale.
     if (!workingLayer.value || hintMarker !== costedHintMarker.value) return
     const legCost = repriceLine(latlng)
-    hintMarker.setTooltipContent(`Cost: ${formatCurrency(legCost)}`)
+
+    // A leg that could not be built says so instead of giving a price, and the
+    // dashed line out to the cursor turns red
+    const message = whyNotBuildable([workingLayer.value.getLatLngs().at(-1), latlng])
+    hintMarker.setTooltipContent(message ?? `Cost: ${formatCurrency(legCost)}`)
+    const hintLine = mapStore.map.pm.Draw.Line._hintline
+    hintLine?.setStyle({
+      color: message
+        ? BLOCKED_LEG_COLOR
+        : drawingLineStyles(playerStore.activePlayer?.id).hintlineStyle.color
+    })
+  }
+
+  /**
+   * Why a line, or a leg of one, may not be built, in words for the player;
+   * null if it may.
+   * @param {Array<Object>} latlngs - The line's vertices
+   * @returns {string|null} The reason, or null
+   */
+  function whyNotBuildable(latlngs) {
+    const block = lineBlock(latlngs, buildRules.value)
+    return block && blockMessage(block, gameStore.region?.properties?.NAME)
   }
 
   // ================== UTILITY FUNCTIONS ==================
@@ -831,6 +888,12 @@ export default function useBuildTrack(grid, formatCurrency) {
    * against the map, without hiding the terrain the player is pricing.
    */
   const DRAWING_LINE_STYLE = { weight: 4, opacity: 0.9 }
+
+  /**
+   * The color the leg out to the cursor turns while it could not be built.
+   * Bulma's danger red, darker than the red a player can pick.
+   */
+  const BLOCKED_LEG_COLOR = '#cc0f35'
 
   /** Leaflet's own line blue, for a line drawn by a player with no color */
   const UNOWNED_DRAWING_COLOR = '#3388ff'

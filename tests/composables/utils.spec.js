@@ -2,13 +2,15 @@
  * utils Tests
  *
  * Tests for the shared helpers, focused on mapWithConcurrency since the grid
- * setup relies on it to stay inside the upstream APIs' tolerance.
+ * setup relies on it to stay inside the upstream APIs' tolerance, and on the
+ * short money format the demand cards fall back to when space is tight.
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   DEFAULT_REQUEST_TIMEOUT_MS,
   fetchWithTimeout,
+  formatShortCurrency,
   mapWithConcurrency,
   wait
 } from '@/composables/utils'
@@ -270,5 +272,38 @@ describe('fetchWithTimeout', () => {
     await vi.advanceTimersByTimeAsync(DEFAULT_REQUEST_TIMEOUT_MS)
 
     await assertion
+  })
+})
+
+describe('formatShortCurrency', () => {
+  it('should give thousands to one decimal place', () => {
+    expect(formatShortCurrency(20300)).toBe('$20.3k')
+  })
+
+  it('should drop the decimal from a whole number of thousands', () => {
+    expect(formatShortCurrency(8000)).toBe('$8k')
+  })
+
+  it('should round to the nearest hundred', () => {
+    expect(formatShortCurrency(23340)).toBe('$23.3k')
+    expect(formatShortCurrency(19960)).toBe('$20k')
+  })
+
+  it('should round a half-hundred up', () => {
+    expect(formatShortCurrency(20350)).toBe('$20.4k')
+  })
+
+  it('should give an amount just under a million in thousands', () => {
+    expect(formatShortCurrency(950000)).toBe('$950k')
+  })
+
+  it('should give millions as M', () => {
+    expect(formatShortCurrency(1250000)).toBe('$1.3M')
+    // Just short of a million rounds up to one, not to "$1000k"
+    expect(formatShortCurrency(999960)).toBe('$1M')
+  })
+
+  it('should leave an amount that rounds to under a thousand as it is', () => {
+    expect(formatShortCurrency(940)).toBe('$940')
   })
 })

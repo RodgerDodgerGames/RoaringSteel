@@ -12,9 +12,14 @@
  *
  * In the map's Plan view each town also shows what it produces: its
  * commodity icons fan out over the top of its dot (see commodityIcons.js),
- * as on the printed board. They are a separate layer, put on the map only
- * in the Plan view, so the Build view stays clear for laying track. The
- * town popup lists the same icons in either view.
+ * as on the printed board. They are hidden in the Build view, so it stays
+ * clear for laying track. The town popup lists the same icons in either view.
+ *
+ * The demand lines the player points at or pins on their cards are marked
+ * here too (see demandMarks.js): a halo round each destination's dot, and
+ * round the commodity's icon at every town producing it. In the Build view
+ * those icons are the only ones shown. While a line is pointed at, the rest
+ * of the towns are dimmed.
  *
  * Where the map looks is not decided here: useMapView fits the Plan view
  * to the region.
@@ -30,7 +35,9 @@ import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 
 import { storeToRefs } from 'pinia'
 import { useMapStore } from '@/stores/map'
+import { useDemandCardsStore } from '@/stores/demandCards'
 import { PLAN_VIEW, planPopupOffset } from '@/composables/map/mapViews'
+import { demandMarks } from '@/composables/map/demandMarks'
 import {
   COMMODITY_ICON_SIZE,
   commodityIconUrl,
@@ -48,20 +55,70 @@ const COMMODITY_PANE = 'commodities'
 const COMMODITY_PANE_Z_INDEX = 590
 
 /**
+ * Class on every town dot, name and commodity icon that belongs to a marked
+ * demand line. They stay at full strength while the rest are dimmed.
+ */
+const MARKED_CLASS = 'is-demand-marked'
+
+/** Class on the map while a demand line is pointed at, which dims the rest */
+const HOVERING_CLASS = 'is-demand-hovering'
+
+/**
+ * How far a town's commodity icons are lifted above its neighbors' while one
+ * of them is marked, so no neighbor's icons cover the marked one or its halo.
+ * Leaflet stacks markers by latitude; this is well past any difference that
+ * makes.
+ */
+const MARKED_RING_Z_OFFSET = 10000
+
+/** Width of the white rim between a marked dot or icon and its halo, in px */
+const HALO_RIM = 2
+
+/** Width of each colored ring in a halo, in px */
+const HALO_RING = 3
+
+/**
+ * The CSS box-shadow that draws a halo: a white rim, then one ring per
+ * color, the first color innermost, and a soft glow round the outside so the
+ * halo stands out against the map.
+ * @param {Array<string>} colors - The marked lines' colors, at least one
+ * @returns {string} A box-shadow value
+ */
+function haloShadow(colors) {
+  const rings = colors.map((color, i) => `0 0 0 ${HALO_RIM + HALO_RING * (i + 1)}px ${color}`)
+  const outer = HALO_RIM + HALO_RING * colors.length
+  return [`0 0 0 ${HALO_RIM}px #fff`, ...rings, `0 0 8px ${outer}px ${colors.at(-1)}`].join(', ')
+}
+
+/**
+ * Marks or unmarks a town dot, name or commodity icon.
+ * @param {HTMLElement} element - The element
+ * @param {boolean} isMarked - Whether it belongs to a marked demand line
+ * @param {Array<string>} [haloColors] - Colors to halo it in; none for no halo
+ */
+function setMark(element, isMarked, haloColors) {
+  element.classList.toggle(MARKED_CLASS, isMarked)
+  element.style.boxShadow = haloColors ? haloShadow(haloColors) : ''
+}
+
+/**
  * Composable for managing town markers on the map.
  *
- * @returns {Object} { townsLayer, commodityLayer, addTownsToMap }
+ * @returns {Object} { townsLayer, addTownsToMap }
  */
 export function useTowns() {
   // A shallowRef keeps the layer a plain Leaflet object rather than a Vue
   // proxy. This is the layer handed to the map store, which explains why.
   const townsLayer = shallowRef(null)
 
-  /**
-   * Every town's commodity icons, one marker per town. Kept raw for the
-   * same reason as the towns layer.
-   */
-  const commodityLayer = shallowRef(null)
+  /** The layer holding every town's commodity icons, once drawn */
+  let commodityLayer = null
+
+  /** Each town with the marker holding its commodity icons: [{ town, marker }] */
+  let commodityMarkers = []
+
+  /** The towns drawn, as given to `addTownsToMap` */
+  let drawnTowns = []
 
   /** The map the towns were drawn on, once they have been */
   let townsMap = null
@@ -69,18 +126,46 @@ export function useTowns() {
   // get access to isDrawingActive from map store
   const mapStore = useMapStore()
   const { isDrawingActive } = storeToRefs(mapStore)
+  const demandCardsStore = useDemandCardsStore()
 
   /**
-   * Shows the commodity icons in the Plan view and hides them in the Build
-   * view.
+   * Shows the commodity icons the view calls for, and marks the towns of the
+   * demand lines the player has picked out.
+   *
+   * Every icon shows in the Plan view; in the Build view only the icons of
+   * marked lines do. A town that is a marked line's destination or makes its
+   * commodity keeps its dot and name clear of the dimming while the line is
+   * pointed at; only the destination's dot gets a halo, since the producer's
+   * halo goes on the commodity's icon.
    */
-  function showCommodities() {
-    if (!commodityLayer.value || !townsMap) return
-    if (mapStore.viewMode === PLAN_VIEW) commodityLayer.value.addTo(townsMap)
-    else commodityLayer.value.remove()
+  function showMarks() {
+    if (!townsMap) return
+    const { isHovering, lines } = demandCardsStore.markedLines
+    const { destinations, producers } = demandMarks(lines, drawnTowns)
+    const isPlanView = mapStore.viewMode === PLAN_VIEW
+
+    townsLayer.value.eachLayer((marker) => {
+      const name = marker.feature.properties.name
+      const isMarked = Boolean(destinations[name] || producers[name])
+      setMark(marker.getElement(), isMarked, destinations[name])
+      marker.getTooltip()?.getElement()?.classList.toggle(MARKED_CLASS, isMarked)
+    })
+
+    commodityMarkers.forEach(({ town, marker }) => {
+      // One icon per industry, in the same order
+      const icons = marker.getElement().querySelectorAll('.commodity-icon')
+      town.industries.forEach(({ name }, i) => {
+        const colors = producers[town.name]?.[name]
+        setMark(icons[i], Boolean(colors), colors)
+        icons[i].hidden = !isPlanView && !colors
+      })
+      marker.setZIndexOffset(producers[town.name] ? MARKED_RING_Z_OFFSET : 0)
+    })
+
+    townsMap.getContainer().classList.toggle(HOVERING_CLASS, isHovering)
   }
 
-  watch(() => mapStore.viewMode, showCommodities)
+  watch([() => demandCardsStore.markedLines, () => mapStore.viewMode], showMarks)
 
   /**
    * Adds town markers, and their commodity icons, to the map.
@@ -182,8 +267,10 @@ export function useTowns() {
     if (!townsMap.getPane(COMMODITY_PANE)) {
       townsMap.createPane(COMMODITY_PANE).style.zIndex = COMMODITY_PANE_Z_INDEX
     }
-    commodityLayer.value = L.layerGroup(towns.value.map(createCommodityMarker))
-    showCommodities()
+    drawnTowns = towns.value
+    commodityMarkers = drawnTowns.map((town) => ({ town, marker: createCommodityMarker(town) }))
+    commodityLayer = L.layerGroup(commodityMarkers.map(({ marker }) => marker)).addTo(townsMap)
+    showMarks()
   }
 
   /**
@@ -277,12 +364,11 @@ export function useTowns() {
     if (townsLayer.value) {
       townsLayer.value.clearLayers()
     }
-    commodityLayer.value?.remove()
+    commodityLayer?.remove()
   })
 
   return {
     townsLayer,
-    commodityLayer,
     addTownsToMap
   }
 }

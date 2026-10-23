@@ -16,6 +16,7 @@
 
 import { defineStore } from 'pinia'
 import { useStorage } from '@vueuse/core'
+import { PIN_COLORS } from '@/config/demands'
 
 /** The localStorage key all settings are kept under, as one JSON object */
 export const SETTINGS_STORAGE_KEY = 'roaringsteel_settings'
@@ -26,8 +27,35 @@ export const SETTINGS_STORAGE_KEY = 'roaringsteel_settings'
  */
 export const DEFAULT_SETTINGS = Object.freeze({
   /** Show how many demand cards are left in the deck, on the demand strip */
-  showDeckCount: false
+  showDeckCount: false,
+  /**
+   * How many demand lines a player may pin to the map at once. Pinning one
+   * more drops the oldest pin.
+   */
+  pinLimit: 3
 })
+
+/**
+ * The whole numbers a number setting may take, smallest and largest. A
+ * number setting must be listed here.
+ */
+export const SETTING_RANGES = Object.freeze({
+  /** At least one, or pinning would do nothing; no more than there are colors to draw pins in */
+  pinLimit: Object.freeze({ min: 1, max: PIN_COLORS.length })
+})
+
+/**
+ * Whether a value read back can be used for a setting: the same kind as the
+ * default, and, for a number setting, a whole number within its range.
+ * @param {string} name - The setting's name
+ * @param {*} value - The value read back
+ * @returns {boolean} True if the setting may take the value
+ */
+function isUsable(name, value) {
+  if (typeof value !== typeof DEFAULT_SETTINGS[name]) return false
+  const range = SETTING_RANGES[name]
+  return !range || (Number.isInteger(value) && value >= range.min && value <= range.max)
+}
 
 /**
  * Picks out the settings that can be trusted from settings read back from
@@ -35,9 +63,9 @@ export const DEFAULT_SETTINGS = Object.freeze({
  *
  * Only settings this version of the game knows are kept, and only when the
  * value is the same kind as the default (a true/false setting must be true or
- * false, not the text "false"). Anything else is left out, so a save from a
- * newer or hand-edited copy of the game cannot put a setting into a state the
- * game does not expect.
+ * false, not the text "false") and, for a number, within its range. Anything
+ * else is left out, so a save from a newer or hand-edited copy of the game
+ * cannot put a setting into a state the game does not expect.
  *
  * @param {Object} source - Settings as read back; may be anything at all
  * @returns {Object} Just the usable settings, possibly none
@@ -45,7 +73,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
 function usableSettings(source) {
   return Object.fromEntries(
     Object.keys(DEFAULT_SETTINGS)
-      .filter((name) => typeof source?.[name] === typeof DEFAULT_SETTINGS[name])
+      .filter((name) => isUsable(name, source?.[name]))
       .map((name) => [name, source[name]])
   )
 }

@@ -286,6 +286,22 @@ describe('useGamePersistence', () => {
       expect(demandCardsStore.drawPile.map((c) => c.id)).toEqual([10, 11, 12])
     })
 
+    it("should carry the active player's pinned demand lines through a save and reload", () => {
+      demandCardsStore.setDeck({ drawPile: deckOf(12) })
+      demandCardsStore.dealHands(playerIds())
+      const [firstCard] = demandCardsStore.handOf(playerStore.activePlayer.id)
+      demandCardsStore.togglePin(firstCard.id, 0)
+      const pinsBefore = demandCardsStore.pinsOf(playerStore.activePlayer.id)
+      persistence.autoSave()
+
+      demandCardsStore.reset()
+      const [latest] = persistence.getAutoSaves()
+      persistence.loadAutoSave(latest.index)
+
+      expect(pinsBefore).toHaveLength(1)
+      expect(demandCardsStore.pinsOf(playerStore.activePlayer.id)).toEqual(pinsBefore)
+    })
+
     it('should deal hands when loading a save made before hands existed', () => {
       const save = persistence.serializeGameState()
       delete save.demandDeck

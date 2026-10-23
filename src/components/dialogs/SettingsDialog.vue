@@ -14,11 +14,15 @@
 
 <script setup>
 import { storeToRefs } from 'pinia'
-import { useSettingsStore } from '@/stores/settings'
+import { useSettingsStore, SETTING_RANGES } from '@/stores/settings'
 
 const emit = defineEmits(['close'])
 
 const { settings } = storeToRefs(useSettingsStore())
+
+/** Every pin limit the player can choose, smallest first */
+const { min, max } = SETTING_RANGES.pinLimit
+const pinLimits = Array.from({ length: max - min + 1 }, (_, i) => min + i)
 </script>
 
 <template>
@@ -39,6 +43,21 @@ const { settings } = storeToRefs(useSettingsStore())
             </label>
           </div>
           <p class="help">The count appears in the header of the demand card strip.</p>
+        </div>
+
+        <div class="field">
+          <label class="label is-small" for="pin-limit">Pinned demand lines</label>
+          <div class="control">
+            <div class="select is-small">
+              <select id="pin-limit" v-model.number="settings.pinLimit">
+                <option v-for="count in pinLimits" :key="count" :value="count">{{ count }}</option>
+              </select>
+            </div>
+          </div>
+          <p class="help">
+            How many demand lines you can pin to the map at once, each in its own color. Pinning one
+            more drops the oldest.
+          </p>
         </div>
 
         <p class="is-size-7 has-text-grey mt-5">

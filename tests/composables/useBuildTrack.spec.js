@@ -12,7 +12,8 @@
  * afterwards was charged for and recorded once per visit.
  *
  * Modes: drawing and removing both act on map clicks, so at most one may be on,
- * and Escape backs out of either.
+ * and Escape backs out of either. Both happen in the map's Build view: starting
+ * either switches the map to it, and switching to the Plan view ends them.
  *
  * Pricing: a line costs the grid cells it crosses, followed live as it is drawn.
  */
@@ -23,6 +24,7 @@ import { mount } from '@vue/test-utils'
 import L from 'leaflet'
 import useBuildTrack from '@/composables/map/useBuildTrack'
 import { useMapStore } from '@/stores/map'
+import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 import { usePlayerStore } from '@/stores/players'
 import { useTrackStore } from '@/stores/track'
 import { formatCurrency } from '@/composables/utils'
@@ -518,6 +520,50 @@ describe('useBuildTrack', () => {
 
     it('should mount and unmount without throwing', () => {
       expect(() => mountWithoutMap().unmount()).not.toThrow()
+    })
+  })
+
+  describe('the map view', () => {
+    it('should switch to the Build view when a drawing starts', () => {
+      const { api } = mountBuildTrack(map, L.layerGroup(), pricedGrid)
+
+      api.startDrawingLine()
+
+      expect(useMapStore().viewMode).toBe(BUILD_VIEW)
+    })
+
+    it('should stay in the Plan view when there is no grid to price a drawing', () => {
+      const { api } = mountBuildTrack(map)
+
+      api.startDrawingLine()
+
+      expect(useMapStore().viewMode).toBe(PLAN_VIEW)
+    })
+
+    it('should switch to the Build view when removal mode is switched on', () => {
+      const { api } = mountBuildTrack(map)
+
+      api.toggleRemoveMode()
+
+      expect(useMapStore().viewMode).toBe(BUILD_VIEW)
+    })
+
+    it('should stop a drawing in progress when switched to the Plan view', () => {
+      const { api } = mountBuildTrack(map, L.layerGroup(), pricedGrid)
+      api.startDrawingLine()
+
+      useMapStore().setViewMode(PLAN_VIEW)
+
+      expect(api.isDrawingActive.value).toBe(false)
+    })
+
+    it('should switch removal mode off when switched to the Plan view', () => {
+      const { api } = mountBuildTrack(map)
+      api.toggleRemoveMode()
+
+      useMapStore().setViewMode(PLAN_VIEW)
+
+      expect(api.isRemoving.value).toBe(false)
     })
   })
 

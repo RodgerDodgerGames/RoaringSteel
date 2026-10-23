@@ -31,6 +31,8 @@ public/data
 
 src/assets
 - icons/towns
+- icons/commodities: what towns produce, from [game-icons.net](https://game-icons.net)
+  (CC BY 3.0; authors in its CREDITS.md)
 - fonts
 - images
 

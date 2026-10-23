@@ -1,0 +1,109 @@
+# Commodity icon credits
+
+The commodity icons in this folder are from [game-icons.net](https://game-icons.net),
+licensed under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). They are
+unmodified copies of the SVGs in the [game-icons/icons](https://github.com/game-icons/icons)
+repository. The map credits game-icons.net in its attribution line.
+
+| File                     | Author                                                                        |
+| ------------------------ | ----------------------------------------------------------------------------- |
+| anvil.svg                | [Lorc](https://game-icons.net/1x1/lorc/anvil.html)                            |
+| beer-bottle.svg          | [Delapouite](https://game-icons.net/1x1/delapouite/beer-bottle.html)          |
+| book-pile.svg            | [Delapouite](https://game-icons.net/1x1/delapouite/book-pile.html)            |
+| bread.svg                | [Delapouite](https://game-icons.net/1x1/delapouite/bread.html)                |
+| brick-pile.svg           | [Delapouite](https://game-icons.net/1x1/delapouite/brick-pile.html)           |
+| bubbling-flask.svg       | [Lorc](https://game-icons.net/1x1/lorc/bubbling-flask.html)                   |
+| bus.svg                  | [Delapouite](https://game-icons.net/1x1/delapouite/bus.html)                  |
+| car-battery.svg          | [Delapouite](https://game-icons.net/1x1/delapouite/car-battery.html)          |
+| car-door.svg             | [Delapouite](https://game-icons.net/1x1/delapouite/car-door.html)             |
+| car-wheel.svg            | [Delapouite](https://game-icons.net/1x1/delapouite/car-wheel.html)            |
+| cardboard-box-closed.svg | [Delapouite](https://game-icons.net/1x1/delapouite/cardboard-box-closed.html) |
+| cargo-ship.svg           | [Delapouite](https://game-icons.net/1x1/delapouite/cargo-ship.html)           |
+| carrot.svg               | [Delapouite](https://game-icons.net/1x1/delapouite/carrot.html)               |
+| chicken.svg              | [Delapouite](https://game-icons.net/1x1/delapouite/chicken.html)              |
+| cigar.svg                | [Delapouite](https://game-icons.net/1x1/delapouite/cigar.html)                |
+| city-car.svg             | [Delapouite](https://game-icons.net/1x1/delapouite/city-car.html)             |
+| clay-brick.svg           | [Delapouite](https://game-icons.net/1x1/delapouite/clay-brick.html)           |
+| coal-wagon.svg           | [Delapouite](https://game-icons.net/1x1/delapouite/coal-wagon.html)           |
+| cog.svg                  | [Lorc](https://game-icons.net/1x1/lorc/cog.html)                              |
+| commercial-airplane.svg  | [Delapouite](https://game-icons.net/1x1/delapouite/commercial-airplane.html)  |
+| compact-disc.svg         | [Delapouite](https://game-icons.net/1x1/delapouite/compact-disc.html)         |
+| compass.svg              | [Lorc](https://game-icons.net/1x1/lorc/compass.html)                          |
+| concrete-bag.svg         | [Delapouite](https://game-icons.net/1x1/delapouite/concrete-bag.html)         |
+| cow.svg                  | [Delapouite](https://game-icons.net/1x1/delapouite/cow.html)                  |
+| crane.svg                | [Delapouite](https://game-icons.net/1x1/delapouite/crane.html)                |
+| drill.svg                | [Delapouite](https://game-icons.net/1x1/delapouite/drill.html)                |
+| envelope.svg             | [Lorc](https://game-icons.net/1x1/lorc/envelope.html)                         |
+| factory-arm.svg          | [Delapouite](https://game-icons.net/1x1/delapouite/factory-arm.html)          |
+| farm-tractor.svg         | [Delapouite](https://game-icons.net/1x1/delapouite/farm-tractor.html)         |
+| fertilizer-bag.svg       | [Delapouite](https://game-icons.net/1x1/delapouite/fertilizer-bag.html)       |
+| fishing-pole.svg         | [Delapouite](https://game-icons.net/1x1/delapouite/fishing-pole.html)         |
+| fork-knife-spoon.svg     | [Delapouite](https://game-icons.net/1x1/delapouite/fork-knife-spoon.html)     |
+| forklift.svg             | [Delapouite](https://game-icons.net/1x1/delapouite/forklift.html)             |
+| foundry-bucket.svg       | [Delapouite](https://game-icons.net/1x1/delapouite/foundry-bucket.html)       |
+| fridge.svg               | [Caro Asercion](https://game-icons.net/1x1/caro-asercion/fridge.html)         |
+| fruit-tree.svg           | [Delapouite](https://game-icons.net/1x1/delapouite/fruit-tree.html)           |
+| furnace.svg              | [Delapouite](https://game-icons.net/1x1/delapouite/furnace.html)              |
+| gears.svg                | [Lorc](https://game-icons.net/1x1/lorc/gears.html)                            |
+| gold-nuggets.svg         | [Delapouite](https://game-icons.net/1x1/delapouite/gold-nuggets.html)         |
+| grain-bundle.svg         | [Delapouite](https://game-icons.net/1x1/delapouite/grain-bundle.html)         |
+| greenhouse.svg           | [Delapouite](https://game-icons.net/1x1/delapouite/greenhouse.html)           |
+| hexagonal-nut.svg        | [Delapouite](https://game-icons.net/1x1/delapouite/hexagonal-nut.html)        |
+| i-beam.svg               | [Delapouite](https://game-icons.net/1x1/delapouite/i-beam.html)               |
+| laptop.svg               | [Delapouite](https://game-icons.net/1x1/delapouite/laptop.html)               |
+| leather-boot.svg         | [Lorc](https://game-icons.net/1x1/lorc/leather-boot.html)                     |
+| leather-vest.svg         | [Lorc](https://game-icons.net/1x1/lorc/leather-vest.html)                     |
+| light-bulb.svg           | [Lorc](https://game-icons.net/1x1/lorc/light-bulb.html)                       |
+| log.svg                  | [Delapouite](https://game-icons.net/1x1/delapouite/log.html)                  |
+| mason-jar.svg            | [Caro Asercion](https://game-icons.net/1x1/caro-asercion/mason-jar.html)      |
+| meat.svg                 | [Lorc](https://game-icons.net/1x1/lorc/meat.html)                             |
+| medicine-pills.svg       | [Delapouite](https://game-icons.net/1x1/delapouite/medicine-pills.html)       |
+| melting-metal.svg        | [Delapouite](https://game-icons.net/1x1/delapouite/melting-metal.html)        |
+| metal-bar.svg            | [Lorc](https://game-icons.net/1x1/lorc/metal-bar.html)                        |
+| metal-plate.svg          | [Delapouite](https://game-icons.net/1x1/delapouite/metal-plate.html)          |
+| microchip.svg            | [Lorc](https://game-icons.net/1x1/lorc/microchip.html)                        |
+| milk-carton.svg          | [Rihlsul](https://game-icons.net/1x1/rihlsul/milk-carton.html)                |
+| mountain-road.svg        | [Delapouite](https://game-icons.net/1x1/delapouite/mountain-road.html)        |
+| newspaper.svg            | [Delapouite](https://game-icons.net/1x1/delapouite/newspaper.html)            |
+| oil-drum.svg             | [Skoll](https://game-icons.net/1x1/skoll/oil-drum.html)                       |
+| oil-pump.svg             | [Delapouite](https://game-icons.net/1x1/delapouite/oil-pump.html)             |
+| paint-bucket.svg         | [Delapouite](https://game-icons.net/1x1/delapouite/paint-bucket.html)         |
+| paint-roller.svg         | [Delapouite](https://game-icons.net/1x1/delapouite/paint-roller.html)         |
+| photo-camera.svg         | [Delapouite](https://game-icons.net/1x1/delapouite/photo-camera.html)         |
+| pig.svg                  | [Skoll](https://game-icons.net/1x1/skoll/pig.html)                            |
+| pipes.svg                | [Delapouite](https://game-icons.net/1x1/delapouite/pipes.html)                |
+| plane-wing.svg           | [Delapouite](https://game-icons.net/1x1/delapouite/plane-wing.html)           |
+| planks.svg               | [Delapouite](https://game-icons.net/1x1/delapouite/planks.html)               |
+| plastic-duck.svg         | [Delapouite](https://game-icons.net/1x1/delapouite/plastic-duck.html)         |
+| plug.svg                 | [Delapouite](https://game-icons.net/1x1/delapouite/plug.html)                 |
+| radio-tower.svg          | [Delapouite](https://game-icons.net/1x1/delapouite/radio-tower.html)          |
+| railway.svg              | [Delapouite](https://game-icons.net/1x1/delapouite/railway.html)              |
+| recycle.svg              | [Lorc](https://game-icons.net/1x1/lorc/recycle.html)                          |
+| round-bottom-flask.svg   | [Lorc](https://game-icons.net/1x1/lorc/round-bottom-flask.html)               |
+| sailboat.svg             | [Delapouite](https://game-icons.net/1x1/delapouite/sailboat.html)             |
+| screw.svg                | [Delapouite](https://game-icons.net/1x1/delapouite/screw.html)                |
+| scroll-unfurled.svg      | [Lorc](https://game-icons.net/1x1/lorc/scroll-unfurled.html)                  |
+| sewing-machine.svg       | [Caro Asercion](https://game-icons.net/1x1/caro-asercion/sewing-machine.html) |
+| sheep.svg                | [Delapouite](https://game-icons.net/1x1/delapouite/sheep.html)                |
+| shrimp.svg               | [Delapouite](https://game-icons.net/1x1/delapouite/shrimp.html)               |
+| soap.svg                 | [Delapouite](https://game-icons.net/1x1/delapouite/soap.html)                 |
+| sofa.svg                 | [Delapouite](https://game-icons.net/1x1/delapouite/sofa.html)                 |
+| steam-locomotive.svg     | [Delapouite](https://game-icons.net/1x1/delapouite/steam-locomotive.html)     |
+| stethoscope.svg          | [Delapouite](https://game-icons.net/1x1/delapouite/stethoscope.html)          |
+| stone-block.svg          | [Lorc](https://game-icons.net/1x1/lorc/stone-block.html)                      |
+| stone-pile.svg           | [Delapouite](https://game-icons.net/1x1/delapouite/stone-pile.html)           |
+| sugar-cane.svg           | [Delapouite](https://game-icons.net/1x1/delapouite/sugar-cane.html)           |
+| t-shirt.svg              | [Delapouite](https://game-icons.net/1x1/delapouite/t-shirt.html)              |
+| toolbox.svg              | [Delapouite](https://game-icons.net/1x1/delapouite/toolbox.html)              |
+| truck.svg                | [Delapouite](https://game-icons.net/1x1/delapouite/truck.html)                |
+| turbine.svg              | [Delapouite](https://game-icons.net/1x1/delapouite/turbine.html)              |
+| tv.svg                   | [Delapouite](https://game-icons.net/1x1/delapouite/tv.html)                   |
+| warehouse.svg            | [Delapouite](https://game-icons.net/1x1/delapouite/warehouse.html)            |
+| washing-machine.svg      | [Delapouite](https://game-icons.net/1x1/delapouite/washing-machine.html)      |
+| water-tank.svg           | [Delapouite](https://game-icons.net/1x1/delapouite/water-tank.html)           |
+| wheat.svg                | [Lorc](https://game-icons.net/1x1/lorc/wheat.html)                            |
+| windmill.svg             | [Delapouite](https://game-icons.net/1x1/delapouite/windmill.html)             |
+| wine-glass.svg           | [Lorc](https://game-icons.net/1x1/lorc/wine-glass.html)                       |
+| wire-coil.svg            | [Delapouite](https://game-icons.net/1x1/delapouite/wire-coil.html)            |
+| wooden-crate.svg         | [Delapouite](https://game-icons.net/1x1/delapouite/wooden-crate.html)         |
+| yarn.svg                 | [Delapouite](https://game-icons.net/1x1/delapouite/yarn.html)                 |

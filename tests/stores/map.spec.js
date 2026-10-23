@@ -3,7 +3,7 @@
  *
  * Tests for the map state store including:
  * - Map reference management
- * - Zoom and center controls
+ * - The Plan and Build views, and where the Build view was left
  * - Drawing state management
  * - Towns layer management
  * - Holding real Leaflet objects without leaking their listeners
@@ -13,6 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import L from 'leaflet'
 import '@geoman-io/leaflet-geoman-free'
 import { useMapStore } from '@/stores/map'
+import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 
 describe('Map Store', () => {
   let mapStore
@@ -26,12 +27,13 @@ describe('Map Store', () => {
       expect(mapStore.map).toBeNull()
     })
 
-    it('should start with default zoom level of 3', () => {
-      expect(mapStore.mapZoom).toBe(3)
+    it('should start in the Plan view', () => {
+      expect(mapStore.viewMode).toBe(PLAN_VIEW)
     })
 
-    it('should start with default center at [40, -100]', () => {
-      expect(mapStore.mapCenter).toEqual([40, -100])
+    it('should start with no Build view position', () => {
+      expect(mapStore.mapZoom).toBeNull()
+      expect(mapStore.mapCenter).toBeNull()
     })
 
     it('should start with null towns layer', () => {
@@ -60,37 +62,42 @@ describe('Map Store', () => {
     })
   })
 
-  describe('setMapZoom', () => {
-    it('should set zoom level', () => {
-      mapStore.setMapZoom(10)
+  describe('setMapView', () => {
+    it('should record where the Build view is', () => {
+      mapStore.setMapView({ zoom: 8, center: [38.3, -104.6] })
 
-      expect(mapStore.mapZoom).toBe(10)
-    })
-
-    it('should allow any zoom value', () => {
-      mapStore.setMapZoom(1)
-      expect(mapStore.mapZoom).toBe(1)
-
-      mapStore.setMapZoom(18)
-      expect(mapStore.mapZoom).toBe(18)
+      expect(mapStore.mapZoom).toBe(8)
+      expect(mapStore.mapCenter).toEqual([38.3, -104.6])
     })
   })
 
-  describe('setMapCenter', () => {
-    it('should set map center coordinates', () => {
-      mapStore.setMapCenter([37.7749, -122.4194])
+  describe('setViewMode', () => {
+    it('should switch between the Plan and Build views', () => {
+      expect(mapStore.setViewMode(BUILD_VIEW)).toBe(true)
+      expect(mapStore.viewMode).toBe(BUILD_VIEW)
 
-      expect(mapStore.mapCenter).toEqual([37.7749, -122.4194])
+      mapStore.setViewMode(PLAN_VIEW)
+      expect(mapStore.viewMode).toBe(PLAN_VIEW)
     })
 
-    it('should handle different coordinate formats', () => {
-      // US coordinates
-      mapStore.setMapCenter([40.7128, -74.006])
-      expect(mapStore.mapCenter).toEqual([40.7128, -74.006])
+    it('should refuse a view that does not exist', () => {
+      mapStore.setViewMode(BUILD_VIEW)
 
-      // European coordinates
-      mapStore.setMapCenter([51.5074, -0.1278])
-      expect(mapStore.mapCenter).toEqual([51.5074, -0.1278])
+      expect(mapStore.setViewMode('satellite')).toBe(false)
+      expect(mapStore.viewMode).toBe(BUILD_VIEW)
+    })
+  })
+
+  describe('reset', () => {
+    it('should go back to the Plan view and forget the Build view position', () => {
+      mapStore.setViewMode(BUILD_VIEW)
+      mapStore.setMapView({ zoom: 8, center: [39, -105] })
+
+      mapStore.reset()
+
+      expect(mapStore.viewMode).toBe(PLAN_VIEW)
+      expect(mapStore.mapZoom).toBeNull()
+      expect(mapStore.mapCenter).toBeNull()
     })
   })
 
@@ -195,13 +202,12 @@ describe('Map Store', () => {
       const mockLayer = { id: 'layer' }
 
       mapStore.setMap(mockMap)
-      mapStore.setMapZoom(12)
-      mapStore.setMapCenter([35, -80])
+      mapStore.setMapView({ zoom: 7, center: [35, -80] })
       mapStore.setIsDrawingActive(true)
       mapStore.setTownsLayer(mockLayer)
 
       expect(mapStore.map).toEqual(mockMap)
-      expect(mapStore.mapZoom).toBe(12)
+      expect(mapStore.mapZoom).toBe(7)
       expect(mapStore.mapCenter).toEqual([35, -80])
       expect(mapStore.isDrawingActive).toBe(true)
       expect(mapStore.townsLayer).toEqual(mockLayer)

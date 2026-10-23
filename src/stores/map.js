@@ -4,8 +4,13 @@
  * Manages Leaflet map state and references. Provides centralized access
  * to the map instance, view settings, and layer references.
  *
+ * The map is seen in one of two views, Plan or Build (see
+ * composables/map/mapViews.js). The view is chosen in the top bar and
+ * applied to the map by useMapView.
+ *
  * Used by:
  * - MainMap.vue for map initialization
+ * - useMapView.js for switching between the Plan and Build views
  * - useBuildTrack.js for drawing operations
  * - useTowns.js for town marker management
  *
@@ -14,6 +19,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, shallowRef } from 'vue'
+import { MAP_VIEWS, PLAN_VIEW } from '@/composables/map/mapViews'
 
 export const useMapStore = defineStore('map', () => {
   // STATE
@@ -30,11 +36,23 @@ export const useMapStore = defineStore('map', () => {
   /** Leaflet map instance reference */
   const map = shallowRef(null)
 
-  /** Current map zoom level */
-  const mapZoom = ref(3)
+  /**
+   * Which view the map is in: PLAN_VIEW or BUILD_VIEW. Every game opens in
+   * the Plan view, new or loaded, so players see the whole board first.
+   */
+  const viewMode = ref(PLAN_VIEW)
 
-  /** Current map center coordinates [lat, lng] */
-  const mapCenter = ref([40, -100])
+  /**
+   * Zoom the Build view was last left at, so switching back returns there.
+   * Null until the player first opens the Build view. Saved with the game.
+   */
+  const mapZoom = ref(null)
+
+  /**
+   * Center [lat, lng] the Build view was last left at. Null until the player
+   * first opens the Build view. Saved with the game.
+   */
+  const mapCenter = ref(null)
 
   /** Leaflet LayerGroup containing town markers */
   const townsLayer = shallowRef(null)
@@ -49,14 +67,19 @@ export const useMapStore = defineStore('map', () => {
     map.value = newMap
   }
 
-  /** @param {number} zoom - Zoom level (1-18) */
-  const setMapZoom = (zoom) => {
-    mapZoom.value = zoom
-  }
-
-  /** @param {Array<number>} center - [latitude, longitude] */
-  const setMapCenter = (center) => {
-    mapCenter.value = center
+  /**
+   * Switches the map to the Plan or Build view. Anything else is refused, so
+   * a typo cannot leave the map in a view nothing knows how to show.
+   * @param {string} mode - PLAN_VIEW or BUILD_VIEW
+   * @returns {boolean} True if the view was set
+   */
+  const setViewMode = (mode) => {
+    if (!MAP_VIEWS.includes(mode)) {
+      console.warn(`Unknown map view: ${mode}`)
+      return false
+    }
+    viewMode.value = mode
+    return true
   }
 
   /** @param {boolean} status - Whether drawing mode is active */
@@ -70,18 +93,21 @@ export const useMapStore = defineStore('map', () => {
   }
 
   /**
-   * Resets the map store to initial state.
-   * Note: Only resets serializable state (zoom/center), not Leaflet instances.
+   * Resets the map store to initial state: the Plan view, with no Build view
+   * position yet.
+   * Note: Only resets serializable state, not Leaflet instances.
    */
   const reset = () => {
-    mapZoom.value = 3
-    mapCenter.value = [40, -100]
+    viewMode.value = PLAN_VIEW
+    mapZoom.value = null
+    mapCenter.value = null
     isDrawingActive.value = false
     // Note: map and townsLayer are Leaflet instances and should not be reset here
   }
 
   /**
-   * Sets the map view state (used for loading saved games).
+   * Records where the Build view is: kept up to date as the player moves
+   * around it, and restored from a saved game.
    * @param {Object} viewState - Object with zoom and center properties
    */
   const setMapView = (viewState) => {
@@ -92,14 +118,14 @@ export const useMapStore = defineStore('map', () => {
   return {
     // state
     map,
+    viewMode,
     mapZoom,
     mapCenter,
     townsLayer,
     isDrawingActive,
     // actions
     setMap,
-    setMapZoom,
-    setMapCenter,
+    setViewMode,
     setIsDrawingActive,
     setTownsLayer,
     reset,

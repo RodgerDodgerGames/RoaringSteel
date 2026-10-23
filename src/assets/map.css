@@ -35,7 +35,7 @@
 
 /* town tooltip (town display names under the icon) */
 .town-tooltip {
-  font-family: "Eutimia";
+  font-family: var(--font-town-name);
   font-size: 1rem;
   border: none;
   box-shadow: none;
@@ -49,7 +49,7 @@
 
 /* town popup */
 .town-popup {
-  font-family: "Averia Serif Libre";
+  font-family: var(--bulma-family-primary);
 }
 
 /* town popup list */

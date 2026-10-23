@@ -92,7 +92,7 @@ const commodities = computed(() => legendCommodities(towns.value))
     </button>
 
     <div v-show="isOpen" id="map-legend-panel" class="box map-legend__panel">
-      <h3 class="map-legend__heading">Towns</h3>
+      <h3 class="caps-label map-legend__heading">Towns</h3>
       <ul>
         <li v-for="row in townRows" :key="row.size" class="map-legend__row">
           <span class="map-legend__symbol">
@@ -107,7 +107,7 @@ const commodities = computed(() => legendCommodities(towns.value))
         </li>
       </ul>
 
-      <h3 class="map-legend__heading">On the map</h3>
+      <h3 class="caps-label map-legend__heading">On the map</h3>
       <ul>
         <li class="map-legend__row">
           <span class="map-legend__symbol">
@@ -162,7 +162,7 @@ const commodities = computed(() => legendCommodities(towns.value))
         </li>
       </ul>
 
-      <h3 class="map-legend__heading">Commodities</h3>
+      <h3 class="caps-label map-legend__heading">Commodities</h3>
       <p v-if="commodities.length === 0" class="is-size-7 has-text-grey">
         No town on this map produces anything.
       </p>
@@ -216,14 +216,10 @@ const commodities = computed(() => legendCommodities(towns.value))
   font-size: 0.85rem;
 }
 
-/* Small capitals, like the titles of the game screen's other sections */
+/* Its look comes from .caps-label (roaring-steel.scss); this spaces the
+   headings out between the groups */
 .map-legend__heading {
   margin: 0.75rem 0 0.25rem;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--bulma-text-weak);
 }
 
 .map-legend__heading:first-child {

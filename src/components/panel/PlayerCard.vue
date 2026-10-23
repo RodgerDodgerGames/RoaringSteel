@@ -25,11 +25,11 @@ const { activePlayer } = storeToRefs(playerStore)
 <template>
   <div v-if="activePlayer" class="player-card" :style="{ '--player-color': activePlayer.color }">
     <div class="player-card__who">
-      <span class="player-card__label">Your turn</span>
+      <span class="caps-label">Your turn</span>
       <span class="player-card__name">{{ activePlayer.name }}</span>
     </div>
     <div class="player-card__cash">
-      <span class="player-card__label">Cash</span>
+      <span class="caps-label">Cash</span>
       <span class="player-card__amount">{{ formatCurrency(activePlayer.cash) }}</span>
     </div>
   </div>
@@ -56,14 +56,6 @@ const { activePlayer } = storeToRefs(playerStore)
 
 .player-card__cash {
   align-items: flex-end;
-}
-
-.player-card__label {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--bulma-text-weak);
 }
 
 .player-card__name {

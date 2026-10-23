@@ -36,62 +36,99 @@ $beige-lighter: #eff0eb;
 );
 
 /////////////////////////////////////////////////////////////
-/// 3. Import Fonts
+/// 3. Map Styles
 /////////////////////////////////////////////////////////////
 
-// Define font for Eutemia I
+// Towns, popups and commodity icons on the Leaflet map. Pulled in here so
+// main.js has a single stylesheet to import.
+@use 'map';
+
+/////////////////////////////////////////////////////////////
+/// 4. Fonts
+/////////////////////////////////////////////////////////////
+
+// The fonts downloaded into ./fonts (each folder keeps its license).
+// `font-display: swap` shows the text in the fallback font while the file
+// loads, rather than hiding it.
 @font-face {
   font-family: 'Eutemia';
-  src: url('./fonts/eutemia-i/Eutemia.ttf');
+  src: url('./fonts/eutemia-i/Eutemia.ttf') format('truetype');
+  font-display: swap;
 }
 
-// Define font for Saddlebag
 @font-face {
   font-family: 'Saddlebag';
-  src: url('./fonts/saddlebag/Saddlebag.ttf');
+  src: url('./fonts/saddlebag/Saddlebag.ttf') format('truetype');
+  font-display: swap;
 }
 
-// Import Google fonts
+@font-face {
+  font-family: 'Steelplate Textura';
+  src: url('./fonts/steelplate-textura/SteelplateTextura.ttf') format('truetype');
+  font-display: swap;
+}
+
+// Google fonts: Averia Serif Libre is the body font (Bulma's $family-primary
+// above); Fredericka the Great and Stint Ultra Condensed are here to try out
 @import url('https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Fredericka+the+Great&family=Stint+Ultra+Condensed&display=swap');
 
-/////////////////////////////////////////////////////////////
-/// 4. Additional Root Customizations
-/////////////////////////////////////////////////////////////
-
+// Font slots: which font each part of the game uses. To try a different font
+// for a part, change its line here. The body text's font, which the town
+// popups on the map use too, is Bulma's $family-primary, set in section 2.
 :root {
-  --bulma-body-background-color: var(--bulma-scheme-main);
-  --bulma-body-size: 1em;
-  --bulma-body-min-width: 300px;
-  --bulma-body-rendering: optimizeLegibility;
-  --bulma-body-family: var(--bulma-family-primary);
-  --bulma-body-overflow-x: hidden;
-  --bulma-body-overflow-y: scroll;
-  --bulma-body-color: var(--bulma-text);
-  --bulma-body-font-size: 1rem;
-  --bulma-body-weight: var(--bulma-weight-normal);
-  --bulma-body-line-height: 1.5;
-  --bulma-code-family: var(--bulma-family-code);
-  --bulma-code-padding: 0.25em 0.5em 0.25em;
-  --bulma-code-weight: normal;
-  --bulma-code-size: 0.875em;
-  --bulma-small-font-size: 0.875em;
-  --bulma-hr-background-color: var(--bulma-background);
-  --bulma-hr-height: 2px;
-  --bulma-hr-margin: 1.5rem 0;
-  --bulma-strong-color: var(--bulma-text-strong);
-  --bulma-strong-weight: var(--bulma-weight-semibold);
-  --bulma-pre-font-size: 0.875em;
-  --bulma-pre-padding: 1.25rem 1.5rem;
-  --bulma-pre-code-font-size: 1em;
+  // The "Roaring Steel" name in the game screen's top bar
+  --font-brand: 'Eutemia', serif;
+  // The welcome screen's title
+  --font-welcome-title: 'Saddlebag', serif;
+  // Town names on the map
+  --font-town-name: 'Saddlebag', serif;
+}
+
+// One class per font, to try a font on any element straight from the
+// markup, e.g. <h1 class="title is-family-steelplate">. Like Bulma's own
+// is-family-* helpers, they win over a component's styles.
+.is-family-averia {
+  font-family: 'Averia Serif Libre', serif !important;
+}
+
+.is-family-eutemia {
+  font-family: 'Eutemia', serif !important;
+}
+
+.is-family-saddlebag {
+  font-family: 'Saddlebag', serif !important;
+}
+
+.is-family-steelplate {
+  font-family: 'Steelplate Textura', serif !important;
+}
+
+.is-family-fredericka {
+  font-family: 'Fredericka the Great', serif !important;
+}
+
+.is-family-stint {
+  font-family: 'Stint Ultra Condensed', serif !important;
 }
 
 /////////////////////////////////////////////////////////////
-/// 5. Custom Styling
+/// 5. Shared Custom Styles
 /////////////////////////////////////////////////////////////
 
-// Add any additional custom styles below
-body {
-  font-family: var(--bulma-body-family);
-  font-size: var(--bulma-body-font-size);
-  line-height: var(--bulma-body-line-height);
+// A small, bold, gray, spaced-out capitals label: the titles of the game
+// screen's sections, the map legend's headings, and the player card's
+// "Your turn" and "Cash". Bulma has no class for this look, so it lives here
+// once instead of in each component. Add `is-size-7` for the larger titles.
+.caps-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bulma-text-weak);
+}
+
+// The panels of the new-game setup screens (player select and confirm)
+.welcome-modal-container {
+  max-width: 70%;
+  border-radius: 20px;
 }

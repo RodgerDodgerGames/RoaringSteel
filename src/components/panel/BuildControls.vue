@@ -171,7 +171,6 @@ const sectionsThisTurn = computed(() =>
 
 .build-controls__sections {
   margin: 0.5rem 0;
-  padding: 0;
   list-style: none;
   font-variant-numeric: tabular-nums;
 }

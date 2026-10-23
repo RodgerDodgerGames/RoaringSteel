@@ -123,12 +123,12 @@ function handleConfirmed() {
 <style scoped>
 /* Additional styling for the welcome screen */
 .hero {
-  background-image: url('src/assets/images/Unknown.jpg');
+  background-image: url('@/assets/images/Unknown.jpg');
   background-size: cover;
   background-position: center;
 }
 .roaring-title {
-  font-family: 'Saddlebag';
+  font-family: var(--font-welcome-title);
   font-size: 4rem;
 }
 #welcomeContainer {

@@ -84,7 +84,7 @@ function lineEvents(index) {
 
 <template>
   <article class="demand-card" :aria-label="label">
-    <ul class="demand-card__list">
+    <ul>
       <li v-for="(demand, index) in demands" :key="index">
         <!-- A button where the line can be pinned; plain text in a peeked-at hand -->
         <component
@@ -118,12 +118,6 @@ function lineEvents(index) {
   border-radius: var(--bulma-radius);
   background: var(--bulma-scheme-main);
   box-shadow: var(--bulma-shadow);
-}
-
-.demand-card__list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
 }
 
 /*

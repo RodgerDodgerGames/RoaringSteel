@@ -55,7 +55,7 @@ const isCollapsed = useStorage(`roaringsteel_${props.storageKey}_collapsed`, fal
         :aria-expanded="!isCollapsed"
         @click="isCollapsed = !isCollapsed"
       >
-        <span class="collapsible-section__title">{{ title }}</span>
+        <span class="caps-label is-size-7">{{ title }}</span>
         <span v-if="badge" class="tag is-rounded">{{ badge }}</span>
         <span class="icon collapsible-section__chevron" aria-hidden="true">
           <i class="fas" :class="isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
@@ -98,14 +98,6 @@ const isCollapsed = useStorage(`roaringsteel_${props.storageKey}_collapsed`, fal
 
 .collapsible-section__toggle:hover {
   background: var(--bulma-scheme-main-ter);
-}
-
-.collapsible-section__title {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--bulma-text-weak);
 }
 
 .collapsible-section__chevron {

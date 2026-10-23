@@ -150,16 +150,18 @@ function openDialog(name) {
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 0.4rem 1rem;
+  padding: 0.5rem 1rem;
   background: var(--bulma-primary);
   color: var(--bulma-primary-invert);
 }
 
 .top-bar__brand {
   font-family: 'Eutemia', serif;
-  font-size: 1.75rem;
+  font-size: 2.5rem;
   line-height: 1;
   white-space: nowrap;
+  margin-block: -0.5rem; /* counter the top-bar's padding */
+  margin-right: auto; /* soaks up spare space */
 }
 
 .top-bar__round {
@@ -201,7 +203,7 @@ function openDialog(name) {
 .top-bar__players {
   display: flex;
   gap: 0.5rem;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   margin: 0;

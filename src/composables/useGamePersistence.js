@@ -145,13 +145,20 @@ export function useGamePersistence() {
    * people can play again without typing everything in a second time. The
    * roster can still be changed before the new game starts.
    *
+   * A player whose color the roster refuses — one already taken, which only a
+   * damaged or hand-edited save could hold — is kept with the first color
+   * still free, rather than left out.
+   *
    * Saving the old game first, if wanted, is up to the caller: this does not
    * save anything.
    */
   function startNewGame() {
     const roster = playerStore.players.map(({ name, color }) => ({ name, color }))
     resetGame()
-    roster.forEach((draft) => playerStore.addDraftPlayer(draft))
+    roster.forEach(
+      (draft) =>
+        playerStore.addDraftPlayer(draft) ?? playerStore.addDraftPlayer({ name: draft.name })
+    )
   }
 
   /**

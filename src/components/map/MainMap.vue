@@ -23,7 +23,7 @@
 
 <script setup>
 import { storeToRefs } from 'pinia'
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -71,6 +71,18 @@ onMounted(() => {
     // add townsLayer to store
     mapStore.setTownsLayer(townsLayer.value)
   }
+})
+
+// The map goes when the game screen does (a new game, say). Leaflet keeps
+// listening to the window until a map is removed, so one left behind would
+// keep working on a container that is gone. The store lets go of it too, so
+// nothing reaches the old map before the next game's is made. useTowns,
+// called above, takes its layers off first: its own unmount hook was
+// registered before this one.
+onUnmounted(() => {
+  map.value?.remove()
+  mapStore.setMap(null)
+  mapStore.setTownsLayer(null)
 })
 
 // Leaflet measures its container once and only re-measures when told. Without

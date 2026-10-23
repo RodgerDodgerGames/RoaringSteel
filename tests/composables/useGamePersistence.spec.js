@@ -431,6 +431,20 @@ describe('useGamePersistence', () => {
       ])
     })
 
+    it('should keep a player whose color is already taken, with a free color', () => {
+      // Only a damaged or hand-edited save could hold two players in one color
+      playerStore.setPlayers([
+        ...playerStore.players,
+        { id: 4, name: 'Dana', color: 'RED', cash: 0, isTurn: false }
+      ])
+
+      persistence.startNewGame()
+
+      const dana = playerStore.draftPlayers.find(({ name }) => name === 'Dana')
+      expect(dana).toBeDefined()
+      expect(dana.color.toLowerCase()).not.toBe('red')
+    })
+
     it('should start the new setup empty when the game had no players', () => {
       playerStore.reset()
 

@@ -18,52 +18,28 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useGamePersistence } from '@/composables/useGamePersistence'
+import { useSaveToFile } from '@/composables/useSaveToFile'
 
 // Component events
 const emit = defineEmits(['close'])
 
-// Get export functionality from game persistence composable
-const { exportToFile } = useGamePersistence()
+// The file name, its checks and the download, shared with the New Game dialog
+const { filename, fileLabel, errorMessage, save } = useSaveToFile()
 
-// Reactive state
-const filename = ref('roaring-steel-save') // Default filename for exported save
-const isExporting = ref(false) // Loading state during export operation
 const successMessage = ref('') // Success feedback message
-const errorMessage = ref('') // Error feedback message
 
 /**
- * Handles the export of the current game state to a JSON file.
- *
- * Validates the filename, clears previous messages, and triggers the file download.
- * Shows success or error feedback based on the export result.
+ * Downloads the game as a save file under the typed name, then closes the
+ * dialog after a moment, so the player sees it worked. A failure keeps the
+ * dialog open with the reason showing.
  */
-async function handleExport() {
-  // Validate filename input
-  if (!filename.value.trim()) {
-    errorMessage.value = 'Please enter a filename'
-    return
-  }
-
-  // Reset UI state
-  isExporting.value = true
-  errorMessage.value = ''
+function handleExport() {
   successMessage.value = ''
-
-  // Attempt to export game to file
-  const success = exportToFile(filename.value.trim())
-
-  isExporting.value = false
-
-  // Display appropriate feedback message
-  if (success) {
+  if (save()) {
     successMessage.value = 'Game exported successfully!'
-    // close modal after a short delay
     setTimeout(() => {
       handleClose()
     }, 1000)
-  } else {
-    errorMessage.value = 'Failed to export game. Please try again.'
   }
 }
 
@@ -119,20 +95,14 @@ function handleClose() {
                 class="input"
                 type="text"
                 placeholder="Enter filename (without .json)"
-                :disabled="isExporting"
               />
             </div>
-            <p class="help">File will be saved as {{ filename || 'filename' }}.json</p>
+            <p class="help">File will be saved as {{ fileLabel }}</p>
           </div>
 
           <div class="field">
             <div class="control">
-              <button
-                class="button is-primary is-fullwidth"
-                :class="{ 'is-loading': isExporting }"
-                :disabled="isExporting"
-                @click="handleExport"
-              >
+              <button class="button is-primary is-fullwidth" @click="handleExport">
                 <span class="icon">
                   <i class="fas fa-download"></i>
                 </span>

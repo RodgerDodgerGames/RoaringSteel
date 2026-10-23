@@ -9,6 +9,11 @@
   auto-saves replace them after a few turns, so a file is the safe way to
   keep a game to come back to.
 
+  Saving does not start the new game by itself. The browser may ask where
+  to put the file, and the player may cancel, which this dialog cannot see;
+  so once the download has started it asks one more time, and the game is
+  only given up when the player says so.
+
   This dialog only asks. Clearing the game away and moving to the new game's
   setup are left to whoever listens for `start`.
 
@@ -19,34 +24,18 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useGamePersistence } from '@/composables/useGamePersistence'
+import { useSaveToFile } from '@/composables/useSaveToFile'
 
 const emit = defineEmits(['close', 'start'])
 
-const { exportToFile } = useGamePersistence()
+const { filename, fileLabel, errorMessage, save } = useSaveToFile()
 
-/** Name for the save file, without the .json */
-const filename = ref('roaring-steel-save')
+/** True once the save file has been downloaded */
+const isSaved = ref(false)
 
-/** Why the save failed, if it did; the new game is not started then */
-const errorMessage = ref('')
-
-/**
- * Downloads the game as a save file, then starts the new game. If the save
- * fails, the game is kept and the player is told, so a game they meant to
- * keep is never thrown away.
- */
-function saveAndStart() {
-  errorMessage.value = ''
-  if (!filename.value.trim()) {
-    errorMessage.value = 'Please enter a filename'
-    return
-  }
-  if (!exportToFile(filename.value.trim())) {
-    errorMessage.value = 'The game could not be saved, so it has been kept. Please try again.'
-    return
-  }
-  emit('start')
+/** Downloads the save file, then asks once more before ending the game */
+function handleSave() {
+  isSaved.value = save()
 }
 </script>
 
@@ -60,38 +49,52 @@ function saveAndStart() {
       </header>
 
       <section class="modal-card-body">
-        <p class="mb-4">
-          This game ends here. Save it first if you might want to come back to it: it is downloaded
-          as a file you can open again with Load Game.
-        </p>
-
-        <div v-if="errorMessage" class="notification is-danger is-light">
-          {{ errorMessage }}
-        </div>
-
-        <div class="field">
-          <label class="label" for="new-game-filename">Save file name</label>
-          <div class="control">
-            <input
-              id="new-game-filename"
-              v-model="filename"
-              class="input"
-              type="text"
-              placeholder="Enter filename (without .json)"
-            />
+        <template v-if="isSaved">
+          <div class="notification is-success is-light">
+            Your game is downloading as {{ fileLabel }}. Open it again any time with Load Game.
           </div>
-          <p class="help">Saved as {{ filename || 'filename' }}.json</p>
-        </div>
+          <p>Once the file is safely saved, start the new game.</p>
+        </template>
+
+        <template v-else>
+          <p class="mb-4">
+            This game ends here. Save it first if you might want to come back to it: it is
+            downloaded as a file you can open again with Load Game.
+          </p>
+
+          <div v-if="errorMessage" class="notification is-danger is-light">
+            {{ errorMessage }}
+          </div>
+
+          <div class="field">
+            <label class="label" for="new-game-filename">Save file name</label>
+            <div class="control">
+              <input
+                id="new-game-filename"
+                v-model="filename"
+                class="input"
+                type="text"
+                placeholder="Enter filename (without .json)"
+              />
+            </div>
+            <p class="help">Saved as {{ fileLabel }}</p>
+          </div>
+        </template>
       </section>
 
       <footer class="modal-card-foot buttons">
-        <button class="button is-primary" @click="saveAndStart">
-          <span class="icon"><i class="fas fa-download" aria-hidden="true"></i></span>
-          <span>Save, then start new game</span>
-        </button>
-        <button class="button is-danger is-outlined" @click="emit('start')">
-          Start new game without saving
-        </button>
+        <template v-if="isSaved">
+          <button class="button is-primary" @click="emit('start')">Start new game</button>
+        </template>
+        <template v-else>
+          <button class="button is-primary" @click="handleSave">
+            <span class="icon"><i class="fas fa-download" aria-hidden="true"></i></span>
+            <span>Save game</span>
+          </button>
+          <button class="button is-danger is-outlined" @click="emit('start')">
+            Start new game without saving
+          </button>
+        </template>
         <button class="button" @click="emit('close')">Keep playing</button>
       </footer>
     </div>

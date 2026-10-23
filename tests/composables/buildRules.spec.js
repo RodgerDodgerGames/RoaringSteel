@@ -129,6 +129,31 @@ describe('lineBlock over water', () => {
   it('should let a line make several short crossings with land between', () => {
     expect(lineBlock([at(0), at(6)], rulesWith([1, 2, 4, 5]))).toBeNull()
   })
+
+  it('should refuse a crossing drawn over several legs, however short each', () => {
+    const water = Array.from({ length: gameRules.bridges.maxCells + 1 }, (_, i) => i + 1)
+
+    const legs = [at(0), ...water.map((cell) => at(cell)), at(water.length + 1)]
+
+    expect(lineBlock(legs, rulesWith(water))).toEqual({ reason: 'water' })
+  })
+
+  it('should not let a finished line end on water', () => {
+    const line = [at(0), at(1)]
+
+    expect(lineBlock(line, rulesWith([1]))).toBeNull()
+    expect(lineBlock(line, rulesWith([1]), { isFinished: true })).toEqual({
+      reason: 'endsOnWater'
+    })
+  })
+
+  it('should let a finished line end at a town whose cell is water', () => {
+    const rules = rulesWith([1])
+
+    expect(
+      lineBlock([at(0), at(1)], { ...rules, townCells: [rules.grid[1]] }, { isFinished: true })
+    ).toBeNull()
+  })
 })
 
 describe('blockMessage', () => {

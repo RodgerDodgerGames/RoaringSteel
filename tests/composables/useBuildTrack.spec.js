@@ -665,6 +665,22 @@ describe('useBuildTrack', () => {
       expect(hintMarker.getTooltip().getContent()).toBe(`Cost: ${bridge} (bridge ${bridge})`)
     })
 
+    it('should take back a leg that makes a crossing begun on an earlier leg too long', () => {
+      const { workingLayer } = startLineAtTown()
+      const place = (latlng) => {
+        workingLayer.addLatLng(latlng)
+        workingLayer.fire('pm:vertexadded', { latlng })
+      }
+
+      // Partway over the water: a crossing as long as a bridge may be
+      place(centerOf(span - 1))
+      // On to land, over one more water cell: the crossing is now too long,
+      // though this leg alone crosses no more water than allowed
+      place(centerOf(span + 1))
+
+      expect(workingLayer.getLatLngs()).toHaveLength(2)
+    })
+
     it('should take back a leg that crosses more water than a bridge can', () => {
       const { api, workingLayer } = startLineAtTown()
 

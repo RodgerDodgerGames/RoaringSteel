@@ -19,6 +19,7 @@
 
 import { nlcdCostMap } from '@/config/nlcd'
 import { gameRules } from '@/config/game'
+import { gridConfig } from '@/config/grid'
 
 /**
  * The land cover cost the grid gives open water (NLCD class 11). The grid
@@ -46,18 +47,24 @@ export function bridgeCellCost(position) {
   return gameRules.bridges.costPerCell * position
 }
 
+/** The longest bridge track may cross water on, in km */
+export const MAX_BRIDGE_KM = (gameRules.bridges.maxCells * gridConfig.cellSize) / 1000
+
 /**
- * The longest row of water cells in a list of cells, in the order a line
- * crosses them.
- * @param {Array<Object>} cells - Grid cells, in order along a line
+ * The longest crossing of water along a line: the most water cells it
+ * passes through between one land cell and the next. A water cell the line
+ * comes back to within a crossing counts once.
+ * @param {Array<Object>} path - Grid cells in order along a line (see
+ *   `cellPath` in trackCost.js)
  * @returns {number} How many water cells the longest crossing has; 0 for none
  */
-export function longestCrossing(cells) {
+export function longestCrossing(path) {
   let longest = 0
-  let run = 0
-  cells.forEach((cell) => {
-    run = isWaterCell(cell) ? run + 1 : 0
-    longest = Math.max(longest, run)
+  const crossing = new Set()
+  path.forEach((cell) => {
+    if (isWaterCell(cell)) crossing.add(cell)
+    else crossing.clear()
+    longest = Math.max(longest, crossing.size)
   })
   return longest
 }

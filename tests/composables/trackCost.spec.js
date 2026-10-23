@@ -144,6 +144,14 @@ describe('trackCost', () => {
       expect(priceLine([centerOf(0), centerOf(4)], grid)).toBe(100 + BRIDGE + 200 + BRIDGE + 300)
     })
 
+    // Following a shore can take a line back over land it has crossed already;
+    // the water either side of that land is two crossings, not one long one
+    it('should count water either side of land crossed twice as two crossings', () => {
+      const grid = rowWithWater(['W', 100, 'W'])
+
+      expect(priceLine([centerOf(1), centerOf(0), centerOf(2)], grid)).toBe(100 + BRIDGE + BRIDGE)
+    })
+
     it('should say how much of the price is bridges', () => {
       const grid = rowWithWater([100, 'W', 'W', 300])
 

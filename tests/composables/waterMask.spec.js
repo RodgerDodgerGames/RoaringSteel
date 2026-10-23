@@ -1,35 +1,30 @@
 /**
  * Water Mask Tests
  *
- * The map shades the grid cells the game counts as water, so players can see
- * where a bridge would be needed. Only water inside the region is shaded;
- * outside it the map is grayed out already.
+ * The map shades every grid cell the game counts as water, as a square
+ * around the cell's center, so players can see where a bridge is needed.
  */
 
 import { describe, it, expect } from 'vitest'
-import { waterCellBounds } from '@/composables/map/waterMask'
+import { waterSquares } from '@/composables/map/waterMask'
 import { nlcdCostMap } from '@/config/nlcd'
 
 const lake = { id: '0-0', centroid: { lat: 40, lng: -100 }, landCover: nlcdCostMap[11] }
 const farm = { id: '0-1', centroid: { lat: 40, lng: -99.9 }, landCover: nlcdCostMap[82] }
-const everywhere = () => true
 
-describe('waterCellBounds', () => {
+describe('waterSquares', () => {
   it('should shade water cells and leave land alone', () => {
-    expect(waterCellBounds([lake, farm], everywhere)).toHaveLength(1)
+    expect(waterSquares([lake, farm])).toHaveLength(1)
   })
 
   it("should shade a water cell's whole square, around its center", () => {
-    const [[[south, west], [north, east]]] = waterCellBounds([lake], everywhere)
+    const [[corners]] = waterSquares([lake])
+    const lats = corners.map(([lat]) => lat)
+    const lngs = corners.map(([, lng]) => lng)
 
-    expect(south).toBeLessThan(40)
-    expect(north).toBeGreaterThan(40)
-    expect(west).toBeLessThan(-100)
-    expect(east).toBeGreaterThan(-100)
-    expect(north - 40).toBeCloseTo(40 - south)
-  })
-
-  it('should leave out water outside the region', () => {
-    expect(waterCellBounds([lake], () => false)).toEqual([])
+    expect(Math.min(...lats)).toBeLessThan(40)
+    expect(Math.max(...lats)).toBeGreaterThan(40)
+    expect(Math.min(...lngs)).toBeLessThan(-100)
+    expect(Math.max(...lngs)).toBeGreaterThan(-100)
   })
 })

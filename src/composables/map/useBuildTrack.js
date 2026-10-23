@@ -467,7 +467,9 @@ export default function useBuildTrack(grid, formatCurrency) {
         // A leg that breaks a build rule is taken straight back off, so the
         // line never holds track that could not be built; the player is told
         // why, and carries on from the vertex before
-        const message = whyNotBuildable(workingLayer.value.getLatLngs().slice(-2))
+        // The whole line, not just the new leg: a crossing of water can run
+        // over several legs
+        const message = whyNotBuildable(workingLayer.value.getLatLngs())
         if (message) {
           const drawing = mapStore.map.pm.Draw.Line
           drawing._removeLastVertex()
@@ -503,7 +505,7 @@ export default function useBuildTrack(grid, formatCurrency) {
     if (e.layer?.pm?._shape === 'Line') {
       // Checked again as a whole, however the drawing ended: each leg was
       // checked as it was placed, but a finished line is what gets built
-      const blocked = whyNotBuildable(e.layer.getLatLngs())
+      const blocked = whyNotBuildable(e.layer.getLatLngs(), { isFinished: true })
       if (blocked) {
         discardDrawnLayer(e.layer)
         buildError.value = `${blocked} That section was not built.`
@@ -789,7 +791,7 @@ export default function useBuildTrack(grid, formatCurrency) {
     // dashed line out to the cursor turns red. Its cost is left out of the
     // line's running total: counted, it could push the total over budget, and
     // the panel would blame money for a leg the border rules out.
-    const message = whyNotBuildable([workingLayer.value.getLatLngs().at(-1), latlng])
+    const message = whyNotBuildable([...workingLayer.value.getLatLngs(), latlng])
     const leg = repriceLine(message ? undefined : latlng)
     hintMarker.setTooltipContent(message ?? legTooltip(leg))
     const hintLine = mapStore.map.pm.Draw.Line._hintline
@@ -812,13 +814,14 @@ export default function useBuildTrack(grid, formatCurrency) {
   }
 
   /**
-   * Why a line, or a leg of one, may not be built, in words for the player;
-   * null if it may.
+   * Why a line may not be built, in words for the player; null if it may.
    * @param {Array<Object>} latlngs - The line's vertices
+   * @param {Object} [options] - See `lineBlock`: `isFinished` for a line
+   *   that is done, which may not end on water
    * @returns {string|null} The reason, or null
    */
-  function whyNotBuildable(latlngs) {
-    const block = lineBlock(latlngs, buildRules.value)
+  function whyNotBuildable(latlngs, options) {
+    const block = lineBlock(latlngs, buildRules.value, options)
     return block && blockMessage(block, gameStore.region?.properties?.NAME)
   }
 

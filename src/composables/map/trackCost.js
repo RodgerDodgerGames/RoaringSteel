@@ -121,12 +121,25 @@ export function pointsAlongLine(latlngs) {
  * @returns {Array<Object>} The cells crossed
  */
 export function cellsAlongLine(latlngs, grid) {
-  const cells = new Map()
+  return [...new Set(cellPath(latlngs, grid))]
+}
+
+/**
+ * The grid cells a line passes through, in the order it passes through them.
+ * A cell the line comes back to later is listed again, so the path shows
+ * where the line goes in and out of water; it is only listed once for as long
+ * as the line stays in it.
+ * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
+ * @param {Array<Object>} grid - Grid cells
+ * @returns {Array<Object>} The cells, in order along the line
+ */
+export function cellPath(latlngs, grid) {
+  const path = []
   pointsAlongLine(latlngs).forEach((point) => {
     const cell = findCell(point, grid)
-    if (cell && !cells.has(cell.id)) cells.set(cell.id, cell)
+    if (cell && cell !== path.at(-1)) path.push(cell)
   })
-  return [...cells.values()]
+  return path
 }
 
 /**
@@ -134,7 +147,8 @@ export function cellsAlongLine(latlngs, grid) {
  *
  * Each land cell the line passes through adds its own cost. Each water cell
  * adds a bridge instead, priced by how far into its crossing it is: the line
- * is followed cell by cell, and a run of water cells is one crossing.
+ * is followed cell by cell (see `cellPath`), and the water cells it passes
+ * through between one land cell and the next are one crossing.
  *
  * A land cell whose cost is missing (its terrain data failed to load) adds
  * nothing rather than making the whole line unpriceable.
@@ -147,18 +161,25 @@ export function cellsAlongLine(latlngs, grid) {
 export function linePrice(latlngs, grid) {
   let total = 0
   let bridges = 0
-  // How many water cells in a row the line has crossed so far
-  let crossing = 0
-  cellsAlongLine(latlngs, grid).forEach((cell) => {
-    if (isWaterCell(cell)) {
-      crossing += 1
-      const bridge = bridgeCellCost(crossing)
-      bridges += bridge
-      total += bridge
+  // Cells already paid for: each is charged once, however often it is crossed
+  const charged = new Set()
+  // The water cells of the crossing the line is on, if it is on one
+  const crossing = new Set()
+
+  cellPath(latlngs, grid).forEach((cell) => {
+    if (!isWaterCell(cell)) {
+      crossing.clear()
+      if (!charged.has(cell) && Number.isFinite(cell.cost)) total += cell.cost
+      charged.add(cell)
       return
     }
-    crossing = 0
-    if (Number.isFinite(cell.cost)) total += cell.cost
+    crossing.add(cell)
+    if (charged.has(cell)) return
+    charged.add(cell)
+    // Priced by how far into its crossing the cell is
+    const bridge = bridgeCellCost(crossing.size)
+    bridges += bridge
+    total += bridge
   })
   return { total, bridges }
 }

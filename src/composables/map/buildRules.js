@@ -14,7 +14,11 @@
  *
  * And track may bridge water, but only so far: a crossing of more water
  * cells in a row than the longest bridge allowed cannot be built (see
- * water.js and `gameRules.bridges`).
+ * water.js and `gameRules.bridges`). A bridge has to reach land, so a
+ * finished line may not end on water — or a long crossing could be built
+ * as two short ones, the second starting where the first stopped midstream.
+ * A line ending at a town is the exception: a town on the shore can have
+ * its cell counted as water.
  *
  * A line is checked at the same points its price is worked out from (see
  * trackCost.js), a quarter of a cell apart, so a leg cannot slip across a
@@ -25,10 +29,9 @@
  * @module composables/map/buildRules
  */
 
-import { gridConfig } from '@/config/grid'
 import { gameRules } from '@/config/game'
-import { findCell, pointsAlongLine, cellsAlongLine, cellBounds } from '@/composables/map/trackCost'
-import { longestCrossing } from '@/composables/map/water'
+import { findCell, pointsAlongLine, cellPath, cellBounds } from '@/composables/map/trackCost'
+import { isWaterCell, longestCrossing, MAX_BRIDGE_KM } from '@/composables/map/water'
 
 /**
  * Whether a point lies inside a grid cell.
@@ -62,18 +65,28 @@ export function townCells(towns, grid) {
  * @param {Function} rules.isInRegion - Whether a point is inside the region
  *   being played (see `regionTest` in region.js)
  * @param {Array<Object>} rules.townCells - The cells towns sit in (see `townCells`)
+ * @param {Object} [options]
+ * @param {boolean} [options.isFinished] - True for a finished line, which may
+ *   not end on water; a line still being drawn may stop there for now
  * @returns {{reason: 'outside', point: {lat: number, lng: number}}|{reason:
- *   'water'}|null} The rule broken — for the region, with the first point
- *   along the line that breaks it — or null if the line may be built
+ *   'water'|'endsOnWater'}|null} The rule broken — for the region, with the
+ *   first point along the line that breaks it — or null if the line may be built
  */
-export function lineBlock(latlngs, { grid, isInRegion, townCells }) {
+export function lineBlock(latlngs, { grid, isInRegion, townCells }, { isFinished = false } = {}) {
   for (const point of pointsAlongLine(latlngs)) {
     if (isInRegion(point)) continue
     if (townCells.some((cell) => isInCell(point, cell))) continue
     return { reason: 'outside', point }
   }
-  if (longestCrossing(cellsAlongLine(latlngs, grid)) > gameRules.bridges.maxCells) {
+
+  const path = cellPath(latlngs, grid)
+  if (longestCrossing(path) > gameRules.bridges.maxCells) {
     return { reason: 'water' }
+  }
+
+  const end = path.at(-1)
+  if (isFinished && end && isWaterCell(end) && !townCells.includes(end)) {
+    return { reason: 'endsOnWater' }
   }
   return null
 }
@@ -88,10 +101,10 @@ export function blockMessage(block, regionName) {
   switch (block.reason) {
     case 'outside':
       return `Track can't go outside ${regionName || 'the map'}.`
-    case 'water': {
-      const km = (gameRules.bridges.maxCells * gridConfig.cellSize) / 1000
-      return `Too much water to bridge: a bridge can span at most ${km} km.`
-    }
+    case 'water':
+      return `Too much water to bridge: a bridge can span at most ${MAX_BRIDGE_KM} km.`
+    case 'endsOnWater':
+      return "Track can't end on water: a bridge has to reach land."
     default:
       return "Track can't go there."
   }

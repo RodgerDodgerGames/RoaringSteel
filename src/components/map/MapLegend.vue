@@ -30,8 +30,7 @@ import {
   TIES_STYLE
 } from '@/composables/map/trackStyles'
 import { PIN_COLORS } from '@/config/demands'
-import { gameRules } from '@/config/game'
-import { gridConfig } from '@/config/grid'
+import { MAX_BRIDGE_KM } from '@/composables/map/water'
 
 const { towns } = storeToRefs(useTownsStore())
 const playerStore = usePlayerStore()
@@ -70,9 +69,6 @@ const sampleEnds = {
 const haloSample = { icon: TOWN_ICONS.small, shadow: haloShadow([PIN_COLORS[0]]) }
 
 const commodities = computed(() => legendCommodities(towns.value))
-
-/** The longest bridge track may cross water on, in km */
-const bridgeKm = (gameRules.bridges.maxCells * gridConfig.cellSize) / 1000
 </script>
 
 <template>
@@ -104,7 +100,7 @@ const bridgeKm = (gameRules.bridges.maxCells * gridConfig.cellSize) / 1000
           <span class="map-legend__symbol">
             <span class="map-legend__water"></span>
           </span>
-          Water: bridged at extra cost, up to {{ bridgeKm }} km
+          Water: bridged at extra cost, up to {{ MAX_BRIDGE_KM }} km
         </li>
         <li class="map-legend__row">
           <!-- A short piece of track, drawn the way the map draws it: a dark

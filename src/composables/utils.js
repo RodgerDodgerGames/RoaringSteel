@@ -167,11 +167,19 @@ export const formatCurrency = (value) => {
   }).format(value)
 }
 
-/** Formats money compactly: "$20.3K", "$8K", "$1.3M" */
+/**
+ * Formats money compactly: "$20.3K", "$8K", "$1.3M".
+ *
+ * The smallest number of decimal places is set to none outright. Left out,
+ * some browsers (Chrome among them) fill it in from the dollar's two decimal
+ * places, cut to the one allowed, and a whole number of thousands comes out
+ * as "$8.0K".
+ */
 const shortCurrencyFormat = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',
   notation: 'compact',
+  minimumFractionDigits: 0,
   maximumFractionDigits: 1
 })
 

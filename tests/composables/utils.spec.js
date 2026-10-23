@@ -284,6 +284,28 @@ describe('formatShortCurrency', () => {
     expect(formatShortCurrency(8000)).toBe('$8k')
   })
 
+  it('should drop the decimal in browsers that give money cents by default', async () => {
+    // Chrome fills in a money format's smallest number of decimal places from
+    // the dollar's two (cut to the one allowed), so 8,000 came out "$8.0k".
+    // Node does not, so a browser that does is stood in for here.
+    const RealNumberFormat = Intl.NumberFormat
+    const centsByDefault = function (locale, options = {}) {
+      const minimumFractionDigits =
+        options.minimumFractionDigits ?? Math.min(2, options.maximumFractionDigits ?? 2)
+      return new RealNumberFormat(locale, { ...options, minimumFractionDigits })
+    }
+    vi.stubGlobal('Intl', Object.assign(Object.create(Intl), { NumberFormat: centsByDefault }))
+    try {
+      // Imported afresh, so its formatter is made by the stand-in
+      vi.resetModules()
+      const utils = await import('@/composables/utils')
+      expect(utils.formatShortCurrency(8000)).toBe('$8k')
+      expect(utils.formatShortCurrency(20300)).toBe('$20.3k')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('should round to the nearest hundred', () => {
     expect(formatShortCurrency(23340)).toBe('$23.3k')
     expect(formatShortCurrency(19960)).toBe('$20k')

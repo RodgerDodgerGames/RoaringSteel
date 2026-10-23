@@ -62,7 +62,7 @@ function pinColorsOf(card) {
     :badge="settings.showDeckCount ? `Deck: ${drawPile.length} left` : ''"
   >
     <template #actions>
-      <div class="buttons are-small has-addons" role="group" aria-label="Show the hand of">
+      <div class="buttons are-small has-addons mb-0" role="group" aria-label="Show the hand of">
         <button
           v-for="player in players"
           :key="player.id"
@@ -103,12 +103,6 @@ function pinColorsOf(card) {
   flex: none;
   border-top: 1px solid var(--bulma-border);
   background: var(--bulma-scheme-main-bis);
-}
-
-/* Bulma's button group carries a bottom margin meant for stacked rows */
-.demand-strip .buttons,
-.demand-strip .buttons .button {
-  margin-bottom: 0;
 }
 
 /* The player's color, as on their chip in the top bar */

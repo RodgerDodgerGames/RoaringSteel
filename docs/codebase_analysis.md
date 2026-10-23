@@ -335,16 +335,6 @@ const maxIndustries = 3
 - 100vh problematic on mobile
 - Inconsistent use of Bulma responsive classes
 
-#### Asset Loading Issues
-```javascript
-// In WelcomeView.vue:
-background-image: url('src/assets/images/Unknown.jpg');
-// Build warning: "referenced in src/assets didn't resolve at build time"
-
-// Should use import instead:
-import bgImage from '@/assets/images/Unknown.jpg'
-```
-
 ### Recommendations
 - Replace full Bulma with minimal custom CSS
 - Create SCSS variables for colors, spacing

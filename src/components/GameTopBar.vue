@@ -82,12 +82,12 @@ function openDialog(name) {
     </span>
 
     <!-- Plan / Build: which view of the map is showing -->
-    <div class="buttons has-addons top-bar__views" role="group" aria-label="Map view">
+    <div class="buttons has-addons mb-0 top-bar__views" role="group" aria-label="Map view">
       <button
         v-for="option in mapViews"
         :key="option.view"
-        class="button is-small top-bar__view-button"
-        :class="{ 'is-selected': viewMode === option.view }"
+        class="button is-small is-white"
+        :class="viewMode === option.view ? 'is-selected has-text-weight-bold' : 'is-outlined'"
         :aria-pressed="viewMode === option.view"
         :title="option.title"
         @click="mapStore.setViewMode(option.view)"
@@ -117,7 +117,7 @@ function openDialog(name) {
     <div ref="menuRef" class="dropdown is-right" :class="{ 'is-active': isMenuOpen }">
       <div class="dropdown-trigger">
         <button
-          class="button is-small top-bar__menu-button"
+          class="button is-small is-white is-outlined"
           aria-haspopup="true"
           :aria-expanded="isMenuOpen"
           @click="isMenuOpen = !isMenuOpen"
@@ -168,7 +168,7 @@ function openDialog(name) {
 }
 
 .top-bar__brand {
-  font-family: 'Eutemia', serif;
+  font-family: var(--font-brand);
   font-size: 2.5rem;
   line-height: 1;
   white-space: nowrap;
@@ -184,30 +184,11 @@ function openDialog(name) {
   opacity: 0.85;
 }
 
-/* Bulma's `.buttons` leaves room below the group, and under each button, for
-   rows that wrap; this one never wraps. Its own rule is `.buttons:not(:last-child)`,
-   so the group is matched with `.buttons` too to outrank it. */
-.buttons.top-bar__views {
+/* The Plan / Build group keeps its size; the player chips give way instead.
+   Its buttons are Bulma's white ghost buttons (is-white is-outlined), and the
+   view showing is solid white. */
+.top-bar__views {
   flex: none;
-  margin-bottom: 0;
-}
-
-.top-bar__views .button {
-  margin-bottom: 0;
-}
-
-.top-bar__view-button {
-  background: transparent;
-  border-color: rgba(255, 255, 255, 0.6);
-  color: inherit;
-}
-
-/* The view showing: solid and light, like the active player's chip */
-.top-bar__view-button.is-selected {
-  background: var(--bulma-scheme-main);
-  border-color: var(--bulma-scheme-main);
-  color: var(--bulma-text-strong);
-  font-weight: 700;
 }
 
 /* Takes the space between round and menu; chips past the edge are clipped
@@ -218,8 +199,6 @@ function openDialog(name) {
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
-  margin: 0;
-  padding: 0;
   list-style: none;
 }
 
@@ -260,11 +239,5 @@ function openDialog(name) {
 .player-chip__cash {
   font-variant-numeric: tabular-nums;
   opacity: 0.85;
-}
-
-.top-bar__menu-button {
-  background: transparent;
-  border-color: rgba(255, 255, 255, 0.6);
-  color: inherit;
 }
 </style>

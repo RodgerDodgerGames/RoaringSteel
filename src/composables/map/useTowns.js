@@ -5,8 +5,9 @@
  * Creates GeoJSON layers from town data with size-based icons,
  * tooltips showing town names, and popups showing industries.
  *
- * Each size of town has its own shape and size of icon (see townIcons.js);
- * whatever its shape, the comments here call a town's icon its dot.
+ * Each size of town has its own shape and size of icon, with a building
+ * standing on it in the Build view (see townIcons.js); whatever its shape,
+ * the comments here call a town's icon its dot.
  *
  * In the map's Plan view each town also shows what it produces: its
  * commodity icons fan out over the top of its dot (see commodityIcons.js),
@@ -42,7 +43,7 @@ import {
   iconRingOffsets,
   iconRingRadius
 } from '@/composables/map/commodityIcons'
-import { townIcon, townNameOffset } from '@/composables/map/townIcons'
+import { townIcon, townIconHtml, townNameOffset } from '@/composables/map/townIcons'
 
 /**
  * The map pane the commodity icons are drawn in: above track (panes 410–430)
@@ -61,6 +62,9 @@ const MARKED_CLASS = 'is-demand-marked'
 
 /** Class on the map while a demand line is pointed at, which dims the rest */
 const HOVERING_CLASS = 'is-demand-hovering'
+
+/** Class on the map in the Plan view, which hides the towns' buildings */
+const PLAN_VIEW_CLASS = 'is-plan-view'
 
 /**
  * How far a town's commodity icons are lifted above its neighbors' while one
@@ -128,11 +132,12 @@ export function useTowns() {
   const demandCardsStore = useDemandCardsStore()
 
   /**
-   * Shows the commodity icons the view calls for, and marks the towns of the
-   * demand lines the player has picked out.
+   * Shows the commodity icons and town buildings the view calls for, and
+   * marks the towns of the demand lines the player has picked out.
    *
-   * Every icon shows in the Plan view; in the Build view only the icons of
-   * marked lines do. A town that is a marked line's destination or makes its
+   * Every commodity icon shows in the Plan view; in the Build view only the
+   * icons of marked lines do. The towns' buildings are the other way round:
+   * shown in the Build view, hidden in the Plan view. A town that is a marked line's destination or makes its
    * commodity keeps its dot and name clear of the dimming while the line is
    * pointed at; only the destination's dot gets a halo, since the producer's
    * halo goes on the commodity's icon.
@@ -162,6 +167,7 @@ export function useTowns() {
     })
 
     townsMap.getContainer().classList.toggle(HOVERING_CLASS, isHovering)
+    townsMap.getContainer().classList.toggle(PLAN_VIEW_CLASS, isPlanView)
   }
 
   watch([() => demandCardsStore.markedLines, () => mapStore.viewMode], showMarks)
@@ -204,9 +210,11 @@ export function useTowns() {
       // pointToLayer is called for each Point feature to create its marker
       pointToLayer: (feature, latlng) => {
         const size = feature.properties.size
-        const { url, size: iconSize } = townIcon(size)
-        const icon = L.icon({
-          iconUrl: url,
+        // The marker is the size of the town's shape, so the shape is what
+        // sits on the town's spot; its building overflows above it
+        const iconSize = townIcon(size).size
+        const icon = L.divIcon({
+          html: townIconHtml(size),
           iconSize: [iconSize, iconSize],
           className: 'marker'
         })

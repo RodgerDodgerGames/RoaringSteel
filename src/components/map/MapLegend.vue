@@ -20,8 +20,15 @@ import { storeToRefs } from 'pinia'
 import { useStorage } from '@vueuse/core'
 import { useTownsStore } from '@/stores/towns'
 import { usePlayerStore } from '@/stores/players'
-import { townIcon } from '@/composables/map/townIcons'
+import { TOWN_ICONS } from '@/composables/map/townIcons'
 import { legendCommodities } from '@/composables/map/legend'
+import { haloShadow } from '@/composables/map/useTowns'
+import {
+  UNOWNED_TRACK_COLOR,
+  RAIL_STYLE,
+  CASING_STYLE,
+  TIES_STYLE
+} from '@/composables/map/trackStyles'
 import { PIN_COLORS } from '@/config/demands'
 
 const { towns } = storeToRefs(useTownsStore())
@@ -35,18 +42,30 @@ const townRows = [
   { size: 'large', label: 'Large town' },
   { size: 'medium', label: 'Medium town' },
   { size: 'small', label: 'Small town' }
-].map((row) => ({ ...row, ...townIcon(row.size) }))
+].map((row) => ({ ...row, icon: TOWN_ICONS[row.size] }))
 
-/** Leaflet's own line blue, for a sample of track when no one has the turn */
-const SAMPLE_TRACK_COLOR = '#3388ff'
-
-/** The track sample is drawn in the color of the player whose turn it is */
+/**
+ * The track sample is drawn in the color of the player whose turn it is,
+ * or black, as the map draws track with no owner, when no one has the turn
+ */
 const trackColor = computed(
-  () => playerStore.colorOf(playerStore.activePlayer?.id) ?? SAMPLE_TRACK_COLOR
+  () => playerStore.colorOf(playerStore.activePlayer?.id) ?? UNOWNED_TRACK_COLOR
 )
 
-/** The ring round the halo sample, in the first color a pinned line gets */
-const haloSample = `0 0 0 2px #fff, 0 0 0 5px ${PIN_COLORS[0]}`
+/**
+ * Where the track sample's lines run, in the sample's own px. The ends are
+ * inset by half the casing's width, so its round caps are not cut off.
+ */
+const SAMPLE_LENGTH = 36
+const sampleEnds = {
+  x1: CASING_STYLE.weight / 2,
+  x2: SAMPLE_LENGTH - CASING_STYLE.weight / 2,
+  y1: TIES_STYLE.weight / 2,
+  y2: TIES_STYLE.weight / 2
+}
+
+/** The halo sample: a small town ringed in the first color a pinned line gets */
+const haloSample = { icon: TOWN_ICONS.small, shadow: haloShadow([PIN_COLORS[0]]) }
 
 const commodities = computed(() => legendCommodities(towns.value))
 </script>
@@ -68,7 +87,7 @@ const commodities = computed(() => legendCommodities(towns.value))
       <ul>
         <li v-for="row in townRows" :key="row.size" class="map-legend__row">
           <span class="map-legend__symbol">
-            <img :src="row.url" :width="row.size" :height="row.size" alt="" />
+            <img :src="row.icon.url" :width="row.icon.size" :height="row.icon.size" alt="" />
           </span>
           {{ row.label }}
         </li>
@@ -81,36 +100,26 @@ const commodities = computed(() => legendCommodities(towns.value))
                casing and ties under a rail in the builder's color -->
           <svg
             class="map-legend__symbol"
-            viewBox="0 0 28 14"
-            width="28"
-            height="14"
+            :width="SAMPLE_LENGTH"
+            :height="TIES_STYLE.weight"
             aria-hidden="true"
           >
             <line
-              x1="2"
-              y1="7"
-              x2="26"
-              y2="7"
-              stroke="#222"
-              stroke-width="5"
+              v-bind="sampleEnds"
+              :stroke="CASING_STYLE.color"
+              :stroke-width="CASING_STYLE.weight"
               stroke-linecap="round"
             />
             <line
-              x1="2"
-              y1="7"
-              x2="26"
-              y2="7"
-              stroke="#222"
-              stroke-width="10"
-              stroke-dasharray="1.5 5"
+              v-bind="sampleEnds"
+              :stroke="TIES_STYLE.color"
+              :stroke-width="TIES_STYLE.weight"
+              :stroke-dasharray="TIES_STYLE.dashArray"
             />
             <line
-              x1="2"
-              y1="7"
-              x2="26"
-              y2="7"
+              v-bind="sampleEnds"
               :stroke="trackColor"
-              stroke-width="3"
+              :stroke-width="RAIL_STYLE.weight"
               stroke-linecap="round"
             />
           </svg>
@@ -120,10 +129,10 @@ const commodities = computed(() => legendCommodities(towns.value))
           <span class="map-legend__symbol">
             <img
               class="map-legend__halo"
-              :src="townRows[2].url"
-              :width="townRows[2].size"
-              :height="townRows[2].size"
-              :style="{ boxShadow: haloSample }"
+              :src="haloSample.icon.url"
+              :width="haloSample.icon.size"
+              :height="haloSample.icon.size"
+              :style="{ boxShadow: haloSample.shadow }"
               alt=""
             />
           </span>
@@ -212,7 +221,7 @@ const commodities = computed(() => legendCommodities(towns.value))
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 28px;
+  width: 36px;
 }
 
 .map-legend__halo {

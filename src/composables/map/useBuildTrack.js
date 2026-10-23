@@ -12,6 +12,12 @@ import { useTrackStore } from '@/stores/track'
 import { useGameStore } from '@/stores/game'
 import { priceLine } from '@/composables/map/trackCost'
 import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
+import {
+  UNOWNED_TRACK_COLOR,
+  RAIL_STYLE,
+  CASING_STYLE,
+  TIES_STYLE
+} from '@/composables/map/trackStyles'
 
 /**
  * Injection key for the one build-track instance a game view runs.
@@ -830,18 +836,6 @@ export default function useBuildTrack(grid, formatCurrency) {
   const UNOWNED_DRAWING_COLOR = '#3388ff'
 
   /**
-   * What finished track is drawn in when its owner has no color (a damaged
-   * save): plain black, the way all track looked before it was colored.
-   */
-  const UNOWNED_TRACK_COLOR = 'black'
-
-  /**
-   * The dark gray that frames every player's track, so the paler player
-   * colors (yellow, lime) still stand out against the light map.
-   */
-  const TRACK_EDGE_COLOR = '#222'
-
-  /**
    * The Leaflet panes finished track is drawn in, one per piece, lowest first.
    *
    * Track is three lines stacked on the same route: a dark casing, the ties,
@@ -861,47 +855,6 @@ export default function useBuildTrack(grid, formatCurrency) {
     { name: 'trackRails', zIndex: 430 }
   ]
   const [CASING_PANE, TIES_PANE, RAILS_PANE] = TRACK_PANES.map((pane) => pane.name)
-
-  /**
-   * The rail: a line in the owner's color running down the middle of the
-   * track. Round caps and joins keep bends smooth and close the gap where
-   * two sections meet end to end.
-   */
-  const RAIL_STYLE = { weight: 4, opacity: 1, lineCap: 'round', lineJoin: 'round' }
-
-  /**
-   * The casing: a dark line under the rail, wider than it, so the rail has a
-   * thin dark edge on both sides.
-   *
-   * The casing and ties are kept out of Geoman's snapping (`snapIgnore`):
-   * they follow the rail's route exactly, so they would only add duplicate
-   * snap targets for Geoman to check on every move of the cursor.
-   */
-  const CASING_STYLE = {
-    color: TRACK_EDGE_COLOR,
-    weight: 7,
-    opacity: 1,
-    lineCap: 'round',
-    lineJoin: 'round',
-    snapIgnore: true
-  }
-
-  /**
-   * The ties: a wide line drawn as short dashes. Each 2px dash crosses the
-   * rail like a tie, with an 8px gap to the next, so ties fall every 10px.
-   * Butt caps keep the dashes square; round ones would make them blobs. A
-   * bevel join does the same at bends: Leaflet's default round join turns a
-   * tie that lands on a corner into a dark blob as wide as the tie line.
-   */
-  const TIES_STYLE = {
-    color: TRACK_EDGE_COLOR,
-    weight: 13,
-    opacity: 1,
-    dashArray: '2, 8',
-    lineCap: 'butt',
-    lineJoin: 'bevel',
-    snapIgnore: true
-  }
 
   /**
    * Creates the panes finished track is drawn in, if this map does not have

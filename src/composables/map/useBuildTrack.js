@@ -12,7 +12,8 @@ import { useTrackStore } from '@/stores/track'
 import { useGameStore } from '@/stores/game'
 import { useTownsStore } from '@/stores/towns'
 import { priceLine } from '@/composables/map/trackCost'
-import { lineBlock, blockMessage, townCellIds } from '@/composables/map/buildRules'
+import { lineBlock, blockMessage, townCells } from '@/composables/map/buildRules'
+import { regionTest } from '@/composables/map/region'
 import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 import {
   UNOWNED_TRACK_COLOR,
@@ -87,14 +88,12 @@ export default function useBuildTrack(grid, formatCurrency) {
 
   /**
    * What every line is checked against before it is built (see buildRules.js):
-   * the grid, the region being played, and the cells the towns sit in. Kept
-   * as one computed so the town cells are looked up once, not on every move of
-   * the cursor.
+   * the region being played, and the cells the towns sit in. Kept as one
+   * computed so both are worked out once, not on every move of the cursor.
    */
   const buildRules = computed(() => ({
-    grid: grid.value ?? [],
-    region: gameStore.region,
-    townCells: townCellIds(townsStore.towns, grid.value ?? [])
+    isInRegion: regionTest(gameStore.region),
+    townCells: townCells(townsStore.towns, grid.value ?? [])
   }))
 
   /**
@@ -468,7 +467,11 @@ export default function useBuildTrack(grid, formatCurrency) {
         // why, and carries on from the vertex before
         const message = whyNotBuildable(workingLayer.value.getLatLngs().slice(-2))
         if (message) {
-          mapStore.map.pm.Draw.Line._removeLastVertex()
+          const drawing = mapStore.map.pm.Draw.Line
+          drawing._removeLastVertex()
+          // Geoman puts its own "click to finish" text back on the cursor as it
+          // takes the vertex off; the reason is what the player needs there
+          drawing._hintMarker?.setTooltipContent(message)
           repriceLine()
           buildError.value = message
           return
@@ -777,11 +780,13 @@ export default function useBuildTrack(grid, formatCurrency) {
     // or even after the next one began. Geoman gives every drawing a fresh
     // hint marker, so a call from any marker but the current one is stale.
     if (!workingLayer.value || hintMarker !== costedHintMarker.value) return
-    const legCost = repriceLine(latlng)
 
     // A leg that could not be built says so instead of giving a price, and the
-    // dashed line out to the cursor turns red
+    // dashed line out to the cursor turns red. Its cost is left out of the
+    // line's running total: counted, it could push the total over budget, and
+    // the panel would blame money for a leg the border rules out.
     const message = whyNotBuildable([workingLayer.value.getLatLngs().at(-1), latlng])
+    const legCost = repriceLine(message ? undefined : latlng)
     hintMarker.setTooltipContent(message ?? `Cost: ${formatCurrency(legCost)}`)
     const hintLine = mapStore.map.pm.Draw.Line._hintline
     hintLine?.setStyle({

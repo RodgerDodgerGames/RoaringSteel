@@ -7,135 +7,85 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { regionContains, townCellIds, lineBlock, blockMessage } from '@/composables/map/buildRules'
+import { townCells, lineBlock, blockMessage } from '@/composables/map/buildRules'
+import { regionTest } from '@/composables/map/region'
+import { gridConfig } from '@/config/grid'
+import { metersToLatitudeDegrees } from '@/composables/setup/useMapSupport'
 
-/** A 2° square region, from (0, 0) to (2, 2) */
-const square = {
-  type: 'Feature',
-  properties: { NAME: 'Squareland' },
-  geometry: {
-    type: 'Polygon',
-    coordinates: [
-      [
-        [0, 0],
-        [2, 0],
-        [2, 2],
-        [0, 2],
-        [0, 0]
-      ]
-    ]
-  }
-}
+/** Degrees one grid cell spans along the equator, where these tests are set */
+const CELL = metersToLatitudeDegrees(gridConfig.cellSize)
 
-/** Two 1° squares a degree apart, like a state in two pieces */
+/** A square of the region, `size` cells across, starting `x` cells east */
+const square = (x, size) => [
+  [
+    [x * CELL, 0],
+    [(x + size) * CELL, 0],
+    [(x + size) * CELL, size * CELL],
+    [x * CELL, size * CELL],
+    [x * CELL, 0]
+  ]
+]
+
+/** A region in two pieces: cells 0–1 and cells 4–5 of the row, a gap between */
 const islands = {
   type: 'Feature',
   properties: { NAME: 'Islands' },
-  geometry: {
-    type: 'MultiPolygon',
-    coordinates: [
-      [
-        [
-          [0, 0],
-          [1, 0],
-          [1, 1],
-          [0, 1],
-          [0, 0]
-        ]
-      ],
-      [
-        [
-          [2, 0],
-          [3, 0],
-          [3, 1],
-          [2, 1],
-          [2, 0]
-        ]
-      ]
-    ]
-  }
+  geometry: { type: 'MultiPolygon', coordinates: [square(0, 2), square(4, 2)] }
 }
 
-/** One cell per degree, centered on the half degrees, from 0 to 4 east */
-const grid = [0, 1, 2, 3].map((i) => ({ id: `0-${i}`, centroid: { lat: 0.5, lng: i + 0.5 } }))
+/** A row of eight cells along the equator, just north of it */
+const grid = Array.from({ length: 8 }, (_, i) => ({
+  id: `0-${i}`,
+  centroid: { lat: CELL / 2, lng: (i + 0.5) * CELL }
+}))
 
-describe('regionContains', () => {
-  it('should tell points inside the region from points outside', () => {
-    expect(regionContains(square, { lat: 1, lng: 1 })).toBe(true)
-    expect(regionContains(square, { lat: 1, lng: 3 })).toBe(false)
-  })
+/** The point in the middle of cell `i`, or `along` cells east of its west edge */
+const at = (i, along = 0.5) => ({ lat: CELL / 2, lng: (i + along) * CELL })
 
-  it('should count every piece of a region in several pieces', () => {
-    expect(regionContains(islands, { lat: 0.5, lng: 2.5 })).toBe(true)
-    expect(regionContains(islands, { lat: 0.5, lng: 1.5 })).toBe(false)
-  })
+const rules = { isInRegion: regionTest(islands), townCells: [] }
 
-  it('should read a region given as a collection of features', () => {
-    const collection = { type: 'FeatureCollection', features: [square] }
-
-    expect(regionContains(collection, { lat: 1, lng: 1 })).toBe(true)
-    expect(regionContains(collection, { lat: 1, lng: 3 })).toBe(false)
-  })
-
-  it('should count everywhere as inside when there is no region', () => {
-    expect(regionContains(null, { lat: 50, lng: 50 })).toBe(true)
-  })
-})
-
-describe('townCellIds', () => {
+describe('townCells', () => {
   it('should give the cell each town sits in', () => {
     const towns = [
-      { lat: 0.4, lon: 0.6 },
-      { lat: 0.5, lon: 3.2 }
+      { lat: CELL / 2, lon: 0.4 * CELL },
+      { lat: CELL / 2, lon: 3.2 * CELL }
     ]
 
-    expect(townCellIds(towns, grid)).toEqual(new Set(['0-0', '0-3']))
+    expect(townCells(towns, grid).map(({ id }) => id)).toEqual(['0-0', '0-3'])
   })
 })
 
 describe('lineBlock', () => {
-  const rules = { grid, region: islands, townCells: new Set() }
-
   it('should let a line inside the region be built', () => {
-    const line = [
-      { lat: 0.5, lng: 0.2 },
-      { lat: 0.5, lng: 0.8 }
-    ]
-
-    expect(lineBlock(line, rules)).toBeNull()
+    expect(lineBlock([at(0), at(1)], rules)).toBeNull()
   })
 
   it('should refuse a line that crosses outside between two corners inside', () => {
     // Both ends are in the region; the middle crosses the gap between pieces
-    const line = [
-      { lat: 0.5, lng: 0.5 },
-      { lat: 0.5, lng: 2.5 }
-    ]
-
-    const block = lineBlock(line, rules)
+    const block = lineBlock([at(1), at(4)], rules)
 
     expect(block.reason).toBe('outside')
-    expect(regionContains(islands, block.point)).toBe(false)
+    expect(rules.isInRegion(block.point)).toBe(false)
   })
 
   it('should let a line reach a town whose cell is outside the region', () => {
-    // A town just over the edge, in the cell between the two pieces
-    const line = [
-      { lat: 0.5, lng: 0.5 },
-      { lat: 0.5, lng: 1.4 }
-    ]
+    const townRules = { ...rules, townCells: [grid[2]] }
 
-    expect(lineBlock(line, { ...rules, townCells: new Set(['0-1']) })).toBeNull()
+    expect(lineBlock([at(1), at(2, 0.9)], townRules)).toBeNull()
   })
 
-  it('should still refuse a line that goes on past the town cell', () => {
-    const line = [
-      { lat: 0.5, lng: 0.5 },
-      { lat: 0.5, lng: 3.5 },
-      { lat: 3.5, lng: 3.5 }
-    ]
+  it('should refuse a line that goes on past the town cell', () => {
+    const townRules = { ...rules, townCells: [grid[2]] }
 
-    expect(lineBlock(line, { ...rules, townCells: new Set(['0-1']) })).not.toBeNull()
+    expect(lineBlock([at(1), at(3)], townRules)).not.toBeNull()
+  })
+
+  it("should refuse a point beyond the grid's edge, even nearest a town's cell", () => {
+    // Past the last cell, the town's cell is the nearest there is, but the
+    // point is nowhere near inside it
+    const townRules = { ...rules, townCells: [grid[7]] }
+
+    expect(lineBlock([at(5), at(12)], townRules)).not.toBeNull()
   })
 })
 

@@ -13,7 +13,10 @@
  * @module composables/map/regionMask
  */
 
+import { watch } from 'vue'
 import L from 'leaflet'
+import { useGameStore } from '@/stores/game'
+import { regionPolygons } from '@/composables/map/region'
 
 /**
  * The map pane the mask is drawn in: above the terrain tiles (200) and below
@@ -59,13 +62,9 @@ const MASK_STYLE = {
  *   is no region to cut out (nothing is masked then)
  */
 export function maskRings(region) {
-  if (!region) return null
-  const features = region.type === 'FeatureCollection' ? region.features : [region]
-  const polygons = features.flatMap(({ geometry }) => {
-    if (geometry?.type === 'Polygon') return [geometry.coordinates]
-    if (geometry?.type === 'MultiPolygon') return geometry.coordinates
-    return []
-  })
+  const polygons = regionPolygons(region).flatMap(({ geometry }) =>
+    geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates
+  )
   if (polygons.length === 0) return null
 
   const regionRings = polygons.flat().map((ring) => ring.map(([lng, lat]) => [lat, lng]))
@@ -78,11 +77,43 @@ export function maskRings(region) {
  * @param {Object|null} region - The region being played
  * @returns {Object|null} The mask layer, or null when there is no region
  */
-export function drawRegionMask(map, region) {
+function drawRegionMask(map, region) {
   const rings = maskRings(region)
   if (!rings) return null
   if (!map.getPane(MASK_PANE)) {
     map.createPane(MASK_PANE).style.zIndex = MASK_PANE_Z_INDEX
   }
   return L.polygon(rings, MASK_STYLE).addTo(map)
+}
+
+/**
+ * Keeps a map masked to the region in the game store.
+ *
+ * The mask is redrawn whenever the region changes — a game in another state
+ * loaded over this one — so the gray always matches where the build rules
+ * keep track out of.
+ *
+ * @returns {{attach: Function}} `attach(map)` draws the mask on a map, once
+ *   the map exists
+ */
+export function useRegionMask() {
+  const gameStore = useGameStore()
+  let map = null
+  let mask = null
+
+  /** Takes down the mask drawn last, if any, and draws the region's */
+  function redraw() {
+    mask?.remove()
+    mask = map ? drawRegionMask(map, gameStore.region) : null
+  }
+
+  watch(() => gameStore.region, redraw)
+
+  /** @param {Object} leafletMap - The map to mask */
+  function attach(leafletMap) {
+    map = leafletMap
+    redraw()
+  }
+
+  return { attach }
 }

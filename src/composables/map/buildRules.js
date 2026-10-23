@@ -21,37 +21,38 @@
  * @module composables/map/buildRules
  */
 
-import { booleanPointInPolygon } from '@turf/turf'
+import { gridConfig } from '@/config/grid'
 import { findCell, pointsAlongLine } from '@/composables/map/trackCost'
+import {
+  metersToLatitudeDegrees,
+  metersToLongitudeDegrees
+} from '@/composables/setup/useMapSupport'
 
 /**
- * Whether a point is inside the region being played.
- *
- * The region is the state's GeoJSON: a Feature, or a FeatureCollection whose
- * features together make up the region. With no region at all (a damaged
- * save) there is no outside to keep track out of, so every point counts as
- * inside.
- *
- * @param {Object|null} region - GeoJSON Feature or FeatureCollection
+ * Whether a point lies inside a grid cell: within half a cell's width of
+ * its center, north-south and east-west.
  * @param {{lat: number, lng: number}} point - The point
- * @returns {boolean} True if the point is inside the region
+ * @param {Object} cell - Grid cell with a `centroid`
+ * @returns {boolean} True if the point is in the cell
  */
-export function regionContains(region, point) {
-  if (!region) return true
-  const features = region.type === 'FeatureCollection' ? region.features : [region]
-  return features.some((feature) => booleanPointInPolygon([point.lng, point.lat], feature))
+function isInCell(point, cell) {
+  const halfSize = gridConfig.cellSize / 2
+  return (
+    Math.abs(point.lat - cell.centroid.lat) <= metersToLatitudeDegrees(halfSize) &&
+    Math.abs(point.lng - cell.centroid.lng) <= metersToLongitudeDegrees(halfSize, cell.centroid.lat)
+  )
 }
 
 /**
- * The ids of the grid cells the towns sit in. Track may go into these even
- * where they reach outside the region.
+ * The grid cells the towns sit in. Track may go into these even where they
+ * reach outside the region.
  * @param {Array<Object>} towns - Towns, each with lat and lon
  * @param {Array<Object>} grid - Grid cells
- * @returns {Set} Cell ids
+ * @returns {Array<Object>} The cells, each once
  */
-export function townCellIds(towns, grid) {
-  const ids = towns.map((town) => findCell({ lat: town.lat, lng: town.lon }, grid)?.id)
-  return new Set(ids.filter((id) => id != null))
+export function townCells(towns, grid) {
+  const cells = towns.map((town) => findCell({ lat: town.lat, lng: town.lon }, grid))
+  return [...new Set(cells.filter(Boolean))]
 }
 
 /**
@@ -59,17 +60,16 @@ export function townCellIds(towns, grid) {
  *
  * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
  * @param {Object} rules - What the line is checked against
- * @param {Array<Object>} rules.grid - Grid cells
- * @param {Object|null} rules.region - The region being played
- * @param {Set} rules.townCells - Ids of the cells towns sit in (see `townCellIds`)
+ * @param {Function} rules.isInRegion - Whether a point is inside the region
+ *   being played (see `regionTest` in region.js)
+ * @param {Array<Object>} rules.townCells - The cells towns sit in (see `townCells`)
  * @returns {{reason: 'outside', point: {lat: number, lng: number}}|null} The
  *   rule broken and the first point along the line that breaks it, or null
  */
-export function lineBlock(latlngs, { grid, region, townCells }) {
+export function lineBlock(latlngs, { isInRegion, townCells }) {
   for (const point of pointsAlongLine(latlngs)) {
-    if (regionContains(region, point)) continue
-    // Only looked up for points outside, which few lines have any of
-    if (townCells.has(findCell(point, grid)?.id)) continue
+    if (isInRegion(point)) continue
+    if (townCells.some((cell) => isInCell(point, cell))) continue
     return { reason: 'outside', point }
   }
   return null

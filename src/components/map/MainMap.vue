@@ -32,12 +32,10 @@ import { useTowns } from '@/composables/map/useTowns'
 import { useMapView } from '@/composables/map/useMapView'
 import { useTownsStore } from '@/stores/towns'
 import { useMapStore } from '@/stores/map'
-import { useGameStore } from '@/stores/game'
-import { drawRegionMask } from '@/composables/map/regionMask'
+import { useRegionMask } from '@/composables/map/regionMask'
 
 const townsStore = useTownsStore()
 const mapStore = useMapStore()
-const gameStore = useGameStore()
 // get towns from store
 const { towns } = storeToRefs(townsStore)
 const { map } = storeToRefs(mapStore)
@@ -45,6 +43,7 @@ const { map } = storeToRefs(mapStore)
 const mapContainer = ref(null)
 const { addTownsToMap, townsLayer } = useTowns()
 const mapView = useMapView()
+const regionMask = useRegionMask()
 
 onMounted(() => {
   // No starting view: useMapView gives the map its view below
@@ -69,10 +68,9 @@ onMounted(() => {
   // Into the Plan view (or whichever the store holds) before the towns go on
   mapView.attach(map.value)
 
-  // The edge of the board: track may not be built in the gray
-  drawRegionMask(map.value, gameStore.region)
-
   if (map.value) {
+    // The edge of the board: track may not be built in the gray
+    regionMask.attach(map.value)
     // add towns to map
     addTownsToMap(map, towns)
     // add townsLayer to store

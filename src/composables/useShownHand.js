@@ -8,6 +8,10 @@
  * at someone else's hand to see what they are chasing. The peek ends when the
  * turn passes, so nobody starts their turn looking at another player's cards.
  *
+ * Only the active player's own hand is for planning from: its demand lines
+ * can be pointed at and pinned to the map. A hand being peeked at is for
+ * reading only.
+ *
  * Which hand is on screen is display state, not game state: it is not saved.
  *
  * @module composables/useShownHand
@@ -32,6 +36,11 @@ export function useShownHand() {
    */
   const shownPlayer = computed(
     () => players.value.find((p) => p.id === peekedPlayerId.value) ?? activePlayer.value
+  )
+
+  /** True while the shown hand is the active player's own, which they can pin from */
+  const isOwnHand = computed(
+    () => Boolean(activePlayer.value) && shownPlayer.value?.id === activePlayer.value.id
   )
 
   /** The cards in the shown player's hand */
@@ -59,5 +68,5 @@ export function useShownHand() {
     peekedPlayerId.value = playerId === activePlayer.value?.id ? null : playerId
   }
 
-  return { shownPlayer, cards, showHandOf }
+  return { shownPlayer, cards, isOwnHand, showHandOf }
 }

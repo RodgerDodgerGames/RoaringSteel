@@ -85,3 +85,29 @@
 .town-popup--no-tip .leaflet-popup-tip-container {
   display: none;
 }
+
+/* A commodity icon the Build view leaves out (see useTowns) */
+.commodity-icon[hidden] {
+  display: none;
+}
+
+/*
+  Demand lines picked out on the cards (see useTowns). A marked town dot or
+  commodity icon gets a halo, drawn as an inline box-shadow in the line's
+  colors; the dot is round, so its halo is too.
+*/
+.marker.is-demand-marked {
+  border-radius: 50%;
+}
+
+/* While a line is pointed at, every town and icon not in it fades back */
+.is-demand-hovering .marker:not(.is-demand-marked),
+.is-demand-hovering .commodity-icon:not(.is-demand-marked) {
+  opacity: 0.25;
+}
+
+/* Town names too. Leaflet sets each name's opacity on the element itself,
+   which only `!important` can override. */
+.is-demand-hovering .town-tooltip:not(.is-demand-marked) {
+  opacity: 0.25 !important;
+}

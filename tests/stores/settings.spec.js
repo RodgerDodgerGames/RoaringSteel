@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { setActivePinia, createPinia } from 'pinia'
 import { useSettingsStore, SETTINGS_STORAGE_KEY, DEFAULT_SETTINGS } from '@/stores/settings'
+import { PIN_COLORS } from '@/config/demands'
 
 /**
  * The settings as a freshly loaded page would see them: a new Pinia, so the
@@ -62,6 +63,36 @@ describe('settings store', () => {
     expect(error).toHaveBeenCalled()
   })
 
+  describe('the pin limit', () => {
+    it('should let a player pin three demand lines until they change it', () => {
+      expect(useSettingsStore().settings.pinLimit).toBe(3)
+    })
+
+    it('should remember a pin limit inside the allowed range', () => {
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ pinLimit: PIN_COLORS.length }))
+
+      expect(settingsAfterReload().pinLimit).toBe(PIN_COLORS.length)
+    })
+
+    it('should use the default for a pin limit outside the allowed range', () => {
+      // No pins at all would make pinning do nothing; more pins than colors
+      // would leave a pinned line with no color to draw it in
+      const outOfRange = [0, PIN_COLORS.length + 1, 2.5]
+      outOfRange.forEach((pinLimit) => {
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ pinLimit }))
+        expect(settingsAfterReload().pinLimit).toBe(3)
+      })
+    })
+
+    it('should ignore an out-of-range pin limit in a loaded save', () => {
+      const store = useSettingsStore()
+
+      store.applySettings({ pinLimit: 99 })
+
+      expect(store.settings.pinLimit).toBe(3)
+    })
+  })
+
   describe('applySettings', () => {
     it("should take on a loaded save's settings and remember them", async () => {
       useSettingsStore().applySettings({ showDeckCount: true })
@@ -75,7 +106,7 @@ describe('settings store', () => {
 
       store.applySettings({ showDeckCount: true, showSecretHands: true })
 
-      expect(store.settings).toEqual({ showDeckCount: true })
+      expect(store.settings).toEqual({ ...DEFAULT_SETTINGS, showDeckCount: true })
     })
 
     it('should ignore a saved value of the wrong kind', () => {

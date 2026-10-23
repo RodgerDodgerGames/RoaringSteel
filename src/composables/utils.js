@@ -166,3 +166,24 @@ export const formatCurrency = (value) => {
     minimumFractionDigits: 0
   }).format(value)
 }
+
+/** Formats money compactly: "$20.3K", "$8K", "$1.3M" */
+const shortCurrencyFormat = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  notation: 'compact',
+  maximumFractionDigits: 1
+})
+
+/**
+ * Formats a number as short US currency, to the nearest hundred dollars:
+ * "$20.3k" for 20,300, "$8k" for 8,000, "$1.3M" for 1,250,000. An amount
+ * under a thousand is given in full.
+ *
+ * The demand cards switch to this when the window leaves them too little
+ * room for the full amount.
+ *
+ * @param {number} value - An amount of money
+ * @returns {string} Short currency string
+ */
+export const formatShortCurrency = (value) => shortCurrencyFormat.format(value).replace('K', 'k')

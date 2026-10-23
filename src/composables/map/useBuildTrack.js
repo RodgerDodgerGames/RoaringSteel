@@ -12,7 +12,7 @@ import { useTrackStore } from '@/stores/track'
 import { useGameStore } from '@/stores/game'
 import { useTownsStore } from '@/stores/towns'
 import { priceLine, linePrice } from '@/composables/map/trackCost'
-import { lineBlock, blockMessage, townCells } from '@/composables/map/buildRules'
+import { lineBlock, blockMessage, townCells, builtLegs } from '@/composables/map/buildRules'
 import { regionTest } from '@/composables/map/region'
 import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 import {
@@ -88,14 +88,19 @@ export default function useBuildTrack(grid, formatCurrency) {
 
   /**
    * What every line is checked against before it is built (see buildRules.js):
-   * the grid, the region being played, and the cells the towns sit in. Kept
-   * as one computed so these are worked out once, not on every move of the
-   * cursor.
+   * the grid, the region being played, the cells the towns sit in, and the
+   * track built so far. Worked out once rather than on every move of the
+   * cursor; the board parts and the track are kept apart, so building or
+   * tearing up track does not work the board out again.
    */
-  const buildRules = computed(() => ({
+  const boardRules = computed(() => ({
     grid: grid.value ?? [],
     isInRegion: regionTest(gameStore.region),
     townCells: townCells(townsStore.towns, grid.value ?? [])
+  }))
+  const buildRules = computed(() => ({
+    ...boardRules.value,
+    builtLegs: builtLegs(trackStore.segments)
   }))
 
   /**
@@ -791,12 +796,17 @@ export default function useBuildTrack(grid, formatCurrency) {
     // dashed line out to the cursor turns red. Its cost is left out of the
     // line's running total: counted, it could push the total over budget, and
     // the panel would blame money for a leg the border rules out.
-    const line = [...workingLayer.value.getLatLngs(), latlng]
-    const message = whyNotBuildable(line)
+    //
+    // Checked as if the line were finished here, so a leg ending on water
+    // can say so before the player double-clicks and loses the line. That
+    // is only a warning while drawing goes on, and `lineBlock` checks it
+    // last, so it is never in the way of a rule that is actually broken.
+    const block = lineBlock([...workingLayer.value.getLatLngs(), latlng], buildRules.value, {
+      isFinished: true
+    })
+    const endsOnWater = block?.reason === 'endsOnWater'
+    const message = block && !endsOnWater ? describeBlock(block) : null
     const leg = repriceLine(message ? undefined : latlng)
-    // A line may not be finished on water, so a leg ending there says so
-    // before the player double-clicks and loses the line
-    const endsOnWater = !message && whyNotBuildable(line, { isFinished: true })
     hintMarker.setTooltipContent(
       message ??
         `${legTooltip(leg)}${endsOnWater ? ': keep going, a bridge has to reach land' : ''}`
@@ -829,7 +839,16 @@ export default function useBuildTrack(grid, formatCurrency) {
    */
   function whyNotBuildable(latlngs, options) {
     const block = lineBlock(latlngs, buildRules.value, options)
-    return block && blockMessage(block, gameStore.region?.properties?.NAME)
+    return block && describeBlock(block)
+  }
+
+  /**
+   * A broken rule, in words for the player (see `blockMessage`).
+   * @param {Object} block - What `lineBlock` found
+   * @returns {string} The message
+   */
+  function describeBlock(block) {
+    return blockMessage(block, gameStore.region?.properties?.NAME)
   }
 
   // ================== UTILITY FUNCTIONS ==================

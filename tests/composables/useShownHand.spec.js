@@ -48,6 +48,15 @@ describe('useShownHand', () => {
     expect(cards.value.map((c) => c.id)).toEqual([1])
   })
 
+  it('should let the active player pin from their own hand, but not from a hand they peek at', () => {
+    const { isOwnHand, showHandOf } = useShownHand()
+    expect(isOwnHand.value).toBe(true)
+
+    showHandOf(ids[1])
+
+    expect(isOwnHand.value).toBe(false)
+  })
+
   it("should show another player's hand when peeked at", () => {
     const { shownPlayer, cards, showHandOf } = useShownHand()
 

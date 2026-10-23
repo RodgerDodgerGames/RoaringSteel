@@ -57,11 +57,13 @@ export function useGamePersistence() {
       },
       towns: townsStore.towns,
       grid: gridStore.grid,
-      // The undealt deck and every player's hand. Saves from before hands
-      // existed held only the deck, under `demandCards`.
+      // The undealt deck, every player's hand, and the demand lines each
+      // player has pinned to the map. Saves from before hands existed held
+      // only the deck, under `demandCards`.
       demandDeck: {
         drawPile: demandCardsStore.drawPile,
-        hands: demandCardsStore.hands
+        hands: demandCardsStore.hands,
+        pins: demandCardsStore.pins
       },
       track: trackStore.segments,
       // The player's display settings at the time of saving. Copied, so the

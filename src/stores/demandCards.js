@@ -14,13 +14,23 @@
  *   demands: [{ destination, industry, payoff }] // The card's three contracts
  * }
  *
+ * A player plans routes by picking demand lines (single contracts) out of
+ * their hand to see on the map: the line under the pointer, and any lines
+ * they have pinned. Each pinned line keeps its own color until it is
+ * unpinned. Pins belong to a player and are saved with the hands; they are
+ * cleared with the hands too, because card ids restart with every new deck
+ * and an old pin would otherwise land on a new game's card.
+ *
  * @module stores/demandCards
  */
 
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import * as turf from '@turf/turf'
 import { useTownsStore } from './towns'
+import { usePlayerStore } from './players'
+import { useSettingsStore } from './settings'
+import { PIN_COLORS } from '@/config/demands'
 
 /** How many demand cards each player holds, per the Empire Builder rules */
 export const HAND_SIZE = 3
@@ -28,6 +38,8 @@ export const HAND_SIZE = 3
 export const useDemandCardsStore = defineStore('demandCards', () => {
   const townsStore = useTownsStore()
   const towns = computed(() => townsStore.towns)
+  const playerStore = usePlayerStore()
+  const settingsStore = useSettingsStore()
 
   // STATE
 
@@ -41,6 +53,20 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
    */
   const hands = ref({})
 
+  /**
+   * The demand lines each player has pinned to the map, keyed by player id
+   * like `hands`, oldest pin first. Each pin is
+   * { cardId, line, slot }: `line` is the contract's place on its card (0–2),
+   * and `slot` the pin's place in PIN_COLORS, which is its color.
+   */
+  const pins = ref({})
+
+  /**
+   * The demand line under the pointer, as { cardId, line }, or null. Only
+   * where the pointer is, so it is not saved.
+   */
+  const hoveredLine = ref(null)
+
   // GETTERS
 
   /**
@@ -51,6 +77,110 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
   function handOf(playerId) {
     return hands.value[playerId] ?? []
   }
+
+  /**
+   * One contract in a player's hand.
+   * @param {number} playerId - The player's id
+   * @param {number} cardId - The card's id
+   * @param {number} line - The contract's place on the card (0–2)
+   * @returns {Object|null} The contract, or null if the player does not hold it
+   */
+  function demandIn(playerId, cardId, line) {
+    return handOf(playerId).find((card) => card.id === cardId)?.demands[line] ?? null
+  }
+
+  /**
+   * The lines a player has pinned, oldest first.
+   * @param {number} playerId - The player's id
+   * @returns {Array} Their pins: [{ cardId, line, slot }]
+   */
+  function pinsOf(playerId) {
+    return pins.value[playerId] ?? []
+  }
+
+  /**
+   * The color a player's line is pinned in.
+   * @param {number} playerId - The player's id
+   * @param {number} cardId - The card's id
+   * @param {number} line - The contract's place on the card (0–2)
+   * @returns {string|null} The pin's color, or null if the line is not pinned
+   */
+  function pinColor(playerId, cardId, line) {
+    const pin = pinsOf(playerId).find((p) => p.cardId === cardId && p.line === line)
+    return pin ? PIN_COLORS[pin.slot] : null
+  }
+
+  /**
+   * The pins a player keeps when they pin one more line: all of them, or,
+   * with the limit already reached, all but the oldest.
+   * @param {number} playerId - The player's id
+   * @returns {Array} The pins kept, oldest first
+   */
+  function pinsKeptByNewPin(playerId) {
+    const playerPins = pinsOf(playerId)
+    const keep = settingsStore.settings.pinLimit - 1
+    return playerPins.slice(Math.max(0, playerPins.length - keep))
+  }
+
+  /**
+   * The first color no pin in a set is using, so pinned lines never share a
+   * color.
+   * @param {Array} kept - The pins that keep their colors
+   * @returns {number} A free place in PIN_COLORS
+   */
+  function freeSlot(kept) {
+    let slot = 0
+    while (kept.some((pin) => pin.slot === slot)) slot++
+    return slot
+  }
+
+  /**
+   * The color a player's next pin would get. The line under the pointer is
+   * shown in it, so the player sees the color before they click.
+   * @param {number} playerId - The player's id
+   * @returns {string} A color from PIN_COLORS
+   */
+  function nextPinColor(playerId) {
+    return PIN_COLORS[freeSlot(pinsKeptByNewPin(playerId))]
+  }
+
+  /**
+   * The demand lines to mark on the map, for the player whose turn it is.
+   *
+   * While the pointer is over one of their lines, just that line, so the map
+   * can pick out its towns alone (`isHovering`); it is in its pin's color,
+   * or in the color pinning it would give. Otherwise every line they have
+   * pinned, each in its own color.
+   *
+   * Only the active player's hand counts. Another player's hand can be shown
+   * on the strip to see what they are chasing, but pointing at its lines
+   * marks nothing, and the active player's pins stay on the map meanwhile.
+   *
+   * @returns {{isHovering: boolean, lines: Array<{destination: string,
+   *   industry: string, color: string}>}}
+   */
+  const markedLines = computed(() => {
+    const playerId = playerStore.activePlayer?.id
+    const marked = (demand, color) => ({
+      destination: demand.destination,
+      industry: demand.industry,
+      color
+    })
+
+    const hovered = hoveredLine.value
+    const hoveredDemand = hovered && demandIn(playerId, hovered.cardId, hovered.line)
+    if (hoveredDemand) {
+      const color = pinColor(playerId, hovered.cardId, hovered.line) ?? nextPinColor(playerId)
+      return { isHovering: true, lines: [marked(hoveredDemand, color)] }
+    }
+
+    const lines = pinsOf(playerId).flatMap((pin) => {
+      // A save edited by hand could pin a card the player does not hold
+      const demand = demandIn(playerId, pin.cardId, pin.line)
+      return demand ? [marked(demand, PIN_COLORS[pin.slot])] : []
+    })
+    return { isHovering: false, lines }
+  })
 
   // ACTIONS
 
@@ -236,11 +366,100 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
   }
 
   /**
+   * Pins a line in the active player's hand to the map, or unpins it if it
+   * is already pinned. A new pin takes the first free color. Past the pin
+   * limit (a setting), the oldest pin is dropped to make room.
+   *
+   * A line in any other player's hand is left alone: only the player whose
+   * turn it is plans on the map.
+   *
+   * @param {number} cardId - The card's id
+   * @param {number} line - The contract's place on the card (0–2)
+   */
+  function togglePin(cardId, line) {
+    const playerId = playerStore.activePlayer?.id
+    if (!demandIn(playerId, cardId, line)) return
+
+    const isThisLine = (pin) => pin.cardId === cardId && pin.line === line
+    if (pinsOf(playerId).some(isThisLine)) {
+      pins.value[playerId] = pinsOf(playerId).filter((pin) => !isThisLine(pin))
+      return
+    }
+
+    const kept = pinsKeptByNewPin(playerId)
+    pins.value[playerId] = [...kept, { cardId, line, slot: freeSlot(kept) }]
+  }
+
+  /**
+   * Notes which line the pointer is over (see `markedLines`).
+   * @param {number} cardId - The card's id
+   * @param {number} line - The contract's place on the card (0–2)
+   */
+  function hoverLine(cardId, line) {
+    hoveredLine.value = { cardId, line }
+  }
+
+  /** Notes that the pointer has left the demand lines */
+  function endHover() {
+    hoveredLine.value = null
+  }
+
+  /**
+   * Drops each player's oldest pins down to the pin limit. Run when the
+   * limit is lowered in Settings, or by a loaded save's settings.
+   */
+  function trimPins() {
+    const limit = settingsStore.settings.pinLimit
+    Object.keys(pins.value).forEach((playerId) => {
+      pins.value[playerId] = pins.value[playerId].slice(-limit)
+    })
+  }
+
+  watch(() => settingsStore.settings.pinLimit, trimPins)
+
+  /**
    * Resets the demand cards store to initial state.
    */
   function reset() {
     drawPile.value = []
     hands.value = {}
+    pins.value = {}
+    hoveredLine.value = null
+  }
+
+  /**
+   * Whether a pin read back from a save can be used: on one of a card's three
+   * contracts, and in one of the pin colors.
+   * @param {*} pin - A pin as saved
+   * @returns {boolean} True if the pin can be used
+   */
+  function isUsablePin(pin) {
+    return (
+      Number.isInteger(pin?.cardId) &&
+      Number.isInteger(pin.line) &&
+      pin.line >= 0 &&
+      pin.line < 3 &&
+      Number.isInteger(pin.slot) &&
+      pin.slot >= 0 &&
+      pin.slot < PIN_COLORS.length
+    )
+  }
+
+  /**
+   * The pins in a save that can be used. A damaged or hand-edited save could
+   * hold anything there, and a pin that is not a list of well-formed pins
+   * would break every reading of the pins, so anything else is left out.
+   * @param {*} saved - The save's pins
+   * @returns {Object} Each player's usable pins, keyed by player id
+   */
+  function usablePins(saved) {
+    if (!saved || typeof saved !== 'object') return {}
+    return Object.fromEntries(
+      Object.entries(saved).map(([playerId, playerPins]) => [
+        playerId,
+        Array.isArray(playerPins) ? playerPins.filter(isUsablePin) : []
+      ])
+    )
   }
 
   /**
@@ -254,6 +473,9 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
    * @param {Object} deck - Saved deck state
    * @param {Array} deck.drawPile - Cards not yet dealt
    * @param {Object} [deck.hands] - Each player's hand, keyed by player id
+   * @param {Object} [deck.pins] - Each player's pinned lines, keyed by player
+   *   id; saves from before pins existed have none, and unusable pins are
+   *   left out
    * @returns {boolean} True if the deck was restored
    */
   function setDeck(deck) {
@@ -263,15 +485,25 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
       Array.isArray(card) ? { id: index + 1, demands: card } : card
     )
     hands.value = deck.hands ?? {}
+    pins.value = usablePins(deck.pins)
     return true
   }
 
   return {
     drawPile,
     hands,
+    pins,
+    hoveredLine,
     handOf,
+    pinsOf,
+    pinColor,
+    nextPinColor,
+    markedLines,
     generateDemandCards,
     dealHands,
+    togglePin,
+    hoverLine,
+    endHover,
     reset,
     setDeck
   }

@@ -12,6 +12,11 @@
   chasing. When the turn passes, the strip goes back to the new active
   player's hand, so nobody starts their turn looking at someone else's cards.
 
+  The active player plans on the map from their own hand: pointing at a
+  demand line marks its towns, and clicking pins it (see DemandCard). A hand
+  being peeked at is for reading only, and the active player's pins stay on
+  the map while they look.
+
   The strip folds down to its header line when the player wants more map;
   that choice is remembered in the browser. The map resizes to fill the space.
 
@@ -28,12 +33,24 @@ import { useShownHand } from '@/composables/useShownHand'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import DemandCard from '@/components/demands/DemandCard.vue'
 
-const { drawPile } = storeToRefs(useDemandCardsStore())
+const demandCardsStore = useDemandCardsStore()
+const { drawPile } = storeToRefs(demandCardsStore)
 const { players, activePlayer } = storeToRefs(usePlayerStore())
 const { settings } = storeToRefs(useSettingsStore())
 
-// Whose hand is on screen, and switching between hands
-const { shownPlayer, cards, showHandOf } = useShownHand()
+// Whose hand is on screen, whether it can be pinned from, and switching between hands
+const { shownPlayer, cards, isOwnHand, showHandOf } = useShownHand()
+
+/**
+ * The color each of a card's lines is pinned in, or null where it is not.
+ * @param {Object} card - A card in the active player's hand
+ * @returns {Array<string|null>} One entry per line
+ */
+function pinColorsOf(card) {
+  return card.demands.map((_, line) =>
+    demandCardsStore.pinColor(activePlayer.value.id, card.id, line)
+  )
+}
 </script>
 
 <template>
@@ -67,6 +84,12 @@ const { shownPlayer, cards, showHandOf } = useShownHand()
         :key="card.id"
         :demands="card.demands"
         :label="`${shownPlayer.name}'s card ${index + 1}`"
+        :is-playable="isOwnHand"
+        :pin-colors="isOwnHand ? pinColorsOf(card) : []"
+        :next-color="isOwnHand ? demandCardsStore.nextPinColor(activePlayer.id) : null"
+        @hover="(line) => demandCardsStore.hoverLine(card.id, line)"
+        @leave="demandCardsStore.endHover()"
+        @toggle="(line) => demandCardsStore.togglePin(card.id, line)"
       />
     </div>
     <p v-else class="demand-strip__empty">
@@ -102,7 +125,7 @@ const { shownPlayer, cards, showHandOf } = useShownHand()
 .demand-strip__cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
+  gap: 0.6rem;
 }
 
 .demand-strip__empty {

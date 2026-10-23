@@ -1,7 +1,7 @@
 <!--
   MapLegend.vue
 
-  The map's key, floating in its bottom-left corner: what the town shapes
+  The map's key, floating in its bottom-left corner: what the town icons
   mean, what track looks like, what the ring round a town or icon means, and
   which commodity each icon stands for.
 
@@ -20,7 +20,7 @@ import { storeToRefs } from 'pinia'
 import { useStorage } from '@vueuse/core'
 import { useTownsStore } from '@/stores/towns'
 import { usePlayerStore } from '@/stores/players'
-import { TOWN_ICONS } from '@/composables/map/townIcons'
+import { TOWN_ICONS, townIconHtml } from '@/composables/map/townIcons'
 import { legendCommodities } from '@/composables/map/legend'
 import { haloShadow } from '@/composables/map/useTowns'
 import {
@@ -38,12 +38,16 @@ const playerStore = usePlayerStore()
 // Remembered per browser; closed until the player first opens it
 const isOpen = useStorage('roaringsteel_map_legend_open', false)
 
-/** The town sizes, largest first, with the names the legend gives them */
+/**
+ * The town sizes, largest first, with the names the legend gives them. Each
+ * is drawn with the map's own markup, shape and building, as the Build view
+ * shows it; the Plan view's bare shapes are the same shapes.
+ */
 const townRows = [
   { size: 'large', label: 'Large town' },
   { size: 'medium', label: 'Medium town' },
   { size: 'small', label: 'Small town' }
-].map((row) => ({ ...row, icon: TOWN_ICONS[row.size] }))
+].map((row) => ({ ...row, icon: TOWN_ICONS[row.size], html: townIconHtml(row.size) }))
 
 /**
  * The track sample is drawn in the color of the player whose turn it is,
@@ -66,7 +70,11 @@ const sampleEnds = {
 }
 
 /** The halo sample: a small town ringed in the first color a pinned line gets */
-const haloSample = { icon: TOWN_ICONS.small, shadow: haloShadow([PIN_COLORS[0]]) }
+const haloSample = {
+  icon: TOWN_ICONS.small,
+  html: townIconHtml('small'),
+  shadow: haloShadow([PIN_COLORS[0]])
+}
 
 const commodities = computed(() => legendCommodities(towns.value))
 </script>
@@ -88,7 +96,12 @@ const commodities = computed(() => legendCommodities(towns.value))
       <ul>
         <li v-for="row in townRows" :key="row.size" class="map-legend__row">
           <span class="map-legend__symbol">
-            <img :src="row.icon.url" :width="row.icon.size" :height="row.icon.size" alt="" />
+            <!-- v-html is safe: the markup is built from fixed shapes and image URLs -->
+            <span
+              class="map-legend__town"
+              :style="{ width: `${row.icon.size}px`, height: `${row.icon.size}px` }"
+              v-html="row.html"
+            ></span>
           </span>
           {{ row.label }}
         </li>
@@ -134,14 +147,16 @@ const commodities = computed(() => legendCommodities(towns.value))
         </li>
         <li class="map-legend__row">
           <span class="map-legend__symbol">
-            <img
-              class="map-legend__halo"
-              :src="haloSample.icon.url"
-              :width="haloSample.icon.size"
-              :height="haloSample.icon.size"
-              :style="{ boxShadow: haloSample.shadow }"
-              alt=""
-            />
+            <!-- v-html is safe: the markup is built from fixed shapes and image URLs -->
+            <span
+              class="map-legend__town map-legend__halo"
+              :style="{
+                width: `${haloSample.icon.size}px`,
+                height: `${haloSample.icon.size}px`,
+                boxShadow: haloSample.shadow
+              }"
+              v-html="haloSample.html"
+            ></span>
           </span>
           A demand line you have pinned or are pointing at
         </li>
@@ -229,6 +244,17 @@ const commodities = computed(() => legendCommodities(towns.value))
   align-items: center;
   justify-content: center;
   width: 36px;
+}
+
+/*
+  A town drawn as the map draws it: the box is its shape, and its building
+  is placed from the box's corner and rises above it, so the box is lowered
+  to leave room for the building inside the row
+*/
+.map-legend__town {
+  position: relative;
+  flex: none;
+  margin-top: 10px;
 }
 
 .map-legend__halo {

@@ -56,13 +56,16 @@ export const MAX_BRIDGE_KM = (gameRules.bridges.maxCells * gridConfig.cellSize) 
  * comes back to within a crossing counts once.
  * @param {Array<Object>} path - Grid cells in order along a line (see
  *   `cellPath` in trackCost.js)
+ * @param {Array<Object>} [landCells] - Cells to count as land whatever their
+ *   land cover: the cells towns sit in, since a town on the shore is the
+ *   land a bridge reaches even when its cell's center is in the water
  * @returns {number} How many water cells the longest crossing has; 0 for none
  */
-export function longestCrossing(path) {
+export function longestCrossing(path, landCells = []) {
   let longest = 0
   const crossing = new Set()
   path.forEach((cell) => {
-    if (isWaterCell(cell)) crossing.add(cell)
+    if (isWaterCell(cell) && !landCells.includes(cell)) crossing.add(cell)
     else crossing.clear()
     longest = Math.max(longest, crossing.size)
   })

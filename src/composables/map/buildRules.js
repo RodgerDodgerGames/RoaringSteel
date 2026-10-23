@@ -80,7 +80,7 @@ export function lineBlock(latlngs, { grid, isInRegion, townCells }, { isFinished
   }
 
   const path = cellPath(latlngs, grid)
-  if (longestCrossing(path) > gameRules.bridges.maxCells) {
+  if (longestCrossing(path, townCells) > gameRules.bridges.maxCells) {
     return { reason: 'water' }
   }
 

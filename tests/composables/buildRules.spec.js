@@ -138,6 +138,15 @@ describe('lineBlock over water', () => {
     expect(lineBlock(legs, rulesWith(water))).toEqual({ reason: 'water' })
   })
 
+  it("should not count a town on the shore toward a crossing's length", () => {
+    const water = Array.from({ length: gameRules.bridges.maxCells + 1 }, (_, i) => i + 1)
+    const rules = rulesWith(water)
+    // The last water cell is a town's: the land the bridge reaches
+    const town = rules.grid[water.at(-1)]
+
+    expect(lineBlock([at(0), at(water.at(-1))], { ...rules, townCells: [town] })).toBeNull()
+  })
+
   it('should not let a finished line end on water', () => {
     const line = [at(0), at(1)]
 

@@ -662,7 +662,16 @@ describe('useBuildTrack', () => {
       vi.advanceTimersByTime(200)
 
       const bridge = formatCurrency(gameRules.bridges.costPerCell)
-      expect(hintMarker.getTooltip().getContent()).toBe(`Cost: ${bridge} (bridge ${bridge})`)
+      expect(hintMarker.getTooltip().getContent()).toContain(`Cost: ${bridge} (bridge ${bridge})`)
+    })
+
+    it('should warn on the cursor that a line may not be finished on water', () => {
+      const { hintMarker } = startLineAtTown()
+
+      hintMarker.setLatLng(centerOf(1))
+      vi.advanceTimersByTime(200)
+
+      expect(hintMarker.getTooltip().getContent()).toMatch(/a bridge has to reach land/)
     })
 
     it('should take back a leg that makes a crossing begun on an earlier leg too long', () => {

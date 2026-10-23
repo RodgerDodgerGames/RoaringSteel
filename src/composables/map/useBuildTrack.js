@@ -791,9 +791,16 @@ export default function useBuildTrack(grid, formatCurrency) {
     // dashed line out to the cursor turns red. Its cost is left out of the
     // line's running total: counted, it could push the total over budget, and
     // the panel would blame money for a leg the border rules out.
-    const message = whyNotBuildable([...workingLayer.value.getLatLngs(), latlng])
+    const line = [...workingLayer.value.getLatLngs(), latlng]
+    const message = whyNotBuildable(line)
     const leg = repriceLine(message ? undefined : latlng)
-    hintMarker.setTooltipContent(message ?? legTooltip(leg))
+    // A line may not be finished on water, so a leg ending there says so
+    // before the player double-clicks and loses the line
+    const endsOnWater = !message && whyNotBuildable(line, { isFinished: true })
+    hintMarker.setTooltipContent(
+      message ??
+        `${legTooltip(leg)}${endsOnWater ? ': keep going, a bridge has to reach land' : ''}`
+    )
     const hintLine = mapStore.map.pm.Draw.Line._hintline
     hintLine?.setStyle({
       color: message

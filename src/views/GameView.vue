@@ -22,6 +22,8 @@
   the track layers on the map, so it has to live exactly as long as the map
   does, and this view is the map's parent. It is created here and handed to
   the dock's build controls through provide/inject.
+
+  @emits new-game - The player chose New Game from the Game menu
 -->
 
 <script setup>
@@ -37,6 +39,8 @@ import DemandStrip from '@/components/demands/DemandStrip.vue'
 import { useGridStore } from '@/stores/grid'
 import useBuildTrack, { buildTrackKey } from '@/composables/map/useBuildTrack'
 import { formatCurrency } from '@/composables/utils'
+
+const emit = defineEmits(['new-game'])
 
 // The cost grid prices every section of track as it is drawn
 const { grid } = storeToRefs(useGridStore())
@@ -64,7 +68,7 @@ onBeforeUnmount(() => document.documentElement.classList.remove(PAGE_CLASS))
     <!-- Wrapped because the top bar renders its dialogs alongside the bar, and
          a class passed to a component with several root elements is dropped -->
     <div class="game-view__top">
-      <GameTopBar />
+      <GameTopBar @new-game="emit('new-game')" />
     </div>
 
     <main class="game-view__board">

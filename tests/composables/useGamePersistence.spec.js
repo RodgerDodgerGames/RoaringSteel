@@ -13,6 +13,10 @@ import { useGameStore } from '@/stores/game'
 import { useTrackStore } from '@/stores/track'
 import { useDemandCardsStore } from '@/stores/demandCards'
 import { useSettingsStore } from '@/stores/settings'
+import { useTownsStore } from '@/stores/towns'
+import { useGridStore } from '@/stores/grid'
+import { useMapStore } from '@/stores/map'
+import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 import { useGamePersistence } from '@/composables/useGamePersistence'
 
 describe('useGamePersistence', () => {
@@ -376,6 +380,63 @@ describe('useGamePersistence', () => {
       expect(persistence.deserializeGameState(save)).toBe(true)
 
       expect(settingsStore.settings.showDeckCount).toBe(true)
+    })
+  })
+
+  describe('starting a new game', () => {
+    beforeEach(() => {
+      gameStore.advanceTurn()
+      useTownsStore().setTowns([{ name: 'Denver', industries: [] }])
+      useGridStore().setGrid([{ id: '0-0', cost: 100 }])
+      trackStore.addSegment({
+        ownerId: 1,
+        coordinates: [
+          { lat: 39.7, lng: -105 },
+          { lat: 39.8, lng: -104.9 }
+        ],
+        cost: 500
+      })
+      useDemandCardsStore().setDeck({ drawPile: [], hands: { 1: [] }, pins: {} })
+      useMapStore().setViewMode(BUILD_VIEW)
+    })
+
+    it('should clear away everything from the game that was being played', () => {
+      persistence.startNewGame()
+
+      expect(gameStore.region).toBeNull()
+      expect(gameStore.turn).toBe(0)
+      expect(playerStore.players).toEqual([])
+      expect(useTownsStore().towns).toEqual([])
+      expect(useGridStore().grid).toEqual([])
+      expect(trackStore.segments).toEqual([])
+      expect(useDemandCardsStore().hands).toEqual({})
+      expect(useMapStore().viewMode).toBe(PLAN_VIEW)
+    })
+
+    it("should keep the player's settings", () => {
+      useSettingsStore().settings.showDeckCount = true
+
+      persistence.startNewGame()
+
+      expect(useSettingsStore().settings.showDeckCount).toBe(true)
+    })
+
+    it('should start the new setup with the same players, colors and order', () => {
+      persistence.startNewGame()
+
+      expect(playerStore.draftPlayers.map(({ name, color }) => ({ name, color }))).toEqual([
+        { name: 'Alice', color: 'red' },
+        { name: 'Bob', color: 'blue' },
+        { name: 'Charlie', color: 'green' }
+      ])
+    })
+
+    it('should start the new setup empty when the game had no players', () => {
+      playerStore.reset()
+
+      persistence.startNewGame()
+
+      expect(playerStore.draftPlayers).toEqual([])
     })
   })
 })

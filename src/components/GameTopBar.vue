@@ -11,10 +11,13 @@
     town produces) and Build view (zoomed in to lay track)
   - every player in turn order, with their color and cash; the player whose
     turn it is stands out, like the player holding the dice
-  - a Game menu with Save, Load and Settings
+  - a Game menu with New Game, Save, Load and Settings
 
   Actions that belong to the current turn (building, End Turn) are not here;
   they live in the player dock, next to the information they depend on.
+
+  @emits new-game - The player gave up this game for a new one (and saved it
+                    first, if they wanted to)
 -->
 
 <script setup>
@@ -24,12 +27,15 @@ import { onClickOutside } from '@vueuse/core'
 import SaveGameDialog from '@/components/dialogs/SaveGameDialog.vue'
 import LoadGameDialog from '@/components/dialogs/LoadGameDialog.vue'
 import SettingsDialog from '@/components/dialogs/SettingsDialog.vue'
+import NewGameDialog from '@/components/dialogs/NewGameDialog.vue'
 import { usePlayerStore } from '@/stores/players'
 import { useGameStore } from '@/stores/game'
 import { useMapStore } from '@/stores/map'
 import { formatCurrency } from '@/composables/utils'
 import { gameRules } from '@/config/game'
 import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
+
+const emit = defineEmits(['new-game'])
 
 const { players } = storeToRefs(usePlayerStore())
 // The store counts rounds from 0; players count them from 1
@@ -51,12 +57,12 @@ onClickOutside(menuRef, () => {
   isMenuOpen.value = false
 })
 
-// Which dialog is showing: 'save', 'load', 'settings', or null for none
+// Which dialog is showing: 'new', 'save', 'load', 'settings', or null for none
 const openDialogName = ref(null)
 
 /**
  * Opens one of the game dialogs from the menu, closing the menu behind it.
- * @param {'save'|'load'|'settings'} name - The dialog to open
+ * @param {'new'|'save'|'load'|'settings'} name - The dialog to open
  */
 function openDialog(name) {
   isMenuOpen.value = false
@@ -122,6 +128,7 @@ function openDialog(name) {
       </div>
       <div class="dropdown-menu" role="menu">
         <div class="dropdown-content">
+          <a class="dropdown-item" role="menuitem" @click="openDialog('new')">New game</a>
           <a class="dropdown-item" role="menuitem" @click="openDialog('save')">Save game</a>
           <a class="dropdown-item" role="menuitem" @click="openDialog('load')">Load game</a>
           <hr class="dropdown-divider" />
@@ -136,6 +143,11 @@ function openDialog(name) {
     </div>
   </header>
 
+  <NewGameDialog
+    v-if="openDialogName === 'new'"
+    @close="openDialogName = null"
+    @start="emit('new-game')"
+  />
   <SaveGameDialog v-if="openDialogName === 'save'" @close="openDialogName = null" />
   <LoadGameDialog v-if="openDialogName === 'load'" @close="openDialogName = null" />
   <SettingsDialog v-if="openDialogName === 'settings'" @close="openDialogName = null" />

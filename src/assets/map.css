@@ -6,6 +6,33 @@
   padding: 0;
 }
 
+/*
+  A town's icon (see townIcons.js): its shape, in the app's primary color
+  with a white rim, and the building standing on it, placed from the shape's
+  top-left corner and overflowing above it.
+*/
+.town-shape {
+  display: block;
+}
+
+.town-shape__fill {
+  fill: var(--bulma-primary);
+  stroke: #fff;
+}
+
+.town-building {
+  position: absolute;
+  /* Pressing on a building must not start the browser's own image drag */
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+/* The Plan view shows the towns as bare shapes, leaving room for the
+   commodity icons round them */
+.is-plan-view .town-building {
+  display: none;
+}
+
 /* town tooltip (town display names under the icon) */
 .town-tooltip {
   font-family: "Eutimia";

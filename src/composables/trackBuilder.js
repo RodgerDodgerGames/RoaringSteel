@@ -79,6 +79,25 @@ export function useTrackBuilder() {
   }
 
   /**
+   * Every player's start points as keys (see `pointKey`), worked out once per
+   * change to the towns or track rather than on every move of the cursor:
+   * `cities` for everyone, and `own` by player id.
+   */
+  const startKeys = computed(() => {
+    const own = new Map()
+    trackStore.segments.forEach(({ ownerId, coordinates }) => {
+      if (!own.has(ownerId)) own.set(ownerId, new Set())
+      coordinates.forEach((point) => own.get(ownerId).add(pointKey(point)))
+    })
+    const cities = new Set(
+      townsStore.towns
+        .filter((town) => town.size === 'large')
+        .map((town) => pointKey({ lat: town.lat, lng: town.lon }))
+    )
+    return { cities, own }
+  })
+
+  /**
    * Whether a player may start a section at a point.
    * @param {number} playerId - The player
    * @param {{lat: number, lng: number}} point - Where the section would start
@@ -86,7 +105,8 @@ export function useTrackBuilder() {
    */
   function canStartAt(playerId, point) {
     const key = pointKey(point)
-    return startPoints(playerId).some((start) => pointKey(start) === key)
+    const { cities, own } = startKeys.value
+    return cities.has(key) || Boolean(own.get(playerId)?.has(key))
   }
 
   /**
@@ -145,6 +165,8 @@ export function useTrackBuilder() {
 
     const cost = priceLine(latlngs, gridStore.grid)
     const affordable = playerStore.availableForTrack(playerId)
+    // Whether building had started this turn, to put back if this one fails
+    const hadSpent = playerStore.hasSpentThisTurn(playerId)
 
     // Charged before it is recorded: once a section is in the store it is
     // indistinguishable from one that was paid for, so a build the player
@@ -175,6 +197,8 @@ export function useTrackBuilder() {
       // silently would leave the player charged for track no save records.
       console.error('Could not record track segment:', trackStore.error)
       playerStore.refundTrackSpend(playerId, cost)
+      // Nothing was built, so building has not started either
+      if (!hadSpent) playerStore.updatePlayer(playerId, { hasSpentThisTurn: false })
       return { ok: false, error: 'That section could not be recorded.' }
     }
 

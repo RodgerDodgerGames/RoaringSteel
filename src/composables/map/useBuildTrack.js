@@ -818,8 +818,7 @@ export default function useBuildTrack(formatCurrency) {
    * Shows a "not allowed" cursor over places a line cannot start from, so a
    * player can see where track may begin before they click.
    *
-   * Debounced because mousemove fires on every pixel and the check scans every
-   * town and track endpoint.
+   * Debounced because mousemove fires on every pixel.
    */
   const debouncedCursorValidation = useDebounceFn((latlng) => {
     const cursorStyle = validateStartPoint(latlng) ? 'default' : 'not-allowed'

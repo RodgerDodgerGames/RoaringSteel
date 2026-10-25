@@ -7,9 +7,10 @@
  * Track is stored as sections, each a line of points (see the track store).
  * Here every point becomes a stop on the network (a node), and each straight
  * leg between two points a stretch of track (an edge). Sections join where
- * they share a point: a section is always started on a town or on the end of
- * a section already built, and a town clicked while drawing puts the point
- * exactly on the town, so shared points are exactly equal. Lines that merely
+ * they share a point: a section is always started in a town or on a point of
+ * a section already built (an end or a bend), and a town clicked while
+ * drawing puts the point exactly on the town, so shared points are exactly
+ * equal. Lines that merely
  * cross do not join — as in Empire Builder, where lines cross at a milepost
  * but a train cannot turn from one onto the other there.
  *
@@ -178,50 +179,111 @@ function firstSteps(network, position) {
  */
 export function shortestRoutes(network, position, { owners = null } = {}) {
   const isAllowed = (edge) => !owners || owners.has(edge.ownerId)
-  // The best way found to each arrival, keyed "from>to"; `behind` is the
-  // node the train has just left, which it may not go straight back to
+  // The best way found to each arrival, keyed "from>to": how far, the step
+  // that arrived, and the arrival it came on from (null for a first step).
+  // `behind` is the node just left, which the train may not go straight
+  // back to. Only the last step is kept; a route is read back at the end.
   const arrivals = new Map()
   const settled = new Set()
-  // Arrivals waiting to be settled; small enough that a scan beats a heap
-  const frontier = []
+  const frontier = new MinHeap()
 
-  const offer = (behind, to, km, steps) => {
-    const key = `${behind}>${to}`
+  const offer = (behind, step, km, previous) => {
+    const key = `${behind}>${step.to}`
     const known = arrivals.get(key)
     if (known && known.km <= km) return
-    arrivals.set(key, { behind, to, km, steps })
-    frontier.push(key)
+    arrivals.set(key, { behind, step, km, previous })
+    frontier.push(km, key)
   }
 
   firstSteps(network, position)
     .filter(isAllowed)
     // Set off part way along a stretch, the node behind is the one it came from
-    .forEach((step) => offer(step.from ?? position.cameFrom, step.to, step.km, [step]))
+    .forEach((step) => offer(step.from ?? position.cameFrom, step, step.km, null))
 
-  const best = new Map()
-  while (frontier.length) {
-    // Settle the nearest arrival not yet settled
-    let nearestIndex = 0
-    frontier.forEach((key, i) => {
-      if (arrivals.get(key).km < arrivals.get(frontier[nearestIndex]).km) nearestIndex = i
-    })
-    const key = frontier.splice(nearestIndex, 1)[0]
+  // For each node, the arrival that reaches it soonest
+  const nearest = new Map()
+  while (frontier.size) {
+    const key = frontier.pop()
     if (settled.has(key)) continue
     settled.add(key)
 
-    const { behind, to: here, km, steps } = arrivals.get(key)
-    if (!best.has(here) || best.get(here).km > km) best.set(here, { km, steps })
+    const { behind, step, km } = arrivals.get(key)
+    const here = step.to
+    if (!nearest.has(here)) nearest.set(here, key)
 
     const mayReverse = Boolean(network.nodes.get(here).town)
     network.adjacency
       .get(here)
       .filter((edge) => isAllowed(edge) && (mayReverse || edge.to !== behind))
-      .forEach((edge) => offer(here, edge.to, km + edge.km, [...steps, { from: here, ...edge }]))
+      .forEach((edge) => offer(here, { from: here, ...edge }, km + edge.km, key))
   }
+
+  // Each node's route, read back from its arrival through the ones before
+  const best = new Map()
+  nearest.forEach((key, node) => {
+    const steps = []
+    for (let at = key; at !== null; at = arrivals.get(at).previous) {
+      steps.unshift(arrivals.get(at).step)
+    }
+    best.set(node, { km: arrivals.get(key).km, steps })
+  })
 
   // A train already standing on a node has nowhere to go to reach it
   if (position.nodeKey) best.delete(position.nodeKey)
   return best
+}
+
+/**
+ * A binary min-heap of keys by distance, for the route search: the nearest
+ * waiting arrival comes out first. A key may be pushed again with a shorter
+ * distance; the search skips the longer copy when it comes out later.
+ */
+class MinHeap {
+  constructor() {
+    this.items = []
+  }
+
+  get size() {
+    return this.items.length
+  }
+
+  /**
+   * @param {number} km - The distance it is filed by
+   * @param {string} key - What is filed
+   */
+  push(km, key) {
+    const items = this.items
+    items.push({ km, key })
+    let i = items.length - 1
+    while (i > 0) {
+      const parent = (i - 1) >> 1
+      if (items[parent].km <= items[i].km) break
+      ;[items[parent], items[i]] = [items[i], items[parent]]
+      i = parent
+    }
+  }
+
+  /** @returns {string} The key with the least distance, taken out */
+  pop() {
+    const items = this.items
+    const top = items[0]
+    const last = items.pop()
+    if (items.length) {
+      items[0] = last
+      let i = 0
+      for (;;) {
+        const left = 2 * i + 1
+        const right = left + 1
+        let least = i
+        if (left < items.length && items[left].km < items[least].km) least = left
+        if (right < items.length && items[right].km < items[least].km) least = right
+        if (least === i) break
+        ;[items[least], items[i]] = [items[i], items[least]]
+        i = least
+      }
+    }
+    return top.key
+  }
 }
 
 /**

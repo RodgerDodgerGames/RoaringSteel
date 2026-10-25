@@ -125,6 +125,17 @@ describe('useTrackBuilder', () => {
     expect(result.error).toMatch(/alongside/)
   })
 
+  it('should not count a section that could not be recorded as building started', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(trackStore, 'addSegment').mockReturnValue(null)
+
+    const result = builder.buildSection(ANN, [centerOf(0), centerOf(2)])
+
+    expect(result.ok).toBe(false)
+    expect(playerStore.players[0].cash).toBe(40000)
+    expect(playerStore.hasSpentThisTurn(ANN)).toBe(false)
+  })
+
   describe('startPoints', () => {
     it("should be the major cities and the points of the player's own track", () => {
       trackStore.addSegment({ ownerId: ANN, coordinates: [centerOf(2), centerOf(3)] })

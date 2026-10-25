@@ -313,7 +313,7 @@ describe('trains store', () => {
     beforeEach(() => {
       demandCardsStore.setDeck({
         drawPile: [{ id: 8, demands: [] }],
-        hands: { [ANN]: [demandCard] }
+        hands: { [ANN]: [demandCard, { id: 20, demands: [] }, { id: 21, demands: [] }] }
       })
       store.placeTrain(ANN, 'Middle')
       store.pickUp(ANN, 'Beef')
@@ -331,7 +331,7 @@ describe('trains store', () => {
 
       expect(cashOf(ANN)).toBe(49000)
       expect(store.trainOf(ANN).loads).toEqual([])
-      expect(demandCardsStore.handOf(ANN).map((c) => c.id)).toEqual([8])
+      expect(demandCardsStore.handOf(ANN).map((c) => c.id)).toEqual([20, 21, 8])
     })
 
     it('should refuse a demand for somewhere else', () => {

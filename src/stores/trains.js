@@ -39,7 +39,7 @@
  */
 
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { gameRules } from '@/config/game'
 import { TRAIN_TYPES, TRAIN_CHANGES, STARTING_TRAIN, trainRangeKm } from '@/config/trains'
 import { townKey, positionAtNode, shortestRoutes, runRoute } from '@/composables/network'
@@ -83,9 +83,6 @@ export const useTrainsStore = defineStore('trains', () => {
   const trains = ref({})
 
   // GETTERS
-
-  /** The track and towns as a network trains can run on (see the network store) */
-  const network = computed(() => networkStore.network)
 
   /**
    * A player's train. A player with no train on record (a new game, or a
@@ -209,8 +206,8 @@ export const useTrainsStore = defineStore('trains', () => {
   function routesFor(playerId) {
     const position = trainOf(playerId).position
     if (!position) return new Map()
-    const own = shortestRoutes(network.value, position, { owners: new Set([playerId]) })
-    const any = shortestRoutes(network.value, position)
+    const own = shortestRoutes(networkStore.network, position, { owners: new Set([playerId]) })
+    const any = shortestRoutes(networkStore.network, position)
     const routes = new Map()
     any.forEach((route, key) => {
       routes.set(key, own.get(key) ?? route)
@@ -242,10 +239,15 @@ export const useTrainsStore = defineStore('trains', () => {
     const left = kmLeft(playerId)
     const list = []
     routesFor(playerId).forEach((route, key) => {
-      const town = network.value.nodes.get(key).town
+      const town = networkStore.network.nodes.get(key).town
       if (!town) return
       // Fees are only paid for track the train actually reaches this turn
-      const { ownersUsed } = runRoute(network.value, trainOf(playerId).position, route.steps, left)
+      const { ownersUsed } = runRoute(
+        networkStore.network,
+        trainOf(playerId).position,
+        route.steps,
+        left
+      )
       const payTo = ownersToPay(playerId, ownersUsed)
       list.push({
         town,
@@ -347,7 +349,7 @@ export const useTrainsStore = defineStore('trains', () => {
     if (!town) return refuse('There is no such town.')
 
     const train = storedTrain(playerId)
-    train.position = positionAtNode(network.value, townKey(town))
+    train.position = positionAtNode(networkStore.network, townKey(town))
     train.hasActed = true
     return { ok: true }
   }
@@ -379,19 +381,16 @@ export const useTrainsStore = defineStore('trains', () => {
     if (!route) return refuse(`No track joins your train to ${town.name}.`)
 
     const train = storedTrain(playerId)
-    const run = runRoute(network.value, train.position, route.steps, kmLeft(playerId))
+    const run = runRoute(networkStore.network, train.position, route.steps, kmLeft(playerId))
     const payTo = ownersToPay(playerId, run.ownersUsed)
     const fees = payTo.length * gameRules.trackUseFee
-    const cash = playerStore.players.find((p) => p.id === playerId)?.cash ?? 0
-    if (fees > cash) {
+    // Charged first: owners must never be paid fees the mover was not charged
+    if (!playerStore.spendCash(playerId, fees)) {
+      const cash = playerStore.players.find((p) => p.id === playerId)?.cash ?? 0
       return refuse(
         `Running on other players' track costs ${formatCurrency(fees)} in fees; you have ${formatCurrency(cash)}.`
       )
     }
-
-    // Checked rather than assumed: owners must never be paid fees the mover
-    // was not charged
-    if (!playerStore.spendCash(playerId, fees)) return refuse(playerStore.error)
     payTo.forEach((ownerId) => playerStore.earnCash(ownerId, gameRules.trackUseFee))
     train.feesPaidTo = [...train.feesPaidTo, ...payTo]
     train.position = run.position
@@ -515,7 +514,6 @@ export const useTrainsStore = defineStore('trains', () => {
     // state
     trains,
     // getters
-    network,
     trainOf,
     trainTypeOf,
     kmLeft,

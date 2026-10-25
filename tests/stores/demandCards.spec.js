@@ -468,22 +468,32 @@ describe('demandCards store', () => {
     })
 
     it('should shuffle the discard pile into a new deck when the deck runs out', () => {
-      store.setDeck({ drawPile: [], discardPile: [card(5)], hands: { 1: [card(91)] } })
+      store.setDeck({
+        drawPile: [],
+        discardPile: [card(5)],
+        hands: { 1: [card(91), card(92), card(93)] }
+      })
 
       store.discardCard(1, 91)
 
-      expect(idsOf(store.handOf(1))).toEqual([5])
+      expect(idsOf(store.handOf(1))).toEqual([92, 93, 5])
       expect(idsOf(store.discardPile)).toEqual([91])
     })
 
-    it('should leave the hand short when there are no cards left anywhere', () => {
+    it('should deal the card played back only when there is no other card anywhere', () => {
       store.setDeck({ drawPile: [], hands: { 1: [card(91)] } })
 
       store.discardCard(1, 91)
 
-      // The card played is not dealt straight back
-      expect(store.handOf(1)).toEqual([])
-      expect(idsOf(store.discardPile)).toEqual([91])
+      expect(idsOf(store.handOf(1))).toEqual([91])
+    })
+
+    it('should top a short hand back up to three', () => {
+      store.setDeck({ drawPile: deckOf(4), hands: { 1: [card(91)] } })
+
+      store.discardCard(1, 91)
+
+      expect(idsOf(store.handOf(1))).toEqual([1, 2, 3])
     })
   })
 
@@ -510,6 +520,15 @@ describe('demandCards store', () => {
 
       expect(idsOf(store.handOf(1)).sort()).toEqual([5, 6, 7])
       expect(idsOf(store.discardPile)).toEqual([91, 92, 93])
+    })
+
+    it('should make up a full hand from the thrown-in cards when the rest run short', () => {
+      store.setDeck({ drawPile: [card(5)], hands: { 1: [card(91), card(92), card(93)] } })
+
+      store.discardHand(1)
+
+      expect(idsOf(store.handOf(1))[0]).toBe(5)
+      expect(store.handOf(1)).toHaveLength(3)
     })
 
     it('should drop all the player pins', () => {
@@ -564,6 +583,13 @@ describe('demandCards store', () => {
       expect(store.drawPile[0].demands[0].payoff).toBe(expected)
       expect(store.discardPile[0].demands[0].payoff).toBe(expected)
       expect(store.handOf(1)[0].demands[0].payoff).toBe(expected)
+    })
+
+    it('should pass over a damaged card rather than fail', () => {
+      useTownsStore().setTowns([])
+      store.setDeck({ drawPile: [card(1)], hands: { 1: [{ id: 9 }] } })
+
+      expect(() => store.repriceDemands()).not.toThrow()
     })
 
     it('should leave a demand for a town not in the game as it was', () => {

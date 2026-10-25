@@ -383,46 +383,58 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
   }
 
   /**
-   * Plays a card out of a player's hand — one of its demands has been
-   * delivered — onto the discard pile, and draws them a new card in its place.
-   * Any of the player's pins on the card go with it.
+   * Swaps cards out of a player's hand for new ones from the deck, filling
+   * the hand back up to `HAND_SIZE`; the cards going out are put on the
+   * discard pile, and the player's pins on them dropped.
    *
-   * The new card is drawn before the old one is discarded, so a deck that
-   * has run out cannot shuffle the card just played straight back to them.
+   * The deck is drawn from before the outgoing cards are discarded, so a deck
+   * that has run out is refilled from the cards played earlier, not the ones
+   * going out now — those are only dealt back if there is nothing else left.
+   * @param {number} playerId - The player
+   * @param {Array<Object>} outgoing - The cards leaving the hand
+   */
+  function replaceCards(playerId, outgoing) {
+    const kept = handOf(playerId).filter((card) => !outgoing.includes(card))
+    const drawUp = () => {
+      while (kept.length < HAND_SIZE) {
+        const drawn = drawCard()
+        if (!drawn) return
+        kept.push(drawn)
+      }
+    }
+    drawUp()
+    discardPile.value.push(...outgoing)
+    drawUp()
+
+    const outgoingIds = outgoing.map((card) => card.id)
+    pins.value[playerId] = pinsOf(playerId).filter((pin) => !outgoingIds.includes(pin.cardId))
+    hands.value[playerId] = kept
+  }
+
+  /**
+   * Plays a card out of a player's hand — one of its demands has been
+   * delivered — onto the discard pile, and draws them a new card in its place
+   * (see `replaceCards`).
    * @param {number} playerId - The player
    * @param {number} cardId - The card
    * @returns {boolean} True if the player held the card
    */
   function discardCard(playerId, cardId) {
-    const hand = handOf(playerId)
-    const card = hand.find((c) => c.id === cardId)
+    const card = handOf(playerId).find((c) => c.id === cardId)
     if (!card) return false
-
-    const drawn = drawCard()
-    discardPile.value.push(card)
-    pins.value[playerId] = pinsOf(playerId).filter((pin) => pin.cardId !== cardId)
-    hands.value[playerId] = hand.filter((c) => c !== card).concat(drawn ? [drawn] : [])
+    replaceCards(playerId, [card])
     return true
   }
 
   /**
    * Throws in a player's whole hand and deals them a new one: Empire
    * Builder's way out of a hand of demands that are no good. It costs the
-   * player their turn; ending the turn is up to the caller.
-   *
-   * As with a single card, the new hand is drawn before the old one goes on
-   * the discard pile, so the player is never dealt back the cards they threw in.
+   * player their turn; ending the turn is up to the caller. The new hand
+   * comes from the rest of the deck first (see `replaceCards`).
    * @param {number} playerId - The player
    */
   function discardHand(playerId) {
-    const hand = []
-    for (let i = 0; i < HAND_SIZE; i++) {
-      const drawn = drawCard()
-      if (drawn) hand.push(drawn)
-    }
-    discardPile.value.push(...handOf(playerId))
-    pins.value[playerId] = []
-    hands.value[playerId] = hand
+    replaceCards(playerId, [...handOf(playerId)])
   }
 
   /**
@@ -489,6 +501,8 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
   function repriceDemands() {
     const townsData = towns.value
     const reprice = (card) => {
+      // A damaged save could hold anything here; what is not a card is left be
+      if (!Array.isArray(card?.demands)) return
       card.demands.forEach((demand) => {
         const destination = townsData.find((town) => town.name === demand.destination)
         if (destination) demand.payoff = demandPayoff(destination, demand.industry, townsData)
@@ -496,7 +510,7 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
     }
     drawPile.value.forEach(reprice)
     discardPile.value.forEach(reprice)
-    Object.values(hands.value).forEach((hand) => hand.forEach(reprice))
+    Object.values(hands.value).forEach((hand) => Array.isArray(hand) && hand.forEach(reprice))
   }
 
   /**

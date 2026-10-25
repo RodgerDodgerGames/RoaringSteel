@@ -241,6 +241,13 @@ export function useTowns() {
           // exit early if drawing is active
           if (isDrawingActive.value) return
 
+          // Choosing a town for the train: the click is the choice, not a
+          // request for the town's popup
+          if (mapStore.townPicker) {
+            mapStore.townPicker.onPick(feature.properties)
+            return
+          }
+
           // popup options. The Plan view is fixed in place, so a popup there
           // must not pan the map to fit itself in (see `keepPopupInView`).
           const isPlanView = mapStore.viewMode === PLAN_VIEW

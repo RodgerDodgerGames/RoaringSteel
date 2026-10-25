@@ -43,10 +43,8 @@ const trackStore = useTrackStore()
 const { turn } = storeToRefs(useGameStore())
 
 /**
- * What the active player has spent on track this turn. It is both how much of
- * the turn's allowance is used and the total of the sections listed below — a
- * section is charged as it is recorded and refunded as it is removed, so the
- * two never differ.
+ * How much of the turn's allowance the active player has used: on track, and
+ * on changing their train, which comes out of the same allowance.
  */
 const spentThisTurn = computed(() => playerStore.trackSpendThisTurn(playerStore.activePlayer?.id))
 
@@ -57,6 +55,11 @@ const spentThisTurn = computed(() => playerStore.trackSpendThisTurn(playerStore.
  */
 const sectionsThisTurn = computed(() =>
   trackStore.segmentsBuiltOn(playerStore.activePlayer?.id, turn.value)
+)
+
+/** What the sections built this turn cost, together */
+const sectionsTotal = computed(() =>
+  sectionsThisTurn.value.reduce((total, section) => total + section.cost, 0)
 )
 </script>
 
@@ -130,7 +133,7 @@ const sectionsThisTurn = computed(() =>
       </ol>
       <div class="build-controls__total">
         <span>Total</span>
-        <span>{{ formatCurrency(spentThisTurn) }}</span>
+        <span>{{ formatCurrency(sectionsTotal) }}</span>
       </div>
     </div>
   </div>

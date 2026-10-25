@@ -7,29 +7,68 @@
   1. who they are and their cash          (PlayerCard)
   2. their train                          (TrainPanel)
   3. this turn, step by step:
-       1. move the train                  — not built yet
-       2. build track OR upgrade the train — the Empire Builder rule: a player
-          spends their turn's money on one or the other, never both
+       1. move the train                  (MoveControls)
+       2. build track OR upgrade the train — the Empire Builder rule: a turn's
+          money goes on one or the other (a crossgrade leaves some to build
+          with), chosen with the switch     (BuildControls, UpgradeControls)
      In the two opening building rounds trains do not run, so step 1 gives
      way to a note saying so, and building is the whole turn.
-  4. End Turn, pinned to the bottom so it is always in the same place
+  4. End Turn, pinned to the bottom so it is always in the same place, with
+     the option of throwing in the hand of demand cards instead of a turn
+
+  Once someone has won, the steps give way to who won, and a button to see
+  the final standings again.
 
   The middle scrolls on its own if it outgrows the window, so the player card
   and End Turn never leave the screen.
+
+  @emits show-results - The player wants to see the final standings
 -->
 
 <script setup>
+import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import PlayerCard from '@/components/panel/PlayerCard.vue'
 import TrainPanel from '@/components/panel/TrainPanel.vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
+import MoveControls from '@/components/panel/MoveControls.vue'
 import BuildControls from '@/components/panel/BuildControls.vue'
+import UpgradeControls from '@/components/panel/UpgradeControls.vue'
 import { useGameStore } from '@/stores/game'
+import { usePlayerStore } from '@/stores/players'
 import { useTurn } from '@/composables/useTurn'
 import { gameRules } from '@/config/game'
 
-const { isBuildingRound } = storeToRefs(useGameStore())
-const { nextPlayer, playsAgain, endTurn } = useTurn()
+const emit = defineEmits(['show-results'])
+
+const gameStore = useGameStore()
+const { isBuildingRound, isOver, winnerId } = storeToRefs(gameStore)
+const playerStore = usePlayerStore()
+const { nextPlayer, playsAgain, endTurn, canDiscardHand, discardHand } = useTurn()
+
+/** The winner, once there is one */
+const winner = computed(() => playerStore.players.find((p) => p.id === winnerId.value))
+
+/** What the turn's money is going on: 'build' or 'upgrade' */
+const spendOn = ref('build')
+
+// Each turn opens on building, the usual choice
+watch(
+  () => playerStore.activePlayer?.id,
+  () => {
+    spendOn.value = 'build'
+  }
+)
+
+/**
+ * Throws in the hand for a new one, after making sure: it costs the whole
+ * turn and cannot be undone.
+ */
+function confirmDiscardHand() {
+  if (window.confirm('Throw in all your demand cards for three new ones? This ends your turn.')) {
+    discardHand()
+  }
+}
 </script>
 
 <template>
@@ -37,55 +76,86 @@ const { nextPlayer, playsAgain, endTurn } = useTurn()
     <PlayerCard />
 
     <div class="player-dock__body">
-      <TrainPanel />
+      <!-- The game is over: who won -->
+      <div v-if="isOver" class="player-dock__over">
+        <p class="title is-5 mb-2">{{ winner?.name ?? 'Someone' }} has won!</p>
+        <button class="button is-primary is-small" @click="emit('show-results')">
+          See the final standings
+        </button>
+      </div>
 
-      <CollapsibleSection title="This turn" storage-key="dock_turn">
-        <!-- Opening rounds: no train movement, so no step 1 -->
-        <p v-if="isBuildingRound" class="turn-steps__opening">
-          Building round: lay track to get started. Trains start running in round
-          {{ gameRules.buildingRounds + 1 }}.
-        </p>
+      <template v-else>
+        <TrainPanel />
 
-        <ol class="turn-steps">
-          <!-- Step 1: placeholder until trains can move -->
-          <li v-if="!isBuildingRound" class="turn-step is-placeholder">
-            <div class="turn-step__heading">
-              <span class="turn-step__number">1</span>
-              <span>Move your train</span>
-              <span class="tag is-rounded ml-auto">Not built yet</span>
-            </div>
-            <p class="turn-step__note">
-              Run your train along your track to pick up and deliver loads.
-            </p>
-          </li>
+        <CollapsibleSection title="This turn" storage-key="dock_turn">
+          <!-- Opening rounds: no train movement, so no step 1 -->
+          <p v-if="isBuildingRound" class="turn-steps__opening">
+            Building round: lay track to get started. Trains start running in round
+            {{ gameRules.buildingRounds + 1 }}.
+          </p>
 
-          <!-- Step 2: build or upgrade -->
-          <li class="turn-step">
-            <div class="turn-step__heading">
-              <span class="turn-step__number">{{ isBuildingRound ? 1 : 2 }}</span>
-              <span>Build track <em>or</em> upgrade your train</span>
-            </div>
+          <ol class="turn-steps">
+            <!-- Step 1: move the train -->
+            <li v-if="!isBuildingRound" class="turn-step">
+              <div class="turn-step__heading">
+                <span class="turn-step__number">1</span>
+                <span>Move your train</span>
+              </div>
+              <p class="turn-step__note">
+                Run it along the track, stopping in towns to pick up and deliver. Do this before you
+                build.
+              </p>
+              <MoveControls />
+            </li>
 
-            <!-- Build is the only choice that works so far; Upgrade shows
-                 where the choice will be made once trains exist -->
-            <div class="buttons has-addons turn-step__choice">
-              <button class="button is-small is-selected is-primary" aria-pressed="true">
-                Build track
-              </button>
-              <button class="button is-small" disabled title="Not built yet">Upgrade train</button>
-            </div>
+            <!-- Step 2: build or upgrade -->
+            <li class="turn-step">
+              <div class="turn-step__heading">
+                <span class="turn-step__number">{{ isBuildingRound ? 1 : 2 }}</span>
+                <span>Build track <em>or</em> upgrade your train</span>
+              </div>
 
-            <BuildControls />
-          </li>
-        </ol>
-      </CollapsibleSection>
+              <div class="buttons has-addons turn-step__choice" role="group">
+                <button
+                  class="button is-small"
+                  :class="{ 'is-selected is-primary': spendOn === 'build' }"
+                  :aria-pressed="spendOn === 'build'"
+                  @click="spendOn = 'build'"
+                >
+                  Build track
+                </button>
+                <button
+                  class="button is-small"
+                  :class="{ 'is-selected is-primary': spendOn === 'upgrade' }"
+                  :aria-pressed="spendOn === 'upgrade'"
+                  @click="spendOn = 'upgrade'"
+                >
+                  Upgrade train
+                </button>
+              </div>
+
+              <!-- v-show, so each side keeps its last report while the other shows -->
+              <BuildControls v-show="spendOn === 'build'" />
+              <UpgradeControls v-show="spendOn === 'upgrade'" />
+            </li>
+          </ol>
+        </CollapsibleSection>
+      </template>
     </div>
 
-    <footer class="player-dock__footer">
+    <footer v-if="!isOver" class="player-dock__footer">
       <button class="button is-primary is-medium is-fullwidth" @click="endTurn">End turn</button>
       <p v-if="nextPlayer" class="player-dock__next">
         Next up: {{ nextPlayer.name }}{{ playsAgain ? ' again' : '' }}
       </p>
+      <button
+        v-if="canDiscardHand"
+        class="button is-text is-small is-fullwidth mt-1"
+        title="Instead of taking a turn, swap all your demand cards for new ones"
+        @click="confirmDiscardHand"
+      >
+        Throw in my demand cards (ends my turn)
+      </button>
     </footer>
   </aside>
 </template>
@@ -152,7 +222,7 @@ const { nextPlayer, playsAgain, endTurn } = useTurn()
 }
 
 .turn-step__note {
-  margin-top: 0.25rem;
+  margin: 0.25rem 0 0.5rem;
   padding-left: 2rem;
   font-size: 0.85rem;
   color: var(--bulma-text-weak);
@@ -162,13 +232,9 @@ const { nextPlayer, playsAgain, endTurn } = useTurn()
   margin: 0.6rem 0 0.75rem;
 }
 
-/* Faded, to read as a preview rather than as a step that can be taken */
-.turn-step.is-placeholder {
-  opacity: 0.55;
-}
-
-.turn-step.is-placeholder .turn-step__number {
-  background: var(--bulma-text-weak);
+/* Where the steps were, once the game is over */
+.player-dock__over {
+  padding: 1rem;
 }
 
 .player-dock__footer {

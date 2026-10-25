@@ -8,6 +8,7 @@
   - Town markers with size-based icons
   - Each town's commodity icons, in the Plan view
   - Interactive popups for town information
+  - Every player's train, where it stands (trainMarkers.js)
 
   Integrates with:
   - mapStore: Stores map instance and view state
@@ -35,6 +36,7 @@ import { useTownsStore } from '@/stores/towns'
 import { useMapStore } from '@/stores/map'
 import { useRegionMask } from '@/composables/map/regionMask'
 import { useWaterMask } from '@/composables/map/waterMask'
+import { useTrainMarkers } from '@/composables/map/trainMarkers'
 
 const townsStore = useTownsStore()
 const mapStore = useMapStore()
@@ -47,6 +49,7 @@ const { addTownsToMap, townsLayer } = useTowns()
 const mapView = useMapView()
 const regionMask = useRegionMask()
 const waterMask = useWaterMask()
+const trainMarkers = useTrainMarkers()
 
 onMounted(() => {
   // No starting view: useMapView gives the map its view below
@@ -80,6 +83,8 @@ onMounted(() => {
     addTownsToMap(map, towns)
     // add townsLayer to store
     mapStore.setTownsLayer(townsLayer.value)
+    // the trains, over the towns they stand in
+    trainMarkers.attach(map.value)
   }
 })
 

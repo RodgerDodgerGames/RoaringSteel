@@ -2,8 +2,8 @@
   MapModeHint.vue
 
   A banner floating at the top of the map that says which mode the map is in
-  while it is not simply being looked at — drawing track or removing it — and
-  how to get out of that mode.
+  while it is not simply being looked at — drawing track, removing it, or
+  choosing a town for the train — and how to get out of that mode.
 
   The controls that start these modes are in the dock at the side, but the
   player's eyes are on the map while they use them, so the instructions are
@@ -11,6 +11,8 @@
 
   @prop isDrawing  - True while a line of track is being drawn
   @prop isRemoving - True while removal mode is on
+  @prop pickPrompt - While a town is being chosen on the map, what clicking
+                     one does; empty otherwise
 -->
 
 <script setup>
@@ -24,13 +26,17 @@ const props = defineProps({
   isRemoving: {
     type: Boolean,
     default: false
+  },
+  pickPrompt: {
+    type: String,
+    default: ''
   }
 })
 
 /**
  * The banner's wording for the current mode, or null when there is no mode to
- * explain. Drawing and removing are never both on — the build composable
- * switches one off as the other starts.
+ * explain. Only one mode is ever on — each switches the others off as it
+ * starts.
  */
 const hint = computed(() => {
   if (props.isDrawing) {
@@ -38,6 +44,9 @@ const hint = computed(() => {
       title: 'Building track',
       body: 'Start in a major city or at the end of your track. Click a town or double-click to finish.'
     }
+  }
+  if (props.pickPrompt) {
+    return { title: 'Choosing a town', body: props.pickPrompt }
   }
   if (props.isRemoving) {
     return {

@@ -264,8 +264,10 @@ export default function useBuildTrack(formatCurrency) {
    * flag in step.
    */
   function toggleRemoveMode() {
-    // Drawing and removing both act on map clicks, so only one may be live
+    // Drawing, removing and choosing a town for the train all act on map
+    // clicks, so only one may be live
     if (isDrawingActive.value) cancelDrawing()
+    mapStore.setTownPicker(null)
     // Track is torn up in the Build view. Removal mode is only ever on in that
     // view, so when this switches it off the view stays as it is.
     mapStore.setViewMode(BUILD_VIEW)
@@ -289,8 +291,10 @@ export default function useBuildTrack(formatCurrency) {
   function startDrawingLine() {
     resetLineTracking()
 
-    // Drawing and removing both act on map clicks, so only one may be live
+    // Drawing, removing and choosing a town for the train all act on map
+    // clicks, so only one may be live
     stopRemoving()
+    mapStore.setTownPicker(null)
 
     // Cost comes from the grid cells a line crosses, so with no grid every
     // line prices at zero and is built for nothing. Refuse rather than give

@@ -60,6 +60,15 @@ export const useMapStore = defineStore('map', () => {
   /** Flag indicating if track drawing mode is active */
   const isDrawingActive = ref(false)
 
+  /**
+   * While the player is choosing a town on the map — where to place or send
+   * their train — what to do with the town they click: { prompt, onPick },
+   * where `prompt` says what clicking does and `onPick` is handed the town.
+   * Null the rest of the time, when clicking a town opens its popup.
+   * Held shallowly: it carries a function, which has nothing to watch inside.
+   */
+  const townPicker = shallowRef(null)
+
   // ACTIONS
 
   /** @param {Object} newMap - Leaflet map instance */
@@ -87,6 +96,15 @@ export const useMapStore = defineStore('map', () => {
     isDrawingActive.value = status
   }
 
+  /**
+   * Starts or stops choosing a town on the map (see `townPicker`).
+   * @param {{prompt: string, onPick: Function}|null} picker - What a click
+   *   on a town does, or null to go back to opening its popup
+   */
+  const setTownPicker = (picker) => {
+    townPicker.value = picker
+  }
+
   /** @param {Object} newTownsLayer - Leaflet LayerGroup with town markers */
   const setTownsLayer = (newTownsLayer) => {
     townsLayer.value = newTownsLayer
@@ -102,6 +120,7 @@ export const useMapStore = defineStore('map', () => {
     mapZoom.value = null
     mapCenter.value = null
     isDrawingActive.value = false
+    townPicker.value = null
     // Note: map and townsLayer are Leaflet instances and should not be reset here
   }
 
@@ -123,10 +142,12 @@ export const useMapStore = defineStore('map', () => {
     mapCenter,
     townsLayer,
     isDrawingActive,
+    townPicker,
     // actions
     setMap,
     setViewMode,
     setIsDrawingActive,
+    setTownPicker,
     setTownsLayer,
     reset,
     setMapView

@@ -28,7 +28,6 @@
 
 <script setup>
 import { provide, onMounted, onBeforeUnmount } from 'vue'
-import { storeToRefs } from 'pinia'
 
 import GameTopBar from '@/components/GameTopBar.vue'
 import MainMap from '@/components/map/MainMap.vue'
@@ -37,19 +36,15 @@ import MapLegend from '@/components/map/MapLegend.vue'
 import PlayerDock from '@/components/panel/PlayerDock.vue'
 import DemandStrip from '@/components/demands/DemandStrip.vue'
 
-import { useGridStore } from '@/stores/grid'
 import useBuildTrack, { buildTrackKey } from '@/composables/map/useBuildTrack'
 import { formatCurrency } from '@/composables/utils'
 
 const emit = defineEmits(['new-game'])
 
-// The cost grid prices every section of track as it is drawn
-const { grid } = storeToRefs(useGridStore())
-
 // One build-track instance for the whole game. Its onMounted runs after
 // MainMap's (a parent mounts after its children), so the map and towns are in
 // the store by the time it reads them.
-const buildTrack = useBuildTrack(grid, formatCurrency)
+const buildTrack = useBuildTrack(formatCurrency)
 provide(buildTrackKey, buildTrack)
 
 // Destructured so the template unwraps them; refs nested inside a plain

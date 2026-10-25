@@ -36,7 +36,7 @@ const hint = computed(() => {
   if (props.isDrawing) {
     return {
       title: 'Building track',
-      body: 'Start at a town or the end of your track. Click a town or double-click to finish.'
+      body: 'Start in a major city or at the end of your track. Click a town or double-click to finish.'
     }
   }
   if (props.isRemoving) {

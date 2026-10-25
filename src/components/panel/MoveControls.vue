@@ -95,7 +95,8 @@ function destinationLabel({ town: destination, km, reachable, payTo, fee }) {
     <template v-else>
       <div class="move-controls__status">
         <span>{{ town ? `In ${town.name}` : 'Between towns' }}</span>
-        <span>{{ Math.round(kmLeft) }} of {{ trainType.rangeKm }} km left</span>
+        <!-- Only while it can still go: once it is done, the note below says why -->
+        <span v-if="!moveBlock">{{ Math.round(kmLeft) }} of {{ trainType.rangeKm }} km left</span>
       </div>
 
       <p v-if="moveBlock" class="move-controls__note">{{ moveBlock }}</p>

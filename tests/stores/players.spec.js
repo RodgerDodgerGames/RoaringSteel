@@ -495,7 +495,7 @@ describe('Player Store', () => {
       it('should take the amount off the player', () => {
         expect(playerStore.spendCash(1, 5000)).toBe(true)
 
-        expect(playerStore.players[0].cash).toBe(15000)
+        expect(playerStore.players[0].cash).toBe(gameRules.startingCash - 5000)
       })
 
       it('should let a player spend down to exactly zero', () => {
@@ -541,7 +541,7 @@ describe('Player Store', () => {
       it('should charge the player and record it against the turn', () => {
         expect(playerStore.spendOnTrack(1, 5000)).toBe(true)
 
-        expect(playerStore.players[0].cash).toBe(15000)
+        expect(playerStore.players[0].cash).toBe(gameRules.startingCash - 5000)
         expect(playerStore.players[0].trackSpentThisTurn).toBe(5000)
       })
 
@@ -550,7 +550,7 @@ describe('Player Store', () => {
         playerStore.spendOnTrack(1, 3000)
 
         expect(playerStore.players[0].trackSpentThisTurn).toBe(8000)
-        expect(playerStore.players[0].cash).toBe(12000)
+        expect(playerStore.players[0].cash).toBe(gameRules.startingCash - 8000)
       })
 
       it('should refuse a section that exceeds the turn budget', () => {
@@ -692,7 +692,7 @@ describe('Player Store', () => {
         expect(playerStore.resetTrackSpend(1)).toBe(true)
 
         expect(playerStore.players[0].trackSpentThisTurn).toBe(0)
-        expect(playerStore.players[0].cash).toBe(15000)
+        expect(playerStore.players[0].cash).toBe(gameRules.startingCash - 5000)
       })
 
       it('should return false for an unknown player', () => {

@@ -26,11 +26,11 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import * as turf from '@turf/turf'
 import { useTownsStore } from './towns'
 import { usePlayerStore } from './players'
 import { useSettingsStore } from './settings'
 import { PIN_COLORS } from '@/config/demands'
+import { demandPayoff } from '@/composables/payoffs'
 
 /** How many demand cards each player holds, per the Empire Builder rules */
 export const HAND_SIZE = 3
@@ -273,30 +273,8 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
         const selectedIndustry = weightedRandomSelect(availableIndustries, 'proportion')
         console.log(`selected industry: ${selectedIndustry.name}`)
 
-        // Calculate payoff based on distance and industry rarity
-        const sourceTowns = townsData.filter((town) =>
-          town.industries.some((prod) => prod.name === selectedIndustry.name)
-        )
-
-        const distances = sourceTowns.map((src) =>
-          turf.distance(
-            turf.point([src.lon, src.lat]),
-            turf.point([destination.lon, destination.lat])
-          )
-        )
-
-        // calculate payoff
-        // The payoff is calculated as the average distance between source towns and destination,
-        // multiplied by 10 to scale the value, and then multiplied by the rarity factor.
-        // The rarity factor is calculated as the inverse of the count of towns that produce
-        // the selected industry. The idea is that rarer industries should have a higher payoff.
-        // The result is then rounded to the nearest integer.
-        const avgDistance = distances.reduce((a, b) => a + b, 0) / distances.length || 0
-        const rarityFactor = 1 / industryCounts[selectedIndustry.name]
-        const payoff = Math.round(avgDistance * 10 * rarityFactor)
-        console.log(
-          `average distance: ${avgDistance}, rarity factor: ${rarityFactor}, Payoff: ${payoff}`
-        )
+        // Pays by how far the commodity has to come (see payoffs.js)
+        const payoff = demandPayoff(destination, selectedIndustry.name, townsData)
 
         // Create a demand option
         demandOptions.push({

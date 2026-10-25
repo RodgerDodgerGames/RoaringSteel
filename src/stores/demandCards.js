@@ -21,6 +21,11 @@
  * cleared with the hands too, because card ids restart with every new deck
  * and an old pin would otherwise land on a new game's card.
  *
+ * A card leaves a hand when one of its demands is delivered, or when the
+ * player throws in their whole hand. Either way it goes on the discard pile
+ * and a new card is drawn in its place. When the deck runs out, the discard
+ * pile is shuffled to make a new one, as at a real table.
+ *
  * @module stores/demandCards
  */
 
@@ -45,6 +50,9 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
 
   /** Cards not yet dealt, top of the deck first */
   const drawPile = ref([])
+
+  /** Cards played or thrown in, shuffled back into the deck when it runs out */
+  const discardPile = ref([])
 
   /**
    * Each player's hand, keyed by player id. A plain object rather than a Map
@@ -311,9 +319,11 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
     for (let pass = 0; pass < HAND_SIZE; pass++) {
       playerIds.forEach((playerId) => {
         const hand = handOf(playerId)
-        if (hand.length >= HAND_SIZE || drawPile.value.length === 0) return
+        if (hand.length >= HAND_SIZE) return
+        const drawn = drawCard()
+        if (!drawn) return
         // Assigned as a new array so a player with no hand yet gets an entry
-        hands.value[playerId] = [...hand, drawPile.value.shift()]
+        hands.value[playerId] = [...hand, drawn]
       })
     }
 
@@ -341,6 +351,72 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
       cumulative += obj[weightKey]
       if (rand < cumulative) return obj
     }
+  }
+
+  /**
+   * Takes the top card off the deck. When the deck is empty, the discard pile
+   * is shuffled to become the new deck first, so the game never runs out of
+   * cards while any have been played.
+   * @returns {Object|undefined} The card, or undefined if there are no cards
+   *   left anywhere
+   */
+  function drawCard() {
+    if (drawPile.value.length === 0 && discardPile.value.length > 0) {
+      drawPile.value = shuffled(discardPile.value)
+      discardPile.value = []
+    }
+    return drawPile.value.shift()
+  }
+
+  /**
+   * A copy of some cards in random order (a Fisher–Yates shuffle).
+   * @param {Array} cards - The cards
+   * @returns {Array} The same cards, shuffled
+   */
+  function shuffled(cards) {
+    const deck = [...cards]
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[deck[i], deck[j]] = [deck[j], deck[i]]
+    }
+    return deck
+  }
+
+  /**
+   * Plays a card out of a player's hand — one of its demands has been
+   * delivered — onto the discard pile, and draws them a new card in its place.
+   * Any of the player's pins on the card go with it.
+   * @param {number} playerId - The player
+   * @param {number} cardId - The card
+   * @returns {boolean} True if the player held the card
+   */
+  function discardCard(playerId, cardId) {
+    const hand = handOf(playerId)
+    const card = hand.find((c) => c.id === cardId)
+    if (!card) return false
+
+    discardPile.value.push(card)
+    pins.value[playerId] = pinsOf(playerId).filter((pin) => pin.cardId !== cardId)
+    const drawn = drawCard()
+    hands.value[playerId] = hand.filter((c) => c !== card).concat(drawn ? [drawn] : [])
+    return true
+  }
+
+  /**
+   * Throws in a player's whole hand and deals them a new one: Empire
+   * Builder's way out of a hand of demands that are no good. It costs the
+   * player their turn; ending the turn is up to the caller.
+   * @param {number} playerId - The player
+   */
+  function discardHand(playerId) {
+    discardPile.value.push(...handOf(playerId))
+    pins.value[playerId] = []
+    const hand = []
+    for (let i = 0; i < HAND_SIZE; i++) {
+      const drawn = drawCard()
+      if (drawn) hand.push(drawn)
+    }
+    hands.value[playerId] = hand
   }
 
   /**
@@ -400,6 +476,7 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
    */
   function reset() {
     drawPile.value = []
+    discardPile.value = []
     hands.value = {}
     pins.value = {}
     hoveredLine.value = null
@@ -450,6 +527,8 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
    *
    * @param {Object} deck - Saved deck state
    * @param {Array} deck.drawPile - Cards not yet dealt
+   * @param {Array} [deck.discardPile] - Cards played or thrown in; saves
+   *   from before cards could be played have none
    * @param {Object} [deck.hands] - Each player's hand, keyed by player id
    * @param {Object} [deck.pins] - Each player's pinned lines, keyed by player
    *   id; saves from before pins existed have none, and unusable pins are
@@ -462,6 +541,7 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
     drawPile.value = deck.drawPile.map((card, index) =>
       Array.isArray(card) ? { id: index + 1, demands: card } : card
     )
+    discardPile.value = Array.isArray(deck.discardPile) ? deck.discardPile : []
     hands.value = deck.hands ?? {}
     pins.value = usablePins(deck.pins)
     return true
@@ -469,6 +549,7 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
 
   return {
     drawPile,
+    discardPile,
     hands,
     pins,
     hoveredLine,
@@ -479,6 +560,8 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
     markedLines,
     generateDemandCards,
     dealHands,
+    discardCard,
+    discardHand,
     togglePin,
     hoverLine,
     endHover,

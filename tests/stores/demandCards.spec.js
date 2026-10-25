@@ -434,4 +434,98 @@ describe('demandCards store', () => {
       ])
     })
   })
+
+  describe('discardCard', () => {
+    beforeEach(() => {
+      store.setDeck({ drawPile: deckOf(4), hands: { 1: [card(91), card(92), card(93)] } })
+    })
+
+    it('should put the card on the discard pile and draw a replacement', () => {
+      expect(store.discardCard(1, 92)).toBe(true)
+
+      expect(idsOf(store.handOf(1))).toEqual([91, 93, 1])
+      expect(idsOf(store.discardPile)).toEqual([92])
+      expect(idsOf(store.drawPile)).toEqual([2, 3, 4])
+    })
+
+    it('should drop the player pins on the card', () => {
+      usePlayerStore().addPlayer({ name: 'Alice', color: 'red' })
+      usePlayerStore().startGame()
+      store.togglePin(92, 0)
+      store.togglePin(91, 1)
+
+      store.discardCard(1, 92)
+
+      expect(store.pinsOf(1).map((pin) => pin.cardId)).toEqual([91])
+    })
+
+    it('should refuse a card the player does not hold', () => {
+      expect(store.discardCard(1, 1)).toBe(false)
+
+      expect(idsOf(store.handOf(1))).toEqual([91, 92, 93])
+      expect(store.discardPile).toEqual([])
+    })
+
+    it('should shuffle the discard pile into a new deck when the deck runs out', () => {
+      store.setDeck({ drawPile: [], discardPile: [card(5)], hands: { 1: [card(91)] } })
+
+      store.discardCard(1, 91)
+
+      // Card 91 joined the pile before the draw, so either card may come up
+      expect(store.handOf(1)).toHaveLength(1)
+      expect(store.drawPile.length + store.discardPile.length).toBe(1)
+    })
+
+    it('should leave the hand short when there are no cards left anywhere', () => {
+      store.setDeck({ drawPile: [], hands: { 1: [card(91)] } })
+      // Nothing to shuffle until 91 is played; after it is, 91 is redrawn
+      store.discardCard(1, 91)
+
+      expect(idsOf(store.handOf(1))).toEqual([91])
+    })
+  })
+
+  describe('discardHand', () => {
+    it('should throw in the whole hand and deal a new one', () => {
+      store.setDeck({ drawPile: deckOf(4), hands: { 1: [card(91), card(92), card(93)] } })
+
+      store.discardHand(1)
+
+      expect(idsOf(store.handOf(1))).toEqual([1, 2, 3])
+      expect(idsOf(store.discardPile)).toEqual([91, 92, 93])
+    })
+
+    it('should drop all the player pins', () => {
+      usePlayerStore().addPlayer({ name: 'Alice', color: 'red' })
+      usePlayerStore().startGame()
+      store.setDeck({ drawPile: deckOf(4), hands: { 1: [card(91)] } })
+      store.togglePin(91, 0)
+
+      store.discardHand(1)
+
+      expect(store.pinsOf(1)).toEqual([])
+    })
+  })
+
+  describe('discard pile in a save', () => {
+    it('should be restored from a save', () => {
+      store.setDeck({ drawPile: deckOf(1), discardPile: [card(50)] })
+
+      expect(idsOf(store.discardPile)).toEqual([50])
+    })
+
+    it('should start empty for a save from before cards could be played', () => {
+      store.setDeck({ drawPile: deckOf(1) })
+
+      expect(store.discardPile).toEqual([])
+    })
+
+    it('should be cleared by reset', () => {
+      store.setDeck({ drawPile: deckOf(1), discardPile: [card(50)] })
+
+      store.reset()
+
+      expect(store.discardPile).toEqual([])
+    })
+  })
 })

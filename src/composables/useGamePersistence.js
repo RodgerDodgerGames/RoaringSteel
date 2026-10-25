@@ -187,6 +187,9 @@ export function useGamePersistence() {
    * A damaged deck does not stop the load — the rest of the game is still
    * playable — but it is logged, since every hand will come up empty.
    *
+   * A save from before trains ran has its demands priced afresh, by today's
+   * payoff rule.
+   *
    * @param {Object} data - Saved game data
    */
   function restoreDemandDeck(data) {
@@ -203,6 +206,11 @@ export function useGamePersistence() {
     if (isOldSave) {
       demandCardsStore.dealHands(playerStore.players.map((player) => player.id))
     }
+
+    // Saves from before trains ran were dealt cards priced by an older rule
+    // that paid far too little to ever win; they are priced afresh. Towns are
+    // restored before this runs, so every destination can be found.
+    if (!data.trains) demandCardsStore.repriceDemands()
   }
 
   /**

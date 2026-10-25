@@ -225,6 +225,15 @@ describe('trains store', () => {
       )
     })
 
+    // The bug: tearing the track back up refunded the spend, and with it the
+    // train's right to move
+    it('should stay refused after the track is torn up and refunded', () => {
+      playerStore.spendOnTrack(ANN, 1000)
+      playerStore.refundTrackSpend(ANN, 1000)
+
+      expect(store.moveTrain(ANN, 'East').ok).toBe(false)
+    })
+
     it('should refuse once the player has started building', () => {
       playerStore.spendOnTrack(ANN, 1000)
 

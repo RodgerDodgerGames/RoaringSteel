@@ -13,7 +13,9 @@
  *   isTurn: boolean,   // True if it's this player's turn
  *   color: string,     // Player's chosen color, never shared with another player
  *   position: number,  // Board position (for future use)
- *   trackSpentThisTurn: number // Spent on track this turn, against the budget
+ *   trackSpentThisTurn: number, // Spent on track this turn, against the budget
+ *   hasSpentThisTurn: boolean   // Spent any of the allowance this turn, even
+ *                               // if a removal has since refunded it
  * }
  *
  * @module stores/players
@@ -164,7 +166,8 @@ export const usePlayerStore = defineStore('playerStore', () => {
         isTurn: false,
         color: player.color,
         position: 0,
-        trackSpentThisTurn: 0
+        trackSpentThisTurn: 0,
+        hasSpentThisTurn: false
       })
       return true
     } catch (e) {
@@ -335,6 +338,18 @@ export const usePlayerStore = defineStore('playerStore', () => {
   }
 
   /**
+   * Whether a player has spent any of this turn's allowance, on track or on
+   * their train. Stays true once set until the turn ends, even if the track
+   * is torn up and refunded: spending is the start of the build half of the
+   * turn, after which the train may not move (see the trains store).
+   * @param {number} id The player's ID.
+   * @returns {boolean} True once they have spent from the allowance this turn.
+   */
+  function hasSpentThisTurn(id) {
+    return players.value.find((p) => p.id === id)?.hasSpentThisTurn === true
+  }
+
+  /**
    * How much of this turn's track allowance a player has left.
    * @param {number} id The player's ID.
    * @returns {number} Unspent allowance, never negative.
@@ -455,6 +470,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     if (!spendCash(id, amount)) return false
 
     player.trackSpentThisTurn = spentOnTrack(player) + amount
+    player.hasSpentThisTurn = true
     return true
   }
 
@@ -499,6 +515,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     if (!player) return false
 
     player.trackSpentThisTurn = 0
+    player.hasSpentThisTurn = false
     return true
   }
 
@@ -662,7 +679,9 @@ export const usePlayerStore = defineStore('playerStore', () => {
         ...player,
         trackSpentThisTurn: Number.isFinite(player.trackSpentThisTurn)
           ? player.trackSpentThisTurn
-          : 0
+          : 0,
+        // Saves from before this flag: anything spent this turn still counts
+        hasSpentThisTurn: player.hasSpentThisTurn === true || Number(player.trackSpentThisTurn) > 0
       }))
     }
   }
@@ -685,6 +704,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     startGame,
     setActivePlayer,
     trackSpendThisTurn,
+    hasSpentThisTurn,
     trackBudgetRemaining,
     availableForTrack,
     spendCash,

@@ -366,6 +366,15 @@ describe('useTurn', () => {
       ).toEqual([1, 2, 3])
     })
 
+    it('should stay refused after the building is torn up and refunded', () => {
+      playerStore.updatePlayer(1, { cash: 5000 })
+      playerStore.spendOnTrack(1, 1000)
+      playerStore.refundTrackSpend(1, 1000)
+      const { canDiscardHand } = useTurn()
+
+      expect(canDiscardHand.value).toBe(false)
+    })
+
     it('should be refused once the player has used their train this turn', () => {
       useTownsStore().setTowns([
         { name: 'Alpha', msa: 'A', lat: 0, lon: 0, size: 'small', industries: [] }

@@ -8,23 +8,21 @@
  * The cities have to be joined by the player's own track, all on one
  * connected piece of it (see `majorCitiesJoined` in network.js).
  *
- * Checked whenever a player's cash goes up mid-turn (a delivery) and as each
- * turn ends, which catches a win made by building the last link.
- *
- * The network is built here from the track and towns rather than taken from
- * the trains store, because that store checks for a winner after each
- * delivery, and the two would otherwise each import the other.
+ * A player wins on their own turn, as the player claiming a win does in
+ * Empire Builder: it is checked when they deliver, and as their turn ends,
+ * which catches a win made by building the last link. Cash that comes to a
+ * player on someone else's turn — a fee for running on their track — counts
+ * when their own turn comes round.
  *
  * @module composables/victory
  */
 
-import { computed } from 'vue'
 import { gameRules } from '@/config/game'
-import { buildNetwork, majorCitiesJoined } from '@/composables/network'
+import { majorCitiesJoined } from '@/composables/network'
 import { useGameStore } from '@/stores/game'
 import { usePlayerStore } from '@/stores/players'
 import { useTownsStore } from '@/stores/towns'
-import { useTrackStore } from '@/stores/track'
+import { useNetworkStore } from '@/stores/network'
 
 /**
  * How many major cities a player must join to win, out of however many the
@@ -40,10 +38,7 @@ export function useVictory() {
   const gameStore = useGameStore()
   const playerStore = usePlayerStore()
   const townsStore = useTownsStore()
-  const trackStore = useTrackStore()
-
-  /** The track as a network, to see which cities it joins (see network.js) */
-  const network = computed(() => buildNetwork(trackStore.segments, townsStore.towns))
+  const networkStore = useNetworkStore()
 
   /**
    * How close a player is to winning: their cash against what is needed,
@@ -56,7 +51,7 @@ export function useVictory() {
     const cash = playerStore.players.find((p) => p.id === playerId)?.cash ?? 0
     const majorCities = townsStore.towns.filter((town) => town.size === 'large').length
     const citiesNeeded = majorCitiesNeeded(majorCities)
-    const citiesJoined = majorCitiesJoined(network.value, playerId)
+    const citiesJoined = majorCitiesJoined(networkStore.network, playerId)
     const cashNeeded = gameRules.victory.cash
     return {
       cash,

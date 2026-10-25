@@ -537,6 +537,33 @@ describe('Player Store', () => {
       })
     })
 
+    describe('hasSpentThisTurn', () => {
+      it('should be false at the start of a turn', () => {
+        expect(playerStore.hasSpentThisTurn(1)).toBe(false)
+      })
+
+      it('should stay true after the spend is refunded', () => {
+        playerStore.spendOnTrack(1, 1000)
+        playerStore.refundTrackSpend(1, 1000)
+
+        expect(playerStore.hasSpentThisTurn(1)).toBe(true)
+      })
+
+      it('should be cleared as the turn ends', () => {
+        playerStore.spendOnTrack(1, 1000)
+
+        playerStore.resetTrackSpend(1)
+
+        expect(playerStore.hasSpentThisTurn(1)).toBe(false)
+      })
+
+      it('should be true for a player saved mid-build before the flag existed', () => {
+        playerStore.setPlayers([{ id: 1, name: 'Alice', cash: 100, trackSpentThisTurn: 500 }])
+
+        expect(playerStore.hasSpentThisTurn(1)).toBe(true)
+      })
+    })
+
     describe('earnCash', () => {
       it('should add the amount to the player', () => {
         expect(playerStore.earnCash(1, 9000)).toBe(true)

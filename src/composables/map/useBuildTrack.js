@@ -804,7 +804,7 @@ export default function useBuildTrack(formatCurrency) {
 
   /**
    * Whether the active player may start a line here: in a major city or at
-   * the end of their own track (see the track builder).
+   * an end or bend of their own track (see the track builder).
    * @param {Object} latlng - Where the line would start
    * @returns {boolean} True if it may start here
    */

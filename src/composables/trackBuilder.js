@@ -9,8 +9,10 @@
  *
  * A section must:
  * - be built by the player whose turn it is, while the game is on;
- * - start in a major city or at the end of the player's own track — Empire
- *   Builder's rule, so every network grows out of a major city;
+ * - start in a major city or on the player's own track — Empire Builder's
+ *   rule, so every network grows out of a major city. "On" means at one of
+ *   the points the track is drawn through (its ends and bends): that is
+ *   where a new section joins the network (see network.js);
  * - keep to the build rules (inside the region, bridges, spacing — see
  *   buildRules.js);
  * - cost no more than the player has left to spend this turn, in cash and
@@ -32,7 +34,8 @@ import { pointKey } from '@/composables/network'
 import { formatCurrency } from '@/composables/utils'
 
 /** What to tell a player whose line starts somewhere track may not start */
-export const START_RULE = 'Track must start in a major city or at the end of your own track.'
+export const START_RULE =
+  'Track must start in a major city, or at an end or bend of your own track.'
 
 export function useTrackBuilder() {
   const gameStore = useGameStore()
@@ -60,7 +63,8 @@ export function useTrackBuilder() {
 
   /**
    * Every point a player may start a section from: each major city, and
-   * both ends of every section of their own track.
+   * every point their own track is drawn through — its ends, and its bends,
+   * so a branch can leave a line part way along.
    * @param {number} playerId - The player
    * @returns {Array<{lat: number, lng: number}>} The points
    */
@@ -68,10 +72,10 @@ export function useTrackBuilder() {
     const cities = townsStore.towns
       .filter((town) => town.size === 'large')
       .map((town) => ({ lat: town.lat, lng: town.lon }))
-    const ends = trackStore
+    const ownPoints = trackStore
       .segmentsForOwner(playerId)
-      .flatMap(({ coordinates }) => [coordinates[0], coordinates.at(-1)])
-    return [...cities, ...ends]
+      .flatMap(({ coordinates }) => coordinates)
+    return [...cities, ...ownPoints]
   }
 
   /**

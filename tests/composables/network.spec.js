@@ -117,6 +117,57 @@ describe('network', () => {
       expect(routes.get(townKey(west)).km).toBeGreaterThan(2 * toEast.km)
     })
 
+    // The bug: the train could run on one stretch to the next bend and turn
+    // round there, so it reversed anywhere just past where it stopped
+    it('should not let a train turn round on a bend further along', () => {
+      // Off the line the towns are on, so neither bend is a town
+      const b1 = { lat: 0.02, lng: 0.05 }
+      const b2 = { lat: 0.02, lng: 0.1 }
+      const network = buildNetwork([segment(1, p(west), b1, b2, p(east))], towns)
+      const onB1 = positionAtNode(network, pointKey(b1), townKey(west))
+
+      const toWest = shortestRoutes(network, onB1).get(townKey(west))
+
+      // On to East to turn round there
+      expect(toWest.steps.map((step) => step.to)).toContain(townKey(east))
+    })
+
+    it('should not let a train stopped part way along turn round on the next bend', () => {
+      const bend = { lat: 0.02, lng: 0.1 }
+      const network = buildNetwork([segment(1, p(west), bend, p(east))], towns)
+      const halfway = {
+        lat: 0.01,
+        lng: 0.05,
+        nodeKey: null,
+        townId: null,
+        cameFrom: townKey(west),
+        ahead: pointKey(bend),
+        ownerId: 1
+      }
+
+      const toWest = shortestRoutes(network, halfway).get(townKey(west))
+
+      expect(toWest.steps.map((step) => step.to)).toContain(townKey(east))
+    })
+
+    it('should let a train come back the way it came by going round a loop', () => {
+      // West - bend - East, with a loop out of the bend and back into it
+      const bend = { lat: 0.02, lng: 0.1 }
+      const loopA = { lat: 0.07, lng: 0.15 }
+      const loopB = { lat: -0.03, lng: 0.15 }
+      const network = buildNetwork(
+        [segment(1, p(west), bend), segment(1, bend, loopA, loopB, bend)],
+        towns
+      )
+      const onBend = positionAtNode(network, pointKey(bend), townKey(west))
+
+      const toWest = shortestRoutes(network, onBend).get(townKey(west))
+
+      // Round the loop, either way, back through the bend and on to West
+      expect(toWest.steps).toHaveLength(4)
+      expect(toWest.steps.slice(-2).map((step) => step.to)).toEqual([pointKey(bend), townKey(west)])
+    })
+
     it('should let a train reverse in a town', () => {
       const network = buildNetwork([segment(1, p(west), p(middle), p(east))], towns)
       // In Middle, having come from West

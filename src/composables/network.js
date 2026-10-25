@@ -160,6 +160,13 @@ function firstSteps(network, position) {
 /**
  * The shortest way from where a train stands to every node it can reach.
  *
+ * The no-reversing rule depends on which way the train is going, not only
+ * where it is, so the search is over arrivals — "at this node, having come
+ * from that one" — rather than over nodes. From an arrival the train may go
+ * on along any stretch except the one back where it came from, unless the
+ * node is a town. Searching nodes alone would let a route turn round on any
+ * bend: out one stretch and straight back.
+ *
  * @param {Object} network - From `buildNetwork`
  * @param {Object} position - Where the train is (see the module notes)
  * @param {Object} [options]
@@ -171,41 +178,45 @@ function firstSteps(network, position) {
  */
 export function shortestRoutes(network, position, { owners = null } = {}) {
   const isAllowed = (edge) => !owners || owners.has(edge.ownerId)
-  const best = new Map()
-  const done = new Set()
-  // Nodes waiting to be settled; small enough that a scan beats a heap
+  // The best way found to each arrival, keyed "from>to"; `behind` is the
+  // node the train has just left, which it may not go straight back to
+  const arrivals = new Map()
+  const settled = new Set()
+  // Arrivals waiting to be settled; small enough that a scan beats a heap
   const frontier = []
 
-  const offer = (key, km, steps) => {
-    const known = best.get(key)
+  const offer = (behind, to, km, steps) => {
+    const key = `${behind}>${to}`
+    const known = arrivals.get(key)
     if (known && known.km <= km) return
-    best.set(key, { km, steps })
+    arrivals.set(key, { behind, to, km, steps })
     frontier.push(key)
   }
 
   firstSteps(network, position)
     .filter(isAllowed)
-    .forEach((step) => offer(step.to, step.km, [step]))
+    // Set off part way along a stretch, the node behind is the one it came from
+    .forEach((step) => offer(step.from ?? position.cameFrom, step.to, step.km, [step]))
 
+  const best = new Map()
   while (frontier.length) {
-    // Settle the nearest node not yet settled
+    // Settle the nearest arrival not yet settled
     let nearestIndex = 0
     frontier.forEach((key, i) => {
-      if (best.get(key).km < best.get(frontier[nearestIndex]).km) nearestIndex = i
+      if (arrivals.get(key).km < arrivals.get(frontier[nearestIndex]).km) nearestIndex = i
     })
     const key = frontier.splice(nearestIndex, 1)[0]
-    if (done.has(key)) continue
-    done.add(key)
+    if (settled.has(key)) continue
+    settled.add(key)
 
-    const { km, steps } = best.get(key)
+    const { behind, to: here, km, steps } = arrivals.get(key)
+    if (!best.has(here) || best.get(here).km > km) best.set(here, { km, steps })
+
+    const mayReverse = Boolean(network.nodes.get(here).town)
     network.adjacency
-      .get(key)
-      .filter(isAllowed)
-      .forEach((edge) => {
-        if (!done.has(edge.to)) {
-          offer(edge.to, km + edge.km, [...steps, { from: key, ...edge }])
-        }
-      })
+      .get(here)
+      .filter((edge) => isAllowed(edge) && (mayReverse || edge.to !== behind))
+      .forEach((edge) => offer(here, edge.to, km + edge.km, [...steps, { from: here, ...edge }]))
   }
 
   // A train already standing on a node has nowhere to go to reach it

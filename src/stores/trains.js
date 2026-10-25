@@ -42,19 +42,13 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { gameRules } from '@/config/game'
 import { TRAIN_TYPES, TRAIN_CHANGES, STARTING_TRAIN, trainRangeKm } from '@/config/trains'
-import {
-  buildNetwork,
-  townKey,
-  positionAtNode,
-  shortestRoutes,
-  runRoute
-} from '@/composables/network'
+import { townKey, positionAtNode, shortestRoutes, runRoute } from '@/composables/network'
 import { formatCurrency } from '@/composables/utils'
 import { useVictory } from '@/composables/victory'
 import { useGameStore } from './game'
 import { usePlayerStore } from './players'
 import { useTownsStore } from './towns'
-import { useTrackStore } from './track'
+import { useNetworkStore } from './network'
 import { useDemandCardsStore } from './demandCards'
 
 /**
@@ -79,7 +73,7 @@ export const useTrainsStore = defineStore('trains', () => {
   const gameStore = useGameStore()
   const playerStore = usePlayerStore()
   const townsStore = useTownsStore()
-  const trackStore = useTrackStore()
+  const networkStore = useNetworkStore()
   const demandCardsStore = useDemandCardsStore()
   const { checkForWinner } = useVictory()
 
@@ -90,11 +84,8 @@ export const useTrainsStore = defineStore('trains', () => {
 
   // GETTERS
 
-  /**
-   * The track and towns as a network trains can run on (see network.js).
-   * Rebuilt whenever track is built or torn up.
-   */
-  const network = computed(() => buildNetwork(trackStore.segments, townsStore.towns))
+  /** The track and towns as a network trains can run on (see the network store) */
+  const network = computed(() => networkStore.network)
 
   /**
    * A player's train. A player with no train on record (a new game, or a
@@ -177,7 +168,7 @@ export const useTrainsStore = defineStore('trains', () => {
     const notTheirTurn = whyNotTheirTurn(playerId)
     if (notTheirTurn) return notTheirTurn
     if (gameStore.isBuildingRound) return "Trains don't run in the building rounds."
-    if (playerStore.trackSpendThisTurn(playerId) > 0) {
+    if (playerStore.hasSpentThisTurn(playerId)) {
       return 'Your train is done for this turn: you have started building.'
     }
     return null
@@ -398,7 +389,9 @@ export const useTrainsStore = defineStore('trains', () => {
       )
     }
 
-    playerStore.spendCash(playerId, fees)
+    // Checked rather than assumed: owners must never be paid fees the mover
+    // was not charged
+    if (!playerStore.spendCash(playerId, fees)) return refuse(playerStore.error)
     payTo.forEach((ownerId) => playerStore.earnCash(ownerId, gameRules.trackUseFee))
     train.feesPaidTo = [...train.feesPaidTo, ...payTo]
     train.position = run.position

@@ -63,6 +63,15 @@ describe('useTrackBuilder', () => {
     expect(builder.buildSection(ANN, [centerOf(2), centerOf(4)]).ok).toBe(true)
   })
 
+  it("should branch off at a bend in the player's own track", () => {
+    builder.buildSection(ANN, [centerOf(0), centerOf(2), { lat: 2 * CELL, lng: 3 * CELL }])
+
+    // Away south from the bend, so the branch is not beside the line
+    expect(builder.buildSection(ANN, [centerOf(2), { lat: -2 * CELL, lng: 3 * CELL }]).ok).toBe(
+      true
+    )
+  })
+
   it('should not start a section in a town that is not a major city', () => {
     expect(builder.buildSection(ANN, [centerOf(5), centerOf(3)])).toEqual({
       ok: false,
@@ -117,7 +126,7 @@ describe('useTrackBuilder', () => {
   })
 
   describe('startPoints', () => {
-    it("should be the major cities and both ends of the player's own track", () => {
+    it("should be the major cities and the points of the player's own track", () => {
       trackStore.addSegment({ ownerId: ANN, coordinates: [centerOf(2), centerOf(3)] })
       trackStore.addSegment({ ownerId: BO, coordinates: [centerOf(4), centerOf(5)] })
 

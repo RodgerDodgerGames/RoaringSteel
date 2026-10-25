@@ -388,6 +388,33 @@ describe('useGamePersistence', () => {
       expect(gameStore.winnerId).toBe(2)
     })
 
+    it('should price afresh the demands of a save from before trains', () => {
+      useTownsStore().setTowns([
+        { name: 'Denver', lat: 39.7, lon: -105, industries: [] },
+        { name: 'Pueblo', lat: 38.3, lon: -104.6, industries: [{ name: 'Steel' }] }
+      ])
+      useDemandCardsStore().setDeck({
+        drawPile: [{ id: 1, demands: [{ destination: 'Denver', industry: 'Steel', payoff: 600 }] }]
+      })
+      const save = persistence.serializeGameState()
+      delete save.trains
+
+      persistence.deserializeGameState(JSON.parse(JSON.stringify(save)))
+
+      expect(useDemandCardsStore().drawPile[0].demands[0].payoff).toBeGreaterThan(600)
+    })
+
+    it('should keep the prices of a current save as they are', () => {
+      useTownsStore().setTowns([{ name: 'Denver', lat: 39.7, lon: -105, industries: [] }])
+      useDemandCardsStore().setDeck({
+        drawPile: [{ id: 1, demands: [{ destination: 'Denver', industry: 'Steel', payoff: 600 }] }]
+      })
+
+      roundTrip()
+
+      expect(useDemandCardsStore().drawPile[0].demands[0].payoff).toBe(600)
+    })
+
     it('should keep the played demand cards', () => {
       const demandCardsStore = useDemandCardsStore()
       demandCardsStore.setDeck({ drawPile: [], discardPile: [{ id: 9, demands: [] }] })

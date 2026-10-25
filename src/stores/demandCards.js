@@ -386,6 +386,9 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
    * Plays a card out of a player's hand — one of its demands has been
    * delivered — onto the discard pile, and draws them a new card in its place.
    * Any of the player's pins on the card go with it.
+   *
+   * The new card is drawn before the old one is discarded, so a deck that
+   * has run out cannot shuffle the card just played straight back to them.
    * @param {number} playerId - The player
    * @param {number} cardId - The card
    * @returns {boolean} True if the player held the card
@@ -395,9 +398,9 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
     const card = hand.find((c) => c.id === cardId)
     if (!card) return false
 
+    const drawn = drawCard()
     discardPile.value.push(card)
     pins.value[playerId] = pinsOf(playerId).filter((pin) => pin.cardId !== cardId)
-    const drawn = drawCard()
     hands.value[playerId] = hand.filter((c) => c !== card).concat(drawn ? [drawn] : [])
     return true
   }
@@ -406,16 +409,19 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
    * Throws in a player's whole hand and deals them a new one: Empire
    * Builder's way out of a hand of demands that are no good. It costs the
    * player their turn; ending the turn is up to the caller.
+   *
+   * As with a single card, the new hand is drawn before the old one goes on
+   * the discard pile, so the player is never dealt back the cards they threw in.
    * @param {number} playerId - The player
    */
   function discardHand(playerId) {
-    discardPile.value.push(...handOf(playerId))
-    pins.value[playerId] = []
     const hand = []
     for (let i = 0; i < HAND_SIZE; i++) {
       const drawn = drawCard()
       if (drawn) hand.push(drawn)
     }
+    discardPile.value.push(...handOf(playerId))
+    pins.value[playerId] = []
     hands.value[playerId] = hand
   }
 
@@ -470,6 +476,28 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
   }
 
   watch(() => settingsStore.settings.pinLimit, trimPins)
+
+  /**
+   * Prices every demand in the game afresh by the payoff rule (see
+   * payoffs.js): in the deck, the discard pile and every hand. Used on saves
+   * made before the rule changed, whose cards pay a small fraction of what
+   * track costs, so the game could never be won by delivering.
+   *
+   * A destination is found by name, as everywhere demands are read; one
+   * whose town is not in the game keeps its old payoff.
+   */
+  function repriceDemands() {
+    const townsData = towns.value
+    const reprice = (card) => {
+      card.demands.forEach((demand) => {
+        const destination = townsData.find((town) => town.name === demand.destination)
+        if (destination) demand.payoff = demandPayoff(destination, demand.industry, townsData)
+      })
+    }
+    drawPile.value.forEach(reprice)
+    discardPile.value.forEach(reprice)
+    Object.values(hands.value).forEach((hand) => hand.forEach(reprice))
+  }
 
   /**
    * Resets the demand cards store to initial state.
@@ -562,6 +590,7 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
     dealHands,
     discardCard,
     discardHand,
+    repriceDemands,
     togglePin,
     hoverLine,
     endHover,

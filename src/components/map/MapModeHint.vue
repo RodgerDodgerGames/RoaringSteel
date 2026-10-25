@@ -42,7 +42,7 @@ const hint = computed(() => {
   if (props.isDrawing) {
     return {
       title: 'Building track',
-      body: 'Start in a major city or at the end of your track. Click a town or double-click to finish.'
+      body: 'Start in a major city or on your own track. Click a town or double-click to finish.'
     }
   }
   if (props.pickPrompt) {

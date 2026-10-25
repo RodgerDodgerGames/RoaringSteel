@@ -118,7 +118,7 @@ export function useTurn() {
   const canDiscardHand = computed(() => {
     const id = playerStore.activePlayer?.id
     if (id === undefined || gameStore.isOver) return false
-    return !trainsStore.trainOf(id).hasActed && playerStore.trackSpendThisTurn(id) === 0
+    return !trainsStore.trainOf(id).hasActed && !playerStore.hasSpentThisTurn(id)
   })
 
   /**

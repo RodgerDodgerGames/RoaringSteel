@@ -17,6 +17,7 @@ import { useTownsStore } from '@/stores/towns'
 import { usePlayerStore } from '@/stores/players'
 import { useSettingsStore } from '@/stores/settings'
 import { PIN_COLORS } from '@/config/demands'
+import { demandPayoff } from '@/composables/payoffs'
 
 /**
  * A card with an id and placeholder contracts, for tests that only care
@@ -471,17 +472,18 @@ describe('demandCards store', () => {
 
       store.discardCard(1, 91)
 
-      // Card 91 joined the pile before the draw, so either card may come up
-      expect(store.handOf(1)).toHaveLength(1)
-      expect(store.drawPile.length + store.discardPile.length).toBe(1)
+      expect(idsOf(store.handOf(1))).toEqual([5])
+      expect(idsOf(store.discardPile)).toEqual([91])
     })
 
     it('should leave the hand short when there are no cards left anywhere', () => {
       store.setDeck({ drawPile: [], hands: { 1: [card(91)] } })
-      // Nothing to shuffle until 91 is played; after it is, 91 is redrawn
+
       store.discardCard(1, 91)
 
-      expect(idsOf(store.handOf(1))).toEqual([91])
+      // The card played is not dealt straight back
+      expect(store.handOf(1)).toEqual([])
+      expect(idsOf(store.discardPile)).toEqual([91])
     })
   })
 
@@ -492,6 +494,21 @@ describe('demandCards store', () => {
       store.discardHand(1)
 
       expect(idsOf(store.handOf(1))).toEqual([1, 2, 3])
+      expect(idsOf(store.discardPile)).toEqual([91, 92, 93])
+    })
+
+    // The bug: the hand went on the discard pile first, so with the deck
+    // empty it was shuffled straight back and dealt to the same player
+    it('should not deal back the cards thrown in when the deck has run out', () => {
+      store.setDeck({
+        drawPile: [],
+        discardPile: [card(5), card(6), card(7)],
+        hands: { 1: [card(91), card(92), card(93)] }
+      })
+
+      store.discardHand(1)
+
+      expect(idsOf(store.handOf(1)).sort()).toEqual([5, 6, 7])
       expect(idsOf(store.discardPile)).toEqual([91, 92, 93])
     })
 
@@ -526,6 +543,36 @@ describe('demandCards store', () => {
       store.reset()
 
       expect(store.discardPile).toEqual([])
+    })
+  })
+
+  describe('repriceDemands', () => {
+    it('should price every demand by the payoff rule, wherever the card is', () => {
+      const denver = { name: 'Denver', lat: 39.7, lon: -105, industries: [] }
+      const pueblo = { name: 'Pueblo', lat: 38.3, lon: -104.6, industries: [{ name: 'Steel' }] }
+      useTownsStore().setTowns([denver, pueblo])
+      const old = (id) => ({
+        id,
+        demands: [{ destination: 'Denver', industry: 'Steel', payoff: 600 }]
+      })
+      store.setDeck({ drawPile: [old(1)], discardPile: [old(2)], hands: { 1: [old(3)] } })
+
+      store.repriceDemands()
+
+      const expected = demandPayoff(denver, 'Steel', [denver, pueblo])
+      expect(expected).toBeGreaterThan(600)
+      expect(store.drawPile[0].demands[0].payoff).toBe(expected)
+      expect(store.discardPile[0].demands[0].payoff).toBe(expected)
+      expect(store.handOf(1)[0].demands[0].payoff).toBe(expected)
+    })
+
+    it('should leave a demand for a town not in the game as it was', () => {
+      useTownsStore().setTowns([])
+      store.setDeck({ drawPile: [card(1)] })
+
+      store.repriceDemands()
+
+      expect(store.drawPile[0].demands[0].payoff).toBe(10)
     })
   })
 })

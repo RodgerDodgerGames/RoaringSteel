@@ -20,6 +20,7 @@ import { useDemandCardsStore } from '@/stores/demandCards'
 import { useMapStore } from '@/stores/map'
 import { useTrackStore } from '@/stores/track'
 import { useSettingsStore } from '@/stores/settings'
+import { useTrainsStore } from '@/stores/trains'
 import { turnAfter } from '@/composables/turnOrder'
 
 const SAVE_VERSION = '1.0.0'
@@ -36,6 +37,7 @@ export function useGamePersistence() {
   const mapStore = useMapStore()
   const trackStore = useTrackStore()
   const settingsStore = useSettingsStore()
+  const trainsStore = useTrainsStore()
 
   /**
    * Serializes the current game state into a JSON-safe object.
@@ -49,7 +51,9 @@ export function useGamePersistence() {
       name,
       game: {
         region: gameStore.region,
-        turn: gameStore.turn
+        turn: gameStore.turn,
+        // Null while the game is still on
+        winnerId: gameStore.winnerId
       },
       players: playerStore.players,
       mapView: {
@@ -58,15 +62,19 @@ export function useGamePersistence() {
       },
       towns: townsStore.towns,
       grid: gridStore.grid,
-      // The undealt deck, every player's hand, and the demand lines each
-      // player has pinned to the map. Saves from before hands existed held
-      // only the deck, under `demandCards`.
+      // The undealt deck, the cards played, every player's hand, and the
+      // demand lines each player has pinned to the map. Saves from before
+      // hands existed held only the deck, under `demandCards`.
       demandDeck: {
         drawPile: demandCardsStore.drawPile,
+        discardPile: demandCardsStore.discardPile,
         hands: demandCardsStore.hands,
         pins: demandCardsStore.pins
       },
       track: trackStore.segments,
+      // Every player's train: its kind, loads, where it is, and what it has
+      // done this turn
+      trains: trainsStore.trains,
       // The player's display settings at the time of saving. Copied, so the
       // snapshot doesn't follow later changes to the live settings.
       settings: { ...settingsStore.settings }
@@ -105,6 +113,9 @@ export function useGamePersistence() {
       // Saves written before track was persisted have no `track` field; that is
       // a game with no track, not a broken save
       if (data.track) trackStore.setTrack(data.track)
+      // Saves from before trains have none; each player then gets a new one,
+      // not yet placed, the first time it is needed
+      trainsStore.setTrains(data.trains)
       if (data.mapView) mapStore.setMapView(data.mapView)
       // A save's settings replace the browser's (the player chose this: a game
       // picks up looking as it was saved). Settings are not reset above, so a
@@ -121,7 +132,7 @@ export function useGamePersistence() {
 
   /**
    * Clears away every part of the game: region, turn, players, towns, grid,
-   * demand cards, map view and track. Used before a save is restored, and
+   * demand cards, map view, track and trains. Used before a save is restored, and
    * when the game is given up for a new one.
    *
    * The player's settings are not part of this: they belong to the person at
@@ -135,6 +146,7 @@ export function useGamePersistence() {
     demandCardsStore.reset()
     mapStore.reset()
     trackStore.reset()
+    trainsStore.reset()
   }
 
   /**

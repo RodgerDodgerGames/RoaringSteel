@@ -398,6 +398,33 @@ export const usePlayerStore = defineStore('playerStore', () => {
   }
 
   /**
+   * Give a player money: a delivery's payoff, or another player's fee for
+   * running on their track.
+   * @param {number} id The player's ID.
+   * @param {number} amount How much to give.
+   * @returns {boolean} True if the player was paid.
+   */
+  function earnCash(id, amount) {
+    error.value = null
+
+    const player = players.value.find((p) => p.id === id)
+    if (!player) {
+      error.value = `Player with ID ${id} not found`
+      return false
+    }
+
+    // Otherwise "earning" a negative would be a way to take money off a player
+    // without the checks spendCash makes
+    if (!Number.isFinite(amount) || amount < 0) {
+      error.value = 'Amount earned must be a non-negative number'
+      return false
+    }
+
+    player.cash += amount
+    return true
+  }
+
+  /**
    * Charge a player for track, against both their cash and this turn's budget.
    * @param {number} id The player's ID.
    * @param {number} amount What the track costs.
@@ -661,6 +688,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     trackBudgetRemaining,
     availableForTrack,
     spendCash,
+    earnCash,
     spendOnTrack,
     refundTrackSpend,
     resetTrackSpend,

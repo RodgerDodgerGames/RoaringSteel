@@ -537,6 +537,24 @@ describe('Player Store', () => {
       })
     })
 
+    describe('earnCash', () => {
+      it('should add the amount to the player', () => {
+        expect(playerStore.earnCash(1, 9000)).toBe(true)
+
+        expect(playerStore.players[0].cash).toBe(gameRules.startingCash + 9000)
+      })
+
+      it('should reject a negative amount', () => {
+        expect(playerStore.earnCash(1, -100)).toBe(false)
+
+        expect(playerStore.players[0].cash).toBe(gameRules.startingCash)
+      })
+
+      it('should reject an unknown player', () => {
+        expect(playerStore.earnCash(999, 100)).toBe(false)
+      })
+    })
+
     describe('spendOnTrack', () => {
       it('should charge the player and record it against the turn', () => {
         expect(playerStore.spendOnTrack(1, 5000)).toBe(true)

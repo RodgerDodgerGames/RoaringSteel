@@ -1,9 +1,16 @@
 /**
  * Turn Composable (useTurn.js)
  *
- * Coordinates ending a turn across the player and game stores.
+ * Coordinates ending a turn across the player, train and game stores.
  *
- * Ending a turn also clears the finishing player's track building allowance.
+ * Ending a turn also clears the finishing player's track building allowance
+ * and what their train did this turn, and checks whether they have won (see
+ * victory.js) — a win made by building the last link to a city shows up
+ * here. Once someone has won, no more turns are played.
+ *
+ * A player may instead give up their turn to throw in their hand of demand
+ * cards for a new one (`discardHand`), as long as they have not yet done
+ * anything else with the turn.
  *
  * Who plays next follows the switchback start (see turnOrder.js): the two
  * opening building rounds run first-to-last and then back, and every round
@@ -16,13 +23,19 @@
 import { computed } from 'vue'
 import { useGameStore } from '@/stores/game'
 import { usePlayerStore } from '@/stores/players'
+import { useTrainsStore } from '@/stores/trains'
+import { useDemandCardsStore } from '@/stores/demandCards'
+import { useVictory } from '@/composables/victory'
 import { useGamePersistence } from '@/composables/useGamePersistence'
 import { turnAfter } from '@/composables/turnOrder'
 
 export function useTurn() {
   const gameStore = useGameStore()
   const playerStore = usePlayerStore()
+  const trainsStore = useTrainsStore()
+  const demandCardsStore = useDemandCardsStore()
   const { autoSave } = useGamePersistence()
+  const { checkForWinner } = useVictory()
 
   /**
    * What ending the active player's turn would do: who plays next, and
@@ -63,11 +76,21 @@ export function useTurn() {
       console.warn('Cannot end turn: no players in game')
       return false
     }
+    if (gameStore.isOver) {
+      console.warn('Cannot end turn: the game is over')
+      return false
+    }
 
     // Read before anything changes: once the turn moves, these describe the
     // next player's turn instead
     const { endsRound } = upNext.value
     const finishingId = playerStore.activePlayer?.id
+
+    // A win ends the game where it stands: the turn is not passed on
+    if (finishingId !== undefined && checkForWinner(finishingId)) {
+      autoSave()
+      return true
+    }
 
     if (!playerStore.setActivePlayer(nextPlayer.value.id)) return false
 
@@ -78,6 +101,8 @@ export function useTurn() {
     // twice in a row at the turn of a round gets a fresh allowance for the
     // second turn: it is a turn of its own.
     if (finishingId !== undefined) playerStore.resetTrackSpend(finishingId)
+    // Likewise the train's run: the next turn is a full one
+    if (finishingId !== undefined) trainsStore.endTurn(finishingId)
 
     if (endsRound) gameStore.advanceTurn()
 
@@ -85,5 +110,28 @@ export function useTurn() {
     return true
   }
 
-  return { nextPlayer, playsAgain, endTurn }
+  /**
+   * Whether the active player may throw in their hand: only as the whole of
+   * their turn, so not once they have placed or run their train, loaded or
+   * delivered anything, or spent any of the turn's allowance.
+   */
+  const canDiscardHand = computed(() => {
+    const id = playerStore.activePlayer?.id
+    if (id === undefined || gameStore.isOver) return false
+    return !trainsStore.trainOf(id).hasActed && playerStore.trackSpendThisTurn(id) === 0
+  })
+
+  /**
+   * Throws in the active player's hand of demand cards for a new one, and
+   * ends their turn: Empire Builder's way out of a hand that is no good,
+   * which costs the whole turn.
+   * @returns {boolean} True if the hand was thrown in and the turn ended
+   */
+  function discardHand() {
+    if (!canDiscardHand.value) return false
+    demandCardsStore.discardHand(playerStore.activePlayer.id)
+    return endTurn()
+  }
+
+  return { nextPlayer, playsAgain, endTurn, canDiscardHand, discardHand }
 }

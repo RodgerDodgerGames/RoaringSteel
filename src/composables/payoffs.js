@@ -32,9 +32,7 @@ import { gameRules } from '@/config/game'
 export function haulKm(destination, industry, towns) {
   const to = turf.point([destination.lon, destination.lat])
   const distances = towns
-    .filter(
-      (town) => town !== destination && town.industries.some(({ name }) => name === industry)
-    )
+    .filter((town) => town !== destination && town.industries.some(({ name }) => name === industry))
     .map((town) => turf.distance(turf.point([town.lon, town.lat]), to))
   return distances.length ? Math.min(...distances) : null
 }

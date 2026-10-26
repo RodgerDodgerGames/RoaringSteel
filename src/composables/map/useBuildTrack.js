@@ -733,8 +733,11 @@ export default function useBuildTrack(formatCurrency) {
    */
   function repriceLine(cursorLatLng) {
     const placed = workingLayer.value.getLatLngs()
-    const without = linePrice(placed, grid.value)
-    const withLeg = cursorLatLng ? linePrice([...placed, cursorLatLng], grid.value) : without
+    // Priced on the plain grid cells: the store's reactive ones make every
+    // lookup along the line slow, and this runs as the cursor moves
+    const cells = toRaw(grid.value)
+    const without = linePrice(placed, cells)
+    const withLeg = cursorLatLng ? linePrice([...placed, cursorLatLng], cells) : without
     pendingCost.value = withLeg.total
     return { cost: withLeg.total - without.total, bridges: withLeg.bridges - without.bridges }
   }

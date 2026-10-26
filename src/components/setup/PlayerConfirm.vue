@@ -5,7 +5,8 @@
   When confirmed, commits the store's setup roster to players with starting
   cash and sets the first player's turn.
 
-  @prop {Array} players - The setup roster, for display
+  @prop {Array} players - The setup roster, for display: the people, then
+                          the computer players (see `draftRoster`)
   @emits back - User wants to go back and edit players
   @emits confirmed - Players saved to store, ready to proceed
 -->
@@ -74,7 +75,15 @@ function goBack() {
           <div class="column">
             <div class="card">
               <div class="card-content" :style="{ backgroundColor: player.color }">
-                <div class="is-size-4 has-text-weight-bold has-text-black">{{ player.name }}</div>
+                <div class="is-size-4 has-text-weight-bold has-text-black">
+                  <span v-if="player.isBot" class="icon mr-2" aria-hidden="true">
+                    <i class="fas fa-robot"></i>
+                  </span>
+                  {{ player.name }}
+                  <span v-if="player.isBot" class="is-size-6 has-text-weight-normal">
+                    (computer player)
+                  </span>
+                </div>
               </div>
             </div>
           </div>

@@ -32,7 +32,8 @@ const goal = computed(() => activePlayer.value && progress(activePlayer.value.id
 <template>
   <div v-if="activePlayer" class="player-card" :style="{ '--player-color': activePlayer.color }">
     <div class="player-card__who">
-      <span class="caps-label">Your turn</span>
+      <!-- A computer player's turn is not the person at the screen's -->
+      <span class="caps-label">{{ activePlayer.isBot ? 'Computer player' : 'Your turn' }}</span>
       <span class="player-card__name">{{ activePlayer.name }}</span>
     </div>
     <div class="player-card__cash">

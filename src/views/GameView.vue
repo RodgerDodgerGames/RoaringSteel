@@ -18,6 +18,9 @@
   grow (the dock's contents) scrolls inside its own panel. Narrower windows
   fall back to a single stacked column that scrolls as a page.
 
+  Computer players' turns are played here too (see useBotRunner), for as
+  long as the game is on screen.
+
   When someone wins, the final standings come up over the table; they can
   be closed to look at the board as it ended, and opened again from the dock.
 
@@ -44,6 +47,7 @@ import GameOverDialog from '@/components/dialogs/GameOverDialog.vue'
 import { useGameStore } from '@/stores/game'
 import { useMapStore } from '@/stores/map'
 import useBuildTrack, { buildTrackKey } from '@/composables/map/useBuildTrack'
+import { useBotRunner } from '@/composables/bot/useBotRunner'
 import { formatCurrency } from '@/composables/utils'
 
 const emit = defineEmits(['new-game'])
@@ -57,6 +61,9 @@ provide(buildTrackKey, buildTrack)
 // Destructured so the template unwraps them; refs nested inside a plain
 // object are not unwrapped automatically
 const { isDrawingActive, isRemoving } = buildTrack
+
+// Computer players take their turns by themselves while the game is up
+useBotRunner()
 
 // While a town is being chosen for the train, what clicking one does
 const mapStore = useMapStore()

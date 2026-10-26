@@ -1,9 +1,11 @@
 <!--
   PlayerSelect.vue
 
-  Player setup form allowing users to add 1-6 players with unique names
-  and colors. Blank rows are dropped when the user is done; the names that
-  remain must be unique before progression is allowed.
+  Player setup form allowing users to add players with unique names and
+  colors, and to ask for computer players. Blank rows are dropped when the
+  user is done; the names that remain must be unique before progression is
+  allowed. A game needs at least one player, person or computer — a game of
+  computer players only can be watched.
 
   The roster is held in the player store as draft players, so it survives
   leaving and returning to this screen. Only the open color picker is local.
@@ -13,10 +15,12 @@
   - Color picker over the shared player palette. Colors another player already
     has are dimmed and can't be picked, so no two players share a color.
   - Name uniqueness validation
+  - How many computer players, after the people in turn order. They are
+    named and colored automatically (see `draftRoster` in the player store).
   - Notification system for validation errors
   - A Settings button, so settings can be chosen before the game starts
 
-  @emits done - Array of player objects when validation passes
+  @emits done - The roster, people then computer players, when validation passes
 -->
 
 <script setup>
@@ -34,7 +38,7 @@ const showNotification = ref(false)
 const openColorPickerId = ref(null)
 
 /** The setup roster lives in the store, so it survives leaving this screen. */
-const { draftPlayers: players } = storeToRefs(playerStore)
+const { draftPlayers: players, draftBotCount, maxDraftBots } = storeToRefs(playerStore)
 
 /**
  * Keep at least one row on screen, so the form is never a dead end. The store
@@ -62,7 +66,8 @@ function addPlayer() {
   // The store gives the new row the first color nobody has. With every color
   // taken there is nothing to give it, and colors are never shared.
   if (!playerStore.addDraftPlayer()) {
-    notificationMessage.value = 'Every color is taken. Remove a player to add another.'
+    notificationMessage.value =
+      'Every color is taken. Remove a player or a computer player to add another.'
     showNotification.value = true
   }
 }
@@ -136,6 +141,15 @@ const isNameUnique = (id, name) => {
   return players.value.every((player) => player.id === id || normalizeName(player.name) !== target)
 }
 
+/**
+ * Takes a count typed into the computer players box. The store keeps it in
+ * range, and the box is set back to what was kept, so typing 99 shows the
+ * most there can be rather than 99.
+ */
+const onBotCountInput = (event) => {
+  event.target.value = playerStore.setDraftBotCount(Number(event.target.value))
+}
+
 // Emit events
 const emit = defineEmits(['done'])
 
@@ -150,8 +164,9 @@ const handleDone = () => {
   // failed Done must leave the form exactly as the user left it.
   const named = players.value.filter((player) => player.name.trim() !== '')
 
-  if (named.length === 0) {
-    notificationMessage.value = 'Enter at least one player name before proceeding!'
+  if (named.length === 0 && draftBotCount.value === 0) {
+    notificationMessage.value =
+      'Enter at least one player name, or add a computer player, before proceeding!'
     showNotification.value = true
     return
   }
@@ -166,7 +181,7 @@ const handleDone = () => {
 
   // All validations passed - drop the blank rows and hand over the roster
   playerStore.pruneEmptyDraftPlayers()
-  emit('done', players.value)
+  emit('done', playerStore.draftRoster)
 }
 </script>
 
@@ -244,6 +259,47 @@ const handleDone = () => {
       </form>
     </div>
 
+    <!-- Computer players -->
+    <div class="field is-grouped is-align-items-center is-justify-content-center bot-count">
+      <label class="label mb-0 mr-3" for="bot-count">
+        <span class="icon"><i class="fas fa-robot" aria-hidden="true"></i></span>
+        Computer players
+      </label>
+      <div class="field has-addons mb-0">
+        <p class="control">
+          <button
+            class="button"
+            aria-label="One fewer computer player"
+            :disabled="draftBotCount === 0"
+            @click="playerStore.setDraftBotCount(draftBotCount - 1)"
+          >
+            −
+          </button>
+        </p>
+        <p class="control">
+          <input
+            id="bot-count"
+            class="input has-text-centered bot-count__input"
+            type="number"
+            min="0"
+            :max="maxDraftBots"
+            :value="draftBotCount"
+            @change="onBotCountInput"
+          />
+        </p>
+        <p class="control">
+          <button
+            class="button"
+            aria-label="One more computer player"
+            :disabled="draftBotCount >= maxDraftBots"
+            @click="playerStore.setDraftBotCount(draftBotCount + 1)"
+          >
+            +
+          </button>
+        </p>
+      </div>
+    </div>
+
     <!-- bottom buttons -->
     <div class="buttons is-centered">
       <!-- Add Player Button -->
@@ -265,6 +321,10 @@ const handleDone = () => {
 </template>
 
 <style scoped>
+.bot-count__input {
+  width: 4rem;
+}
+
 .selected-color {
   width: 50px;
   height: 50px;

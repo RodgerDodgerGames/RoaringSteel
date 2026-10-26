@@ -125,6 +125,34 @@ describe('useTrackBuilder', () => {
     expect(result.error).toMatch(/alongside/)
   })
 
+  it('should check and price a long line on a big grid quickly', () => {
+    // A state-sized grid: 60 rows of 60 cells. Checking a line looks up the
+    // cell under every point along it, which once went through the store's
+    // reactive wrappers and took most of a second here.
+    const bigGrid = []
+    for (let row = 0; row < 60; row++) {
+      for (let col = 0; col < 60; col++) {
+        bigGrid.push({
+          id: `${row}-${col}`,
+          centroid: { lat: row * CELL, lng: col * CELL },
+          cost: 10
+        })
+      }
+    }
+    useGridStore().setGrid(bigGrid)
+    useTownsStore().setTowns([
+      { name: 'Big', msa: 'B', lat: 0, lon: 0, size: 'large', industries: [] }
+    ])
+    // A zigzag 40 cells long, to the north
+    const line = Array.from({ length: 41 }, (_, i) => ({ lat: i * CELL, lng: (i % 2) * CELL }))
+
+    const started = performance.now()
+    const result = builder.buildSection(ANN, line)
+
+    expect(result.ok).toBe(true)
+    expect(performance.now() - started).toBeLessThan(250)
+  })
+
   it('should not count a section that could not be recorded as building started', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.spyOn(trackStore, 'addSegment').mockReturnValue(null)

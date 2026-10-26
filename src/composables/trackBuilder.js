@@ -21,7 +21,7 @@
  * @module composables/trackBuilder
  */
 
-import { computed } from 'vue'
+import { computed, toRaw } from 'vue'
 import { useGameStore } from '@/stores/game'
 import { useGridStore } from '@/stores/grid'
 import { usePlayerStore } from '@/stores/players'
@@ -50,15 +50,28 @@ export function useTrackBuilder() {
    * track built so far. Worked out once rather than on every move of the
    * cursor; the board parts and the track are kept apart, so building or
    * tearing up track does not work the board out again.
+   *
+   * The rules are checked against the plain grid cells and track points, not
+   * the store's reactive copies of them. Checking a line looks up the cell
+   * under every point along it in the whole grid, and going through Vue's
+   * reactive wrappers for each of those lookups made it about twenty times
+   * slower — slow enough to notice on a big state. The grid is only ever
+   * replaced whole, never changed in place, so reading the store's `grid`
+   * here is still enough for these to be worked out again when it changes;
+   * the track is read through the store, so a section added is noticed, and
+   * only its points are unwrapped.
    */
-  const boardRules = computed(() => ({
-    grid: gridStore.grid ?? [],
-    isInRegion: regionTest(gameStore.region),
-    townCells: townCells(townsStore.towns, gridStore.grid ?? [])
-  }))
+  const boardRules = computed(() => {
+    const grid = toRaw(gridStore.grid ?? [])
+    return {
+      grid,
+      isInRegion: regionTest(gameStore.region),
+      townCells: townCells(townsStore.towns, grid)
+    }
+  })
   const buildRules = computed(() => ({
     ...boardRules.value,
-    builtLegs: builtLegs(trackStore.segments)
+    builtLegs: builtLegs(trackStore.segments).map((leg) => leg.map((point) => toRaw(point)))
   }))
 
   /**
@@ -163,7 +176,8 @@ export function useTrackBuilder() {
     const blocked = whyNotBuildable(latlngs, { isFinished: true })
     if (blocked) return { ok: false, error: blocked }
 
-    const cost = priceLine(latlngs, gridStore.grid)
+    // Priced on the plain grid, for speed (see `boardRules`)
+    const cost = priceLine(latlngs, buildRules.value.grid)
     const affordable = playerStore.availableForTrack(playerId)
     // Whether building had started this turn, to put back if this one fails
     const hadSpent = playerStore.hasSpentThisTurn(playerId)

@@ -237,8 +237,12 @@ export function shortestRoutes(network, position, { owners = null } = {}) {
  * A binary min-heap of keys by distance, for the route search: the nearest
  * waiting arrival comes out first. A key may be pushed again with a shorter
  * distance; the search skips the longer copy when it comes out later.
+ *
+ * Exported for the computer player's track search too (see
+ * bot/botPathfinder.js), which files grid cells by what they cost to reach
+ * rather than by km; the heap only ever compares the numbers.
  */
-class MinHeap {
+export class MinHeap {
   constructor() {
     this.items = []
   }

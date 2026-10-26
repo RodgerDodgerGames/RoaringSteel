@@ -16,7 +16,8 @@
  * 2. In an operating round, run the train: place it on the network the first
  *    time, then go from town to town on the player's own track, delivering
  *    and loading, until it has run its distance or has nowhere useful to go.
- * 3. Upgrade the train, at the cash the planner says.
+ * 3. Upgrade the train, at the cash the planner says — unless the player has
+ *    the cash to win and only needs cities, when the money goes on those.
  * 4. Build track with what is left of the turn's allowance: toward the major
  *    cities still needed once the player has the cash to win, otherwise
  *    toward the towns the cheapest demand still needs joined.
@@ -136,9 +137,9 @@ export function useBot() {
    * connect from there is picked, and planned from as though already joined.
    *
    * @param {number} playerId - The player
-   * @returns {Object} The picture: `sources` to build from, `isJoined` and
-   *   `costTo` for any town, and the demand `options`, besides what
-   *   `holdings` gives
+   * @returns {Object} The picture: `sources` to build from and the search
+   *   from them (`field`, see `costField`), `isJoined` and `costTo` for any
+   *   town, and the demand `options`, besides what `holdings` gives
    */
   function survey(playerId) {
     const held = holdings(playerId)
@@ -155,7 +156,7 @@ export function useBot() {
         loads: trainsStore.trainOf(playerId).loads,
         cash: cashOf(playerId)
       })
-      return { sources, isJoined, costTo, options }
+      return { sources, field, isJoined, costTo, options }
     }
 
     const own = trackStore.segmentsForOwner(playerId).flatMap(({ coordinates }) => coordinates)
@@ -212,13 +213,25 @@ export function useBot() {
   }
 
   /**
+   * Whether the player has the cash to win and only lacks major cities, so
+   * their turns go on joining those rather than on demands.
+   * @param {number} playerId - The player
+   * @returns {boolean} True while joining cities
+   */
+  function isJoiningCities(playerId) {
+    const { cash, cashNeeded, citiesJoined, citiesNeeded } = progress(playerId)
+    return cash >= cashNeeded && citiesJoined < citiesNeeded
+  }
+
+  /**
    * Whether the hand is no good: no demand in it can be worked toward with
-   * the cash the player has, so a new hand is worth the turn.
+   * the cash the player has, so a new hand is worth the turn. Never while
+   * the player is joining cities, which needs the turn and not the hand.
    * @param {number} playerId - The player
    * @returns {boolean} True to throw it in
    */
   function shouldThrowInHand(playerId) {
-    return survey(playerId).options.length === 0
+    return !isJoiningCities(playerId) && survey(playerId).options.length === 0
   }
 
   /**
@@ -320,8 +333,13 @@ export function useBot() {
     })
   }
 
-  /** Changes the train for a better one when the planner says it is time */
+  /**
+   * Changes the train for a better one when the planner says it is time —
+   * but not while joining cities (see `isJoiningCities`): an upgrade takes
+   * the turn's allowance and cash the win needs.
+   */
   function upgradeTrain(playerId, report, tried) {
+    if (isJoiningCities(playerId)) return
     const to = upgradeFor(trainsStore.trainOf(playerId).type, cashOf(playerId))
     if (!to) return
     if (tried('upgrade train', trainsStore.changeTrain(playerId, to))) {
@@ -330,31 +348,36 @@ export function useBot() {
   }
 
   /**
-   * The town to build toward next, or null for none.
+   * The town to build toward next, and how much may go on it, or null for
+   * none.
    *
-   * Once the player has the cash to win, the cheapest major city not yet on
-   * their network — if they still need more of them. Otherwise the cheapest
-   * town still to be joined for the cheapest demand that needs any.
+   * While the player is joining cities (see `isJoiningCities`), the cheapest
+   * major city not yet on their network, with only the cash above what
+   * winning needs to spend on it: spending below that line would leave them
+   * with every city and not the cash, and back to chasing demands. With
+   * nothing to spare, they build nothing and deliver until they have some.
+   * Otherwise the cheapest town still to be joined for the cheapest demand
+   * that needs any, with whatever the turn allows.
    *
    * @param {number} playerId - The player
    * @param {Object} picture - From `survey`
    * @param {Set<string>} given - Towns already given up on this turn
-   * @returns {Object|null} The town
+   * @returns {{town: Object, spendable: number}|null} The town, and the most
+   *   that may be spent on it beyond the turn's own limits
    */
   function buildTarget(playerId, picture, given) {
-    const { citiesJoined, citiesNeeded } = progress(playerId)
-    if (cashOf(playerId) >= gameRules.victory.cash && citiesJoined < citiesNeeded) {
+    if (isJoiningCities(playerId)) {
       const [city] = townsStore.towns
         .filter((town) => town.size === 'large' && !picture.isJoined(town) && !given.has(town.msa))
         .map((town) => ({ town, cost: picture.costTo(town) }))
         .filter(({ cost }) => Number.isFinite(cost))
         .sort((a, b) => a.cost - b.cost)
-      if (city) return city.town
+      if (city) return { town: city.town, spendable: cashOf(playerId) - gameRules.victory.cash }
     }
 
     for (const option of picture.options) {
       const town = option.toJoin.find((candidate) => !given.has(candidate.msa))
-      if (town) return town
+      if (town) return { town, spendable: Infinity }
     }
     return null
   }
@@ -372,27 +395,29 @@ export function useBot() {
     // Each pass either builds, gives up on a town, or stops; there are only
     // so many towns to give up on, so the passes are capped as well
     for (let pass = 0; pass < MAX_PASSES && sections < MAX_SECTIONS; pass++) {
-      const budget = playerStore.availableForTrack(playerId)
-      if (budget <= 0) return
+      if (playerStore.availableForTrack(playerId) <= 0) return
 
       const picture = survey(playerId)
       const target = buildTarget(playerId, picture, given)
       if (!target) return
+      const budget = Math.min(playerStore.availableForTrack(playerId), target.spendable)
+      if (budget <= 0) return
 
-      const plan = planLine(picture.board, picture.sources, pointOf(target))
-      if (!plan) {
-        given.add(target.msa)
+      // The survey's own search is the planner's first try
+      const line = planLine(picture.board, picture.sources, pointOf(target.town), picture.field)
+      if (!line) {
+        given.add(target.town.msa)
         continue
       }
-      const line = affordableSection(plan.line, budget, picture.board.rules)
-      if (!line) return
+      const section = affordableSection(line, budget, picture.board.rules)
+      if (!section) return
 
-      const result = builder.buildSection(playerId, line)
+      const result = builder.buildSection(playerId, section)
       if (!tried('build track', result)) return
       sections++
-      report.events.push({ type: 'build', cost: result.cost, toward: target.name })
+      report.events.push({ type: 'build', cost: result.cost, toward: target.town.name })
       // Out of money before the town was reached: the rest waits for next turn
-      if (line.length < plan.line.length) return
+      if (section.length < line.length) return
     }
   }
 

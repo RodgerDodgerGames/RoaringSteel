@@ -279,6 +279,9 @@ export function costField(board, sources, { shut = new Set() } = {}) {
   // Where each starting cell's line begins: the source point in it
   const startIn = new Map()
   const frontier = new MinHeap()
+  // States whose cheapest cost is known. A state is pushed again each time a
+  // cheaper way to it is found; the dearer copies are skipped as they come out.
+  const settled = new Uint8Array(cells.length * STATES)
 
   const mayEnter = (index) => index !== -1 && isOpen[index] && !shut.has(index)
 
@@ -294,6 +297,8 @@ export function costField(board, sources, { shut = new Set() } = {}) {
 
   while (frontier.size) {
     const state = frontier.pop()
+    if (settled[state]) continue
+    settled[state] = 1
     const index = Math.floor(state / STATES)
     const water = Math.floor((state % STATES) / besideStates)
     const beside = state % besideStates
@@ -398,18 +403,17 @@ function pointsThatPass(line, rules) {
  * @param {Array<{lat: number, lng: number}>} sources - Where the player may
  *   start building
  * @param {{lat: number, lng: number}} target - Where the track should reach
- * @returns {{line: Array<Object>, estimate: number}|null} The line, with what
- *   the search expects it to cost, or null
+ * @param {Object} [field] - A search already made from the same sources
+ *   (see `costField`), used for the first try instead of searching again
+ * @returns {Array<Object>|null} The line's points, or null
  */
-export function planLine(board, sources, target) {
+export function planLine(board, sources, target, field = null) {
   const shut = new Set()
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const field = costField(board, sources, { shut })
-    const line = field.lineTo(target)
+    const search = attempt === 0 && field ? field : costField(board, sources, { shut })
+    const line = search.lineTo(target)
     if (!line) return null
-    if (!lineBlock(line, board.rules, { isFinished: true })) {
-      return { line, estimate: field.costTo(target) }
-    }
+    if (!lineBlock(line, board.rules, { isFinished: true })) return line
 
     // The first point the line cannot get to without breaking a rule. When
     // the whole line passes as it is drawn, it only fails as a finished one,
@@ -431,7 +435,9 @@ export function planLine(board, sources, target) {
  *
  * Price only grows as a line gets longer, so the longest affordable start is
  * found by halving; then it is shortened, if need be, until it does not end
- * on water (a bridge has to reach land).
+ * on water (a bridge has to reach land). The whole line keeps to every other
+ * rule, so every start of it does too: ending on water is the only rule a
+ * start of it can break, and only that is checked.
  *
  * @param {Array<Object>} line - The whole line, buildable as a whole
  * @param {number} budget - What the player can spend
@@ -448,8 +454,8 @@ export function affordableSection(line, budget, rules) {
     else tooDear = middle
   }
   for (let count = affordable; count >= 2; count--) {
-    const section = line.slice(0, count)
-    if (!lineBlock(section, rules, { isFinished: true })) return section
+    const end = findCell(line[count - 1], rules.grid)
+    if (!isWaterCell(end) || rules.townCells.includes(end)) return line.slice(0, count)
   }
   return null
 }

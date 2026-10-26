@@ -21,7 +21,7 @@ import { useBot } from '@/composables/bot/useBot'
 import { pointKey } from '@/composables/network'
 import { findCell } from '@/composables/map/trackCost'
 import { gameRules } from '@/config/game'
-import { makeGrid, makeRegion, makeTowns, seededRandom } from '../../utils/botBoard'
+import { makeGrid, makeRegion, makeTowns, seededRandom, centerAt } from '../../utils/botBoard'
 
 /**
  * Sets up a game on the test board.
@@ -238,6 +238,49 @@ describe('useBot', () => {
       expect(report).toMatchObject({ endedTurn: false, errors: [] })
       expect(useTrainsStore().trainOf(1).position).toBeNull()
       expect(useTrackStore().segmentsForOwner(1).length).toBeGreaterThan(0)
+    })
+  })
+
+  describe('with the cash to win', () => {
+    beforeEach(() => {
+      setUpGame([{ name: 'Bot 1', isBot: true }])
+      useGameStore().setGameState({ turn: gameRules.buildingRounds })
+      // A short line out of Alder: one major city joined, three still needed
+      const alder = makeTowns().find(({ name }) => name === 'Alder')
+      useTrackStore().addSegment({
+        ownerId: 1,
+        coordinates: [{ lat: alder.lat, lng: alder.lon }, centerAt(3, 3)],
+        cost: 0
+      })
+    })
+
+    it('should not spend itself below the cash it needs to win', () => {
+      usePlayerStore().updatePlayer(1, { cash: gameRules.victory.cash + 5000 })
+
+      const report = useBot().playTurn(1)
+
+      expect(report.errors).toEqual([])
+      expect(report.events.some(({ type }) => type === 'build')).toBe(true)
+      expect(usePlayerStore().players[0].cash).toBeGreaterThanOrEqual(gameRules.victory.cash)
+    })
+
+    it('should build toward the cities rather than throw in a hopeless hand', () => {
+      usePlayerStore().updatePlayer(1, { cash: gameRules.victory.cash + 20000 })
+      const hopeless = {
+        id: 1,
+        demands: [{ destination: 'Kauri', industry: 'Coal', payoff: 9000 }]
+      }
+      useDemandCardsStore().setDeck({ drawPile: [], hands: { 1: [hopeless] } })
+
+      const report = useBot().playTurn(1)
+
+      expect(report).toMatchObject({ endedTurn: false, errors: [] })
+      const builds = report.events.filter(({ type }) => type === 'build')
+      expect(builds.length).toBeGreaterThan(0)
+      const cities = makeTowns()
+        .filter(({ size }) => size === 'large')
+        .map(({ name }) => name)
+      builds.forEach(({ toward }) => expect(cities).toContain(toward))
     })
   })
 })

@@ -97,50 +97,46 @@ describe('botPathfinder', () => {
 
   describe('planLine', () => {
     it('should find a line the build rules allow, ending on the town', () => {
-      const plan = planLine(board, [pointOf(townNamed('Alder'))], pointOf(townNamed('Birch')))
+      const line = planLine(board, [pointOf(townNamed('Alder'))], pointOf(townNamed('Birch')))
 
-      expect(plan).not.toBeNull()
-      expect(lineBlock(plan.line, rules, { isFinished: true })).toBeNull()
-      expect(plan.line[0]).toEqual(pointOf(townNamed('Alder')))
-      expect(plan.line.at(-1)).toEqual(pointOf(townNamed('Birch')))
+      expect(line).not.toBeNull()
+      expect(lineBlock(line, rules, { isFinished: true })).toBeNull()
+      expect(line[0]).toEqual(pointOf(townNamed('Alder')))
+      expect(line.at(-1)).toEqual(pointOf(townNamed('Birch')))
     })
 
     it('should go round water too wide to bridge', () => {
       // Ivy sits west of the lake and Elm east of it
-      const plan = planLine(board, [pointOf(townNamed('Ivy'))], pointOf(townNamed('Elm')))
+      const line = planLine(board, [pointOf(townNamed('Ivy'))], pointOf(townNamed('Elm')))
 
-      expect(lineBlock(plan.line, rules, { isFinished: true })).toBeNull()
-      const crossed = cellPath(plan.line, rules.grid).map((cell) =>
-        placeOf(cell.centroid, rules.grid)
-      )
+      expect(lineBlock(line, rules, { isFinished: true })).toBeNull()
+      const crossed = cellPath(line, rules.grid).map((cell) => placeOf(cell.centroid, rules.grid))
       expect(crossed.some(({ row, col }) => isLake(row, col))).toBe(false)
     })
 
     it('should bridge water narrow enough to bridge', () => {
       // The river runs the whole height of the board: there is no way round
-      const plan = planLine(board, [pointOf(townNamed('Fir'))], pointOf(townNamed('Dogwood')))
+      const line = planLine(board, [pointOf(townNamed('Fir'))], pointOf(townNamed('Dogwood')))
 
-      expect(lineBlock(plan.line, rules, { isFinished: true })).toBeNull()
-      const crossed = cellPath(plan.line, rules.grid)
+      expect(lineBlock(line, rules, { isFinished: true })).toBeNull()
+      const crossed = cellPath(line, rules.grid)
       expect(crossed.some((cell) => isWaterCell(cell))).toBe(true)
       const places = crossed.map((cell) => placeOf(cell.centroid, rules.grid))
       expect(places.some(({ row, col }) => isRiver(row, col))).toBe(true)
     })
 
     it('should go through the pass rather than over the ridge', () => {
-      const plan = planLine(board, [pointOf(townNamed('Juniper'))], pointOf(townNamed('Gum')))
+      const line = planLine(board, [pointOf(townNamed('Juniper'))], pointOf(townNamed('Gum')))
 
-      const places = cellPath(plan.line, rules.grid).map((cell) =>
-        placeOf(cell.centroid, rules.grid)
-      )
+      const places = cellPath(line, rules.grid).map((cell) => placeOf(cell.centroid, rules.grid))
       expect(places.some(({ row, col }) => isRidge(row, col))).toBe(false)
       expect(places.some(({ row, col }) => row === 3 && col === 12)).toBe(true)
     })
 
     it('should stay inside the region', () => {
-      const plan = planLine(board, [pointOf(townNamed('Fir'))], pointOf(townNamed('Cedar')))
+      const line = planLine(board, [pointOf(townNamed('Fir'))], pointOf(townNamed('Cedar')))
 
-      expect(lineBlock(plan.line, rules, { isFinished: true })).toBeNull()
+      expect(lineBlock(line, rules, { isFinished: true })).toBeNull()
     })
 
     it('should find no line to a town outside the region', () => {
@@ -153,10 +149,10 @@ describe('botPathfinder', () => {
       rules = rulesWith(wall)
       board = searchBoard(rules, towns)
 
-      const plan = planLine(board, [pointOf(townNamed('Ivy'))], pointOf(townNamed('Gum')))
+      const line = planLine(board, [pointOf(townNamed('Ivy'))], pointOf(townNamed('Gum')))
 
-      expect(plan).not.toBeNull()
-      expect(lineBlock(plan.line, rules, { isFinished: true })).toBeNull()
+      expect(line).not.toBeNull()
+      expect(lineBlock(line, rules, { isFinished: true })).toBeNull()
     })
 
     it('should go through the towns it passes, so they join the network', () => {
@@ -172,17 +168,17 @@ describe('botPathfinder', () => {
         builtLegs: []
       }
 
-      const plan = planLine(searchBoard(corridor, corridorTowns), [centerAt(0, 0)], centerAt(0, 6))
+      const line = planLine(searchBoard(corridor, corridorTowns), [centerAt(0, 0)], centerAt(0, 6))
 
-      expect(plan.line.map(pointKey)).toContain(pointKey({ lat: middle.lat, lng: middle.lon }))
+      expect(line.map(pointKey)).toContain(pointKey({ lat: middle.lat, lng: middle.lon }))
     })
 
     it('should start from whichever start point is cheapest', () => {
       const sources = [pointOf(townNamed('Alder')), pointOf(townNamed('Dogwood'))]
 
-      const plan = planLine(board, sources, pointOf(townNamed('Fir')))
+      const line = planLine(board, sources, pointOf(townNamed('Fir')))
 
-      expect(plan.line[0]).toEqual(pointOf(townNamed('Dogwood')))
+      expect(line[0]).toEqual(pointOf(townNamed('Dogwood')))
     })
   })
 
@@ -205,7 +201,7 @@ describe('botPathfinder', () => {
 
   describe('affordableSection', () => {
     it('should build as far as the money goes, as a section the rules allow', () => {
-      const { line } = planLine(board, [pointOf(townNamed('Alder'))], pointOf(townNamed('Dogwood')))
+      const line = planLine(board, [pointOf(townNamed('Alder'))], pointOf(townNamed('Dogwood')))
 
       const section = affordableSection(line, 5000, rules)
 
@@ -216,13 +212,13 @@ describe('botPathfinder', () => {
     })
 
     it('should build the whole line when it can be paid for', () => {
-      const { line } = planLine(board, [pointOf(townNamed('Alder'))], pointOf(townNamed('Juniper')))
+      const line = planLine(board, [pointOf(townNamed('Alder'))], pointOf(townNamed('Juniper')))
 
       expect(affordableSection(line, 1e9, rules)).toEqual(line)
     })
 
     it('should not stop part way over water', () => {
-      const { line } = planLine(board, [pointOf(townNamed('Fir'))], pointOf(townNamed('Dogwood')))
+      const line = planLine(board, [pointOf(townNamed('Fir'))], pointOf(townNamed('Dogwood')))
       // Every budget that runs out somewhere along the line
       for (let budget = 1000; budget < priceLine(line, rules.grid); budget += 500) {
         const section = affordableSection(line, budget, rules)
@@ -232,7 +228,7 @@ describe('botPathfinder', () => {
     })
 
     it('should build nothing when not even the first step can be paid for', () => {
-      const { line } = planLine(board, [pointOf(townNamed('Alder'))], pointOf(townNamed('Birch')))
+      const line = planLine(board, [pointOf(townNamed('Alder'))], pointOf(townNamed('Birch')))
 
       expect(affordableSection(line, 10, rules)).toBeNull()
     })

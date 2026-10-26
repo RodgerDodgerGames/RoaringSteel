@@ -1,9 +1,10 @@
 <!--
   PlayerCard.vue
 
-  The head of the player dock: whose turn it is and how much cash they have.
-  Everything below it in the dock is about this player, so this is the first
-  thing read.
+  The head of the player dock: whose turn it is, how much cash they have,
+  and how close they are to winning — the cash and the major cities joined
+  that the win needs (see victory.js). Everything below it in the dock is
+  about this player, so this is the first thing read.
 
   The player's color is shown as a thick stripe rather than as the card's
   background, so the name stays readable whatever color was picked — black
@@ -14,12 +15,18 @@
 -->
 
 <script setup>
+import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { usePlayerStore } from '@/stores/players'
+import { useVictory } from '@/composables/victory'
 import { formatCurrency } from '@/composables/utils'
 
 const playerStore = usePlayerStore()
 const { activePlayer } = storeToRefs(playerStore)
+const { progress } = useVictory()
+
+/** The active player's way to the win */
+const goal = computed(() => activePlayer.value && progress(activePlayer.value.id))
 </script>
 
 <template>
@@ -32,12 +39,17 @@ const { activePlayer } = storeToRefs(playerStore)
       <span class="caps-label">Cash</span>
       <span class="player-card__amount">{{ formatCurrency(activePlayer.cash) }}</span>
     </div>
+    <p class="player-card__goal">
+      To win: {{ formatCurrency(goal.cashNeeded) }} and {{ goal.citiesNeeded }} major cities joined
+      by your track — you have {{ goal.citiesJoined }}.
+    </p>
   </div>
 </template>
 
 <style scoped>
 .player-card {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
   gap: 1rem;
@@ -73,5 +85,11 @@ const { activePlayer } = storeToRefs(playerStore)
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
   color: var(--bulma-text-strong);
+}
+
+.player-card__goal {
+  flex-basis: 100%;
+  font-size: 0.8rem;
+  color: var(--bulma-text-weak);
 }
 </style>

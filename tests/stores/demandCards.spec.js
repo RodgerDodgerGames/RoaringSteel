@@ -17,6 +17,7 @@ import { useTownsStore } from '@/stores/towns'
 import { usePlayerStore } from '@/stores/players'
 import { useSettingsStore } from '@/stores/settings'
 import { PIN_COLORS } from '@/config/demands'
+import { demandPayoff } from '@/composables/payoffs'
 
 /**
  * A card with an id and placeholder contracts, for tests that only care
@@ -432,6 +433,172 @@ describe('demandCards store', () => {
       expect(store.markedLines.lines).toEqual([
         { destination: 'Town 1A', industry: 'Coal', color: PIN_COLORS[0] }
       ])
+    })
+  })
+
+  describe('discardCard', () => {
+    beforeEach(() => {
+      store.setDeck({ drawPile: deckOf(4), hands: { 1: [card(91), card(92), card(93)] } })
+    })
+
+    it('should put the card on the discard pile and draw a replacement', () => {
+      expect(store.discardCard(1, 92)).toBe(true)
+
+      expect(idsOf(store.handOf(1))).toEqual([91, 93, 1])
+      expect(idsOf(store.discardPile)).toEqual([92])
+      expect(idsOf(store.drawPile)).toEqual([2, 3, 4])
+    })
+
+    it('should drop the player pins on the card', () => {
+      usePlayerStore().addPlayer({ name: 'Alice', color: 'red' })
+      usePlayerStore().startGame()
+      store.togglePin(92, 0)
+      store.togglePin(91, 1)
+
+      store.discardCard(1, 92)
+
+      expect(store.pinsOf(1).map((pin) => pin.cardId)).toEqual([91])
+    })
+
+    it('should refuse a card the player does not hold', () => {
+      expect(store.discardCard(1, 1)).toBe(false)
+
+      expect(idsOf(store.handOf(1))).toEqual([91, 92, 93])
+      expect(store.discardPile).toEqual([])
+    })
+
+    it('should shuffle the discard pile into a new deck when the deck runs out', () => {
+      store.setDeck({
+        drawPile: [],
+        discardPile: [card(5)],
+        hands: { 1: [card(91), card(92), card(93)] }
+      })
+
+      store.discardCard(1, 91)
+
+      expect(idsOf(store.handOf(1))).toEqual([92, 93, 5])
+      expect(idsOf(store.discardPile)).toEqual([91])
+    })
+
+    it('should deal the card played back only when there is no other card anywhere', () => {
+      store.setDeck({ drawPile: [], hands: { 1: [card(91)] } })
+
+      store.discardCard(1, 91)
+
+      expect(idsOf(store.handOf(1))).toEqual([91])
+    })
+
+    it('should top a short hand back up to three', () => {
+      store.setDeck({ drawPile: deckOf(4), hands: { 1: [card(91)] } })
+
+      store.discardCard(1, 91)
+
+      expect(idsOf(store.handOf(1))).toEqual([1, 2, 3])
+    })
+  })
+
+  describe('discardHand', () => {
+    it('should throw in the whole hand and deal a new one', () => {
+      store.setDeck({ drawPile: deckOf(4), hands: { 1: [card(91), card(92), card(93)] } })
+
+      store.discardHand(1)
+
+      expect(idsOf(store.handOf(1))).toEqual([1, 2, 3])
+      expect(idsOf(store.discardPile)).toEqual([91, 92, 93])
+    })
+
+    // The bug: the hand went on the discard pile first, so with the deck
+    // empty it was shuffled straight back and dealt to the same player
+    it('should not deal back the cards thrown in when the deck has run out', () => {
+      store.setDeck({
+        drawPile: [],
+        discardPile: [card(5), card(6), card(7)],
+        hands: { 1: [card(91), card(92), card(93)] }
+      })
+
+      store.discardHand(1)
+
+      expect(idsOf(store.handOf(1)).sort()).toEqual([5, 6, 7])
+      expect(idsOf(store.discardPile)).toEqual([91, 92, 93])
+    })
+
+    it('should make up a full hand from the thrown-in cards when the rest run short', () => {
+      store.setDeck({ drawPile: [card(5)], hands: { 1: [card(91), card(92), card(93)] } })
+
+      store.discardHand(1)
+
+      expect(idsOf(store.handOf(1))[0]).toBe(5)
+      expect(store.handOf(1)).toHaveLength(3)
+    })
+
+    it('should drop all the player pins', () => {
+      usePlayerStore().addPlayer({ name: 'Alice', color: 'red' })
+      usePlayerStore().startGame()
+      store.setDeck({ drawPile: deckOf(4), hands: { 1: [card(91)] } })
+      store.togglePin(91, 0)
+
+      store.discardHand(1)
+
+      expect(store.pinsOf(1)).toEqual([])
+    })
+  })
+
+  describe('discard pile in a save', () => {
+    it('should be restored from a save', () => {
+      store.setDeck({ drawPile: deckOf(1), discardPile: [card(50)] })
+
+      expect(idsOf(store.discardPile)).toEqual([50])
+    })
+
+    it('should start empty for a save from before cards could be played', () => {
+      store.setDeck({ drawPile: deckOf(1) })
+
+      expect(store.discardPile).toEqual([])
+    })
+
+    it('should be cleared by reset', () => {
+      store.setDeck({ drawPile: deckOf(1), discardPile: [card(50)] })
+
+      store.reset()
+
+      expect(store.discardPile).toEqual([])
+    })
+  })
+
+  describe('repriceDemands', () => {
+    it('should price every demand by the payoff rule, wherever the card is', () => {
+      const denver = { name: 'Denver', lat: 39.7, lon: -105, industries: [] }
+      const pueblo = { name: 'Pueblo', lat: 38.3, lon: -104.6, industries: [{ name: 'Steel' }] }
+      useTownsStore().setTowns([denver, pueblo])
+      const old = (id) => ({
+        id,
+        demands: [{ destination: 'Denver', industry: 'Steel', payoff: 600 }]
+      })
+      store.setDeck({ drawPile: [old(1)], discardPile: [old(2)], hands: { 1: [old(3)] } })
+
+      store.repriceDemands()
+
+      const expected = demandPayoff(denver, 'Steel', [denver, pueblo])
+      expect(expected).toBeGreaterThan(600)
+      expect(store.drawPile[0].demands[0].payoff).toBe(expected)
+      expect(store.discardPile[0].demands[0].payoff).toBe(expected)
+      expect(store.handOf(1)[0].demands[0].payoff).toBe(expected)
+    })
+
+    it('should pass over a damaged card rather than fail', () => {
+      useTownsStore().setTowns([])
+      store.setDeck({ drawPile: [card(1)], hands: { 1: [{ id: 9 }] } })
+
+      expect(() => store.repriceDemands()).not.toThrow()
+    })
+
+    it('should leave a demand for a town not in the game as it was', () => {
+      useTownsStore().setTowns([])
+      store.setDeck({ drawPile: [card(1)] })
+
+      store.repriceDemands()
+
+      expect(store.drawPile[0].demands[0].payoff).toBe(10)
     })
   })
 })

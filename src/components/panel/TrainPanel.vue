@@ -1,47 +1,67 @@
 <!--
   TrainPanel.vue
 
-  The active player's train: what kind it is, how far it moves in a turn, and
-  the loads it is carrying.
+  The active player's train: what kind it is, how far it runs in a turn,
+  where it is, and the loads it is carrying (one bay per load it can hold).
 
-  PLACEHOLDER — trains are not in the game yet. This shows where the train
-  will sit in the dock and roughly what it will hold, so the layout can be
-  judged as a whole. It reads no game state. Replace its contents when trains
-  are built.
-
-  Every player begins Empire Builder with a Freight: 9 mileposts a turn,
-  2 loads. That is what is pictured.
+  Every player begins with a Freight; upgrades are bought in the dock's
+  "This turn" section (see UpgradeControls).
 -->
 
 <script setup>
+import { computed } from 'vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
+import { usePlayerStore } from '@/stores/players'
+import { useTrainsStore } from '@/stores/trains'
 
-// The two cargo slots a Freight has, drawn as empty bays
-const LOAD_SLOTS = 2
+const playerStore = usePlayerStore()
+const trainsStore = useTrainsStore()
+
+const playerId = computed(() => playerStore.activePlayer?.id)
+const train = computed(() => trainsStore.trainOf(playerId.value))
+const trainType = computed(() => trainsStore.trainTypeOf(playerId.value))
+
+/** Where the train is, in words */
+const whereabouts = computed(() => {
+  if (!train.value.position) return 'Not on the board yet'
+  const town = trainsStore.townOf(playerId.value)
+  return town ? `In ${town.name}` : 'Between towns'
+})
+
+/** One entry per bay: the load in it, or null when it is empty */
+const bays = computed(() =>
+  Array.from({ length: trainType.value.capacity }, (_, i) => train.value.loads[i] ?? null)
+)
 </script>
 
 <template>
-  <CollapsibleSection title="Train" storage-key="dock_train" badge="Not built yet">
+  <CollapsibleSection title="Train" storage-key="dock_train">
     <div class="train-panel">
       <div class="train-panel__type">
         <span class="icon"><i class="fas fa-train" aria-hidden="true"></i></span>
-        <span class="has-text-weight-bold">Freight</span>
-        <span class="train-panel__stats">9 mileposts · {{ LOAD_SLOTS }} loads</span>
+        <span class="has-text-weight-bold">{{ trainType.name }}</span>
+        <span class="train-panel__stats">
+          {{ trainType.rangeKm }} km a turn · {{ trainType.capacity }} loads
+        </span>
       </div>
+      <p class="train-panel__where">{{ whereabouts }}</p>
 
       <div class="train-panel__loads" aria-label="Loads carried">
-        <span v-for="slot in LOAD_SLOTS" :key="slot" class="train-panel__load">Empty</span>
+        <span
+          v-for="(load, index) in bays"
+          :key="index"
+          class="train-panel__load"
+          :class="{ 'is-full': load }"
+          :title="load ?? ''"
+        >
+          {{ load ?? 'Empty' }}
+        </span>
       </div>
     </div>
   </CollapsibleSection>
 </template>
 
 <style scoped>
-/* Faded, to read as a preview rather than as live controls */
-.train-panel {
-  opacity: 0.55;
-}
-
 .train-panel__type {
   display: flex;
   align-items: center;
@@ -54,6 +74,11 @@ const LOAD_SLOTS = 2
   color: var(--bulma-text-weak);
 }
 
+.train-panel__where {
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+}
+
 .train-panel__loads {
   display: flex;
   gap: 0.5rem;
@@ -62,11 +87,21 @@ const LOAD_SLOTS = 2
 
 .train-panel__load {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
   padding: 0.35rem;
   border: 1px dashed var(--bulma-border);
   border-radius: var(--bulma-radius);
   font-size: 0.8rem;
   text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--bulma-text-weak);
+}
+
+.train-panel__load.is-full {
+  border-style: solid;
+  color: var(--bulma-text-strong);
+  font-weight: 700;
 }
 </style>

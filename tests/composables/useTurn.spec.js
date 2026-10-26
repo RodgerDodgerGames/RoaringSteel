@@ -14,6 +14,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useTurn } from '@/composables/useTurn'
 import { usePlayerStore } from '@/stores/players'
 import { useGameStore } from '@/stores/game'
+import { useTownsStore } from '@/stores/towns'
+import { useTrackStore } from '@/stores/track'
+import { useTrainsStore } from '@/stores/trains'
+import { useDemandCardsStore } from '@/stores/demandCards'
 import { gameRules } from '@/config/game'
 
 // autoSave is stubbed so these tests exercise turn logic, not persistence
@@ -255,6 +259,131 @@ describe('useTurn', () => {
       const { playsAgain } = useTurn()
 
       expect(playsAgain.value).toBe(false)
+    })
+  })
+
+  describe('the end of the game', () => {
+    // Two major cities joined by Alice's track, so she needs both
+    const towns = [
+      { name: 'Alpha', msa: 'A', lat: 0, lon: 0, size: 'large', industries: [] },
+      { name: 'Beta', msa: 'B', lat: 0, lon: 0.3, size: 'large', industries: [] }
+    ]
+
+    beforeEach(() => {
+      seedPlayers(['Alice', 'Bob'])
+      useTownsStore().setTowns(towns)
+      useTrackStore().addSegment({
+        ownerId: 1,
+        coordinates: [
+          { lat: 0, lng: 0 },
+          { lat: 0, lng: 0.3 }
+        ]
+      })
+    })
+
+    it('should end the game, not the turn, when the player has won', () => {
+      playerStore.updatePlayer(1, { cash: gameRules.victory.cash })
+      const { endTurn } = useTurn()
+
+      expect(endTurn()).toBe(true)
+
+      expect(gameStore.winnerId).toBe(1)
+      expect(playerStore.activePlayer.name).toBe('Alice')
+      expect(autoSave).toHaveBeenCalled()
+    })
+
+    it('should pass the turn as usual short of the winning cash', () => {
+      playerStore.updatePlayer(1, { cash: gameRules.victory.cash - 1 })
+      const { endTurn } = useTurn()
+
+      endTurn()
+
+      expect(gameStore.isOver).toBe(false)
+      expect(playerStore.activePlayer.name).toBe('Bob')
+    })
+
+    it('should refuse to end a turn once the game is over', () => {
+      gameStore.declareWinner(2)
+      const { endTurn } = useTurn()
+
+      expect(endTurn()).toBe(false)
+      expect(playerStore.activePlayer.name).toBe('Alice')
+    })
+  })
+
+  describe("the train's turn", () => {
+    it("should clear what the finishing player's train did this turn", () => {
+      seedPlayers(['Alice', 'Bob'])
+      useTownsStore().setTowns([
+        { name: 'Alpha', msa: 'A', lat: 0, lon: 0, size: 'small', industries: [] }
+      ])
+      gameStore.setGameState({ turn: 2 })
+      const trainsStore = useTrainsStore()
+      trainsStore.placeTrain(1, 'A')
+      const { endTurn } = useTurn()
+
+      endTurn()
+
+      expect(trainsStore.trainOf(1).hasActed).toBe(false)
+    })
+  })
+
+  describe('discardHand', () => {
+    const card = (id) => ({ id, demands: [] })
+
+    beforeEach(() => {
+      seedPlayers(['Alice', 'Bob'])
+      useDemandCardsStore().setDeck({
+        drawPile: [card(4), card(5), card(6)],
+        hands: { 1: [card(1), card(2), card(3)] }
+      })
+    })
+
+    it('should give the player a new hand and end their turn', () => {
+      const { discardHand } = useTurn()
+
+      expect(discardHand()).toBe(true)
+
+      expect(
+        useDemandCardsStore()
+          .handOf(1)
+          .map((c) => c.id)
+      ).toEqual([4, 5, 6])
+      expect(playerStore.activePlayer.name).toBe('Bob')
+    })
+
+    it('should be refused once the player has built this turn', () => {
+      playerStore.updatePlayer(1, { cash: 5000 })
+      playerStore.spendOnTrack(1, 1000)
+      const { discardHand, canDiscardHand } = useTurn()
+
+      expect(canDiscardHand.value).toBe(false)
+      expect(discardHand()).toBe(false)
+      expect(
+        useDemandCardsStore()
+          .handOf(1)
+          .map((c) => c.id)
+      ).toEqual([1, 2, 3])
+    })
+
+    it('should stay refused after the building is torn up and refunded', () => {
+      playerStore.updatePlayer(1, { cash: 5000 })
+      playerStore.spendOnTrack(1, 1000)
+      playerStore.refundTrackSpend(1, 1000)
+      const { canDiscardHand } = useTurn()
+
+      expect(canDiscardHand.value).toBe(false)
+    })
+
+    it('should be refused once the player has used their train this turn', () => {
+      useTownsStore().setTowns([
+        { name: 'Alpha', msa: 'A', lat: 0, lon: 0, size: 'small', industries: [] }
+      ])
+      gameStore.setGameState({ turn: 2 })
+      useTrainsStore().placeTrain(1, 'A')
+      const { discardHand } = useTurn()
+
+      expect(discardHand()).toBe(false)
     })
   })
 })

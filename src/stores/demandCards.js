@@ -21,16 +21,21 @@
  * cleared with the hands too, because card ids restart with every new deck
  * and an old pin would otherwise land on a new game's card.
  *
+ * A card leaves a hand when one of its demands is delivered, or when the
+ * player throws in their whole hand. Either way it goes on the discard pile
+ * and a new card is drawn in its place. When the deck runs out, the discard
+ * pile is shuffled to make a new one, as at a real table.
+ *
  * @module stores/demandCards
  */
 
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import * as turf from '@turf/turf'
 import { useTownsStore } from './towns'
 import { usePlayerStore } from './players'
 import { useSettingsStore } from './settings'
 import { PIN_COLORS } from '@/config/demands'
+import { demandPayoff } from '@/composables/payoffs'
 
 /** How many demand cards each player holds, per the Empire Builder rules */
 export const HAND_SIZE = 3
@@ -45,6 +50,9 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
 
   /** Cards not yet dealt, top of the deck first */
   const drawPile = ref([])
+
+  /** Cards played or thrown in, shuffled back into the deck when it runs out */
+  const discardPile = ref([])
 
   /**
    * Each player's hand, keyed by player id. A plain object rather than a Map
@@ -273,30 +281,8 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
         const selectedIndustry = weightedRandomSelect(availableIndustries, 'proportion')
         console.log(`selected industry: ${selectedIndustry.name}`)
 
-        // Calculate payoff based on distance and industry rarity
-        const sourceTowns = townsData.filter((town) =>
-          town.industries.some((prod) => prod.name === selectedIndustry.name)
-        )
-
-        const distances = sourceTowns.map((src) =>
-          turf.distance(
-            turf.point([src.lon, src.lat]),
-            turf.point([destination.lon, destination.lat])
-          )
-        )
-
-        // calculate payoff
-        // The payoff is calculated as the average distance between source towns and destination,
-        // multiplied by 10 to scale the value, and then multiplied by the rarity factor.
-        // The rarity factor is calculated as the inverse of the count of towns that produce
-        // the selected industry. The idea is that rarer industries should have a higher payoff.
-        // The result is then rounded to the nearest integer.
-        const avgDistance = distances.reduce((a, b) => a + b, 0) / distances.length || 0
-        const rarityFactor = 1 / industryCounts[selectedIndustry.name]
-        const payoff = Math.round(avgDistance * 10 * rarityFactor)
-        console.log(
-          `average distance: ${avgDistance}, rarity factor: ${rarityFactor}, Payoff: ${payoff}`
-        )
+        // Pays by how far the commodity has to come (see payoffs.js)
+        const payoff = demandPayoff(destination, selectedIndustry.name, townsData)
 
         // Create a demand option
         demandOptions.push({
@@ -333,9 +319,11 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
     for (let pass = 0; pass < HAND_SIZE; pass++) {
       playerIds.forEach((playerId) => {
         const hand = handOf(playerId)
-        if (hand.length >= HAND_SIZE || drawPile.value.length === 0) return
+        if (hand.length >= HAND_SIZE) return
+        const drawn = drawCard()
+        if (!drawn) return
         // Assigned as a new array so a player with no hand yet gets an entry
-        hands.value[playerId] = [...hand, drawPile.value.shift()]
+        hands.value[playerId] = [...hand, drawn]
       })
     }
 
@@ -363,6 +351,90 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
       cumulative += obj[weightKey]
       if (rand < cumulative) return obj
     }
+  }
+
+  /**
+   * Takes the top card off the deck. When the deck is empty, the discard pile
+   * is shuffled to become the new deck first, so the game never runs out of
+   * cards while any have been played.
+   * @returns {Object|undefined} The card, or undefined if there are no cards
+   *   left anywhere
+   */
+  function drawCard() {
+    if (drawPile.value.length === 0 && discardPile.value.length > 0) {
+      drawPile.value = shuffled(discardPile.value)
+      discardPile.value = []
+    }
+    return drawPile.value.shift()
+  }
+
+  /**
+   * A copy of some cards in random order (a Fisher–Yates shuffle).
+   * @param {Array} cards - The cards
+   * @returns {Array} The same cards, shuffled
+   */
+  function shuffled(cards) {
+    const deck = [...cards]
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[deck[i], deck[j]] = [deck[j], deck[i]]
+    }
+    return deck
+  }
+
+  /**
+   * Swaps cards out of a player's hand for new ones from the deck, filling
+   * the hand back up to `HAND_SIZE`; the cards going out are put on the
+   * discard pile, and the player's pins on them dropped.
+   *
+   * The deck is drawn from before the outgoing cards are discarded, so a deck
+   * that has run out is refilled from the cards played earlier, not the ones
+   * going out now — those are only dealt back if there is nothing else left.
+   * @param {number} playerId - The player
+   * @param {Array<Object>} outgoing - The cards leaving the hand
+   */
+  function replaceCards(playerId, outgoing) {
+    const kept = handOf(playerId).filter((card) => !outgoing.includes(card))
+    const drawUp = () => {
+      while (kept.length < HAND_SIZE) {
+        const drawn = drawCard()
+        if (!drawn) return
+        kept.push(drawn)
+      }
+    }
+    drawUp()
+    discardPile.value.push(...outgoing)
+    drawUp()
+
+    const outgoingIds = outgoing.map((card) => card.id)
+    pins.value[playerId] = pinsOf(playerId).filter((pin) => !outgoingIds.includes(pin.cardId))
+    hands.value[playerId] = kept
+  }
+
+  /**
+   * Plays a card out of a player's hand — one of its demands has been
+   * delivered — onto the discard pile, and draws them a new card in its place
+   * (see `replaceCards`).
+   * @param {number} playerId - The player
+   * @param {number} cardId - The card
+   * @returns {boolean} True if the player held the card
+   */
+  function discardCard(playerId, cardId) {
+    const card = handOf(playerId).find((c) => c.id === cardId)
+    if (!card) return false
+    replaceCards(playerId, [card])
+    return true
+  }
+
+  /**
+   * Throws in a player's whole hand and deals them a new one: Empire
+   * Builder's way out of a hand of demands that are no good. It costs the
+   * player their turn; ending the turn is up to the caller. The new hand
+   * comes from the rest of the deck first (see `replaceCards`).
+   * @param {number} playerId - The player
+   */
+  function discardHand(playerId) {
+    replaceCards(playerId, [...handOf(playerId)])
   }
 
   /**
@@ -418,10 +490,35 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
   watch(() => settingsStore.settings.pinLimit, trimPins)
 
   /**
+   * Prices every demand in the game afresh by the payoff rule (see
+   * payoffs.js): in the deck, the discard pile and every hand. Used on saves
+   * made before the rule changed, whose cards pay a small fraction of what
+   * track costs, so the game could never be won by delivering.
+   *
+   * A destination is found by name, as everywhere demands are read; one
+   * whose town is not in the game keeps its old payoff.
+   */
+  function repriceDemands() {
+    const townsData = towns.value
+    const reprice = (card) => {
+      // A damaged save could hold anything here; what is not a card is left be
+      if (!Array.isArray(card?.demands)) return
+      card.demands.forEach((demand) => {
+        const destination = townsData.find((town) => town.name === demand.destination)
+        if (destination) demand.payoff = demandPayoff(destination, demand.industry, townsData)
+      })
+    }
+    drawPile.value.forEach(reprice)
+    discardPile.value.forEach(reprice)
+    Object.values(hands.value).forEach((hand) => Array.isArray(hand) && hand.forEach(reprice))
+  }
+
+  /**
    * Resets the demand cards store to initial state.
    */
   function reset() {
     drawPile.value = []
+    discardPile.value = []
     hands.value = {}
     pins.value = {}
     hoveredLine.value = null
@@ -472,6 +569,8 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
    *
    * @param {Object} deck - Saved deck state
    * @param {Array} deck.drawPile - Cards not yet dealt
+   * @param {Array} [deck.discardPile] - Cards played or thrown in; saves
+   *   from before cards could be played have none
    * @param {Object} [deck.hands] - Each player's hand, keyed by player id
    * @param {Object} [deck.pins] - Each player's pinned lines, keyed by player
    *   id; saves from before pins existed have none, and unusable pins are
@@ -484,6 +583,7 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
     drawPile.value = deck.drawPile.map((card, index) =>
       Array.isArray(card) ? { id: index + 1, demands: card } : card
     )
+    discardPile.value = Array.isArray(deck.discardPile) ? deck.discardPile : []
     hands.value = deck.hands ?? {}
     pins.value = usablePins(deck.pins)
     return true
@@ -491,6 +591,7 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
 
   return {
     drawPile,
+    discardPile,
     hands,
     pins,
     hoveredLine,
@@ -501,6 +602,9 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
     markedLines,
     generateDemandCards,
     dealHands,
+    discardCard,
+    discardHand,
+    repriceDemands,
     togglePin,
     hoverLine,
     endHover,

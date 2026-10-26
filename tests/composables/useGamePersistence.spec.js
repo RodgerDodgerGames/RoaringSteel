@@ -13,6 +13,7 @@ import { useGameStore } from '@/stores/game'
 import { useTrackStore } from '@/stores/track'
 import { useDemandCardsStore } from '@/stores/demandCards'
 import { useSettingsStore } from '@/stores/settings'
+import { useTrainsStore } from '@/stores/trains'
 import { useTownsStore } from '@/stores/towns'
 import { useGridStore } from '@/stores/grid'
 import { useMapStore } from '@/stores/map'
@@ -351,6 +352,76 @@ describe('useGamePersistence', () => {
       persistence.loadAutoSave(latest.index)
 
       playerIds().forEach((id) => expect(demandCardsStore.handOf(id)).toEqual([]))
+    })
+  })
+
+  describe('trains and the end of the game', () => {
+    /** Saves the game to a file's worth of JSON and loads it straight back */
+    function roundTrip() {
+      const save = JSON.parse(JSON.stringify(persistence.serializeGameState()))
+      expect(persistence.deserializeGameState(save)).toBe(true)
+    }
+
+    it("should carry every player's train through a save and reload", () => {
+      const trainsStore = useTrainsStore()
+      trainsStore.changeTrain(1, 'fastFreight')
+
+      roundTrip()
+
+      expect(useTrainsStore().trainOf(1).type).toBe('fastFreight')
+      expect(useTrainsStore().trainOf(2).type).toBe('freight')
+    })
+
+    it('should give every player a new train for a save written before trains', () => {
+      const save = persistence.serializeGameState()
+      delete save.trains
+
+      expect(persistence.deserializeGameState(save)).toBe(true)
+      expect(useTrainsStore().trainOf(1)).toMatchObject({ type: 'freight', position: null })
+    })
+
+    it('should keep the winner of a game that is over', () => {
+      gameStore.declareWinner(2)
+
+      roundTrip()
+
+      expect(gameStore.winnerId).toBe(2)
+    })
+
+    it('should price afresh the demands of a save from before trains', () => {
+      useTownsStore().setTowns([
+        { name: 'Denver', lat: 39.7, lon: -105, industries: [] },
+        { name: 'Pueblo', lat: 38.3, lon: -104.6, industries: [{ name: 'Steel' }] }
+      ])
+      useDemandCardsStore().setDeck({
+        drawPile: [{ id: 1, demands: [{ destination: 'Denver', industry: 'Steel', payoff: 600 }] }]
+      })
+      const save = persistence.serializeGameState()
+      delete save.trains
+
+      persistence.deserializeGameState(JSON.parse(JSON.stringify(save)))
+
+      expect(useDemandCardsStore().drawPile[0].demands[0].payoff).toBeGreaterThan(600)
+    })
+
+    it('should keep the prices of a current save as they are', () => {
+      useTownsStore().setTowns([{ name: 'Denver', lat: 39.7, lon: -105, industries: [] }])
+      useDemandCardsStore().setDeck({
+        drawPile: [{ id: 1, demands: [{ destination: 'Denver', industry: 'Steel', payoff: 600 }] }]
+      })
+
+      roundTrip()
+
+      expect(useDemandCardsStore().drawPile[0].demands[0].payoff).toBe(600)
+    })
+
+    it('should keep the played demand cards', () => {
+      const demandCardsStore = useDemandCardsStore()
+      demandCardsStore.setDeck({ drawPile: [], discardPile: [{ id: 9, demands: [] }] })
+
+      roundTrip()
+
+      expect(demandCardsStore.discardPile.map((c) => c.id)).toEqual([9])
     })
   })
 

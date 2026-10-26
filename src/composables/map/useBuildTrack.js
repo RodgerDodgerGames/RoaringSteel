@@ -2,7 +2,7 @@
 // Vue composable for handling map drawing and cost calculation logic
 // Organizes and manages all drawing-related logic, including setup, drawing controls, cost calculations, and utility functions.
 
-import { ref, computed, onMounted, onBeforeUnmount, watch, markRaw } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, markRaw, toRaw } from 'vue'
 import { useDebounceFn, onKeyStroke } from '@vueuse/core'
 import L from 'leaflet'
 import { storeToRefs } from 'pinia'
@@ -10,10 +10,10 @@ import { useMapStore } from '@/stores/map'
 import { usePlayerStore } from '@/stores/players'
 import { useTrackStore } from '@/stores/track'
 import { useGameStore } from '@/stores/game'
-import { useTownsStore } from '@/stores/towns'
-import { priceLine, linePrice } from '@/composables/map/trackCost'
-import { lineBlock, blockMessage, townCells, builtLegs } from '@/composables/map/buildRules'
-import { regionTest } from '@/composables/map/region'
+import { useGridStore } from '@/stores/grid'
+import { linePrice } from '@/composables/map/trackCost'
+import { lineBlock } from '@/composables/map/buildRules'
+import { useTrackBuilder, START_RULE } from '@/composables/trackBuilder'
 import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 import {
   UNOWNED_TRACK_COLOR,
@@ -40,11 +40,15 @@ export const buildTrackKey = Symbol('buildTrack')
  * exists — a parent of the map component qualifies, since a parent's
  * `onMounted` runs after its children's.
  *
- * @param {Object} grid - Reactive grid data for cell-based calculations
+ * Whether a finished line is built, and what it costs, is decided by the
+ * track builder (trackBuilder.js), the same way for every builder; this
+ * composable is the drawing tool in front of it, and draws on the map
+ * whatever track the track store holds.
+ *
  * @param {Function} formatCurrency - Utility function to format currency values
  * @returns {Object} - Exposes reactive state, computed properties, and functions for map drawing
  */
-export default function useBuildTrack(grid, formatCurrency) {
+export default function useBuildTrack(formatCurrency) {
   // ================== STATE VARIABLES ==================
 
   const workingLayer = ref(null) // Reference to the currently drawn line layer
@@ -64,9 +68,8 @@ export default function useBuildTrack(grid, formatCurrency) {
    */
   const pendingCost = ref(0)
 
-  // Caching town marker positions and endpoints for faster validation
+  // Where the town markers are, so a vertex placed on one finishes the line
   const townMarkerPositions = ref([])
-  const lineEndpoints = ref([])
 
   // get access to isDrawingActive from map store
   const mapStore = useMapStore()
@@ -82,26 +85,14 @@ export default function useBuildTrack(grid, formatCurrency) {
   // completed track is game state, not a map layer, so it lives in its own store
   const trackStore = useTrackStore()
   const gameStore = useGameStore()
-  const townsStore = useTownsStore()
+
+  // The cost grid prices every section of track as it is drawn
+  const { grid } = storeToRefs(useGridStore())
+
+  // Decides what may be built, and builds it (see the note above)
+  const builder = useTrackBuilder()
 
   // ================== COMPUTED PROPERTIES ==================
-
-  /**
-   * What every line is checked against before it is built (see buildRules.js):
-   * the grid, the region being played, the cells the towns sit in, and the
-   * track built so far. Worked out once rather than on every move of the
-   * cursor; the board parts and the track are kept apart, so building or
-   * tearing up track does not work the board out again.
-   */
-  const boardRules = computed(() => ({
-    grid: grid.value ?? [],
-    isInRegion: regionTest(gameStore.region),
-    townCells: townCells(townsStore.towns, grid.value ?? [])
-  }))
-  const buildRules = computed(() => ({
-    ...boardRules.value,
-    builtLegs: builtLegs(trackStore.segments)
-  }))
 
   /**
    * Whether the active player has track they may still tear up.
@@ -205,7 +196,7 @@ export default function useBuildTrack(grid, formatCurrency) {
     setGeomanOptions() // Configure Geoman drawing tool options
     createTrackPanes() // Make the panes track is drawn in, before any is drawn
     restoreTrackLayers() // Redraw track carried in from a saved game
-    initializeCaches() // Initialize town marker and line endpoint caches
+    initializeCaches() // Note where the town markers are
   })
 
   /**
@@ -236,7 +227,21 @@ export default function useBuildTrack(grid, formatCurrency) {
     allTrackLayers().forEach(removeTrackLayer)
     existingLineLayers.value = []
     restoredLineLayers.value = []
+    isAttached = false
   })
+
+  /**
+   * Keeps the track on the map in step with the track store when the store
+   * changes from somewhere other than this map: a section built without the
+   * map (a computer player, through the track builder), or the whole network
+   * swapped by loading a game. Sections drawn or torn up on the map already
+   * have their layers sorted by the time this runs, so it finds nothing to do
+   * for them.
+   *
+   * Watches the list of sections itself, not their insides: a new array each
+   * time means any section added, removed or replaced sets it off.
+   */
+  watch(() => [...trackStore.segments], syncTrackLayers)
 
   /**
    * Escape backs out of whichever map mode the player is in, the way it does in
@@ -259,8 +264,10 @@ export default function useBuildTrack(grid, formatCurrency) {
    * flag in step.
    */
   function toggleRemoveMode() {
-    // Drawing and removing both act on map clicks, so only one may be live
+    // Drawing, removing and choosing a town for the train all act on map
+    // clicks, so only one may be live
     if (isDrawingActive.value) cancelDrawing()
+    mapStore.setTownPicker(null)
     // Track is torn up in the Build view. Removal mode is only ever on in that
     // view, so when this switches it off the view stays as it is.
     mapStore.setViewMode(BUILD_VIEW)
@@ -284,8 +291,10 @@ export default function useBuildTrack(grid, formatCurrency) {
   function startDrawingLine() {
     resetLineTracking()
 
-    // Drawing and removing both act on map clicks, so only one may be live
+    // Drawing, removing and choosing a town for the train all act on map
+    // clicks, so only one may be live
     stopRemoving()
+    mapStore.setTownPicker(null)
 
     // Cost comes from the grid cells a line crosses, so with no grid every
     // line prices at zero and is built for nothing. Refuse rather than give
@@ -391,12 +400,7 @@ export default function useBuildTrack(grid, formatCurrency) {
   }
 
   function initializeCaches() {
-    // Cache town marker positions
     townMarkerPositions.value = mapStore.townsLayer.getLayers().map((marker) => marker.getLatLng())
-
-    // Cache the endpoints of every line already on the map, so restored track
-    // is a legal place to start building from
-    rebuildLineEndpoints()
   }
 
   /**
@@ -408,18 +412,45 @@ export default function useBuildTrack(grid, formatCurrency) {
    * not building.
    */
   function restoreTrackLayers() {
-    trackStore.segments.forEach((segment) => {
-      const latlngs = segment.coordinates.map((point) => L.latLng(point.lat, point.lng))
-      // Created in the rail pane: the layer becomes the track's rail, and a
-      // line cannot change pane once it is on the map
-      const layer = L.polyline(latlngs, { pane: RAILS_PANE }).addTo(mapStore.map)
-      attachSegment(layer, segment.id)
-      // markRaw: a Leaflet layer read back out of a reactive array comes back as
-      // a proxy, and Geoman hands back the raw layer, so the two would never
-      // compare equal and the cleanup filters below would never match
-      restoredLineLayers.value.push(markRaw(layer))
-      styleTracks(layer, segment.ownerId)
-    })
+    trackStore.segments.forEach(drawSegment)
+  }
+
+  /**
+   * Draws one section from the track store onto the map as track.
+   * @param {Object} segment - The section
+   */
+  function drawSegment(segment) {
+    const latlngs = segment.coordinates.map((point) => L.latLng(point.lat, point.lng))
+    // Created in the rail pane: the layer becomes the track's rail, and a
+    // line cannot change pane once it is on the map
+    const layer = L.polyline(latlngs, { pane: RAILS_PANE }).addTo(mapStore.map)
+    attachSegment(layer, segment)
+    // markRaw: a Leaflet layer read back out of a reactive array comes back as
+    // a proxy, and Geoman hands back the raw layer, so the two would never
+    // compare equal and the cleanup filters below would never match
+    restoredLineLayers.value.push(markRaw(layer))
+    styleTracks(layer, segment.ownerId)
+  }
+
+  /**
+   * Brings the map's track into line with the track store: draws any section
+   * with no layer, and takes off any layer whose section is no longer there
+   * (see the watcher that calls this).
+   *
+   * Sections are matched to layers by the section object itself, not its id:
+   * every game numbers its sections from 1, so after a load a new game's
+   * section 1 is not the old game's section 1.
+   */
+  function syncTrackLayers() {
+    if (!isAttached) return
+    const segments = new Set(trackStore.segments.map(toRaw))
+    const stale = allTrackLayers().filter((layer) => !segments.has(layer.segment))
+    stale.forEach(removeTrackLayer)
+    existingLineLayers.value = existingLineLayers.value.filter((l) => !stale.includes(l))
+    restoredLineLayers.value = restoredLineLayers.value.filter((l) => !stale.includes(l))
+
+    const drawn = new Set(allTrackLayers().map((layer) => layer.segment))
+    trackStore.segments.filter((segment) => !drawn.has(toRaw(segment))).forEach(drawSegment)
   }
 
   /**
@@ -474,7 +505,7 @@ export default function useBuildTrack(grid, formatCurrency) {
         // why, and carries on from the vertex before
         // The whole line, not just the new leg: a crossing of water can run
         // over several legs
-        const message = whyNotBuildable(workingLayer.value.getLatLngs())
+        const message = builder.whyNotBuildable(workingLayer.value.getLatLngs())
         if (message) {
           const drawing = mapStore.map.pm.Draw.Line
           drawing._removeLastVertex()
@@ -508,60 +539,24 @@ export default function useBuildTrack(grid, formatCurrency) {
   function finalizeDrawing(e) {
     mapStore.setIsDrawingActive(false)
     if (e.layer?.pm?._shape === 'Line') {
-      // Checked again as a whole, however the drawing ended: each leg was
-      // checked as it was placed, but a finished line is what gets built
-      const blocked = whyNotBuildable(e.layer.getLatLngs(), { isFinished: true })
-      if (blocked) {
-        discardDrawnLayer(e.layer)
-        buildError.value = `${blocked} That section was not built.`
-        return
-      }
-
-      // Priced from the finished line itself, by the same rule as the live
-      // cost, so the charge matches what was shown however the drawing ended
-      // (town, double-click or the Finish tooltip)
-      const cost = priceLine(e.layer.getLatLngs(), grid.value)
-      const builderId = playerStore.activePlayer?.id
-      const affordable = availableToSpend.value
-
-      // Charged before it is recorded: once a section is in the store it is
-      // indistinguishable from one that was paid for, so a build the player
-      // cannot cover has to be turned away here rather than unwound later
-      if (!playerStore.spendOnTrack(builderId, cost)) {
-        // The store's own message is in raw numbers and names the player, which
-        // is what a log wants and not what the person building wants to read
-        console.warn('Track section refused:', playerStore.error)
+      // Built through the track builder, which checks the finished line as a
+      // whole — where it starts, the build rules, and whether the player can
+      // pay — and prices it by the same rule as the live cost, so the charge
+      // matches what was shown however the drawing ended (town, double-click
+      // or the Finish tooltip)
+      const result = builder.buildSection(playerStore.activePlayer?.id, e.layer.getLatLngs())
+      if (!result.ok) {
         // `discardDrawnLayer` resets the drawing state, `buildError` included,
         // so the explanation is written after it rather than before
         discardDrawnLayer(e.layer)
-        // Money is only one of the ways the charge can fail; blaming the budget
-        // for a section that could not be priced at all would send the player
-        // looking for cash they already have
-        buildError.value = Number.isFinite(cost)
-          ? `That section costs ${formatCurrency(cost)} — more than the ${formatCurrency(affordable)} you have left to spend.`
-          : 'That section could not be priced, so it was not built.'
-        return
-      }
-
-      // Record before styling: the layer has to carry its segment id from the
-      // moment it exists, or a removal cannot find what to un-record
-      const segment = recordSegment(e.layer, cost)
-      if (!segment) {
-        // Nothing was built, so nothing stays charged for
-        playerStore.refundTrackSpend(builderId, cost)
-        // Track that nothing owns and no save records is worse than no track at
-        // all, so take it back off the map rather than leave a phantom line
-        discardDrawnLayer(e.layer)
-        // The line vanishing with no explanation reads as the game losing work
-        buildError.value = 'That section could not be recorded, so it was not built.'
+        buildError.value = `${result.error} That section was not built.`
         return
       }
 
       buildError.value = ''
-      attachSegment(e.layer, segment.id)
+      attachSegment(e.layer, result.segment)
       existingLineLayers.value.push(markRaw(e.layer))
-      updateLineEndpoints(e.layer)
-      styleTracks(e.layer, segment.ownerId)
+      styleTracks(e.layer, result.segment.ownerId)
     }
     resetHintMarkerMoveHandler()
     workingLayer.value = null
@@ -581,43 +576,18 @@ export default function useBuildTrack(grid, formatCurrency) {
     workingLayer.value = null
   }
 
-  /**
-   * Writes a finished line into the track store as owned, priced game state.
-   *
-   * The price is passed in rather than worked out again, so the
-   * amount the player was charged and the amount the segment records are the
-   * same number by construction — a refund pays back what the segment says.
-   *
-   * @param {Object} layer - The completed Leaflet line layer
-   * @param {number} cost - What the player was charged for it
-   * @returns {Object|null} The stored segment, or null if it was rejected
-   */
-  function recordSegment(layer, cost) {
-    const segment = trackStore.addSegment({
-      ownerId: playerStore.activePlayer?.id,
-      coordinates: layer.getLatLngs().map(({ lat, lng }) => ({ lat, lng })),
-      cost,
-      turn: gameStore.turn
-    })
-
-    // Losing the segment silently would leave track on the map that no player
-    // owns and no save records, so say so rather than carrying on quietly
-    if (!segment) {
-      console.error('Could not record track segment:', trackStore.error)
-    }
-    return segment
-  }
-
   // ================== MAP / STORE SYNCHRONIZATION ==================
 
   /**
    * Ties a Leaflet layer to the segment it draws, so a later removal can find
-   * what to take out of the store.
+   * what to take out of the store, and the map can be kept in step with the
+   * store (see `syncTrackLayers`).
    * @param {Object} layer - The track layer
-   * @param {number} segmentId - Id of the segment it draws
+   * @param {Object} segment - The segment it draws
    */
-  function attachSegment(layer, segmentId) {
-    layer.segmentId = segmentId
+  function attachSegment(layer, segment) {
+    layer.segmentId = segment.id
+    layer.segment = toRaw(segment)
   }
 
   /**
@@ -691,7 +661,6 @@ export default function useBuildTrack(grid, formatCurrency) {
     restoredLineLayers.value = restoredLineLayers.value.filter((l) => l !== layer)
     // The panel was itemizing the section just torn up
     resetLineTracking()
-    rebuildLineEndpoints()
   }
 
   /**
@@ -708,16 +677,6 @@ export default function useBuildTrack(grid, formatCurrency) {
     if (!mapStore.map.hasLayer(layer)) layer.addTo(mapStore.map)
     removeStyling(layer)
     styleTracks(layer, segment?.ownerId)
-  }
-
-  /**
-   * Rebuilds the endpoint cache from the track currently on the map.
-   * Recomputing beats patching: after a removal or an edit the old endpoints
-   * are no longer places track can legally start from.
-   */
-  function rebuildLineEndpoints() {
-    lineEndpoints.value = []
-    allTrackLayers().forEach(updateLineEndpoints)
   }
 
   // ================== COST TRACKING & TOOLTIP ==================
@@ -801,11 +760,13 @@ export default function useBuildTrack(grid, formatCurrency) {
     // can say so before the player double-clicks and loses the line. That
     // is only a warning while drawing goes on, and `lineBlock` checks it
     // last, so it is never in the way of a rule that is actually broken.
-    const block = lineBlock([...workingLayer.value.getLatLngs(), latlng], buildRules.value, {
-      isFinished: true
-    })
+    const block = lineBlock(
+      [...workingLayer.value.getLatLngs(), latlng],
+      builder.buildRules.value,
+      { isFinished: true }
+    )
     const endsOnWater = block?.reason === 'endsOnWater'
-    const message = block && !endsOnWater ? describeBlock(block) : null
+    const message = block && !endsOnWater ? builder.describeBlock(block) : null
     const leg = repriceLine(message ? undefined : latlng)
     hintMarker.setTooltipContent(
       message ??
@@ -830,27 +791,6 @@ export default function useBuildTrack(grid, formatCurrency) {
     return bridges > 0 ? `${price} (bridge ${formatCurrency(bridges)})` : price
   }
 
-  /**
-   * Why a line may not be built, in words for the player; null if it may.
-   * @param {Array<Object>} latlngs - The line's vertices
-   * @param {Object} [options] - See `lineBlock`: `isFinished` for a line
-   *   that is done, which may not end on water
-   * @returns {string|null} The reason, or null
-   */
-  function whyNotBuildable(latlngs, options) {
-    const block = lineBlock(latlngs, buildRules.value, options)
-    return block && describeBlock(block)
-  }
-
-  /**
-   * A broken rule, in words for the player (see `blockMessage`).
-   * @param {Object} block - What `lineBlock` found
-   * @returns {string} The message
-   */
-  function describeBlock(block) {
-    return blockMessage(block, gameStore.region?.properties?.NAME)
-  }
-
   // ================== UTILITY FUNCTIONS ==================
 
   /**
@@ -862,15 +802,14 @@ export default function useBuildTrack(grid, formatCurrency) {
     buildError.value = ''
   }
 
+  /**
+   * Whether the active player may start a line here: in a major city or at
+   * an end or bend of their own track (see the track builder).
+   * @param {Object} latlng - Where the line would start
+   * @returns {boolean} True if it may start here
+   */
   function validateStartPoint(latlng) {
-    const isNearTownMarker = townMarkerPositions.value.some((markerPos) => markerPos.equals(latlng))
-    const isNearLineEnd = lineEndpoints.value.some((endPoint) => endPoint.equals(latlng))
-    return isNearTownMarker || isNearLineEnd
-  }
-
-  function updateLineEndpoints(lineLayer) {
-    const linePoints = lineLayer.getLatLngs()
-    lineEndpoints.value.push(linePoints[0], linePoints[linePoints.length - 1])
+    return builder.canStartAt(playerStore.activePlayer?.id, latlng)
   }
 
   // ================== MAP OPTIONS & CURSOR SETUP ==================
@@ -879,8 +818,7 @@ export default function useBuildTrack(grid, formatCurrency) {
    * Shows a "not allowed" cursor over places a line cannot start from, so a
    * player can see where track may begin before they click.
    *
-   * Debounced because mousemove fires on every pixel and the check scans every
-   * town and track endpoint.
+   * Debounced because mousemove fires on every pixel.
    */
   const debouncedCursorValidation = useDebounceFn((latlng) => {
     const cursorStyle = validateStartPoint(latlng) ? 'default' : 'not-allowed'
@@ -905,7 +843,7 @@ export default function useBuildTrack(grid, formatCurrency) {
     mapStore.map.pm.setLang('en', {
       tooltips: {
         placeMarker: 'Place your marker here!',
-        firstVertex: 'Track must start in a town or on existing track',
+        firstVertex: START_RULE,
         continueLine: '',
         finishLine: 'Click to finish the track'
       }

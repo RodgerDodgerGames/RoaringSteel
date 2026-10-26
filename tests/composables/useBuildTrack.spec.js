@@ -27,7 +27,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { defineComponent, ref, nextTick } from 'vue'
+import { defineComponent, nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import L from 'leaflet'
 import useBuildTrack from '@/composables/map/useBuildTrack'
@@ -36,6 +36,8 @@ import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 import { usePlayerStore } from '@/stores/players'
 import { useTrackStore } from '@/stores/track'
 import { useGameStore } from '@/stores/game'
+import { useGridStore } from '@/stores/grid'
+import { useTownsStore } from '@/stores/towns'
 import { formatCurrency } from '@/composables/utils'
 import { gridConfig } from '@/config/grid'
 import { metersToLatitudeDegrees } from '@/composables/setup/useMapSupport'
@@ -105,33 +107,50 @@ function createFakeMap() {
   return map
 }
 
+/** A single grid cell, enough for drawing to be allowed to start */
+const pricedGrid = [{ id: 1, cost: 1000, centroid: { lat: 40, lng: -100 } }]
+
 /**
  * Mounts a bare component that does nothing but run the composable, the way
  * the game view does. The map and towns go into the map store first, which is
- * where the composable looks for them when it mounts.
+ * where the composable looks for them when it mounts, and the grid into the
+ * grid store.
+ *
+ * Every town marker given is also a major city in the towns store, so track
+ * may be started from it (see the track builder). By default there is one,
+ * where the saved section and drawn lines below start.
+ *
  * @param {Object} map - Fake map from `createFakeMap`
  * @param {Object} [towns] - Layer group of town markers
  * @param {Array} [grid] - Cost grid; a non-empty one lets drawing start
  * @returns {Object} The mounted wrapper, plus the composable's exposed API
  */
-function mountBuildTrack(map, towns = L.layerGroup(), grid = []) {
+function mountBuildTrack(map, towns = L.layerGroup([L.marker([40, -100])]), grid = pricedGrid) {
   const mapStore = useMapStore()
   mapStore.setMap(map)
   mapStore.setTownsLayer(towns)
+  useGridStore().setGrid(grid)
+  useTownsStore().setTowns(
+    towns.getLayers().map((marker, i) => ({
+      name: `City ${i}`,
+      msa: String(i),
+      lat: marker.getLatLng().lat,
+      lon: marker.getLatLng().lng,
+      size: 'large',
+      industries: []
+    }))
+  )
 
   let api
   const Host = defineComponent({
     setup() {
-      api = useBuildTrack(ref(grid), formatCurrency)
+      api = useBuildTrack(formatCurrency)
       return () => null
     }
   })
   const wrapper = mount(Host)
   return { wrapper, api }
 }
-
-/** A single grid cell, enough for drawing to be allowed to start */
-const pricedGrid = [{ id: 1, cost: 1000, centroid: { lat: 40, lng: -100 } }]
 
 /** A saved section, as the track store holds one after a load */
 const savedSegment = {
@@ -356,6 +375,62 @@ describe('useBuildTrack', () => {
    * to act on the whole section, or a click on the edge of the track would
    * tear up only part of the drawing and leave the rest behind.
    */
+  describe('track built or loaded without the map', () => {
+    it('should draw a section built through the track builder', async () => {
+      mountBuildTrack(map)
+
+      trackStore.addSegment(savedSegment)
+      await nextTick()
+
+      expect(map.trackLayers()).toHaveLength(1)
+    })
+
+    it("should replace the drawn track with a loaded game's", async () => {
+      trackStore.addSegment(savedSegment)
+      mountBuildTrack(map)
+
+      // A loaded game numbers its sections from 1 too, so its section 1 is
+      // not the old game's section 1
+      trackStore.setTrack([
+        {
+          ...savedSegment,
+          id: 1,
+          coordinates: [
+            { lat: 40, lng: -100 },
+            { lat: 39, lng: -99 }
+          ]
+        }
+      ])
+      await nextTick()
+
+      expect(map.trackLayers()).toHaveLength(1)
+      expect(map.trackLayers()[0].getLatLngs()[1]).toMatchObject({ lat: 39, lng: -99 })
+    })
+
+    it('should not draw a line drawn on the map a second time', async () => {
+      mountBuildTrack(map)
+      // On the map already, as Geoman leaves a line it has just finished
+      const line = createDrawnLine(map)
+      map.addLayer(line)
+
+      map.fire('pm:create', { layer: line })
+      await nextTick()
+
+      expect(map.trackLayers()).toEqual([line])
+    })
+  })
+
+  describe('where a line may start', () => {
+    it('should not build a line that starts away from a major city or own track', () => {
+      // No town markers, so no major cities
+      mountBuildTrack(map, L.layerGroup())
+
+      map.fire('pm:create', { layer: createDrawnLine(map) })
+
+      expect(trackStore.segments).toHaveLength(0)
+    })
+  })
+
   describe('a newly built section', () => {
     /**
      * The rail is the thinnest of the three lines, so if it is not on top the
@@ -730,7 +805,8 @@ describe('useBuildTrack', () => {
         cost: 500,
         turn: 0
       })
-      mountBuildTrack(map, L.layerGroup(), grid)
+      // A city on the top row for Ann's lines to start from
+      mountBuildTrack(map, L.layerGroup([L.marker(centerOf(0, 2))]), grid)
     })
 
     it('should build a line that crosses it', () => {
@@ -755,7 +831,7 @@ describe('useBuildTrack', () => {
     function mountWithoutMap() {
       const Host = defineComponent({
         setup() {
-          useBuildTrack(ref(pricedGrid), formatCurrency)
+          useBuildTrack(formatCurrency)
           return () => null
         }
       })
@@ -777,7 +853,7 @@ describe('useBuildTrack', () => {
     })
 
     it('should stay in the Plan view when there is no grid to price a drawing', () => {
-      const { api } = mountBuildTrack(map)
+      const { api } = mountBuildTrack(map, L.layerGroup(), [])
 
       api.startDrawingLine()
 

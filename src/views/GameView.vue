@@ -18,6 +18,9 @@
   grow (the dock's contents) scrolls inside its own panel. Narrower windows
   fall back to a single stacked column that scrolls as a page.
 
+  When someone wins, the final standings come up over the table; they can
+  be closed to look at the board as it ended, and opened again from the dock.
+
   This view also owns track building. The build composable draws and removes
   the track layers on the map, so it has to live exactly as long as the map
   does, and this view is the map's parent. It is created here and handed to
@@ -27,7 +30,7 @@
 -->
 
 <script setup>
-import { provide, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, provide, onMounted, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import GameTopBar from '@/components/GameTopBar.vue'
@@ -36,25 +39,36 @@ import MapModeHint from '@/components/map/MapModeHint.vue'
 import MapLegend from '@/components/map/MapLegend.vue'
 import PlayerDock from '@/components/panel/PlayerDock.vue'
 import DemandStrip from '@/components/demands/DemandStrip.vue'
+import GameOverDialog from '@/components/dialogs/GameOverDialog.vue'
 
-import { useGridStore } from '@/stores/grid'
+import { useGameStore } from '@/stores/game'
+import { useMapStore } from '@/stores/map'
 import useBuildTrack, { buildTrackKey } from '@/composables/map/useBuildTrack'
 import { formatCurrency } from '@/composables/utils'
 
 const emit = defineEmits(['new-game'])
 
-// The cost grid prices every section of track as it is drawn
-const { grid } = storeToRefs(useGridStore())
-
 // One build-track instance for the whole game. Its onMounted runs after
 // MainMap's (a parent mounts after its children), so the map and towns are in
 // the store by the time it reads them.
-const buildTrack = useBuildTrack(grid, formatCurrency)
+const buildTrack = useBuildTrack(formatCurrency)
 provide(buildTrackKey, buildTrack)
 
 // Destructured so the template unwraps them; refs nested inside a plain
 // object are not unwrapped automatically
 const { isDrawingActive, isRemoving } = buildTrack
+
+// While a town is being chosen for the train, what clicking one does
+const mapStore = useMapStore()
+const pickPrompt = computed(() => mapStore.townPicker?.prompt ?? '')
+
+// The final standings: up as soon as someone wins (or when a finished game
+// is loaded), and whenever the dock asks for them again
+const { isOver } = storeToRefs(useGameStore())
+const isShowingResults = ref(isOver.value)
+watch(isOver, (over) => {
+  isShowingResults.value = over
+})
 
 // Bulma always reserves a vertical scrollbar on <html>. The game screen is
 // sized to the window, so that bar would only ever be an empty gutter; this
@@ -76,14 +90,24 @@ onBeforeUnmount(() => document.documentElement.classList.remove(PAGE_CLASS))
       <div class="game-view__map">
         <MainMap />
         <!-- Says which mode the map is in while drawing or removing track -->
-        <MapModeHint :is-drawing="isDrawingActive" :is-removing="isRemoving" />
+        <MapModeHint
+          :is-drawing="isDrawingActive"
+          :is-removing="isRemoving"
+          :pick-prompt="pickPrompt"
+        />
         <!-- What the towns, track and icons on the map mean -->
         <MapLegend />
       </div>
       <DemandStrip />
     </main>
 
-    <PlayerDock class="game-view__dock" />
+    <PlayerDock class="game-view__dock" @show-results="isShowingResults = true" />
+
+    <GameOverDialog
+      v-if="isShowingResults"
+      @close="isShowingResults = false"
+      @new-game="emit('new-game')"
+    />
   </div>
 </template>
 

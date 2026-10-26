@@ -19,6 +19,13 @@
   Once someone has won, the steps give way to who won, and a button to see
   the final standings again.
 
+  On a computer player's turn there is nothing for a person to do: the
+  steps and End Turn give way to a note that the computer player is taking
+  its turn (it plays and ends it by itself — see useBotRunner). Whenever
+  there are computer players, what each did on its last turn is listed too,
+  so the people at the table can catch up on what happened while they
+  waited.
+
   The middle scrolls on its own if it outgrows the window, so the player card
   and End Turn never leave the screen.
 
@@ -36,6 +43,7 @@ import BuildControls from '@/components/panel/BuildControls.vue'
 import UpgradeControls from '@/components/panel/UpgradeControls.vue'
 import { useGameStore } from '@/stores/game'
 import { usePlayerStore } from '@/stores/players'
+import { useBotsStore } from '@/stores/bots'
 import { useTurn } from '@/composables/useTurn'
 import { gameRules } from '@/config/game'
 
@@ -45,6 +53,15 @@ const gameStore = useGameStore()
 const { isBuildingRound, isOver, winnerId } = storeToRefs(gameStore)
 const playerStore = usePlayerStore()
 const { nextPlayer, playsAgain, endTurn, canDiscardHand, discardHand } = useTurn()
+
+/** Whether the turn is a computer player's, which plays itself */
+const isBotTurn = computed(() => playerStore.activePlayer?.isBot === true)
+
+/** Each computer player's last turn, the latest first */
+const { reports: botReports } = storeToRefs(useBotsStore())
+
+/** A player's name, by id */
+const nameOf = (playerId) => playerStore.players.find((p) => p.id === playerId)?.name ?? ''
 
 /** The winner, once there is one */
 const winner = computed(() => playerStore.players.find((p) => p.id === winnerId.value))
@@ -82,6 +99,12 @@ function confirmDiscardHand() {
         <button class="button is-primary is-small" @click="emit('show-results')">
           See the final standings
         </button>
+      </div>
+
+      <!-- A computer player's turn: it plays by itself -->
+      <div v-else-if="isBotTurn" class="player-dock__bot-turn">
+        <span class="icon"><i class="fas fa-robot" aria-hidden="true"></i></span>
+        <span>{{ playerStore.activePlayer.name }} is taking their turn…</span>
       </div>
 
       <template v-else>
@@ -141,9 +164,26 @@ function confirmDiscardHand() {
           </ol>
         </CollapsibleSection>
       </template>
+
+      <!-- What the computer players did last -->
+      <CollapsibleSection v-if="botReports.length" title="Computer players" storage-key="dock_bots">
+        <ul class="bot-reports">
+          <li v-for="report in botReports" :key="report.playerId" class="bot-report">
+            <span class="bot-report__round">Round {{ report.round + 1 }}</span>
+            {{ report.summary }}
+            <span
+              v-if="report.hadProblem"
+              class="bot-report__problem"
+              :title="`The rules refused something ${nameOf(report.playerId)} tried; see the browser console.`"
+            >
+              (hit a problem)
+            </span>
+          </li>
+        </ul>
+      </CollapsibleSection>
     </div>
 
-    <footer v-if="!isOver" class="player-dock__footer">
+    <footer v-if="!isOver && !isBotTurn" class="player-dock__footer">
       <button class="button is-primary is-medium is-fullwidth" @click="endTurn">End turn</button>
       <p v-if="nextPlayer" class="player-dock__next">
         Next up: {{ nextPlayer.name }}{{ playsAgain ? ' again' : '' }}
@@ -230,6 +270,32 @@ function confirmDiscardHand() {
 
 .turn-step__choice {
   margin: 0.6rem 0 0.75rem;
+}
+
+/* Where the steps were, on a computer player's turn */
+.player-dock__bot-turn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  font-weight: 700;
+}
+
+.bot-reports {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.bot-report__round {
+  margin-right: 0.25rem;
+  font-weight: 700;
+}
+
+.bot-report__problem {
+  color: var(--bulma-danger);
 }
 
 /* Where the steps were, once the game is over */

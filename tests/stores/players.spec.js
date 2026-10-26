@@ -436,6 +436,80 @@ describe('Player Store', () => {
 
       expect(playerStore.draftPlayers).toEqual([])
     })
+
+    it('should clear the computer players asked for on reset', () => {
+      playerStore.setDraftBotCount(2)
+
+      playerStore.reset()
+
+      expect(playerStore.draftBotCount).toBe(0)
+    })
+  })
+
+  describe('computer players', () => {
+    it('should put computer players after the people, named and colored for them', () => {
+      playerStore.addDraftPlayer({ name: 'Alice', color: playerColors[1] })
+      playerStore.setDraftBotCount(2)
+
+      expect(playerStore.draftRoster).toEqual([
+        { name: 'Alice', color: playerColors[1], isBot: false },
+        // The first colors nobody has: Alice holds the second
+        { name: 'Bot 1', color: playerColors[0], isBot: true },
+        { name: 'Bot 2', color: playerColors[2], isBot: true }
+      ])
+    })
+
+    it("should not give a computer player a person's name", () => {
+      playerStore.addDraftPlayer({ name: 'bot 1' })
+      playerStore.setDraftBotCount(1)
+
+      expect(playerStore.draftRoster.at(-1).name).toBe('Bot 2')
+    })
+
+    it('should keep the count between none and the colors left', () => {
+      playerStore.addDraftPlayer({ name: 'Alice' })
+
+      expect(playerStore.setDraftBotCount(-3)).toBe(0)
+      expect(playerStore.setDraftBotCount(99)).toBe(playerColors.length - 1)
+      expect(playerStore.setDraftBotCount(2.7)).toBe(2)
+    })
+
+    it('should not add a person when the computer players need every color left', () => {
+      playerStore.addDraftPlayer({ name: 'Alice' })
+      playerStore.setDraftBotCount(playerColors.length - 1)
+
+      expect(playerStore.addDraftPlayer({ name: 'Bob' })).toBeNull()
+      expect(playerStore.draftPlayers).toHaveLength(1)
+    })
+
+    it('should start a game of people and computer players', () => {
+      playerStore.addDraftPlayer({ name: 'Alice', color: 'red' })
+      playerStore.setDraftBotCount(1)
+
+      expect(playerStore.commitDraftPlayers({ cash: 40000 })).toBe(true)
+      expect(playerStore.players.map(({ name, isBot, cash }) => ({ name, isBot, cash }))).toEqual([
+        { name: 'Alice', isBot: false, cash: 40000 },
+        { name: 'Bot 1', isBot: true, cash: 40000 }
+      ])
+    })
+
+    it('should start a game of computer players only', () => {
+      playerStore.setDraftBotCount(3)
+
+      expect(playerStore.commitDraftPlayers({ cash: 40000 })).toBe(true)
+      expect(playerStore.players.every(({ isBot }) => isBot)).toBe(true)
+      expect(playerStore.players).toHaveLength(3)
+    })
+
+    it('should keep who is a computer player when a game is restored', () => {
+      playerStore.setPlayers([
+        { id: 1, name: 'Alice', color: 'red', cash: 0, isTurn: true },
+        { id: 2, name: 'Bot 1', color: 'blue', cash: 0, isTurn: false, isBot: true }
+      ])
+
+      // A save from before computer players has only people
+      expect(playerStore.players.map(({ isBot }) => isBot)).toEqual([false, true])
+    })
   })
 
   describe('activePlayer getter', () => {

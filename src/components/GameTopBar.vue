@@ -50,6 +50,17 @@ const mapViews = [
   { view: BUILD_VIEW, label: 'Build', icon: 'fa-hammer', title: 'Zoom in to build track' }
 ]
 
+/**
+ * What hovering over a player's chip says: their name, whether they are a
+ * computer player, and whether it is their turn.
+ * @param {Object} player - The player
+ * @returns {string} The title
+ */
+function chipTitle(player) {
+  const name = player.isBot ? `${player.name} (computer player)` : player.name
+  return player.isTurn ? `${name}'s turn` : name
+}
+
 // Game menu: open state, and the element whose outside clicks close it
 const isMenuOpen = ref(false)
 const menuRef = ref(null)
@@ -105,9 +116,13 @@ function openDialog(name) {
         class="player-chip"
         :class="{ 'is-active': player.isTurn }"
         :aria-current="player.isTurn ? 'true' : undefined"
-        :title="player.isTurn ? `${player.name}'s turn` : player.name"
+        :title="chipTitle(player)"
       >
         <span class="player-chip__swatch" :style="{ backgroundColor: player.color }"></span>
+        <!-- Computer players are marked, so nobody waits on them to click -->
+        <span v-if="player.isBot" class="icon is-small" aria-hidden="true">
+          <i class="fas fa-robot"></i>
+        </span>
         <span class="player-chip__name">{{ player.name }}</span>
         <span class="player-chip__cash">{{ formatCurrency(player.cash) }}</span>
       </li>

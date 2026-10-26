@@ -21,6 +21,7 @@ import { useMapStore } from '@/stores/map'
 import { useTrackStore } from '@/stores/track'
 import { useSettingsStore } from '@/stores/settings'
 import { useTrainsStore } from '@/stores/trains'
+import { useBotsStore } from '@/stores/bots'
 import { turnAfter } from '@/composables/turnOrder'
 
 const SAVE_VERSION = '1.0.0'
@@ -38,6 +39,7 @@ export function useGamePersistence() {
   const trackStore = useTrackStore()
   const settingsStore = useSettingsStore()
   const trainsStore = useTrainsStore()
+  const botsStore = useBotsStore()
 
   /**
    * Serializes the current game state into a JSON-safe object.
@@ -132,7 +134,8 @@ export function useGamePersistence() {
 
   /**
    * Clears away every part of the game: region, turn, players, towns, grid,
-   * demand cards, map view, track and trains. Used before a save is restored, and
+   * demand cards, map view, track, trains, and what the computer players did
+   * last. Used before a save is restored, and
    * when the game is given up for a new one.
    *
    * The player's settings are not part of this: they belong to the person at
@@ -147,15 +150,18 @@ export function useGamePersistence() {
     mapStore.reset()
     trackStore.reset()
     trainsStore.reset()
+    botsStore.reset()
   }
 
   /**
    * Ends the game being played, ready for the setup of a new one.
    *
    * The game is cleared away (see `resetGame`), and the setup roster is filled
-   * with this game's players, names and colors, in turn order, so the same
-   * people can play again without typing everything in a second time. The
-   * roster can still be changed before the new game starts.
+   * with this game's people, names and colors, in turn order, and as many
+   * computer players as this game had, so the same table can play again
+   * without typing everything in a second time. The roster can still be
+   * changed before the new game starts. Computer players are named and
+   * colored afresh (see `draftRoster` in the player store).
    *
    * A player whose color the roster refuses — one already taken, which only a
    * damaged or hand-edited save could hold — is kept with the first color
@@ -165,12 +171,16 @@ export function useGamePersistence() {
    * save anything.
    */
   function startNewGame() {
-    const roster = playerStore.players.map(({ name, color }) => ({ name, color }))
+    const people = playerStore.players
+      .filter((player) => !player.isBot)
+      .map(({ name, color }) => ({ name, color }))
+    const botCount = playerStore.players.filter((player) => player.isBot).length
     resetGame()
-    roster.forEach(
+    people.forEach(
       (draft) =>
         playerStore.addDraftPlayer(draft) ?? playerStore.addDraftPlayer({ name: draft.name })
     )
+    playerStore.setDraftBotCount(botCount)
   }
 
   /**

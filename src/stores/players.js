@@ -12,6 +12,7 @@
  *   cash: number,      // Current money (starts at 0 or specified amount)
  *   isTurn: boolean,   // True if it's this player's turn
  *   color: string,     // Player's chosen color, never shared with another player
+ *   isBot: boolean,    // True for a computer player (see composables/bot)
  *   position: number,  // Board position (for future use)
  *   trackSpentThisTurn: number, // Spent on track this turn, against the budget
  *   hasSpentThisTurn: boolean   // Spent any of the allowance this turn, even
@@ -53,6 +54,13 @@ export const usePlayerStore = defineStore('playerStore', () => {
   /** Monotonic id source for drafts, so ids stay stable across removals */
   let nextDraftId = 1
 
+  /**
+   * How many computer players the setup screen has asked for. They are not
+   * drafts of their own: they need no names or colors typed in, and are given
+   * them when the roster is drawn up (see `draftRoster`).
+   */
+  const draftBotCount = ref(0)
+
   /** Loading state for async operations */
   const isLoading = ref(false)
 
@@ -71,6 +79,41 @@ export const usePlayerStore = defineStore('playerStore', () => {
    * @returns {boolean} True if players exist.
    */
   const hasPlayers = computed(() => players.value.length > 0)
+
+  /**
+   * The most computer players the setup screen may ask for: one for each
+   * palette color the people's rows have not taken, since no two players
+   * share a color.
+   */
+  const maxDraftBots = computed(() => Math.max(0, playerColors.length - draftPlayers.value.length))
+
+  /**
+   * The roster the game would start with: the people's rows in the order
+   * they were entered, then the computer players. Computer players are named
+   * "Bot 1", "Bot 2" and so on — skipping any name a person has already
+   * taken — and given the first palette colors nobody has.
+   *
+   * Rows left blank are kept, so committing them fails as it always has; the
+   * setup screen drops them before it gets that far.
+   * @returns {Array<{name: string, color: string, isBot: boolean}>}
+   */
+  const draftRoster = computed(() => {
+    const people = draftPlayers.value.map((draft) => ({
+      name: draft.name.trim(),
+      color: draft.color,
+      isBot: false
+    }))
+    const takenNames = new Set(people.map(({ name }) => name.toLowerCase()))
+    const freeColors = playerColors.filter((color) => !draftHoldingColor(color))
+
+    const bots = []
+    for (let number = 1; bots.length < draftBotCount.value; number++) {
+      const name = `Bot ${number}`
+      if (takenNames.has(name.toLowerCase())) continue
+      bots.push({ name, color: freeColors[bots.length], isBot: true })
+    }
+    return [...people, ...bots]
+  })
 
   /**
    * A player's color, looked up by id. Used to paint each player's track in
@@ -165,6 +208,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
         cash: player.cash || 0,
         isTurn: false,
         color: player.color,
+        isBot: player.isBot === true,
         position: 0,
         trackSpentThisTurn: 0,
         hasSpentThisTurn: false
@@ -560,9 +604,12 @@ export const usePlayerStore = defineStore('playerStore', () => {
    * @param {{name?: string, color?: string}} draft The draft to add.
    * @returns {Object|null} The stored draft, including its generated id, or
    *   null if the color given is already taken, or none was given and every
-   *   palette color is.
+   *   palette color is, or the computer players asked for need every color
+   *   that is left.
    */
   function addDraftPlayer({ name = '', color } = {}) {
+    // Every computer player asked for needs a color of its own too
+    if (draftPlayers.value.length + draftBotCount.value >= playerColors.length) return null
     const assigned = color ?? playerColors.find((c) => !draftHoldingColor(c))
     if (!assigned || draftHoldingColor(assigned)) return null
 
@@ -591,6 +638,18 @@ export const usePlayerStore = defineStore('playerStore', () => {
   }
 
   /**
+   * Set how many computer players the game will have, kept between none and
+   * as many as there are colors left for them (see `maxDraftBots`).
+   * @param {number} count How many computer players.
+   * @returns {number} The count kept.
+   */
+  function setDraftBotCount(count) {
+    const whole = Number.isFinite(count) ? Math.floor(count) : 0
+    draftBotCount.value = Math.min(Math.max(0, whole), maxDraftBots.value)
+    return draftBotCount.value
+  }
+
+  /**
    * Remove a setup roster entry.
    * @param {number} id The id of the draft to remove.
    * @returns {boolean} True if the draft was found and removed.
@@ -604,14 +663,16 @@ export const usePlayerStore = defineStore('playerStore', () => {
   }
 
   /**
-   * Replace the players in the game with the current setup roster.
+   * Replace the players in the game with the current setup roster (see
+   * `draftRoster`): the people first, then the computer players.
    * @param {{cash?: number}} options Starting cash for each player.
    * @returns {boolean} True if every draft became a player.
    */
   function commitDraftPlayers({ cash = 0 } = {}) {
     error.value = null
 
-    if (draftPlayers.value.length === 0) {
+    const roster = draftRoster.value
+    if (roster.length === 0) {
       error.value = 'No players to start the game with'
       return false
     }
@@ -619,9 +680,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     const previous = players.value
     players.value = []
 
-    const committed = draftPlayers.value.every((draft) =>
-      addPlayer({ name: draft.name.trim(), color: draft.color, cash })
-    )
+    const committed = roster.every((entry) => addPlayer({ ...entry, cash }))
 
     // All or nothing: a rejected draft must not leave a half-built roster
     if (!committed) {
@@ -654,6 +713,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
    */
   function resetDraftPlayers() {
     draftPlayers.value = []
+    draftBotCount.value = 0
     nextDraftId = 1
   }
 
@@ -681,7 +741,9 @@ export const usePlayerStore = defineStore('playerStore', () => {
           ? player.trackSpentThisTurn
           : 0,
         // Saves from before this flag: anything spent this turn still counts
-        hasSpentThisTurn: player.hasSpentThisTurn === true || Number(player.trackSpentThisTurn) > 0
+        hasSpentThisTurn: player.hasSpentThisTurn === true || Number(player.trackSpentThisTurn) > 0,
+        // Saves from before computer players have only people
+        isBot: player.isBot === true
       }))
     }
   }
@@ -690,6 +752,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     // state
     players,
     draftPlayers,
+    draftBotCount,
     isLoading,
     error,
     // getters
@@ -697,6 +760,8 @@ export const usePlayerStore = defineStore('playerStore', () => {
     hasPlayers,
     colorOf,
     draftColorOptions,
+    maxDraftBots,
+    draftRoster,
     // actions
     addPlayer,
     updatePlayer,
@@ -715,6 +780,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     addDraftPlayer,
     updateDraftPlayer,
     removeDraftPlayer,
+    setDraftBotCount,
     pruneEmptyDraftPlayers,
     commitDraftPlayers,
     resetDraftPlayers,

@@ -9,6 +9,8 @@
   - Each town's commodity icons, in the Plan view
   - Interactive popups for town information
   - Every player's train, where it stands (trainMarkers.js)
+  - A Credits link in the corner, opening the About dialog, in place of
+    Leaflet's credit line (every credit is listed there)
 
   Integrates with:
   - mapStore: Stores map instance and view state
@@ -37,6 +39,7 @@ import { useMapStore } from '@/stores/map'
 import { useRegionMask } from '@/composables/map/regionMask'
 import { useWaterMask } from '@/composables/map/waterMask'
 import { useTrainMarkers } from '@/composables/map/trainMarkers'
+import MapCreditsLink from '@/components/map/MapCreditsLink.vue'
 
 const townsStore = useTownsStore()
 const mapStore = useMapStore()
@@ -52,8 +55,10 @@ const waterMask = useWaterMask()
 const trainMarkers = useTrainMarkers()
 
 onMounted(() => {
-  // No starting view: useMapView gives the map its view below
-  map.value = L.map(mapContainer.value)
+  // No starting view: useMapView gives the map its view below. No credit
+  // line either: the tiles, the icons and the rest are credited in About,
+  // which the Credits link in the corner opens.
+  map.value = L.map(mapContainer.value, { attributionControl: false })
 
   // add map to store
   mapStore.setMap(map.value)
@@ -61,15 +66,8 @@ onMounted(() => {
   L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_terrain_background/{z}/{x}/{y}{r}.{ext}', {
     minZoom: 0,
     maxZoom: 18,
-    attribution:
-      '&copy; <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://www.stamen.com/" target="_blank">Stamen Design</a> &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     ext: 'png'
   }).addTo(map.value)
-
-  // The commodity icons' license (CC BY) asks for a credit
-  map.value.attributionControl.addAttribution(
-    'Icons &copy; <a href="https://game-icons.net" target="_blank">game-icons.net</a> (CC BY 3.0)'
-  )
 
   // Into the Plan view (or whichever the store holds) before the towns go on
   mapView.attach(map.value)
@@ -111,10 +109,20 @@ useResizeObserver(mapContainer, () => {
 </script>
 
 <template>
-  <div ref="mapContainer" class="game-map"></div>
+  <!-- The wrapper holds the map and the Credits link laid over its corner -->
+  <div class="game-map-frame">
+    <div ref="mapContainer" class="game-map"></div>
+    <MapCreditsLink />
+  </div>
 </template>
 
 <style scoped>
+.game-map-frame {
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
+
 .game-map {
   height: 100%;
   width: 100%;

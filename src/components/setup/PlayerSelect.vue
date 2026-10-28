@@ -28,6 +28,7 @@ import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { usePlayerStore } from '@/stores/players'
 import SettingsButton from '@/components/SettingsButton.vue'
+import AboutButton from '@/components/AboutButton.vue'
 
 const playerStore = usePlayerStore()
 
@@ -310,6 +311,11 @@ const handleDone = () => {
       <!-- Settings button -->
       <p class="control">
         <SettingsButton />
+      </p>
+
+      <!-- About button: what the game is, and its credits -->
+      <p class="control">
+        <AboutButton />
       </p>
 
       <!-- Done button -->

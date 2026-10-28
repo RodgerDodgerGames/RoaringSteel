@@ -16,19 +16,6 @@ export function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-/**
- * Waits for a random amount of time between min and max milliseconds.
- * Used to add jitter to API requests to avoid rate limiting.
- *
- * @param {number} minWaitTime - Minimum wait time in ms (default: 500)
- * @param {number} maxWaitTime - Maximum wait time in ms (default: 2000)
- * @returns {Promise<void>} Resolves after the random delay
- */
-export function waitRandomly(minWaitTime = 500, maxWaitTime = 2000) {
-  const waitTime = Math.floor(Math.random() * (maxWaitTime - minWaitTime)) + minWaitTime
-  return wait(waitTime)
-}
-
 /** Fallback ceiling for any request that does not name its own. */
 export const DEFAULT_REQUEST_TIMEOUT_MS = 30000
 
@@ -55,7 +42,8 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 30000
  * @param {Object} [options] - Standard fetch options, plus `timeoutMs`
  * @param {number} [options.timeoutMs] - Ceiling for the whole exchange
  * @returns {Promise<{ok: boolean, status: number, statusText: string,
- *   json: function(): Promise<*>, text: function(): Promise<string>}>}
+ *   json: function(): Promise<*>, text: function(): Promise<string>,
+ *   blob: function(): Promise<Blob>}>}
  */
 export async function fetchWithTimeout(
   url,
@@ -96,7 +84,9 @@ export async function fetchWithTimeout(
     status: response.status,
     statusText: response.statusText,
     json: () => beforeDeadline(response.json()),
-    text: () => beforeDeadline(response.text())
+    text: () => beforeDeadline(response.text()),
+    // The terrain images (elevation tiles, land cover) are read this way
+    blob: () => beforeDeadline(response.blob())
   }
 }
 

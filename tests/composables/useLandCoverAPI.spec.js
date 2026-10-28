@@ -1,438 +1,224 @@
 /**
  * useLandCoverAPI Composable Tests
  *
- * Tests for NLCD Land Cover API integration
+ * How a pixel's color is read as an NLCD class, how a set of cells is laid
+ * out over land cover pictures, and how the pictures become one cost per
+ * cell. The image download itself needs a browser, so it is stood in for
+ * with pixels made here.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const mockFetch = vi.hoisted(() => vi.fn())
-vi.stubGlobal('fetch', mockFetch)
+const mockFetchImagePixels = vi.hoisted(() => vi.fn())
+vi.mock('@/composables/setup/imagePixels', () => ({ fetchImagePixels: mockFetchImagePixels }))
 
-vi.mock('@/config/nlcd', () => ({
-  nlcdCostMap: {
-    11: 1,
-    12: 1,
-    21: 2,
-    22: 5,
-    23: 3,
-    24: 4,
-    31: 2,
-    41: 1,
-    42: 1,
-    43: 1,
-    51: 2,
-    52: 3,
-    71: 1,
-    72: 2,
-    73: 2,
-    74: 2,
-    81: 2,
-    82: 2,
-    90: 1,
-    95: 1
-  }
-}))
-
-import { useLandCoverAPI } from '@/composables/setup/useLandCoverAPI'
+import {
+  landCoverClass,
+  landCoverImages,
+  useLandCoverAPI
+} from '@/composables/setup/useLandCoverAPI'
+import { nlcdCostMap, nlcdLegendColors } from '@/config/nlcd'
 import { gridApiConfig } from '@/config/grid'
 
-describe('useLandCoverAPI Composable', () => {
+/** A picture filled with one color */
+function imageOf(width, height, [r, g, b], alpha = 255) {
+  const data = new Uint8ClampedArray(width * height * 4)
+  for (let offset = 0; offset < data.length; offset += 4) data.set([r, g, b, alpha], offset)
+  return { width, height, data }
+}
+
+/** A stand-in server that answers every picture request in one color */
+function answerWith(rgb) {
+  return async (url) => {
+    const params = new URL(url).searchParams
+    return imageOf(Number(params.get('WIDTH')), Number(params.get('HEIGHT')), rgb)
+  }
+}
+
+const hex = (color) => [0, 2, 4].map((i) => parseInt(color.slice(i, i + 2), 16))
+
+describe('landCoverClass', () => {
+  it('should read every legend color as its own class', () => {
+    Object.entries(nlcdLegendColors).forEach(([code, rgb]) => {
+      expect(landCoverClass(...rgb, 255)).toBe(Number(code))
+    })
+  })
+
+  it("should read the server's own, slightly shifted, colors as the right classes", () => {
+    // Every color found in a real pull of Massachusetts (2026-10-26), none of
+    // them exactly the legend's
+    const sampled = {
+      '476ba0': 11,
+      ddc9c9: 21,
+      d89382: 22,
+      ed0000: 23,
+      aa0000: 24,
+      b2ada3: 31,
+      '68aa63': 41,
+      '1c6330': 42,
+      b5c98e: 43,
+      ccba7c: 52,
+      e2e2c1: 71,
+      dbd83d: 81,
+      aa7028: 82,
+      bad8ea: 90,
+      '70a3ba': 95
+    }
+    Object.entries(sampled).forEach(([color, code]) => {
+      expect(landCoverClass(...hex(color), 255)).toBe(code)
+    })
+  })
+
+  it('should read the white drawn where there is no data as no class', () => {
+    expect(landCoverClass(255, 255, 255, 255)).toBeNull()
+  })
+
+  it('should read a transparent pixel as no class', () => {
+    expect(landCoverClass(...nlcdLegendColors[41], 0)).toBeNull()
+  })
+})
+
+describe('landCoverImages', () => {
+  const lngPerPixel = 0.01
+  const latPerPixel = 0.01
+
+  it('should cover a small set of cells with one picture', () => {
+    const images = landCoverImages(
+      [
+        { lat: 44, lng: -95 },
+        { lat: 44.5, lng: -94 }
+      ],
+      lngPerPixel,
+      latPerPixel
+    )
+
+    expect(images).toHaveLength(1)
+  })
+
+  it('should split cells too wide for one picture across more', () => {
+    const size = gridApiConfig.landCoverImageSize
+    const images = landCoverImages(
+      [
+        { lat: 44, lng: -95 },
+        { lat: 44, lng: -95 + (size + 10) * lngPerPixel }
+      ],
+      lngPerPixel,
+      latPerPixel
+    )
+
+    expect(images).toHaveLength(2)
+    // The second is cut short to what its cells need
+    expect(images[1].width).toBeLessThan(size)
+  })
+
+  it("should put each cell's pixel over the cell's center", () => {
+    // Whatever the layout, the pixel a cell reads must be the one its center
+    // falls in: the picture's west or north edge plus the pixel's place, to
+    // within half a pixel. 40 cells spread wide enough to need several
+    // pictures.
+    const locations = []
+    for (let i = 0; i < 40; i++) {
+      locations.push({ lat: 40 + i * 0.37, lng: -100 + i * 0.53 })
+    }
+    const images = landCoverImages(locations, lngPerPixel, latPerPixel)
+
+    expect(images.length).toBeGreaterThan(1)
+    images.forEach((image) => {
+      expect(image.east - image.west).toBeCloseTo(image.width * lngPerPixel)
+      expect(image.north - image.south).toBeCloseTo(image.height * latPerPixel)
+      image.cells.forEach(({ index, px, py }) => {
+        expect(px).toBeLessThan(image.width)
+        expect(py).toBeLessThan(image.height)
+        const pixelLng = image.west + (px + 0.5) * lngPerPixel
+        const pixelLat = image.north - (py + 0.5) * latPerPixel
+        expect(Math.abs(pixelLng - locations[index].lng)).toBeLessThanOrEqual(lngPerPixel / 2)
+        expect(Math.abs(pixelLat - locations[index].lat)).toBeLessThanOrEqual(latPerPixel / 2)
+      })
+    })
+    // Every cell is in exactly one picture
+    const covered = images.flatMap((image) => image.cells.map(({ index }) => index))
+    expect(covered.sort((a, b) => a - b)).toEqual(locations.map((_, index) => index))
+  })
+
+  it('should lay out nothing for no cells', () => {
+    expect(landCoverImages([], lngPerPixel, latPerPixel)).toEqual([])
+  })
+})
+
+describe('useLandCoverAPI', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  describe('fetchLandCover Success', () => {
-    it('should fetch land cover cost for location', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          features: [
-            {
-              properties: {
-                PALETTE_INDEX: 22 // Urban/developed area
-              }
-            }
-          ]
-        })
-      })
+  const locations = [
+    { lat: 44.98, lng: -93.27 },
+    { lat: 44.9, lng: -93.1 }
+  ]
 
-      const { fetchLandCover } = useLandCoverAPI()
-      const location = { lat: 44.9778, lng: -93.265 }
+  it('should turn the class under each cell into its cost', async () => {
+    mockFetchImagePixels.mockImplementation(answerWith(hex('68aa63')))
+    const { planLandCover } = useLandCoverAPI()
 
-      const cost = await fetchLandCover(location)
+    const result = await planLandCover(locations, 10000).fetch()
 
-      expect(cost).toBe(5)
-    })
+    expect(result).toEqual({ costs: [nlcdCostMap[41], nlcdCostMap[41]], failed: 0 })
+  })
 
-    it('should handle different land cover types', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          features: [
-            {
-              properties: {
-                PALETTE_INDEX: 41 // Forest
-              }
-            }
-          ]
-        })
-      })
+  it('should leave a cell with no data null without counting it as a failure', async () => {
+    // Beyond the border the NLCD has nothing; that is not a broken download
+    mockFetchImagePixels.mockImplementation(answerWith([255, 255, 255]))
+    const { planLandCover } = useLandCoverAPI()
 
-      const { fetchLandCover } = useLandCoverAPI()
-      const location = { lat: 44.0, lng: -93.0 }
+    const result = await planLandCover(locations, 10000).fetch()
 
-      const cost = await fetchLandCover(location)
+    expect(result).toEqual({ costs: [null, null], failed: 0 })
+  })
 
-      expect(cost).toBe(1)
-    })
+  it('should count the cells of a failed picture and still finish the rest', async () => {
+    // Far enough apart, at 10 km cells, to need two pictures
+    const apart = [
+      { lat: 44, lng: -100 },
+      { lat: 44, lng: -60 }
+    ]
+    mockFetchImagePixels
+      .mockRejectedValueOnce(new Error('Request timed out after 30000ms'))
+      .mockImplementationOnce(answerWith(hex('dbd83d')))
+    const { planLandCover } = useLandCoverAPI()
+    const plan = planLandCover(apart, 10000)
 
-    it('should return cost for first feature when multiple features exist', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          features: [
-            {
-              properties: {
-                PALETTE_INDEX: 22
-              }
-            },
-            {
-              properties: {
-                PALETTE_INDEX: 41
-              }
-            }
-          ]
-        })
-      })
+    const result = await plan.fetch()
 
-      const { fetchLandCover } = useLandCoverAPI()
-      const location = { lat: 44.0, lng: -93.0 }
+    expect(plan.requestCount).toBe(2)
+    expect(result).toEqual({ costs: [null, nlcdCostMap[81]], failed: 1 })
+  })
 
-      const cost = await fetchLandCover(location)
+  it('should ask the NLCD server for a picture of the area', async () => {
+    mockFetchImagePixels.mockImplementation(answerWith(hex('68aa63')))
+    const { planLandCover } = useLandCoverAPI()
 
-      expect(cost).toBe(5)
+    await planLandCover(locations, 10000).fetch()
+
+    const url = new URL(mockFetchImagePixels.mock.calls[0][0])
+    expect(url.origin).toBe('https://www.mrlc.gov')
+    expect(url.searchParams.get('REQUEST')).toBe('GetMap')
+    expect(url.searchParams.get('CRS')).toBe('CRS:84')
+    expect(url.searchParams.get('FORMAT')).toBe('image/png')
+    const [west, south, east, north] = url.searchParams.get('BBOX').split(',').map(Number)
+    locations.forEach(({ lat, lng }) => {
+      expect(lng).toBeGreaterThan(west)
+      expect(lng).toBeLessThan(east)
+      expect(lat).toBeGreaterThan(south)
+      expect(lat).toBeLessThan(north)
     })
   })
 
-  describe('Error Handling', () => {
-    it('should return null on fetch error', async () => {
-      mockFetch.mockRejectedValue(new Error('Network error'))
+  it('should report progress once per picture', async () => {
+    mockFetchImagePixels.mockImplementation(answerWith(hex('68aa63')))
+    const onProgress = vi.fn()
+    const { planLandCover } = useLandCoverAPI()
 
-      const { fetchLandCover } = useLandCoverAPI()
-      const location = { lat: 44.0, lng: -93.0 }
+    await planLandCover(locations, 10000).fetch(onProgress)
 
-      const cost = await fetchLandCover(location)
-
-      expect(cost).toBeNull()
-    })
-
-    it('should return null on JSON parse error', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => {
-          throw new Error('Invalid JSON')
-        }
-      })
-
-      const { fetchLandCover } = useLandCoverAPI()
-      const location = { lat: 44.0, lng: -93.0 }
-
-      const cost = await fetchLandCover(location)
-
-      expect(cost).toBeNull()
-    })
-
-    it('should not throw on error', async () => {
-      mockFetch.mockRejectedValue(new Error('API unavailable'))
-
-      const { fetchLandCover } = useLandCoverAPI()
-      const location = { lat: 44.0, lng: -93.0 }
-
-      expect(async () => await fetchLandCover(location)).not.toThrow()
-    })
-
-    it('should return null on a rate-limited response', async () => {
-      // A 429 body has no `features`, so it used to fall through to the parse
-      // and get written off as a cell with no land cover.
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 429,
-        json: async () => ({ error: 'Too Many Requests' })
-      })
-
-      const { fetchLandCover } = useLandCoverAPI()
-
-      const cost = await fetchLandCover({ lat: 44.0, lng: -93.0 })
-
-      expect(cost).toBeNull()
-    })
-
-    it('should return null for a land cover class with no cost mapping', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          features: [{ properties: { PALETTE_INDEX: 999 } }]
-        })
-      })
-
-      const { fetchLandCover } = useLandCoverAPI()
-
-      const cost = await fetchLandCover({ lat: 44.0, lng: -93.0 })
-
-      expect(cost).toBeNull()
-    })
-  })
-
-  describe('fetchLandCoverInBatches', () => {
-    it('should return one cost per location, in order', async () => {
-      const palettes = [22, 41, 31]
-      let call = 0
-
-      mockFetch.mockImplementation(async () => ({
-        ok: true,
-        json: async () => ({
-          features: [{ properties: { PALETTE_INDEX: palettes[call++] } }]
-        })
-      }))
-
-      const { fetchLandCoverInBatches } = useLandCoverAPI()
-      const locations = [
-        { lat: 44.0, lng: -93.0 },
-        { lat: 45.0, lng: -94.0 },
-        { lat: 46.0, lng: -95.0 }
-      ]
-
-      const results = await fetchLandCoverInBatches(locations)
-
-      expect(results).toEqual([5, 1, 2])
-    })
-
-    it('should keep going when a single location fails', async () => {
-      let call = 0
-
-      mockFetch.mockImplementation(async () => {
-        call++
-        if (call === 1) throw new Error('Network error')
-        return {
-          ok: true,
-          json: async () => ({ features: [{ properties: { PALETTE_INDEX: 22 } }] })
-        }
-      })
-
-      const { fetchLandCoverInBatches } = useLandCoverAPI()
-      const locations = [
-        { lat: 44.0, lng: -93.0 },
-        { lat: 45.0, lng: -94.0 }
-      ]
-
-      const results = await fetchLandCoverInBatches(locations)
-
-      expect(results).toEqual([null, 5])
-    })
-
-    it('should report progress for every location', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ features: [{ properties: { PALETTE_INDEX: 22 } }] })
-      })
-
-      const onProgress = vi.fn()
-      const { fetchLandCoverInBatches } = useLandCoverAPI()
-      const locations = Array(5).fill({ lat: 44.0, lng: -93.0 })
-
-      await fetchLandCoverInBatches(locations, onProgress)
-
-      expect(onProgress).toHaveBeenCalledTimes(5)
-      expect(onProgress.mock.calls.map((c) => c[0])).toEqual([1, 2, 3, 4, 5])
-      expect(onProgress).toHaveBeenLastCalledWith(5, 5)
-    })
-
-    it('should cap how many requests are in flight at once', async () => {
-      let inFlight = 0
-      let peak = 0
-
-      mockFetch.mockImplementation(async () => {
-        inFlight++
-        peak = Math.max(peak, inFlight)
-        await new Promise((resolve) => setTimeout(resolve, 5))
-        inFlight--
-        return {
-          ok: true,
-          json: async () => ({ features: [{ properties: { PALETTE_INDEX: 22 } }] })
-        }
-      })
-
-      const { fetchLandCoverInBatches } = useLandCoverAPI()
-
-      await fetchLandCoverInBatches(Array(20).fill({ lat: 44.0, lng: -93.0 }))
-
-      expect(peak).toBeLessThanOrEqual(gridApiConfig.landCoverConcurrency)
-    })
-
-    it('should handle an empty location list', async () => {
-      const { fetchLandCoverInBatches } = useLandCoverAPI()
-
-      const results = await fetchLandCoverInBatches([])
-
-      expect(results).toEqual([])
-      expect(mockFetch).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('URL Construction', () => {
-    it('should construct GetFeatureInfo URL with correct parameters', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          features: [{ properties: { PALETTE_INDEX: 22 } }]
-        })
-      })
-
-      const { fetchLandCover } = useLandCoverAPI()
-      const location = { lat: 44.9778, lng: -93.265 }
-
-      await fetchLandCover(location)
-
-      const url = mockFetch.mock.calls[0][0]
-      expect(url).toContain('mrlc.gov/geoserver')
-      expect(url).toContain('GetFeatureInfo')
-      expect(url).toContain('NLCD_2021_Land_Cover_L48')
-    })
-
-    it('should include coordinates in bounding box', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          features: [{ properties: { PALETTE_INDEX: 22 } }]
-        })
-      })
-
-      const { fetchLandCover } = useLandCoverAPI()
-      const location = { lat: 44.0, lng: -93.0 }
-
-      await fetchLandCover(location)
-
-      const url = mockFetch.mock.calls[0][0]
-      // Bounding box should be 0.01 degrees around the point
-      expect(url).toContain('BBOX=')
-      expect(url).toContain('-93.01')
-      expect(url).toContain('-92.99')
-      expect(url).toContain('43.99')
-      expect(url).toContain('44.01')
-    })
-
-    it('should request center pixel coordinates', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          features: [{ properties: { PALETTE_INDEX: 22 } }]
-        })
-      })
-
-      const { fetchLandCover } = useLandCoverAPI()
-      const location = { lat: 44.0, lng: -93.0 }
-
-      await fetchLandCover(location)
-
-      const url = mockFetch.mock.calls[0][0]
-      expect(url).toContain('I=128') // Center of 256x256
-      expect(url).toContain('J=128')
-    })
-
-    it('should request JSON response format', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          features: [{ properties: { PALETTE_INDEX: 22 } }]
-        })
-      })
-
-      const { fetchLandCover } = useLandCoverAPI()
-      const location = { lat: 44.0, lng: -93.0 }
-
-      await fetchLandCover(location)
-
-      const url = mockFetch.mock.calls[0][0]
-      expect(url).toContain('application%2Fjson')
-    })
-  })
-
-  describe('Stalled Requests', () => {
-    afterEach(() => {
-      vi.useRealTimers()
-    })
-
-    it('should give up on a cell whose request never answers', async () => {
-      vi.useFakeTimers()
-      mockFetch.mockReturnValue(new Promise(() => {}))
-
-      const { fetchLandCover } = useLandCoverAPI()
-      const pending = fetchLandCover({ lat: 44.9778, lng: -93.265 })
-      await vi.advanceTimersByTimeAsync(gridApiConfig.landCoverTimeoutMs)
-
-      await expect(pending).resolves.toBeNull()
-    })
-
-    it('should give up on a cell whose body never arrives', async () => {
-      // A response can answer with headers and then stall part-way through the
-      // body. A ceiling that covered only the headers would let this hang.
-      vi.useFakeTimers()
-      mockFetch.mockResolvedValue({ ok: true, json: () => new Promise(() => {}) })
-
-      const { fetchLandCover } = useLandCoverAPI()
-      const pending = fetchLandCover({ lat: 44.9778, lng: -93.265 })
-      await vi.advanceTimersByTimeAsync(gridApiConfig.landCoverTimeoutMs)
-
-      await expect(pending).resolves.toBeNull()
-    })
-
-    it('should finish the run when one cell stalls, instead of parking setup (#85)', async () => {
-      // This is the reported bug: two of 399 cells never answered, so two pool
-      // workers waited forever, the run never resolved, and the game sat on the
-      // setup modal with a full bar and no error.
-      vi.useFakeTimers()
-      const answered = {
-        ok: true,
-        json: async () => ({ features: [{ properties: { PALETTE_INDEX: 22 } }] })
-      }
-      mockFetch
-        .mockImplementationOnce(() => Promise.resolve(answered))
-        .mockImplementationOnce(() => new Promise(() => {}))
-        .mockImplementationOnce(() => Promise.resolve(answered))
-
-      const { fetchLandCoverInBatches } = useLandCoverAPI()
-      const pending = fetchLandCoverInBatches([
-        { lat: 44.0, lng: -93.0 },
-        { lat: 45.0, lng: -94.0 },
-        { lat: 46.0, lng: -95.0 }
-      ])
-      await vi.advanceTimersByTimeAsync(gridApiConfig.landCoverTimeoutMs * 2)
-
-      // The stalled cell comes back null, which the grid store counts against
-      // its land cover failure rate like any other failed lookup.
-      await expect(pending).resolves.toEqual([5, null, 5])
-    })
-  })
-
-  describe('Different Locations', () => {
-    it('should handle different coordinates', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          features: [{ properties: { PALETTE_INDEX: 22 } }]
-        })
-      })
-
-      const { fetchLandCover } = useLandCoverAPI()
-
-      await fetchLandCover({ lat: 44.0, lng: -93.0 })
-      await fetchLandCover({ lat: 45.0, lng: -94.0 })
-
-      expect(mockFetch).toHaveBeenCalledTimes(2)
-      const calls = mockFetch.mock.calls
-      expect(calls[0][0]).toContain('44')
-      expect(calls[1][0]).toContain('45')
-    })
+    expect(onProgress.mock.calls).toEqual([[1, 1]])
   })
 })

@@ -46,16 +46,18 @@ const phaseLabel = computed(() => {
 })
 
 // Town and demand card setup runs before the grid store reports any phase.
-// There is no cell count to show yet, so the bar runs indeterminate rather
-// than sitting at a misleading 0%.
+// There is no download count to show yet, so the bar runs indeterminate
+// rather than sitting at a misleading 0%.
 const isIndeterminate = computed(() => currentPhase.value === '')
 
+// Terrain comes down as images: elevation as map tiles, land cover as larger
+// pictures of the land cover map
 const progressDetail = computed(() => {
   if (currentPhase.value === 'elevation') {
-    return `${elevationProgress.value.completed} / ${elevationProgress.value.total} cells`
+    return `${elevationProgress.value.completed} / ${elevationProgress.value.total} tiles`
   }
   if (currentPhase.value === 'landcover') {
-    return `${landCoverProgress.value.completed} / ${landCoverProgress.value.total} cells`
+    return `${landCoverProgress.value.completed} / ${landCoverProgress.value.total} images`
   }
   return ''
 })

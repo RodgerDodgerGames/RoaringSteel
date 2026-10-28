@@ -143,7 +143,13 @@ export function useElevationTiles() {
      *
      * A tile that fails leaves its cells null rather than failing the run:
      * null reads as "unknown", never as sea level, and the grid store judges
-     * how much loss is too much.
+     * how much loss is too much. A tile that arrives at the wrong size counts
+     * as failed (its pixels would not be where the math expects), and so
+     * does a see-through pixel, which holds no height: decoded, it would read
+     * as 32 km below sea level.
+     *
+     * Heights are rounded to the meter. The tiles store fractions of a meter,
+     * which would carry through the cost step into every track price.
      *
      * @param {Function} [onProgress] - Called with (tiles done, tiles in all)
      * @returns {Promise<Array<number|null>>} One per location, in order
@@ -154,12 +160,18 @@ export function useElevationTiles() {
         jobs,
         async (tile) => {
           try {
-            const { width, data } = await fetchImagePixels(tileUrl(zoom, tile.x, tile.y), {
+            const { width, height, data } = await fetchImagePixels(tileUrl(zoom, tile.x, tile.y), {
               timeoutMs: gridApiConfig.elevationTimeoutMs
             })
+            if (width !== TILE_SIZE || height !== TILE_SIZE) {
+              throw new Error(`Elevation tile came back ${width}x${height}`)
+            }
             tile.cells.forEach(({ index, px, py }) => {
               const offset = (py * width + px) * 4
-              elevations[index] = decodeTerrarium(data[offset], data[offset + 1], data[offset + 2])
+              if (data[offset + 3] === 0) return
+              elevations[index] = Math.round(
+                decodeTerrarium(data[offset], data[offset + 1], data[offset + 2])
+              )
             })
           } catch (error) {
             console.error('Error fetching elevation tile:', error)

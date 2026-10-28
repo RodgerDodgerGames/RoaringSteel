@@ -192,6 +192,16 @@ describe('useLandCoverAPI', () => {
     expect(result).toEqual({ costs: [null, nlcdCostMap[81]], failed: 1 })
   })
 
+  it('should count a picture that comes back at the wrong size as failed', async () => {
+    // An error drawn as an image, say: every cell would read the wrong pixel
+    mockFetchImagePixels.mockResolvedValue(imageOf(256, 256, hex('68aa63')))
+    const { planLandCover } = useLandCoverAPI()
+
+    const result = await planLandCover(locations, 10000).fetch()
+
+    expect(result).toEqual({ costs: [null, null], failed: 2 })
+  })
+
   it('should ask the NLCD server for a picture of the area', async () => {
     mockFetchImagePixels.mockImplementation(answerWith(hex('68aa63')))
     const { planLandCover } = useLandCoverAPI()

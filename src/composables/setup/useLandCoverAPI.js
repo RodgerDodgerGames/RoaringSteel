@@ -86,13 +86,23 @@ export function landCoverClass(red, green, blue, alpha) {
 export function landCoverImages(locations, lngPerPixel, latPerPixel) {
   if (locations.length === 0) return []
   const size = gridApiConfig.landCoverImageSize
-  const lngs = locations.map(({ lng }) => lng)
-  const lats = locations.map(({ lat }) => lat)
+  // The cells' extent. Looped rather than `Math.min(...lngs)`: spreading
+  // hundreds of thousands of cells into one call overflows the stack.
+  let minLng = Infinity
+  let maxLng = -Infinity
+  let minLat = Infinity
+  let maxLat = -Infinity
+  locations.forEach(({ lat, lng }) => {
+    minLng = Math.min(minLng, lng)
+    maxLng = Math.max(maxLng, lng)
+    minLat = Math.min(minLat, lat)
+    maxLat = Math.max(maxLat, lat)
+  })
   // Half a pixel's margin, so no cell center sits on an image's outer edge
-  const west = Math.min(...lngs) - lngPerPixel / 2
-  const north = Math.max(...lats) + latPerPixel / 2
-  const columnsNeeded = Math.floor((Math.max(...lngs) - west) / lngPerPixel) + 1
-  const rowsNeeded = Math.floor((north - Math.min(...lats)) / latPerPixel) + 1
+  const west = minLng - lngPerPixel / 2
+  const north = maxLat + latPerPixel / 2
+  const columnsNeeded = Math.floor((maxLng - west) / lngPerPixel) + 1
+  const rowsNeeded = Math.floor((north - minLat) / latPerPixel) + 1
 
   const images = new Map()
   locations.forEach((location, index) => {
@@ -183,9 +193,14 @@ export function useLandCoverAPI() {
         images,
         async (image) => {
           try {
-            const { width, data } = await fetchImagePixels(getMapUrl(image), {
+            const { width, height, data } = await fetchImagePixels(getMapUrl(image), {
               timeoutMs: gridApiConfig.landCoverTimeoutMs
             })
+            // A picture at another size than asked for (an error page drawn as
+            // an image, say) would put every cell on the wrong pixel
+            if (width !== image.width || height !== image.height) {
+              throw new Error(`Land cover image came back ${width}x${height}`)
+            }
             image.cells.forEach(({ index, px, py }) => {
               const offset = (py * width + px) * 4
               const code = landCoverClass(

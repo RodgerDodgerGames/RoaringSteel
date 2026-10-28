@@ -164,6 +164,41 @@ describe('useElevationTiles', () => {
     expect(elevations).toEqual([null, 250])
   })
 
+  it('should round heights to the meter', async () => {
+    // Fractions of a meter would carry into every cell cost and track price
+    mockFetchImagePixels.mockResolvedValue(tileOf(() => 123.6))
+    const { planElevations } = useElevationTiles()
+
+    const elevations = await planElevations([{ lat: 44.98, lng: -93.27 }], 10000).fetch()
+
+    expect(elevations).toEqual([124])
+  })
+
+  it('should treat a tile of the wrong size as failed', async () => {
+    // Its pixels would not be where the tile math puts the cells
+    mockFetchImagePixels.mockResolvedValue({
+      width: 512,
+      height: 512,
+      data: new Uint8ClampedArray(512 * 512 * 4).fill(128)
+    })
+    const { planElevations } = useElevationTiles()
+
+    const elevations = await planElevations([{ lat: 44.98, lng: -93.27 }], 10000).fetch()
+
+    expect(elevations).toEqual([null])
+  })
+
+  it('should read a see-through pixel as unknown, not 32 km below sea level', async () => {
+    const tile = tileOf(() => 100)
+    for (let offset = 3; offset < tile.data.length; offset += 4) tile.data[offset] = 0
+    mockFetchImagePixels.mockResolvedValue(tile)
+    const { planElevations } = useElevationTiles()
+
+    const elevations = await planElevations([{ lat: 44.98, lng: -93.27 }], 10000).fetch()
+
+    expect(elevations).toEqual([null])
+  })
+
   it('should report progress once per tile', async () => {
     mockFetchImagePixels.mockResolvedValue(tileOf(() => 100))
     const onProgress = vi.fn()

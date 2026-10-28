@@ -42,8 +42,10 @@ import { gridApiConfig } from '@/config/grid'
  *
  * Water at or below sea level is the sea, and drops out too, as it always
  * has: the sea is not part of the board. A lake stays — it is water above sea
- * level — and is bridged like any other water. Land stays at any height,
- * including at sea level or below it (coastal Louisiana, Death Valley).
+ * level — and is bridged like any other water. (The rare lake below sea
+ * level, such as the Salton Sea, cannot be told from the sea this way and
+ * drops out with it.) Land stays at any height, including at sea level or
+ * below it (coastal Louisiana, Death Valley).
  *
  * @param {Object} cell - A grid cell
  * @returns {boolean} True if the cell is kept
@@ -203,9 +205,18 @@ export const useGridStore = defineStore('gridStore', () => {
     }
 
     // Work out both downloads before starting either, so the progress bar
-    // knows the size of the whole job from the first moment
-    const elevationPlan = planElevations(locations, cellSize)
-    const landCoverPlan = planLandCover(locations, cellSize)
+    // knows the size of the whole job from the first moment. Planning is only
+    // arithmetic, but if it ever throws, setup must still end on its error
+    // screen with a retry, not hang on the progress bar.
+    let elevationPlan
+    let landCoverPlan
+    try {
+      elevationPlan = planElevations(locations, cellSize)
+      landCoverPlan = planLandCover(locations, cellSize)
+    } catch (e) {
+      console.error('Error planning terrain downloads:', e)
+      return fail('Could not plan the terrain downloads for this region.')
+    }
     elevationProgress.value = { completed: 0, total: elevationPlan.requestCount }
     landCoverProgress.value = { completed: 0, total: landCoverPlan.requestCount }
 

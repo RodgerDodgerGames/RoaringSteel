@@ -322,6 +322,20 @@ describe('Grid Store', () => {
       expect(gridStore.error).toMatch(/no terrain data/i)
     })
 
+    it('should end on its error screen if planning the downloads fails', async () => {
+      // A throw here used to escape setup and leave the progress bar up forever
+      mockPlanLandCover.mockImplementation(() => {
+        throw new RangeError('Maximum call stack size exceeded')
+      })
+
+      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+
+      expect(result).toBe(false)
+      expect(gridStore.error).toMatch(/terrain downloads/i)
+      expect(gridStore.currentPhase).toBe('')
+      expect(mockFetchElevations).not.toHaveBeenCalled()
+    })
+
     it('should report a failure when the region is too small to hold a cell', async () => {
       const result = await gridStore.generateGrid('27', BOUNDS_NO_CELLS, 10000)
 

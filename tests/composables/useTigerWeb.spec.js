@@ -9,7 +9,19 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 const mockFetch = vi.hoisted(() => vi.fn())
 vi.stubGlobal('fetch', mockFetch)
 
+// Retries without the pause between them, both the request's own and the
+// lookup's retries of the failures the server reports in its answer
+vi.mock('@/composables/utils', async (importOriginal) => {
+  const utils = await importOriginal()
+  return {
+    ...utils,
+    fetchWithRetries: (url, options) => utils.fetchWithRetries(url, { ...options, pauseMs: 0 }),
+    wait: async () => {}
+  }
+})
+
 import getMSALatLon from '@/composables/setup/useTigerWeb'
+import { isRefusal } from '@/composables/utils'
 
 describe('useTigerWeb (getMSALatLon)', () => {
   beforeEach(() => {
@@ -133,24 +145,79 @@ describe('useTigerWeb (getMSALatLon)', () => {
       expect(result).toBe(false)
     })
 
-    it('should return false on fetch error', async () => {
+    // A lookup that fails is not a town that doesn't exist: the towns store
+    // must be able to tell them apart
+
+    it('should throw when the connection fails', async () => {
       mockFetch.mockRejectedValue(new Error('Network error'))
 
-      const result = await getMSALatLon('33460')
-
-      expect(result).toBe(false)
+      await expect(getMSALatLon('33460')).rejects.toThrow('Network error')
     })
 
-    it('should return false on HTTP error', async () => {
+    it('should throw when the server fails three times running', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         status: 500,
         statusText: 'Internal Server Error'
       })
 
+      await expect(getMSALatLon('33460')).rejects.toThrow('500')
+      expect(mockFetch).toHaveBeenCalledTimes(3)
+    })
+
+    it('should try again when the server fails, and use the answer that works', async () => {
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 500 }).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          features: [{ attributes: { INTPTLON: '-93.0', INTPTLAT: '44.0' } }]
+        })
+      })
+
       const result = await getMSALatLon('33460')
 
-      expect(result).toBe(false)
+      expect(result).toEqual({ centroidLongitude: '-93.0', centroidLatitude: '44.0' })
+    })
+
+    // How ArcGIS answers a query it could not run: a success, with an error
+    // carrying the status it would have sent
+    const arcgisError = (code) => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ error: { code, message: 'Failed to execute query.' } })
+    })
+    const duluth = {
+      ok: true,
+      status: 200,
+      json: async () => ({ features: [{ attributes: { INTPTLON: '-92.1', INTPTLAT: '46.8' } }] })
+    }
+
+    it('should throw a refusal, without asking again, when the server turns the query down', async () => {
+      mockFetch.mockResolvedValue(arcgisError(400))
+
+      const failure = await getMSALatLon('33460').catch((error) => error)
+
+      expect(failure.message).toContain('Failed to execute query')
+      expect(isRefusal(failure)).toBe(true)
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('should try again when the server reports failing, and use the answer that works', async () => {
+      mockFetch.mockResolvedValueOnce(arcgisError(500)).mockResolvedValueOnce(duluth)
+
+      const result = await getMSALatLon('20260')
+
+      expect(result).toEqual({ centroidLongitude: '-92.1', centroidLatitude: '46.8' })
+    })
+
+    it('should throw when the server reports failing three times running', async () => {
+      mockFetch.mockResolvedValue(arcgisError(500))
+
+      const failure = await getMSALatLon('20260').catch((error) => error)
+
+      expect(failure.message).toContain('500')
+      expect(isRefusal(failure)).toBe(false)
+      expect(mockFetch).toHaveBeenCalledTimes(3)
     })
 
     it('should return false on invalid response structure', async () => {
@@ -165,12 +232,6 @@ describe('useTigerWeb (getMSALatLon)', () => {
 
       expect(result).toBe(false)
     })
-
-    it('should not throw on error', async () => {
-      mockFetch.mockRejectedValue(new Error('Network error'))
-
-      expect(async () => await getMSALatLon('33460')).not.toThrow()
-    })
   })
 
   describe('URL Construction', () => {
@@ -184,6 +245,7 @@ describe('useTigerWeb (getMSALatLon)', () => {
 
       const url = mockFetch.mock.calls[0][0]
       expect(url).toContain('tigerweb.geo.census.gov')
+      expect(url).toContain('/MapServer/3/query?')
       expect(url).toContain('CBSA')
       expect(url).toContain('CBSA%3D%2733460%27')
       expect(url).toContain('INTPTLON%2CINTPTLAT')

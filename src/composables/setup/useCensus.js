@@ -18,7 +18,7 @@
  */
 
 import { ref } from 'vue'
-import { fetchWithTimeout } from '@/composables/utils'
+import { CENSUS_ATTEMPT_TIMEOUT_MS, fetchWithRetries, RequestError } from '@/composables/utils'
 
 /**
  * Composable for fetching Census population data by state.
@@ -39,46 +39,53 @@ export default function useCensus(state, dataWindow) {
    *
    * Tries the release ending at the data window's last year first, then each
    * year before it, down to the window's first year. The API answers 404 for
-   * a release it does not have.
+   * a release it does not have. Each request is tried a few times when the
+   * API fails (see `fetchWithRetries`).
+   *
+   * Every town needs its population, so a failure is thrown for the towns
+   * store to handle, not swallowed into an empty list.
    *
    * @returns {Promise<void>}
+   * @throws {RequestError} When the API fails or turns the request down, or
+   *   no release in the window is published
+   * @throws {Error} When the connection fails
    */
   const fetchPopulationData = async () => {
-    try {
-      let response = null
-      for (let year = dataWindow.end; year >= dataWindow.start; year--) {
-        const url = setupRequest(year)
-        console.log('Fetching population data:', url)
-        response = await fetchWithTimeout(url)
-        if (response.status !== 404) break
-        console.log(`No ACS 5-year release for ${year} yet`)
-      }
-      if (response.status === 404) {
-        throw new Error(
-          `No ACS 5-year release from ${dataWindow.start} to ${dataWindow.end} is published`
-        )
-      }
-
-      const censusData = await response.json()
-      console.log('Census data:', censusData)
-
-      // Census API returns array-of-arrays with header row first
-      // Example: [["NAME", "B01001_001E", "state", "msa"], ["Minneapolis...", "3500000", "27", "33460"], ...]
-      // Remove the header row since we'll destructure by position
-      censusData.shift()
-
-      // Transform array data to named object properties
-      // B01001_001E is the Census variable code for total population
-      populationData.value = censusData.map(([name, population, state_code, msa_code]) => ({
-        name, // Full MSA name (e.g., "Minneapolis-St. Paul-Bloomington, MN-WI")
-        population, // Total population count
-        state_code, // State FIPS code
-        msa_code // Metropolitan Statistical Area code
-      }))
-      console.log('Population data:', populationData.value)
-    } catch (error) {
-      console.error('Error fetching population data:', error)
+    let response = null
+    for (let year = dataWindow.end; year >= dataWindow.start; year--) {
+      const url = setupRequest(year)
+      console.log('Fetching population data:', url)
+      response = await fetchWithRetries(url, { timeoutMs: CENSUS_ATTEMPT_TIMEOUT_MS })
+      if (response.status !== 404) break
+      console.log(`No ACS 5-year release for ${year} yet`)
     }
+    if (response.status === 404) {
+      throw new RequestError(
+        `No ACS 5-year release from ${dataWindow.start} to ${dataWindow.end} is published`,
+        response.status
+      )
+    }
+    if (!response.ok) {
+      throw new RequestError(`ACS population request failed: ${response.status}`, response.status)
+    }
+
+    const censusData = await response.json()
+    console.log('Census data:', censusData)
+
+    // Census API returns array-of-arrays with header row first
+    // Example: [["NAME", "B01001_001E", "state", "msa"], ["Minneapolis...", "3500000", "27", "33460"], ...]
+    // Remove the header row since we'll destructure by position
+    censusData.shift()
+
+    // Transform array data to named object properties
+    // B01001_001E is the Census variable code for total population
+    populationData.value = censusData.map(([name, population, state_code, msa_code]) => ({
+      name, // Full MSA name (e.g., "Minneapolis-St. Paul-Bloomington, MN-WI")
+      population, // Total population count
+      state_code, // State FIPS code
+      msa_code // Metropolitan Statistical Area code
+    }))
+    console.log('Population data:', populationData.value)
   }
 
   return {

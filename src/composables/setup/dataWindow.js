@@ -23,7 +23,7 @@
  * @module composables/setup/dataWindow
  */
 
-import { fetchWithTimeout, wait } from '@/composables/utils'
+import { fetchWithRetries, RequestError } from '@/composables/utils'
 
 /** How many years the window spans. Odd, so it has a single middle year. */
 const WINDOW_YEARS = 5
@@ -36,18 +36,10 @@ const WINDOW_YEARS = 5
 const LOOKBACK_YEARS = 6
 
 /**
- * The QWI API fails now and then for no reason of the request's own: about
- * one request in five answered 500 in a test on 2026-10-28, and the same
- * request a moment later worked. One bad answer should not stop setup, so
- * the lookup is tried a few times, a short pause apart, before it gives up.
- */
-const LOOKUP_ATTEMPTS = 3
-const RETRY_PAUSE_MS = 1000
-
-/**
- * Ceiling for each attempt. The lookup answers in well under a few seconds;
- * a request still going after this has stalled, and a player with towns
- * cached should not sit through three long waits before playing with them.
+ * Ceiling for each attempt, below the other Census requests' (see
+ * `CENSUS_ATTEMPT_TIMEOUT_MS`). The lookup is the smallest of them, and every
+ * new game makes it, so a player with towns cached should not sit through
+ * three long waits (see `fetchWithRetries`) before playing with them.
  */
 const ATTEMPT_TIMEOUT_MS = 10000
 
@@ -104,9 +96,14 @@ export async function fetchDataWindow(stateFipsCode) {
     .map(([name, value]) => `${name}=${String(value).replace(/ /g, '%20')}`)
     .join('&')
 
-  const response = await fetchWithRetries(`https://api.census.gov/data/timeseries/qwi/sa?${query}`)
+  const response = await fetchWithRetries(
+    `https://api.census.gov/data/timeseries/qwi/sa?${query}`,
+    {
+      timeoutMs: ATTEMPT_TIMEOUT_MS
+    }
+  )
   if (!response.ok) {
-    throw new Error(`QWI year lookup failed: ${response.status}`)
+    throw new RequestError(`QWI year lookup failed: ${response.status}`, response.status)
   }
   // No content: the state has no QWI in the lookback at all
   const table = response.status === 204 ? [] : await response.json()
@@ -122,25 +119,4 @@ export async function fetchDataWindow(stateFipsCode) {
     throw new Error(`No full year of QWI data for state ${stateFipsCode}`)
   }
   return dataWindow(endYear)
-}
-
-/**
- * Fetches a URL, trying again when the server fails (a 5xx answer) or the
- * connection does. An answer the server meant — success, or a 4xx such as a
- * bad key — is returned as it is: asking again would get the same.
- *
- * @param {string} url - Request URL
- * @returns {Promise<Object>} The response, from the last attempt
- * @throws {Error} When the last attempt could not connect
- */
-async function fetchWithRetries(url) {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      const response = await fetchWithTimeout(url, { timeoutMs: ATTEMPT_TIMEOUT_MS })
-      if (response.status < 500 || attempt === LOOKUP_ATTEMPTS) return response
-    } catch (error) {
-      if (attempt === LOOKUP_ATTEMPTS) throw error
-    }
-    await wait(RETRY_PAUSE_MS)
-  }
 }

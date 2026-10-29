@@ -90,6 +90,115 @@ export async function fetchWithTimeout(
   }
 }
 
+/** How many times `fetchWithRetries` tries a request before giving up */
+export const RETRY_ATTEMPTS = 3
+
+/** Pause between those attempts, in ms */
+export const RETRY_PAUSE_MS = 1000
+
+/**
+ * Ceiling for each try at a Census Bureau request, in ms. The requests setup
+ * makes answer in about a second; one still going after this has stalled.
+ * Each is tried up to three times, so the default 30-second ceiling would let
+ * a stalled API hold setup for a minute and a half per request, and setup
+ * makes dozens of them.
+ */
+export const CENSUS_ATTEMPT_TIMEOUT_MS = 15000
+
+/**
+ * Fetches a URL, trying again when the server fails or the connection does.
+ *
+ * The Census Bureau's APIs fail now and then for no reason of the request's
+ * own: about one request in five answered 500 in a test on 2026-10-28, and
+ * the same request a moment later worked. Setup makes dozens of them, so
+ * without a second try nearly every game would lose an industry or a town.
+ *
+ * Tried again: a 5xx (the server failing), a 408 or 429 (the server asking
+ * to wait), and a request that could not connect or ran out of time. Any
+ * other answer — success, or a 4xx such as a bad request — is the server's
+ * considered reply, returned as it is: asking again would get the same.
+ *
+ * @param {string} url - Request URL
+ * @param {Object} [options] - Options for `fetchWithTimeout` (its `timeoutMs`
+ *   is the ceiling for each attempt), plus:
+ * @param {number} [options.attempts] - Tries before giving up
+ * @param {number} [options.pauseMs] - Pause between tries
+ * @returns {Promise<Object>} The response, from the last attempt
+ * @throws {Error} When the last attempt could not connect
+ */
+export async function fetchWithRetries(
+  url,
+  { attempts = RETRY_ATTEMPTS, pauseMs = RETRY_PAUSE_MS, ...options } = {}
+) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const response = await fetchWithTimeout(url, options)
+      if (!isWorthRetrying(response.status) || attempt === attempts) return response
+    } catch (error) {
+      // A request the caller cancelled stays cancelled
+      if (attempt === attempts || options.signal?.aborted) throw error
+    }
+    await wait(pauseMs)
+  }
+}
+
+/** True for an answer a later try might change: see `fetchWithRetries` */
+function isWorthRetrying(status) {
+  return status >= 500 || status === 408 || status === 429
+}
+
+/**
+ * A request the server answered with a failure, carrying the HTTP status so
+ * the player can be told what kind of failure it was (see `isRefusal`).
+ */
+export class RequestError extends Error {
+  /**
+   * @param {string} message - What failed, for the console
+   * @param {number} status - The HTTP status the server answered with
+   */
+  constructor(message, status) {
+    super(message)
+    this.name = 'RequestError'
+    this.status = status
+  }
+}
+
+/**
+ * The setup screens' explanation of a request a server turned down (see
+ * `isRefusal`). It will be turned down again, and the player's connection is
+ * fine, so the message does not tell them to check it.
+ *
+ * @param {string} server - Who turned it down, as in "The Census Bureau"
+ * @param {string} what - The data asked for, as in "this state's population"
+ * @param {RequestError} refusal - The error, for its status
+ * @returns {string} Player-facing message
+ */
+export function refusalMessage(server, what, refusal) {
+  return `${server} turned down the request for ${what} (error ${refusal.status}). Trying again won't help; please report the problem.`
+}
+
+/**
+ * Whether an error is a server turning a request down for good: a 4xx answer
+ * that `fetchWithRetries` would not try again. Asking again won't help, and
+ * nor will the player's connection, so the setup screens say so rather than
+ * suggest checking it.
+ *
+ * A bad Census key is not one of these, sadly. The API answers it with a
+ * redirect that carries no CORS header, so the browser reports it to the
+ * page exactly as it would a dropped connection.
+ *
+ * @param {*} error - Anything a failed request threw
+ * @returns {boolean} True for a `RequestError` with such a status
+ */
+export function isRefusal(error) {
+  return (
+    error instanceof RequestError &&
+    error.status >= 400 &&
+    error.status < 500 &&
+    !isWorthRetrying(error.status)
+  )
+}
+
 /**
  * Maps over items with a bounded number of concurrent workers, optionally
  * pacing request starts so an upstream API is not hit in bursts.

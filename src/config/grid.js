@@ -59,6 +59,14 @@ export const gridApiConfig = {
   landCoverTimeoutMs: 30000,
 
   /**
+   * The same for each try at the land cover server's list of years. It
+   * answers in under half a second; every new game asks for it, one with a
+   * cached grid included, and that game should not sit through long waits
+   * on a stalled request before falling back to the cache.
+   */
+  landCoverYearsTimeoutMs: 10000,
+
+  /**
    * Share of cells allowed to go without data, per source, because the image
    * that covers them failed, before setup is treated as a failure. Some loss
    * is normal, but a broken or throttled source fails most requests, and the

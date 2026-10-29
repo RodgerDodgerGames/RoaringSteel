@@ -9,7 +9,7 @@
  * - Employment data calculation
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 // Create hoisted mocks
 const mockUseLocalStorage = vi.hoisted(() => vi.fn())
@@ -282,6 +282,100 @@ describe('Industry Store', () => {
 
       expect(industryStore.isLoadingQWI).toBe(false)
       expect(industryStore.employmentData).toEqual([])
+    })
+  })
+
+  describe('useIndustryData when an industry fails', () => {
+    // Agriculture fails, by its composable error; Livestock comes back
+    beforeEach(() => {
+      mockFetch.mockResolvedValue({
+        text: async () => 'naics_code,label,ind_level\n111,Agriculture,2\n112,Livestock,2'
+      })
+      mockUseQWI.mockImplementation((state, industry) => {
+        const error = { value: null }
+        const data = { value: [] }
+        const fetchQWI = async () => {
+          if (industry === 111) error.value = 'HTTP error! status: 500'
+          else data.value = [{ Emp: 100, msa_code: '12345' }]
+        }
+        return { data, error, fetchQWI }
+      })
+    })
+
+    // Back to the shared mocks the other tests script
+    afterEach(() => {
+      mockUseQWI.mockImplementation(() => ({
+        data: mockQWIData,
+        error: mockQWIError,
+        fetchQWI: mockFetchQWI
+      }))
+    })
+
+    it('should record the industries that failed', async () => {
+      await industryStore.useIndustryData('27', WINDOW)
+
+      expect(industryStore.failedIndustries).toEqual([111])
+      expect(industryStore.employmentData.map((row) => row.industry)).toEqual([112])
+    })
+
+    it('should record an industry whose fetch throws', async () => {
+      mockUseQWI.mockImplementation(() => ({
+        data: { value: [] },
+        error: { value: null },
+        fetchQWI: async () => {
+          throw new Error('QWI API error')
+        }
+      }))
+
+      await industryStore.useIndustryData('27', WINDOW)
+
+      expect(industryStore.failedIndustries).toEqual([111, 112])
+    })
+
+    it('should not cache a fetch with an industry missing', async () => {
+      const written = {}
+      mockUseLocalStorage.mockImplementation(cacheFrom(null, written))
+
+      await industryStore.useIndustryData('27', WINDOW)
+
+      expect(written).toEqual({})
+    })
+
+    it('should forget the failures once a later fetch comes from the cache', async () => {
+      await industryStore.useIndustryData('27', WINDOW)
+      mockUseLocalStorage.mockImplementation(cacheFrom({ start: 2021, end: 2025 }))
+
+      await industryStore.useIndustryData('27', WINDOW)
+
+      expect(industryStore.failedIndustries).toEqual([])
+    })
+
+    it('should not count an industry the API turned down, and still cache the fetch', async () => {
+      const written = {}
+      mockUseLocalStorage.mockImplementation(cacheFrom(null, written))
+      mockUseQWI.mockImplementation((state, industry) => ({
+        data: { value: industry === 111 ? [] : [{ Emp: 100, msa_code: '12345' }] },
+        error: { value: industry === 111 ? 'HTTP error! status: 400' : null },
+        refused: { value: industry === 111 },
+        fetchQWI: async () => {}
+      }))
+
+      await industryStore.useIndustryData('27', WINDOW)
+
+      expect(industryStore.failedIndustries).toEqual([])
+      expect(written.industryWindow_27).toEqual({ start: 2021, end: 2025 })
+    })
+
+    it('should not count an industry with no jobs as failed', async () => {
+      mockUseQWI.mockImplementation(() => ({
+        data: { value: [{ Emp: 0, msa_code: '12345' }] },
+        error: { value: null },
+        fetchQWI: async () => {}
+      }))
+
+      await industryStore.useIndustryData('27', WINDOW)
+
+      expect(industryStore.failedIndustries).toEqual([])
     })
   })
 

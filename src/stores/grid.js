@@ -33,6 +33,7 @@ import {
 } from '../composables/setup/useMapSupport'
 import { isWaterCell } from '@/composables/map/water'
 import { gridApiConfig } from '@/config/grid'
+import { isRefusal, refusalMessage } from '@/composables/utils'
 
 /**
  * Whether a cell, with its terrain filled in, belongs on the board.
@@ -142,9 +143,17 @@ export const useGridStore = defineStore('gridStore', () => {
    * Fetches elevation and land cover data for each cell, then calculates costs.
    * Uses localStorage caching to avoid redundant API calls.
    *
-   * The cache holds the year of land cover the grid was built for, and is
-   * used only for that same year. A game whose data window has moved on
-   * builds its grid again; so does a cache from before the year was recorded.
+   * The cache holds the year of land cover the grid was drawn from: the year
+   * the server served, which is the closest it has to the year asked for.
+   * Each new game asks the server which year that is now, one small request,
+   * and uses the cache only when it is the same year. So a game whose data
+   * window has moved on builds its grid again, as does one where the server
+   * has since added a year closer to the one asked for, or a cache from
+   * before the year was recorded.
+   *
+   * If the server cannot say — it is down, or the player is offline — the
+   * cached grid is used as it is, whatever year it was drawn from, as the
+   * towns are when the Census Bureau is down.
    *
    * @param {string} stateFipsCode - State FIPS code for cache key
    * @param {Array<number>} bounds - Bounding box [minLng, minLat, maxLng, maxLat]
@@ -163,14 +172,34 @@ export const useGridStore = defineStore('gridStore', () => {
     // `useLocalStorage` automatically binds `grid` to `localStorage`
     const cachedGrid = cachedGridFor(stateFipsCode)
 
-    // check if grid already exists in cache, built for the same year
     const { landCoverYear: cachedYear, cells: cachedCells } = cachedGrid.value
-    if (cachedYear === landCoverYear && Array.isArray(cachedCells) && cachedCells.length > 0) {
+    const hasCachedCells = Array.isArray(cachedCells) && cachedCells.length > 0
+
+    /** Plays with the cached grid */
+    function loadCachedGrid() {
       grid.value = cachedCells
       isGridGenerated.value = true
       currentPhase.value = ''
       return true
     }
+
+    // The year of land cover the server will draw: the one asked for, or the
+    // closest it has
+    let servedYear
+    try {
+      servedYear = await landCoverYearFor(landCoverYear)
+    } catch (e) {
+      console.error('Error looking up land cover years:', e)
+      if (hasCachedCells) return loadCachedGrid()
+      return fail(
+        isRefusal(e)
+          ? refusalMessage('The land cover server', 'its years', e)
+          : 'Could not reach the land cover server. Check your connection and retry.'
+      )
+    }
+
+    // check if grid already exists in cache, drawn from the same year
+    if (cachedYear === servedYear && hasCachedCells) return loadCachedGrid()
 
     // cell size is in meters so convert to degrees
     // find mean latitude
@@ -209,16 +238,6 @@ export const useGridStore = defineStore('gridStore', () => {
 
     if (locations.length === 0) {
       return fail('That region is too small to build a grid from. Try selecting a larger area.')
-    }
-
-    // The year of land cover the server will draw: the one asked for, or the
-    // closest it has
-    let servedYear
-    try {
-      servedYear = await landCoverYearFor(landCoverYear)
-    } catch (e) {
-      console.error('Error looking up land cover years:', e)
-      return fail('Could not reach the land cover server. Check your connection and retry.')
     }
 
     // Work out both downloads before starting either, so the progress bar
@@ -314,8 +333,8 @@ export const useGridStore = defineStore('gridStore', () => {
     currentPhase.value = 'calculating'
     focalOpElevation(grid)
 
-    // save grid to cache, with the year it was asked to be built for
-    cachedGrid.value = { landCoverYear, cells: grid.value }
+    // save grid to cache, with the year it was drawn from
+    cachedGrid.value = { landCoverYear: servedYear, cells: grid.value }
 
     isGridGenerated.value = true
     currentPhase.value = ''

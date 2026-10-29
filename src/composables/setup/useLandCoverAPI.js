@@ -25,7 +25,7 @@
 
 import { nlcdCostMap, nlcdLegendColors } from '@/config/nlcd'
 import { gridApiConfig } from '@/config/grid'
-import { fetchWithTimeout, mapWithConcurrency } from '@/composables/utils'
+import { fetchWithRetries, mapWithConcurrency, RequestError } from '@/composables/utils'
 import { fetchImagePixels } from '@/composables/setup/imagePixels'
 import {
   metersToLatitudeDegrees,
@@ -212,10 +212,12 @@ export function useLandCoverAPI() {
    * The year of land cover a game gets when it asks for a given year: that
    * year if the server has it, otherwise the closest one it does. A year it
    * lacks would come back as an error in place of every picture, so the
-   * server's list of years is checked first.
+   * server's list of years is checked first. Every new game needs it, so it
+   * is tried a few times when the server fails (see `fetchWithRetries`).
    *
    * @param {number} year - The year wanted (the data window's middle year)
    * @returns {Promise<number>} The year to draw
+   * @throws {RequestError} When the server answers with a failure
    * @throws {Error} When the server cannot be reached or lists no years
    */
   async function landCoverYearFor(year) {
@@ -224,11 +226,11 @@ export function useLandCoverAPI() {
       VERSION: '1.3.0',
       REQUEST: 'GetCapabilities'
     })
-    const response = await fetchWithTimeout(`${landCoverApiUrl}?${params.toString()}`, {
-      timeoutMs: gridApiConfig.landCoverTimeoutMs
+    const response = await fetchWithRetries(`${landCoverApiUrl}?${params.toString()}`, {
+      timeoutMs: gridApiConfig.landCoverYearsTimeoutMs
     })
     if (!response.ok) {
-      throw new Error(`Land cover server answered ${response.status}`)
+      throw new RequestError(`Land cover server answered ${response.status}`, response.status)
     }
     const served = nearestYear(landCoverYears(await response.text()), year)
     if (served == null) {

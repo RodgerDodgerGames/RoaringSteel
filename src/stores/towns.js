@@ -37,6 +37,7 @@ import { useIndustryStore } from './industry'
 import useCensus from '../composables/setup/useCensus'
 import getMSALatLon from '../composables/setup/useTigerWeb'
 import { fetchDataWindow } from '../composables/setup/dataWindow'
+import { isRefusal, refusalMessage } from '../composables/utils'
 
 /** Size classification labels for towns based on population */
 const sizeClasses = ['small', 'medium', 'large']
@@ -96,6 +97,11 @@ export const useTownsStore = defineStore('towns', () => {
    * and the cache is left as it was. With nothing cached there is nothing to
    * play with, and `error` is set for the setup screen to show.
    *
+   * An industry or a town whose own lookup fails is left out of the game,
+   * and the towns are not cached, so the next game builds them again rather
+   * than keep the gap for the rest of the window. The cache keeps the last
+   * complete build.
+   *
    * @param {string} stateFipsCode - Two-digit FIPS code for the state (e.g., "27" for Minnesota)
    * @returns {Promise<void>}
    */
@@ -114,10 +120,7 @@ export const useTownsStore = defineStore('towns', () => {
       latestWindow = await fetchDataWindow(stateFipsCode)
     } catch (e) {
       console.error('Error looking up the data window:', e)
-      fallBackTo(
-        saved,
-        "Could not reach the Census Bureau for this state's jobs data. Check your connection and retry."
-      )
+      fallBackTo(saved, failureMessage(e, "this state's jobs data"))
       return
     }
 
@@ -158,41 +161,55 @@ export const useTownsStore = defineStore('towns', () => {
     } catch (e) {
       console.error('Error fetching population data:', e)
       isLoadingPopulation.value = false
-      fallBackTo(saved, NO_TOWNS_MESSAGE)
+      fallBackTo(saved, failureMessage(e, "this state's population"))
       return
     }
     isLoadingPopulation.value = false
 
     // Fetch latitude and longitude data for each MSA and populate towns
     isLoadingCoordinates.value = true
+    // Whether any town was left out because its lookup failed
+    let missedTowns = false
     for (const msaCode of MSAs.value) {
       console.log('Fetching lat/lon data for MSA:', msaCode)
+      let coordinates
       try {
-        const { centroidLongitude, centroidLatitude } = await getMSALatLon(msaCode)
-        console.log('Lat/Lon data fetched:', centroidLongitude, centroidLatitude)
-
-        const popData = populationData.value.find((data) => data.msa_code === msaCode)
-
-        // if there is no population data for the MSA, skip it
-        if (!popData) {
-          continue
-        }
-
-        towns.value.push({
-          msa: msaCode,
-          fullName: popData.name.split(', ')[0],
-          // just grab the first name for the short name
-          name: popData.name.split(', ')[0].split('-')[0],
-          stateCode: popData.state_code,
-          population: parseFloat(popData.population),
-          lon: parseFloat(centroidLongitude),
-          lat: parseFloat(centroidLatitude),
-          industries: []
-        })
+        coordinates = await getMSALatLon(msaCode)
       } catch (e) {
         console.error(`Error fetching coordinates for MSA ${msaCode}:`, e)
-        // Continue to next MSA on error
+        // Continue to next MSA on error. A lookup turned down would be turned
+        // down again next game, so only one that failed keeps the towns out
+        // of the cache.
+        if (!isRefusal(e)) missedTowns = true
+        continue
       }
+
+      // TIGERweb has no such area: there is no town to place
+      if (!coordinates) {
+        console.warn(`No coordinates for MSA ${msaCode}; leaving it out`)
+        continue
+      }
+      const { centroidLongitude, centroidLatitude } = coordinates
+      console.log('Lat/Lon data fetched:', centroidLongitude, centroidLatitude)
+
+      const popData = populationData.value.find((data) => data.msa_code === msaCode)
+
+      // if there is no population data for the MSA, skip it
+      if (!popData) {
+        continue
+      }
+
+      towns.value.push({
+        msa: msaCode,
+        fullName: popData.name.split(', ')[0],
+        // just grab the first name for the short name
+        name: popData.name.split(', ')[0].split('-')[0],
+        stateCode: popData.state_code,
+        population: parseFloat(popData.population),
+        lon: parseFloat(centroidLongitude),
+        lat: parseFloat(centroidLatitude),
+        industries: []
+      })
     }
     isLoadingCoordinates.value = false
 
@@ -205,6 +222,12 @@ export const useTownsStore = defineStore('towns', () => {
     // Assign tourism, industries, and sizes to towns
     assignTowns()
     console.log('Towns after assignment:', towns.value)
+
+    // Play with what came back, but leave a build with gaps out of the cache
+    if (missedTowns || industryStore.failedIndustries.length > 0) {
+      console.warn(`Not caching towns for state ${stateFipsCode}: some lookups failed`)
+      return
+    }
 
     // Cache the towns data in localStorage
     cachedTowns.value = { dataWindow: latestWindow, towns: towns.value }
@@ -233,6 +256,19 @@ export const useTownsStore = defineStore('towns', () => {
     const usable =
       cached?.dataWindow != null && Array.isArray(cached.towns) && cached.towns.length > 0
     return usable ? cached : null
+  }
+
+  /**
+   * The setup screen's explanation of a failed Census request: a refusal
+   * (see `refusalMessage`), or else a request that could not get through.
+   *
+   * @param {*} failure - What the request threw
+   * @param {string} what - The data asked for, as in "this state's population"
+   * @returns {string} Player-facing message
+   */
+  function failureMessage(failure, what) {
+    if (isRefusal(failure)) return refusalMessage('The Census Bureau', what, failure)
+    return `Could not reach the Census Bureau for ${what}. Check your connection and retry.`
   }
 
   /**

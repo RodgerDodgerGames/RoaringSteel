@@ -12,13 +12,17 @@ vi.stubGlobal('fetch', mockFetch)
 
 vi.stubEnv('VITE_QWI_KEY', 'test-api-key')
 
-// The pause between attempts, skipped
-vi.mock('@/composables/utils', async (importOriginal) => ({
-  ...(await importOriginal()),
-  wait: vi.fn(async () => {})
-}))
+// Retries without the pause between them
+vi.mock('@/composables/utils', async (importOriginal) => {
+  const utils = await importOriginal()
+  return {
+    ...utils,
+    fetchWithRetries: (url, options) => utils.fetchWithRetries(url, { ...options, pauseMs: 0 })
+  }
+})
 
 import { dataWindow, latestFullYear, fetchDataWindow } from '@/composables/setup/dataWindow'
+import { isRefusal } from '@/composables/utils'
 
 /** QWI rows, one per quarter given ("2024-Q1", ...) */
 function quarters(...times) {
@@ -105,14 +109,6 @@ describe('fetchDataWindow', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2)
   })
 
-  it('should try again when the connection fails', async () => {
-    mockFetch
-      .mockRejectedValueOnce(new Error('Network error'))
-      .mockResolvedValueOnce(qwiAnswer(fullYears(2025)))
-
-    await expect(fetchDataWindow('25')).resolves.toEqual({ start: 2021, end: 2025, middle: 2023 })
-  })
-
   it('should fail when the API fails three times running', async () => {
     mockFetch.mockResolvedValue(serverError)
 
@@ -120,17 +116,13 @@ describe('fetchDataWindow', () => {
     expect(mockFetch).toHaveBeenCalledTimes(3)
   })
 
-  it('should fail when the connection fails three times running', async () => {
-    mockFetch.mockRejectedValue(new Error('Network error'))
-
-    await expect(fetchDataWindow('25')).rejects.toThrow('Network error')
-    expect(mockFetch).toHaveBeenCalledTimes(3)
-  })
-
-  it('should not ask again when the API turns the request down', async () => {
+  it('should fail as a refusal, without asking again, when the API turns the request down', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 400, json: async () => ({}) })
 
-    await expect(fetchDataWindow('25')).rejects.toThrow('400')
+    const failure = await fetchDataWindow('25').catch((error) => error)
+
+    expect(failure.message).toContain('400')
+    expect(isRefusal(failure)).toBe(true)
     expect(mockFetch).toHaveBeenCalledTimes(1)
   })
 

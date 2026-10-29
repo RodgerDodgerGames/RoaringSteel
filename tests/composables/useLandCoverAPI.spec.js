@@ -17,6 +17,15 @@ vi.mock('@/composables/setup/imagePixels', () => ({ fetchImagePixels: mockFetchI
 const mockFetch = vi.hoisted(() => vi.fn())
 vi.stubGlobal('fetch', mockFetch)
 
+// Retries without the pause between them
+vi.mock('@/composables/utils', async (importOriginal) => {
+  const utils = await importOriginal()
+  return {
+    ...utils,
+    fetchWithRetries: (url, options) => utils.fetchWithRetries(url, { ...options, pauseMs: 0 })
+  }
+})
+
 import {
   landCoverClass,
   landCoverImages,
@@ -26,6 +35,7 @@ import {
 } from '@/composables/setup/useLandCoverAPI'
 import { nlcdCostMap, nlcdLegendColors } from '@/config/nlcd'
 import { gridApiConfig } from '@/config/grid'
+import { isRefusal } from '@/composables/utils'
 
 /** A picture filled with one color */
 function imageOf(width, height, [r, g, b], alpha = 255) {
@@ -321,6 +331,29 @@ describe('landCoverYearFor', () => {
     const { landCoverYearFor } = useLandCoverAPI()
 
     await expect(landCoverYearFor(2023)).rejects.toThrow('503')
+    expect(mockFetch).toHaveBeenCalledTimes(3)
+  })
+
+  it('should try again when the server fails, and use the answer that works', async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: false, status: 503, text: async () => '' })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => capabilitiesWith([2021, 2023])
+      })
+    const { landCoverYearFor } = useLandCoverAPI()
+
+    await expect(landCoverYearFor(2023)).resolves.toBe(2023)
+  })
+
+  it('should fail as a refusal when the server turns the request down', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 400, text: async () => '' })
+    const { landCoverYearFor } = useLandCoverAPI()
+
+    const failure = await landCoverYearFor(2023).catch((error) => error)
+
+    expect(isRefusal(failure)).toBe(true)
   })
 
   it('should fail when the server lists no years', async () => {

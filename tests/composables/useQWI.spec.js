@@ -13,6 +13,15 @@ vi.stubGlobal('fetch', mockFetch)
 // Mock environment variable
 vi.stubEnv('VITE_QWI_KEY', 'test-api-key')
 
+// Retries without the pause between them
+vi.mock('@/composables/utils', async (importOriginal) => {
+  const utils = await importOriginal()
+  return {
+    ...utils,
+    fetchWithRetries: (url, options) => utils.fetchWithRetries(url, { ...options, pauseMs: 0 })
+  }
+})
+
 import useQWI from '@/composables/setup/useQWI'
 
 /** A game's data window: QWI from 2021 to 2025 */
@@ -136,6 +145,48 @@ describe('useQWI Composable', () => {
 
       expect(error.value).toContain('401')
       expect(error.value).toContain(errorResponse)
+    })
+
+    it('should try again when the API fails, and use the answer that works', async () => {
+      mockFetch
+        .mockResolvedValueOnce({ ok: false, status: 500, text: async () => 'Server error' })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => [
+            ['Emp', 'metropolitan statistical area/micropolitan statistical area', 'time'],
+            ['100', '12345', '2025-Q1']
+          ]
+        })
+
+      const { data, error, fetchQWI } = useQWI('27', 111, WINDOW)
+      await fetchQWI()
+
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+      expect(error.value).toBeNull()
+      expect(data.value).toEqual([{ Emp: '100', msa_code: '12345', time: '2025-Q1' }])
+    })
+
+    it('should set error when the API fails three times running', async () => {
+      mockFetch.mockResolvedValue({ ok: false, status: 500, text: async () => 'Server error' })
+
+      const { error, refused, fetchQWI } = useQWI('27', 111, WINDOW)
+      await fetchQWI()
+
+      expect(mockFetch).toHaveBeenCalledTimes(3)
+      expect(error.value).toContain('500')
+      expect(refused.value).toBe(false)
+    })
+
+    it('should mark the error a refusal when the API turns the request down', async () => {
+      mockFetch.mockResolvedValue({ ok: false, status: 400, text: async () => 'unknown variable' })
+
+      const { error, refused, fetchQWI } = useQWI('27', 111, WINDOW)
+      await fetchQWI()
+
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+      expect(error.value).toContain('400')
+      expect(refused.value).toBe(true)
     })
 
     it('should handle fetch network error', async () => {

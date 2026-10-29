@@ -1,8 +1,8 @@
 /**
  * Land Cover API Composable (useLandCoverAPI.js)
  *
- * Gets the land cover under each grid cell from the USGS National Land Cover
- * Database (NLCD), and turns it into a building cost.
+ * Gets the land cover under each grid cell from the USGS Annual National Land
+ * Cover Database (Annual NLCD), and turns it into a building cost.
  *
  * The NLCD server draws its map as pictures (a WMS "GetMap"), and those
  * pictures are what this reads: each class has its own color, so the pixel
@@ -13,7 +13,11 @@
  * The pictures are drawn at the same detail as the elevation tiles, about
  * `pixelsPerCell` pixels across a cell.
  *
- * API: https://www.mrlc.gov/geoserver (NLCD 2021 Land Cover)
+ * Annual NLCD has a map for every year since 1985. A game takes its land
+ * cover from the middle year of its data window (see dataWindow.js), or the
+ * nearest year the server has.
+ *
+ * API: https://dmsdata.cr.usgs.gov/geoserver (Annual NLCD land cover, CONUS)
  * Cost mapping: See @/config/nlcd.js for terrain cost values
  *
  * @module composables/setup/useLandCoverAPI
@@ -21,23 +25,25 @@
 
 import { nlcdCostMap, nlcdLegendColors } from '@/config/nlcd'
 import { gridApiConfig } from '@/config/grid'
-import { mapWithConcurrency } from '@/composables/utils'
+import { fetchWithTimeout, mapWithConcurrency } from '@/composables/utils'
 import { fetchImagePixels } from '@/composables/setup/imagePixels'
 import {
   metersToLatitudeDegrees,
   metersToLongitudeDegrees
 } from '@/composables/setup/useMapSupport'
 
-const landCoverApiUrl = 'https://www.mrlc.gov/geoserver/mrlc_display/NLCD_2021_Land_Cover_L48/ows'
-const LAYER = 'mrlc_display:NLCD_2021_Land_Cover_L48'
+const landCoverApiUrl =
+  'https://dmsdata.cr.usgs.gov/geoserver/mrlc_Land-Cover-Native_conus_year_data/wms'
+const LAYER = 'Land-Cover-Native_conus_year_data'
 
 /**
  * How far a pixel's color may be from a legend color and still count as that
- * class (straight-line distance in red/green/blue). The server's colors sit
- * within about 7 of the legend's; the closest two legend colors are 26
- * apart, so 12 takes in every real pixel without ever picking the wrong class.
- * Anything further off — the white the server draws where it has no data,
- * outside the US — matches nothing.
+ * class (straight-line distance in red/green/blue). This server draws the
+ * legend's colors exactly, but the NLCD's other server drew them a few shades
+ * off, so the match allows for a little drift rather than breaking on it.
+ * The closest two legend colors are 26 apart, so 12 never picks the wrong
+ * class. Anything further off — the white the server draws where it has no
+ * data, outside the US — matches nothing.
  */
 const MAX_COLOR_DISTANCE = 12
 
@@ -132,11 +138,53 @@ export function landCoverImages(locations, lngPerPixel, latPerPixel) {
 }
 
 /**
+ * The years a land cover server's description (its WMS "GetCapabilities"
+ * answer) says it has maps for. They are listed as the layer's time
+ * dimension: "1985-01-01T00:00:00.000Z,1986-01-01T00:00:00.000Z,...".
+ *
+ * A server can also describe its times as a range ("1985-01-01/2025-01-01/
+ * P1Y"). That is not read: taken as a list, it would look like the single
+ * year 1985, and every game would silently get 1985's land cover. Reading
+ * nothing fails setup with an error instead.
+ *
+ * @param {string} capabilities - The GetCapabilities XML
+ * @returns {Array<number>} The years, in the order listed; empty if none
+ */
+export function landCoverYears(capabilities) {
+  const match = capabilities.match(/<Dimension[^>]*name="time"[^>]*>([^<]*)<\/Dimension>/)
+  if (!match || match[1].includes('/')) return []
+  return match[1]
+    .split(',')
+    .map((time) => parseInt(time.trim().slice(0, 4), 10))
+    .filter(Number.isFinite)
+}
+
+/**
+ * The year in a list that is closest to the one wanted. When two are equally
+ * close, the earlier wins: a game should not show land cover from after its
+ * own years.
+ *
+ * @param {Array<number>} years - The years to choose from
+ * @param {number} wanted - The year wanted
+ * @returns {number|null} The closest year, or null if the list is empty
+ */
+export function nearestYear(years, wanted) {
+  let best = null
+  years.forEach((year) => {
+    const distance = Math.abs(year - wanted)
+    const bestDistance = best == null ? Infinity : Math.abs(best - wanted)
+    if (distance < bestDistance || (distance === bestDistance && year < best)) best = year
+  })
+  return best
+}
+
+/**
  * The address of one land cover picture.
  * @param {Object} image - From `landCoverImages`
+ * @param {number} year - The year of land cover to draw
  * @returns {string} The URL
  */
-function getMapUrl({ west, south, east, north, width, height }) {
+function getMapUrl({ west, south, east, north, width, height }, year) {
   const params = new URLSearchParams({
     SERVICE: 'WMS',
     VERSION: '1.3.0',
@@ -148,26 +196,59 @@ function getMapUrl({ west, south, east, north, width, height }) {
     BBOX: `${west},${south},${east},${north}`,
     WIDTH: width,
     HEIGHT: height,
-    FORMAT: 'image/png'
+    FORMAT: 'image/png',
+    // A bare year is enough; the server matches it to that year's map
+    TIME: String(year)
   })
   return `${landCoverApiUrl}?${params.toString()}`
 }
 
 /**
  * Composable for the land cover download.
- * @returns {{planLandCover: Function}}
+ * @returns {{landCoverYearFor: Function, planLandCover: Function}}
  */
 export function useLandCoverAPI() {
+  /**
+   * The year of land cover a game gets when it asks for a given year: that
+   * year if the server has it, otherwise the closest one it does. A year it
+   * lacks would come back as an error in place of every picture, so the
+   * server's list of years is checked first.
+   *
+   * @param {number} year - The year wanted (the data window's middle year)
+   * @returns {Promise<number>} The year to draw
+   * @throws {Error} When the server cannot be reached or lists no years
+   */
+  async function landCoverYearFor(year) {
+    const params = new URLSearchParams({
+      SERVICE: 'WMS',
+      VERSION: '1.3.0',
+      REQUEST: 'GetCapabilities'
+    })
+    const response = await fetchWithTimeout(`${landCoverApiUrl}?${params.toString()}`, {
+      timeoutMs: gridApiConfig.landCoverTimeoutMs
+    })
+    if (!response.ok) {
+      throw new Error(`Land cover server answered ${response.status}`)
+    }
+    const served = nearestYear(landCoverYears(await response.text()), year)
+    if (served == null) {
+      throw new Error('Land cover server lists no years')
+    }
+    return served
+  }
+
   /**
    * Works out which pictures a set of cells needs, before anything is
    * fetched, so the progress bar can know the size of the job up front.
    *
    * @param {Array<{lat: number, lng: number}>} locations - Cell centers
    * @param {number} cellMeters - Width of a cell, in meters
+   * @param {number} year - The year of land cover, one the server has (see
+   *   `landCoverYearFor`)
    * @returns {{requestCount: number, fetch: Function}} The plan: how many
    *   pictures it takes, and `fetch(onProgress)` to get them
    */
-  function planLandCover(locations, cellMeters) {
+  function planLandCover(locations, cellMeters, year) {
     const meanLat = locations.reduce((sum, { lat }) => sum + lat, 0) / (locations.length || 1)
     const lngPerPixel = metersToLongitudeDegrees(cellMeters, meanLat) / gridApiConfig.pixelsPerCell
     const latPerPixel = metersToLatitudeDegrees(cellMeters) / gridApiConfig.pixelsPerCell
@@ -193,7 +274,7 @@ export function useLandCoverAPI() {
         images,
         async (image) => {
           try {
-            const { width, height, data } = await fetchImagePixels(getMapUrl(image), {
+            const { width, height, data } = await fetchImagePixels(getMapUrl(image, year), {
               timeoutMs: gridApiConfig.landCoverTimeoutMs
             })
             // A picture at another size than asked for (an error page drawn as
@@ -224,5 +305,5 @@ export function useLandCoverAPI() {
     return { requestCount: images.length, fetch: fetchLandCover }
   }
 
-  return { planLandCover }
+  return { landCoverYearFor, planLandCover }
 }

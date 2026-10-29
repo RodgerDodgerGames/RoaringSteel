@@ -7,7 +7,8 @@
  * API: https://api.census.gov/data/timeseries/qwi/sa
  * Requires: VITE_QWI_KEY environment variable
  *
- * Data returned includes employment counts (Emp) by MSA over the last 5 years.
+ * Data returned includes employment counts (Emp) by MSA, by quarter, over the
+ * game's data window (see dataWindow.js).
  *
  * @module composables/setup/useQWI
  */
@@ -20,9 +21,10 @@ import { fetchWithTimeout } from '@/composables/utils'
  *
  * @param {string} state - Two-digit state FIPS code (e.g., "27" for Minnesota)
  * @param {number} industry - NAICS industry code to query
+ * @param {{start: number, end: number}} dataWindow - The years to fetch, inclusive
  * @returns {Object} { data, error, fetchQWI }
  */
-export default function useQWI(state, industry) {
+export default function useQWI(state, industry, dataWindow) {
   const data = ref([])
   const error = ref(null)
 
@@ -40,9 +42,8 @@ export default function useQWI(state, industry) {
       for: `metropolitan statistical area/micropolitan statistical area:*`,
       // for: `metropolitan statistical area/micropolitan statistical area:33460`,
       in: `state:${state}`, // FIPS code for the state
-      // set up time range to get data from the last five years
-      // time: `${new Date().getFullYear() - 5}-Q1`,
-      time: `from ${new Date().getFullYear() - 5} to ${new Date().getFullYear()}`,
+      // every quarter of the data window's years
+      time: `from ${dataWindow.start} to ${dataWindow.end}`,
       industry: industry // NAICS code for all industries
       // ind_level: '3',  // Level of industry detail
     }

@@ -4,8 +4,9 @@
   Modal overlay shown during grid generation.
 
   While the fetch is running it reports the current phase and a progress bar.
-  If generation fails it swaps to the store's error message with a retry, so a
-  failed setup explains itself instead of leaving a stalled bar on screen.
+  If setup fails — the towns or the grid — it swaps to that store's error
+  message with a retry, so a failed setup explains itself instead of leaving a
+  stalled bar on screen.
 
   @prop isActive - Controls modal visibility
   @emits retry   - Player asked to run grid generation again
@@ -16,6 +17,7 @@
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useGridStore } from '@/stores/grid'
+import { useTownsStore } from '@/stores/towns'
 
 defineProps({
   isActive: {
@@ -27,8 +29,12 @@ defineProps({
 defineEmits(['retry', 'cancel'])
 
 const gridStore = useGridStore()
-const { currentPhase, progressPercent, elevationProgress, landCoverProgress, error } =
+const { currentPhase, progressPercent, elevationProgress, landCoverProgress } =
   storeToRefs(gridStore)
+const { error: townsError } = storeToRefs(useTownsStore())
+
+// Towns are set up first, so at most one of the two has failed
+const error = computed(() => townsError.value || gridStore.error)
 
 const phaseLabel = computed(() => {
   switch (currentPhase.value) {

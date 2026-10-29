@@ -25,15 +25,47 @@ vi.mock('@vueuse/core', () => ({
   useLocalStorage: mockUseLocalStorage
 }))
 
-vi.mock('@/composables/setup/useQWI', () => ({
-  default: () => ({
+const mockUseQWI = vi.hoisted(() =>
+  vi.fn(() => ({
     data: mockQWIData,
     error: mockQWIError,
     fetchQWI: mockFetchQWI
-  })
+  }))
+)
+
+vi.mock('@/composables/setup/useQWI', () => ({
+  default: (...args) => mockUseQWI(...args)
 }))
 
 import { useIndustryStore } from '@/stores/industry'
+
+/** A game's data window: QWI from 2021 to 2025 */
+const WINDOW = { start: 2021, end: 2025, middle: 2023 }
+
+/**
+ * localStorage as it stands after an earlier fetch of one industry for one
+ * MSA, built for the given window (none, for a cache from before windows were
+ * recorded). Writes land in `written`, by key.
+ */
+function cacheFrom(window, written = {}) {
+  const stored = {
+    industries_: [{ naics_code: 111, label: 'Agriculture' }],
+    employmentData_: [{ industry: 111, meanEmp: { 12345: 100 } }],
+    MSAs_: ['12345'],
+    industryWindow_: window ?? {}
+  }
+  return (key, defaultValue) => {
+    const prefix = Object.keys(stored).find((name) => key.startsWith(name))
+    const ref = { _value: prefix ? stored[prefix] : defaultValue }
+    return Object.defineProperty(ref, 'value', {
+      get: () => ref._value,
+      set: (value) => {
+        ref._value = value
+        written[key] = value
+      }
+    })
+  }
+}
 
 describe('Industry Store', () => {
   let industryStore
@@ -84,16 +116,81 @@ describe('Industry Store', () => {
         if (key.includes('industries_')) return { value: cachedIndustries }
         if (key.includes('employmentData_')) return { value: cachedEmploymentData }
         if (key.includes('MSAs_')) return { value: cachedMSAs }
+        if (key.includes('industryWindow_')) return { value: { start: 2021, end: 2025 } }
         return { value: [] }
       })
 
-      await industryStore.useIndustryData('27')
+      await industryStore.useIndustryData('27', WINDOW)
 
       expect(industryStore.industries).toEqual(cachedIndustries)
       expect(industryStore.employmentData).toEqual(cachedEmploymentData)
       expect(industryStore.MSAs).toEqual(cachedMSAs)
       // Should not fetch when cached
       expect(mockFetch).not.toHaveBeenCalled()
+    })
+
+    it('should fetch again when the cache was built for another window', async () => {
+      mockUseLocalStorage.mockImplementation(cacheFrom({ start: 2020, end: 2024 }))
+      mockFetch.mockResolvedValue({
+        text: async () => 'naics_code,label,ind_level\n112,Livestock,2'
+      })
+      mockFetchQWI.mockImplementation(async () => {
+        mockQWIData.value = [{ Emp: 40, msa_code: '22222' }]
+      })
+
+      await industryStore.useIndustryData('27', WINDOW)
+
+      expect(mockFetchQWI).toHaveBeenCalled()
+      expect(industryStore.employmentData.map((e) => e.industry)).toEqual([112])
+      expect(industryStore.MSAs).toEqual(['22222'])
+    })
+
+    it('should fetch again when the cache records no window', async () => {
+      mockUseLocalStorage.mockImplementation(cacheFrom(null))
+
+      await industryStore.useIndustryData('27', WINDOW)
+
+      expect(mockFetch).toHaveBeenCalled()
+    })
+
+    it("should fetch each industry over the data window's years", async () => {
+      mockFetch.mockResolvedValue({
+        text: async () => 'naics_code,label,ind_level\n111,Agriculture,2'
+      })
+
+      await industryStore.useIndustryData('27', WINDOW)
+
+      expect(mockUseQWI).toHaveBeenCalledWith('27', 111, WINDOW)
+    })
+
+    it('should record the window the cache was built for', async () => {
+      const written = {}
+      mockUseLocalStorage.mockImplementation(cacheFrom(null, written))
+      mockFetch.mockResolvedValue({
+        text: async () => 'naics_code,label,ind_level\n111,Agriculture,2'
+      })
+      mockFetchQWI.mockImplementation(async () => {
+        mockQWIData.value = [{ Emp: 100, msa_code: '12345' }]
+      })
+
+      await industryStore.useIndustryData('27', WINDOW)
+
+      expect(written.industryWindow_27).toEqual({ start: 2021, end: 2025 })
+    })
+
+    it("should not add a fetch onto an earlier fetch's data", async () => {
+      mockFetch.mockResolvedValue({
+        text: async () => 'naics_code,label,ind_level\n111,Agriculture,2'
+      })
+      mockFetchQWI.mockImplementation(async () => {
+        mockQWIData.value = [{ Emp: 100, msa_code: '12345' }]
+      })
+
+      await industryStore.useIndustryData('27', WINDOW)
+      await industryStore.useIndustryData('27', { start: 2022, end: 2026, middle: 2024 })
+
+      expect(industryStore.employmentData).toHaveLength(1)
+      expect(industryStore.MSAs).toEqual(['12345'])
     })
   })
 
@@ -106,7 +203,7 @@ describe('Industry Store', () => {
         return { text: async () => 'naics_code,label,ind_level\n111,Agriculture,2' }
       })
 
-      await industryStore.useIndustryData('27')
+      await industryStore.useIndustryData('27', WINDOW)
 
       expect(loadingStates[0].csv).toBe(true)
       expect(industryStore.isLoadingCSV).toBe(false)
@@ -124,7 +221,7 @@ describe('Industry Store', () => {
         mockQWIData.value = [{ Emp: 100, msa_code: '12345' }]
       })
 
-      await industryStore.useIndustryData('27')
+      await industryStore.useIndustryData('27', WINDOW)
 
       expect(loadingStates[0].qwi).toBe(true)
       expect(industryStore.isLoadingQWI).toBe(false)
@@ -136,7 +233,7 @@ describe('Industry Store', () => {
       mockFetch.mockRejectedValue(new Error('Network error'))
 
       // Should not throw
-      await industryStore.useIndustryData('27')
+      await industryStore.useIndustryData('27', WINDOW)
 
       expect(industryStore.isLoadingCSV).toBe(false)
       expect(industryStore.industries).toEqual([])
@@ -145,7 +242,7 @@ describe('Industry Store', () => {
     it('should not proceed to QWI fetch when CSV fails', async () => {
       mockFetch.mockRejectedValue(new Error('Network error'))
 
-      await industryStore.useIndustryData('27')
+      await industryStore.useIndustryData('27', WINDOW)
 
       expect(mockFetchQWI).not.toHaveBeenCalled()
     })
@@ -165,7 +262,7 @@ describe('Industry Store', () => {
       })
 
       // Should not throw
-      await industryStore.useIndustryData('27')
+      await industryStore.useIndustryData('27', WINDOW)
 
       expect(industryStore.isLoadingQWI).toBe(false)
       // Should have processed second industry despite first one erroring
@@ -181,7 +278,7 @@ describe('Industry Store', () => {
         mockQWIError.value = 'API rate limit exceeded'
       })
 
-      await industryStore.useIndustryData('27')
+      await industryStore.useIndustryData('27', WINDOW)
 
       expect(industryStore.isLoadingQWI).toBe(false)
       expect(industryStore.employmentData).toEqual([])
@@ -207,7 +304,7 @@ describe('Industry Store', () => {
         }
       })
 
-      await industryStore.useIndustryData('27')
+      await industryStore.useIndustryData('27', WINDOW)
 
       // Only the second industry should be in employmentData
       expect(industryStore.employmentData.length).toBe(1)
@@ -227,7 +324,7 @@ describe('Industry Store', () => {
         ]
       })
 
-      await industryStore.useIndustryData('27')
+      await industryStore.useIndustryData('27', WINDOW)
 
       expect(industryStore.employmentData[0].meanEmp['12345']).toBe(150) // (100+200)/2
       expect(industryStore.employmentData[0].meanEmp['12346']).toBe(300) // 300/1
@@ -245,7 +342,7 @@ describe('Industry Store', () => {
         ]
       })
 
-      await industryStore.useIndustryData('27')
+      await industryStore.useIndustryData('27', WINDOW)
 
       expect(industryStore.MSAs).toContain('12345')
       expect(industryStore.MSAs).toContain('12346')
@@ -268,7 +365,7 @@ describe('Industry Store', () => {
         }
       })
 
-      await industryStore.useIndustryData('27')
+      await industryStore.useIndustryData('27', WINDOW)
 
       // Agriculture proportion should be capped at 0.2 despite being ~99% of employment
       const agricultureData = industryStore.employmentData.find((e) => e.industry === 111)

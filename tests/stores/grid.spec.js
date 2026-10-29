@@ -7,7 +7,7 @@
  * - Progress reporting
  * - Error handling and surfacing
  * - Which cells are kept
- * - Cache usage
+ * - Cache usage, and the land cover year it was built for
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -19,6 +19,7 @@ const mockFetchElevations = vi.hoisted(() => vi.fn())
 const mockFetchLandCover = vi.hoisted(() => vi.fn())
 const mockPlanElevations = vi.hoisted(() => vi.fn())
 const mockPlanLandCover = vi.hoisted(() => vi.fn())
+const mockLandCoverYearFor = vi.hoisted(() => vi.fn())
 const mockUseLocalStorage = vi.hoisted(() => vi.fn())
 
 // Mock dependencies before any imports
@@ -31,7 +32,10 @@ vi.mock('@/composables/setup/useElevationTiles', () => ({
 }))
 
 vi.mock('@/composables/setup/useLandCoverAPI', () => ({
-  useLandCoverAPI: () => ({ planLandCover: mockPlanLandCover })
+  useLandCoverAPI: () => ({
+    landCoverYearFor: mockLandCoverYearFor,
+    planLandCover: mockPlanLandCover
+  })
 }))
 
 vi.mock('@/composables/setup/useMapSupport', () => ({
@@ -53,6 +57,30 @@ const BOUNDS_2_CELLS = [-95, 44, -94.8, 44.1] // 1 row x 2 cols
 const BOUNDS_4_CELLS = [-95, 44, -94.8, 44.2] // 2 rows x 2 cols
 const BOUNDS_NO_CELLS = [-95, 44, -94.9, 44.1] // 1 row x 0 cols
 
+/** The year land cover is asked for: the middle of a 2021-2025 data window */
+const YEAR = 2023
+
+/** A grid as the cache holds one */
+const CACHED_CELLS = [{ id: '0-0', elevation: 100, landCover: 5, cost: 10 }]
+
+/**
+ * localStorage holding the given grid cache. Writes land in `written`.
+ * @param {*} cached - What the grid key holds
+ * @param {Object} [written] - Collects what is written, by key
+ */
+function gridCache(cached, written = {}) {
+  return (key) => {
+    const ref = { _value: cached }
+    return Object.defineProperty(ref, 'value', {
+      get: () => ref._value,
+      set: (value) => {
+        ref._value = value
+        written[key] = value
+      }
+    })
+  }
+}
+
 /** The land cover cost of open water, which is how a water cell is known */
 const WATER = nlcdCostMap[11]
 
@@ -70,6 +98,7 @@ describe('Grid Store', () => {
     mockPlanLandCover.mockImplementation(() => ({ requestCount: 1, fetch: mockFetchLandCover }))
     mockFetchElevations.mockResolvedValue([])
     mockFetchLandCover.mockResolvedValue(landCover())
+    mockLandCoverYearFor.mockImplementation(async (year) => year)
     gridStore = useGridStore()
     gridStore.reset()
   })
@@ -101,24 +130,80 @@ describe('Grid Store', () => {
   })
 
   describe('generateGrid with cached data', () => {
-    it('should use cached grid data when available', async () => {
-      const cachedData = [{ id: '0-0', elevation: 100, landCover: 5, cost: 10 }]
-      mockUseLocalStorage.mockReturnValue({ value: cachedData })
+    it('should use a cached grid built for the same year', async () => {
+      mockUseLocalStorage.mockImplementation(
+        gridCache({ landCoverYear: YEAR, cells: CACHED_CELLS })
+      )
 
-      const result = await gridStore.generateGrid('27', [-95, 44, -94, 45], 10000)
+      const result = await gridStore.generateGrid('27', [-95, 44, -94, 45], 10000, YEAR)
 
       expect(result).toBe(true)
-      expect(gridStore.grid).toEqual(cachedData)
+      expect(gridStore.grid).toEqual(CACHED_CELLS)
       expect(gridStore.isGridGenerated).toBe(true)
+      expect(mockLandCoverYearFor).not.toHaveBeenCalled()
+      expect(mockFetchElevations).not.toHaveBeenCalled()
+      expect(mockFetchLandCover).not.toHaveBeenCalled()
     })
 
-    it('should not fetch data when cache exists', async () => {
-      mockUseLocalStorage.mockReturnValue({
-        value: [{ id: '0-0', elevation: 100, landCover: 5, cost: 10 }]
-      })
+    it('should build the grid again for another year', async () => {
+      mockUseLocalStorage.mockImplementation(
+        gridCache({ landCoverYear: YEAR - 1, cells: CACHED_CELLS })
+      )
+      mockFetchElevations.mockResolvedValue([100, 200])
+      mockFetchLandCover.mockResolvedValue(landCover(5, 7))
 
-      await gridStore.generateGrid('27', [-95, 44, -94, 45], 10000)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
+      expect(mockFetchLandCover).toHaveBeenCalled()
+      expect(gridStore.grid.map((cell) => cell.id)).toEqual(['0-0', '0-1'])
+    })
+
+    it('should build the grid again from a cache that records no year', async () => {
+      // How grids were cached before the year was recorded: a bare list
+      mockUseLocalStorage.mockImplementation(gridCache(CACHED_CELLS))
+      mockFetchElevations.mockResolvedValue([100, 200])
+      mockFetchLandCover.mockResolvedValue(landCover(5, 7))
+
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
+
+      expect(mockFetchLandCover).toHaveBeenCalled()
+      expect(gridStore.grid.map((cell) => cell.id)).toEqual(['0-0', '0-1'])
+    })
+
+    it('should cache a new grid with the year it was asked for', async () => {
+      const written = {}
+      mockUseLocalStorage.mockImplementation(gridCache({}, written))
+      // The server's closest year differs; the cache is still for the year asked
+      mockLandCoverYearFor.mockResolvedValue(YEAR - 1)
+      mockFetchElevations.mockResolvedValue([100, 200])
+      mockFetchLandCover.mockResolvedValue(landCover(5, 7))
+
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
+
+      expect(written.cachedGrid_27).toEqual({ landCoverYear: YEAR, cells: gridStore.grid })
+    })
+  })
+
+  describe('generateGrid land cover year', () => {
+    it('should draw land cover from the year the server has closest to the one asked', async () => {
+      mockLandCoverYearFor.mockResolvedValue(2021)
+      mockFetchElevations.mockResolvedValue([100, 200])
+      mockFetchLandCover.mockResolvedValue(landCover(5, 7))
+
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
+
+      expect(mockLandCoverYearFor).toHaveBeenCalledWith(YEAR)
+      expect(mockPlanLandCover.mock.calls[0][2]).toBe(2021)
+    })
+
+    it("should end on its error screen if the server's years cannot be had", async () => {
+      mockLandCoverYearFor.mockRejectedValue(new Error('Land cover server answered 503'))
+
+      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
+
+      expect(result).toBe(false)
+      expect(gridStore.error).toMatch(/land cover server/)
+      expect(gridStore.currentPhase).toBe('')
       expect(mockFetchElevations).not.toHaveBeenCalled()
       expect(mockFetchLandCover).not.toHaveBeenCalled()
     })
@@ -134,7 +219,7 @@ describe('Grid Store', () => {
       })
       mockFetchLandCover.mockResolvedValue(landCover(5, 5))
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(loadingStates[0].elevation).toBe(true)
       expect(gridStore.isLoadingElevation).toBe(false)
@@ -151,7 +236,7 @@ describe('Grid Store', () => {
         return landCover(5, 5, 5, 5)
       })
 
-      await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000, YEAR)
 
       expect(wasLoadingLandCover).toBe(true)
       expect(gridStore.isLoadingLandCover).toBe(false)
@@ -161,7 +246,7 @@ describe('Grid Store', () => {
       mockFetchElevations.mockResolvedValue([100, 200])
       mockFetchLandCover.mockResolvedValue(landCover(5, 5))
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(gridStore.isLoadingElevation).toBe(false)
       expect(gridStore.isLoadingLandCover).toBe(false)
@@ -173,7 +258,7 @@ describe('Grid Store', () => {
       mockFetchElevations.mockRejectedValue(new Error('Elevation error'))
 
       // Should not throw
-      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(result).toBe(false)
       expect(gridStore.isLoadingElevation).toBe(false)
@@ -183,7 +268,7 @@ describe('Grid Store', () => {
     it('should surface an error message when elevation fails', async () => {
       mockFetchElevations.mockRejectedValue(new Error('Elevation error'))
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(gridStore.error).toMatch(/elevation/i)
     })
@@ -191,7 +276,7 @@ describe('Grid Store', () => {
     it('should clear the phase on failure so the progress UI can move on', async () => {
       mockFetchElevations.mockRejectedValue(new Error('Elevation error'))
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(gridStore.currentPhase).toBe('')
     })
@@ -199,7 +284,7 @@ describe('Grid Store', () => {
     it('should not proceed to land cover when elevation fails', async () => {
       mockFetchElevations.mockRejectedValue(new Error('Elevation error'))
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(mockFetchLandCover).not.toHaveBeenCalled()
     })
@@ -209,7 +294,7 @@ describe('Grid Store', () => {
       mockFetchLandCover.mockRejectedValue(new Error('Land cover error'))
 
       // Should not throw
-      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(result).toBe(false)
       expect(gridStore.isLoadingLandCover).toBe(false)
@@ -221,7 +306,7 @@ describe('Grid Store', () => {
       // Every tile failed, so there is nothing worth asking land cover about
       mockFetchElevations.mockResolvedValue([null, null])
 
-      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(result).toBe(false)
       expect(gridStore.error).toMatch(/elevation/i)
@@ -233,7 +318,7 @@ describe('Grid Store', () => {
       // run would otherwise reach the end and cache a grid full of holes.
       mockFetchElevations.mockResolvedValue([100, null, null, null])
 
-      const result = await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000)
+      const result = await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000, YEAR)
 
       expect(result).toBe(false)
       expect(gridStore.isGridGenerated).toBe(false)
@@ -246,7 +331,7 @@ describe('Grid Store', () => {
       mockUseLocalStorage.mockReturnValue(cacheEntry)
       mockFetchElevations.mockResolvedValue([100, null, null, null])
 
-      await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000, YEAR)
 
       // A cached fragment would be reused on every future game in this state
       expect(cacheEntry.value).toEqual([])
@@ -258,7 +343,7 @@ describe('Grid Store', () => {
       mockFetchElevations.mockResolvedValue([0, 0, 0, 400])
       mockFetchLandCover.mockResolvedValue(landCover(5, 5, 5, 5))
 
-      const result = await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000)
+      const result = await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000, YEAR)
 
       expect(result).toBe(true)
       expect(gridStore.error).toBeNull()
@@ -270,7 +355,7 @@ describe('Grid Store', () => {
       mockFetchElevations.mockResolvedValue([100, 200, 300, 400])
       mockFetchLandCover.mockResolvedValue({ costs: [5, null, null, null], failed: 3 })
 
-      const result = await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000)
+      const result = await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000, YEAR)
 
       expect(result).toBe(false)
       expect(gridStore.isGridGenerated).toBe(false)
@@ -283,7 +368,7 @@ describe('Grid Store', () => {
       mockFetchElevations.mockResolvedValue([100, 200, 300, 400])
       mockFetchLandCover.mockResolvedValue({ costs: [5, null, null, null], failed: 3 })
 
-      await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000, YEAR)
 
       // A cached fragment would be reused on every future game in this state
       expect(cacheEntry.value).toEqual([])
@@ -293,7 +378,7 @@ describe('Grid Store', () => {
       mockFetchElevations.mockResolvedValue([100, 200])
       mockFetchLandCover.mockResolvedValue({ costs: [null, null], failed: 2 })
 
-      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(result).toBe(false)
       expect(gridStore.isGridGenerated).toBe(false)
@@ -306,7 +391,7 @@ describe('Grid Store', () => {
       mockFetchElevations.mockResolvedValue([100, 200, 300, 400])
       mockFetchLandCover.mockResolvedValue({ costs: [5, null, null, null], failed: 0 })
 
-      const result = await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000)
+      const result = await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000, YEAR)
 
       expect(result).toBe(true)
       expect(gridStore.grid).toHaveLength(1)
@@ -316,7 +401,7 @@ describe('Grid Store', () => {
       mockFetchElevations.mockResolvedValue([100, 200])
       mockFetchLandCover.mockResolvedValue(landCover(null, null))
 
-      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(result).toBe(false)
       expect(gridStore.error).toMatch(/no terrain data/i)
@@ -328,7 +413,7 @@ describe('Grid Store', () => {
         throw new RangeError('Maximum call stack size exceeded')
       })
 
-      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(result).toBe(false)
       expect(gridStore.error).toMatch(/terrain downloads/i)
@@ -337,7 +422,7 @@ describe('Grid Store', () => {
     })
 
     it('should report a failure when the region is too small to hold a cell', async () => {
-      const result = await gridStore.generateGrid('27', BOUNDS_NO_CELLS, 10000)
+      const result = await gridStore.generateGrid('27', BOUNDS_NO_CELLS, 10000, YEAR)
 
       expect(result).toBe(false)
       expect(gridStore.error).toMatch(/too small/i)
@@ -346,13 +431,13 @@ describe('Grid Store', () => {
 
     it('should clear a previous error when generation is retried', async () => {
       mockFetchElevations.mockRejectedValueOnce(new Error('Elevation error'))
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
       expect(gridStore.error).not.toBeNull()
 
       mockFetchElevations.mockResolvedValue([100, 200])
       mockFetchLandCover.mockResolvedValue(landCover(5, 5))
 
-      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(result).toBe(true)
       expect(gridStore.error).toBeNull()
@@ -364,7 +449,7 @@ describe('Grid Store', () => {
       mockFetchElevations.mockResolvedValue([100, 200])
       mockFetchLandCover.mockResolvedValue(landCover(5, 5))
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       const [elevationLocations, elevationCellSize] = mockPlanElevations.mock.calls[0]
       const [landCoverLocations, landCoverCellSize] = mockPlanLandCover.mock.calls[0]
@@ -380,7 +465,7 @@ describe('Grid Store', () => {
       mockFetchElevations.mockResolvedValue([0, 100])
       mockFetchLandCover.mockResolvedValue(landCover(5, 5))
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(gridStore.grid.map((cell) => cell.id)).toEqual(['0-0', '0-1'])
       expect(gridStore.grid.every((cell) => Number.isFinite(cell.cost))).toBe(true)
@@ -390,7 +475,7 @@ describe('Grid Store', () => {
       mockFetchElevations.mockResolvedValue([-20, 100])
       mockFetchLandCover.mockResolvedValue(landCover(5, 5))
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(gridStore.grid.map((cell) => cell.elevation)).toEqual([-20, 100])
     })
@@ -400,7 +485,7 @@ describe('Grid Store', () => {
       mockFetchElevations.mockResolvedValue([-30, 100])
       mockFetchLandCover.mockResolvedValue(landCover(WATER, 5))
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(gridStore.grid.map((cell) => cell.id)).toEqual(['0-1'])
     })
@@ -409,7 +494,7 @@ describe('Grid Store', () => {
       mockFetchElevations.mockResolvedValue([300, 310])
       mockFetchLandCover.mockResolvedValue(landCover(WATER, 5))
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(gridStore.grid.map((cell) => [cell.id, cell.landCover])).toEqual([
         ['0-0', WATER],
@@ -423,7 +508,7 @@ describe('Grid Store', () => {
       mockFetchElevations.mockResolvedValue([null, 200, 300, 400])
       mockFetchLandCover.mockResolvedValue(landCover(7, 8, 9, 10))
 
-      await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000, YEAR)
 
       expect(gridStore.grid.map((cell) => cell.id)).toEqual(['0-1', '1-0', '1-1'])
       expect(gridStore.grid.map((cell) => cell.landCover)).toEqual([8, 9, 10])
@@ -433,7 +518,7 @@ describe('Grid Store', () => {
       mockFetchElevations.mockResolvedValue([100, 200])
       mockFetchLandCover.mockResolvedValue(landCover(5, 7))
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(gridStore.grid.map((cell) => [cell.id, cell.elevation, cell.landCover])).toEqual([
         ['0-0', 100, 5],
@@ -445,7 +530,7 @@ describe('Grid Store', () => {
       mockFetchElevations.mockResolvedValue([100, 200])
       mockFetchLandCover.mockResolvedValue(landCover(5, 5))
 
-      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(result).toBe(true)
       expect(gridStore.isGridGenerated).toBe(true)
@@ -461,7 +546,7 @@ describe('Grid Store', () => {
       mockFetchElevations.mockResolvedValue([100, 200])
       mockFetchLandCover.mockResolvedValue(landCover(5, 7))
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(gridStore.grid).toHaveLength(2)
       expect(gridStore.grid.map((cell) => cell.id)).toEqual(['0-0', '0-1'])
@@ -473,7 +558,7 @@ describe('Grid Store', () => {
       mockFetchElevations.mockResolvedValue([100, 150, 120, 180])
       mockFetchLandCover.mockResolvedValue(landCover(10, 10, 10, 10))
 
-      await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000, YEAR)
 
       // Each cell should have a cost calculated
       gridStore.grid.forEach((cell) => {
@@ -495,7 +580,7 @@ describe('Grid Store', () => {
       })
       mockFetchLandCover.mockResolvedValue(landCover(5, 5))
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(landCoverTotalDuringElevation).toBe(4)
     })
@@ -544,7 +629,7 @@ describe('Grid Store', () => {
     it('should drop the error without discarding the grid', async () => {
       mockFetchElevations.mockResolvedValue([100, 200])
       mockFetchLandCover.mockResolvedValue(landCover(5, 5))
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
       const generated = gridStore.grid
 
       gridStore.error = 'something went wrong'
@@ -558,7 +643,7 @@ describe('Grid Store', () => {
   describe('reset', () => {
     it('should clear progress and error state along with the grid', async () => {
       mockFetchElevations.mockRejectedValue(new Error('Elevation error'))
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
       expect(gridStore.error).not.toBeNull()
 
       gridStore.reset()

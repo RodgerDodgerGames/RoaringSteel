@@ -61,8 +61,8 @@ export const CREDIT_GROUPS = [
           'Oceanic and Atmospheric Administration.'
       },
       {
-        name: 'National Land Cover Database (NLCD 2021)',
-        url: 'https://www.mrlc.gov/',
+        name: 'Annual National Land Cover Database (Annual NLCD)',
+        url: 'https://www.mrlc.gov/data/project/annual-nlcd',
         note: 'Land cover, from the U.S. Geological Survey and the MRLC Consortium'
       }
     ]

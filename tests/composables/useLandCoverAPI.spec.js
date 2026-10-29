@@ -4,7 +4,8 @@
  * How a pixel's color is read as an NLCD class, how a set of cells is laid
  * out over land cover pictures, and how the pictures become one cost per
  * cell. The image download itself needs a browser, so it is stood in for
- * with pixels made here.
+ * with pixels made here. Also which year of land cover a game gets, from the
+ * years the server lists.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -12,9 +13,15 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 const mockFetchImagePixels = vi.hoisted(() => vi.fn())
 vi.mock('@/composables/setup/imagePixels', () => ({ fetchImagePixels: mockFetchImagePixels }))
 
+// The server's list of years comes from a plain fetch
+const mockFetch = vi.hoisted(() => vi.fn())
+vi.stubGlobal('fetch', mockFetch)
+
 import {
   landCoverClass,
   landCoverImages,
+  landCoverYears,
+  nearestYear,
   useLandCoverAPI
 } from '@/composables/setup/useLandCoverAPI'
 import { nlcdCostMap, nlcdLegendColors } from '@/config/nlcd'
@@ -35,6 +42,23 @@ function answerWith(rgb) {
   }
 }
 
+/**
+ * A GetCapabilities answer listing the given years, in the form the Annual
+ * NLCD server writes them (checked against its real answer, 2026-10-28)
+ */
+function capabilitiesWith(years) {
+  const times = years.map((year) => `${year}-01-01T00:00:00.000Z`).join(',')
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?><WMS_Capabilities version="1.3.0"><Capability>' +
+    '<Layer><Name>Land-Cover-Native_conus_year_data</Name>' +
+    `<Dimension name="time" default="current" units="ISO8601">${times}</Dimension>` +
+    '</Layer></Capability></WMS_Capabilities>'
+  )
+}
+
+/** Every year Annual NLCD has today */
+const ANNUAL_NLCD_YEARS = Array.from({ length: 41 }, (_, i) => 1985 + i)
+
 const hex = (color) => [0, 2, 4].map((i) => parseInt(color.slice(i, i + 2), 16))
 
 describe('landCoverClass', () => {
@@ -45,8 +69,8 @@ describe('landCoverClass', () => {
   })
 
   it("should read the server's own, slightly shifted, colors as the right classes", () => {
-    // Every color found in a real pull of Massachusetts (2026-10-26), none of
-    // them exactly the legend's
+    // Every color found in a real pull of Massachusetts from the NLCD's other
+    // server, mrlc.gov (2026-10-26), none of them exactly the legend's
     const sampled = {
       '476ba0': 11,
       ddc9c9: 21,
@@ -159,7 +183,7 @@ describe('useLandCoverAPI', () => {
     mockFetchImagePixels.mockImplementation(answerWith(hex('68aa63')))
     const { planLandCover } = useLandCoverAPI()
 
-    const result = await planLandCover(locations, 10000).fetch()
+    const result = await planLandCover(locations, 10000, 2023).fetch()
 
     expect(result).toEqual({ costs: [nlcdCostMap[41], nlcdCostMap[41]], failed: 0 })
   })
@@ -169,7 +193,7 @@ describe('useLandCoverAPI', () => {
     mockFetchImagePixels.mockImplementation(answerWith([255, 255, 255]))
     const { planLandCover } = useLandCoverAPI()
 
-    const result = await planLandCover(locations, 10000).fetch()
+    const result = await planLandCover(locations, 10000, 2023).fetch()
 
     expect(result).toEqual({ costs: [null, null], failed: 0 })
   })
@@ -184,7 +208,7 @@ describe('useLandCoverAPI', () => {
       .mockRejectedValueOnce(new Error('Request timed out after 30000ms'))
       .mockImplementationOnce(answerWith(hex('dbd83d')))
     const { planLandCover } = useLandCoverAPI()
-    const plan = planLandCover(apart, 10000)
+    const plan = planLandCover(apart, 10000, 2023)
 
     const result = await plan.fetch()
 
@@ -197,19 +221,21 @@ describe('useLandCoverAPI', () => {
     mockFetchImagePixels.mockResolvedValue(imageOf(256, 256, hex('68aa63')))
     const { planLandCover } = useLandCoverAPI()
 
-    const result = await planLandCover(locations, 10000).fetch()
+    const result = await planLandCover(locations, 10000, 2023).fetch()
 
     expect(result).toEqual({ costs: [null, null], failed: 2 })
   })
 
-  it('should ask the NLCD server for a picture of the area', async () => {
+  it("should ask the Annual NLCD server for a picture of the area in the game's year", async () => {
     mockFetchImagePixels.mockImplementation(answerWith(hex('68aa63')))
     const { planLandCover } = useLandCoverAPI()
 
-    await planLandCover(locations, 10000).fetch()
+    await planLandCover(locations, 10000, 2023).fetch()
 
     const url = new URL(mockFetchImagePixels.mock.calls[0][0])
-    expect(url.origin).toBe('https://www.mrlc.gov')
+    expect(url.origin).toBe('https://dmsdata.cr.usgs.gov')
+    expect(url.searchParams.get('LAYERS')).toBe('Land-Cover-Native_conus_year_data')
+    expect(url.searchParams.get('TIME')).toBe('2023')
     expect(url.searchParams.get('REQUEST')).toBe('GetMap')
     expect(url.searchParams.get('CRS')).toBe('CRS:84')
     expect(url.searchParams.get('FORMAT')).toBe('image/png')
@@ -227,8 +253,84 @@ describe('useLandCoverAPI', () => {
     const onProgress = vi.fn()
     const { planLandCover } = useLandCoverAPI()
 
-    await planLandCover(locations, 10000).fetch(onProgress)
+    await planLandCover(locations, 10000, 2023).fetch(onProgress)
 
     expect(onProgress.mock.calls).toEqual([[1, 1]])
+  })
+})
+
+describe('landCoverYears', () => {
+  it("should list the years in the server's time dimension", () => {
+    expect(landCoverYears(capabilitiesWith(ANNUAL_NLCD_YEARS))).toEqual(ANNUAL_NLCD_YEARS)
+  })
+
+  it('should list nothing, rather than one wrong year, for times given as a range', () => {
+    const ranged = capabilitiesWith([]).replace(
+      '></Dimension>',
+      '>1985-01-01T00:00:00.000Z/2025-01-01T00:00:00.000Z/P1Y</Dimension>'
+    )
+    expect(landCoverYears(ranged)).toEqual([])
+  })
+
+  it('should list nothing when the server describes no time dimension', () => {
+    expect(landCoverYears('<WMS_Capabilities><Layer></Layer></WMS_Capabilities>')).toEqual([])
+  })
+})
+
+describe('nearestYear', () => {
+  it('should take the year asked for when it is there', () => {
+    expect(nearestYear(ANNUAL_NLCD_YEARS, 2023)).toBe(2023)
+  })
+
+  it('should take the closest year when the one asked for is not there', () => {
+    expect(nearestYear(ANNUAL_NLCD_YEARS, 2027)).toBe(2025)
+    expect(nearestYear(ANNUAL_NLCD_YEARS, 1970)).toBe(1985)
+  })
+
+  it('should take the earlier of two equally close years', () => {
+    expect(nearestYear([2019, 2021], 2020)).toBe(2019)
+    expect(nearestYear([2021, 2019], 2020)).toBe(2019)
+  })
+
+  it('should be null for no years', () => {
+    expect(nearestYear([], 2023)).toBeNull()
+  })
+})
+
+describe('landCoverYearFor', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('should ask the server for its description, and pick from the years it lists', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => capabilitiesWith([2019, 2020, 2021])
+    })
+    const { landCoverYearFor } = useLandCoverAPI()
+
+    await expect(landCoverYearFor(2023)).resolves.toBe(2021)
+    const url = new URL(mockFetch.mock.calls[0][0])
+    expect(url.origin).toBe('https://dmsdata.cr.usgs.gov')
+    expect(url.searchParams.get('REQUEST')).toBe('GetCapabilities')
+  })
+
+  it('should fail when the server answers with an error', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 503, text: async () => '' })
+    const { landCoverYearFor } = useLandCoverAPI()
+
+    await expect(landCoverYearFor(2023)).rejects.toThrow('503')
+  })
+
+  it('should fail when the server lists no years', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => '<WMS_Capabilities></WMS_Capabilities>'
+    })
+    const { landCoverYearFor } = useLandCoverAPI()
+
+    await expect(landCoverYearFor(2023)).rejects.toThrow('no years')
   })
 })

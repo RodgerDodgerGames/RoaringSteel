@@ -93,6 +93,9 @@ async function handlePlayGameClick() {
   try {
     // run setup towns after the region is selected
     await townsStore.setupTowns(region.value.properties.STATE)
+    // Leave the modal up on failure, as for the grid below: it shows the
+    // error and offers a retry
+    if (townsStore.error) return
     // build the demand deck, then deal every player their opening hand in
     // turn order — the players were confirmed before the region was picked
     demandCardsStore.generateDemandCards()
@@ -103,7 +106,8 @@ async function handlePlayGameClick() {
     const generated = await gridStore.generateGrid(
       region.value.properties.STATE,
       bounds,
-      gridConfig.cellSize
+      gridConfig.cellSize,
+      townsStore.dataWindow.middle
     )
 
     // Leave the modal up on failure so it can show the error and offer a retry.
@@ -137,16 +141,18 @@ async function handleNewGame() {
   currentView.value = 'welcome'
 }
 
-// Player asked to retry after a failed grid setup
+// Player asked to retry after a failed town or grid setup
 function handleSetupRetry() {
   // Drop the error first so the modal shows progress again straight away,
   // rather than sitting on the old message through the town setup fetch.
+  townsStore.clearError()
   gridStore.clearError()
   handlePlayGameClick()
 }
 
-// Player backed out of a failed grid setup
+// Player backed out of a failed town or grid setup
 function handleSetupCancel() {
+  townsStore.clearError()
   gridStore.reset()
   isSettingUpGame.value = false
 }

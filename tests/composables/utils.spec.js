@@ -194,6 +194,19 @@ describe('fetchWithTimeout', () => {
     await expect(response.json()).rejects.toThrow(/timed out/i)
   })
 
+  it('should keep the ceiling armed while an image body is read', async () => {
+    // Terrain arrives as images, read with blob(). A stall part-way through
+    // an image must end the request just as one part-way through JSON does.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, status: 200, blob: () => new Promise(() => {}) })
+    )
+
+    const response = await fetchWithTimeout('https://example.test', { timeoutMs: 20 })
+
+    await expect(response.blob()).rejects.toThrow(/timed out/i)
+  })
+
   it('should spend one budget across headers and body, not one each', async () => {
     vi.useFakeTimers()
     vi.stubGlobal(

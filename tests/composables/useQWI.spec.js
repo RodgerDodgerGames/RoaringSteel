@@ -15,6 +15,9 @@ vi.stubEnv('VITE_QWI_KEY', 'test-api-key')
 
 import useQWI from '@/composables/setup/useQWI'
 
+/** A game's data window: QWI from 2021 to 2025 */
+const WINDOW = { start: 2021, end: 2025, middle: 2023 }
+
 describe('useQWI Composable', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -22,14 +25,14 @@ describe('useQWI Composable', () => {
 
   describe('Initial State', () => {
     it('should return empty data and no error initially', () => {
-      const { data, error } = useQWI('27', 111)
+      const { data, error } = useQWI('27', 111, WINDOW)
 
       expect(data.value).toEqual([])
       expect(error.value).toBeNull()
     })
 
     it('should have a fetchQWI function', () => {
-      const { fetchQWI } = useQWI('27', 111)
+      const { fetchQWI } = useQWI('27', 111, WINDOW)
       expect(typeof fetchQWI).toBe('function')
     })
   })
@@ -48,7 +51,7 @@ describe('useQWI Composable', () => {
         json: async () => mockResponse
       })
 
-      const { data, fetchQWI } = useQWI('27', 111)
+      const { data, fetchQWI } = useQWI('27', 111, WINDOW)
       await fetchQWI()
 
       expect(data.value).toHaveLength(2)
@@ -78,7 +81,7 @@ describe('useQWI Composable', () => {
         json: async () => mockResponse
       })
 
-      const { data, fetchQWI } = useQWI('27', 111)
+      const { data, fetchQWI } = useQWI('27', 111, WINDOW)
       await fetchQWI()
 
       expect(data.value[0]).toHaveProperty('msa_code', '12345')
@@ -97,7 +100,7 @@ describe('useQWI Composable', () => {
         json: async () => mockResponse
       })
 
-      const { data, fetchQWI } = useQWI('27', 111)
+      const { data, fetchQWI } = useQWI('27', 111, WINDOW)
       await fetchQWI()
 
       // Should not include header row
@@ -111,7 +114,7 @@ describe('useQWI Composable', () => {
         status: 204
       })
 
-      const { data, error, fetchQWI } = useQWI('27', 111)
+      const { data, error, fetchQWI } = useQWI('27', 111, WINDOW)
       await fetchQWI()
 
       expect(data.value).toEqual([])
@@ -128,7 +131,7 @@ describe('useQWI Composable', () => {
         text: async () => errorResponse
       })
 
-      const { error, fetchQWI } = useQWI('27', 111)
+      const { error, fetchQWI } = useQWI('27', 111, WINDOW)
       await fetchQWI()
 
       expect(error.value).toContain('401')
@@ -138,7 +141,7 @@ describe('useQWI Composable', () => {
     it('should handle fetch network error', async () => {
       mockFetch.mockRejectedValue(new Error('Network error'))
 
-      const { error, fetchQWI } = useQWI('27', 111)
+      const { error, fetchQWI } = useQWI('27', 111, WINDOW)
       await fetchQWI()
 
       expect(error.value).toContain('Network error')
@@ -147,7 +150,7 @@ describe('useQWI Composable', () => {
     it('should not throw on error', async () => {
       mockFetch.mockRejectedValue(new Error('Connection failed'))
 
-      const { fetchQWI } = useQWI('27', 111)
+      const { fetchQWI } = useQWI('27', 111, WINDOW)
 
       // Should not throw
       expect(async () => await fetchQWI()).not.toThrow()
@@ -161,7 +164,7 @@ describe('useQWI Composable', () => {
         status: 204
       })
 
-      const { fetchQWI } = useQWI('27', 111)
+      const { fetchQWI } = useQWI('27', 111, WINDOW)
       await fetchQWI()
 
       const callArgs = mockFetch.mock.calls[0][0]
@@ -170,13 +173,25 @@ describe('useQWI Composable', () => {
       expect(callArgs).toContain('https://api.census.gov/data/timeseries/qwi/sa')
     })
 
+    it('should ask for every quarter of the data window, and no others', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 204
+      })
+
+      const { fetchQWI } = useQWI('27', 111, WINDOW)
+      await fetchQWI()
+
+      expect(mockFetch.mock.calls[0][0]).toContain('time=from 2021 to 2025')
+    })
+
     it('should include API key in URL', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         status: 204
       })
 
-      const { fetchQWI } = useQWI('27', 111)
+      const { fetchQWI } = useQWI('27', 111, WINDOW)
       await fetchQWI()
 
       const callArgs = mockFetch.mock.calls[0][0]
@@ -191,8 +206,8 @@ describe('useQWI Composable', () => {
         status: 204
       })
 
-      const { fetchQWI: fetchQWI1 } = useQWI('27', 111)
-      const { fetchQWI: fetchQWI2 } = useQWI('27', 112)
+      const { fetchQWI: fetchQWI1 } = useQWI('27', 111, WINDOW)
+      const { fetchQWI: fetchQWI2 } = useQWI('27', 112, WINDOW)
 
       await fetchQWI1()
       await fetchQWI2()
@@ -208,8 +223,8 @@ describe('useQWI Composable', () => {
         status: 204
       })
 
-      const { fetchQWI: fetchQWI1 } = useQWI('27', 111)
-      const { fetchQWI: fetchQWI2 } = useQWI('06', 111)
+      const { fetchQWI: fetchQWI1 } = useQWI('27', 111, WINDOW)
+      const { fetchQWI: fetchQWI2 } = useQWI('06', 111, WINDOW)
 
       await fetchQWI1()
       await fetchQWI2()

@@ -6,17 +6,25 @@
   When a state is clicked, it is highlighted and the selection is
   emitted to the parent component.
 
+  Its credits are in the About dialog, which the Credits link in the corner
+  opens, in place of Leaflet's credit line.
+
   @emits state-click - GeoJSON feature object of the selected state
 -->
 
 <template>
-  <div id="map" ref="mapContainer" class="map-container"></div>
+  <!-- The wrapper holds the map and the Credits link laid over its corner -->
+  <div class="map-frame">
+    <div id="map" ref="mapContainer" class="map-container"></div>
+    <MapCreditsLink />
+  </div>
 </template>
 
 <script setup>
 import { onMounted, ref } from 'vue'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import MapCreditsLink from '@/components/map/MapCreditsLink.vue'
 
 // define emit
 const emit = defineEmits(['state-click'])
@@ -25,11 +33,10 @@ const mapContainer = ref(null)
 let selectedLayer = null // Track the currently highlighted layer
 
 onMounted(() => {
-  const map = L.map(mapContainer.value).setView([37.8, -96], 4)
+  const map = L.map(mapContainer.value, { attributionControl: false }).setView([37.8, -96], 4)
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '© OpenStreetMap'
+    maxZoom: 19
   }).addTo(map)
 
   // Load GeoJSON (replace with your path)
@@ -92,6 +99,10 @@ function stateClickHandler(selectedState) {
 </script>
 
 <style scoped>
+.map-frame {
+  position: relative;
+}
+
 .map-container {
   height: 500px;
   width: 100%;

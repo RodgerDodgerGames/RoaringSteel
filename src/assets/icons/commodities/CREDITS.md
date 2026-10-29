@@ -3,7 +3,7 @@
 The commodity icons in this folder are from [game-icons.net](https://game-icons.net),
 licensed under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). They are
 unmodified copies of the SVGs in the [game-icons/icons](https://github.com/game-icons/icons)
-repository. The map credits game-icons.net in its attribution line.
+repository. The game credits game-icons.net in its About dialog (src/config/credits.js).
 
 | File                     | Author                                                                        |
 | ------------------------ | ----------------------------------------------------------------------------- |

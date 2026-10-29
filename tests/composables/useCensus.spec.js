@@ -11,7 +11,33 @@ vi.stubGlobal('fetch', mockFetch)
 
 vi.stubEnv('VITE_QWI_KEY', 'test-api-key')
 
+// Retries without the pause between them
+vi.mock('@/composables/utils', async (importOriginal) => {
+  const utils = await importOriginal()
+  return {
+    ...utils,
+    fetchWithRetries: (url, options) => utils.fetchWithRetries(url, { ...options, pauseMs: 0 })
+  }
+})
+
 import useCensus from '@/composables/setup/useCensus'
+import { isRefusal } from '@/composables/utils'
+
+/** A game's data window: QWI from 2021 to 2025 */
+const WINDOW = { start: 2021, end: 2025, middle: 2023 }
+
+/** An answer with one metro area in it */
+const oneMsa = {
+  ok: true,
+  status: 200,
+  json: async () => [
+    ['NAME', 'B01001_001E', 'state', 'msa'],
+    ['City1', '100000', '27', '12345']
+  ]
+}
+
+/** The API's answer for a release it does not have */
+const noSuchRelease = { ok: false, status: 404, json: async () => ({}) }
 
 describe('useCensus Composable', () => {
   beforeEach(() => {
@@ -20,13 +46,13 @@ describe('useCensus Composable', () => {
 
   describe('Initial State', () => {
     it('should return empty population data initially', () => {
-      const { populationData } = useCensus('27')
+      const { populationData } = useCensus('27', WINDOW)
 
       expect(populationData.value).toEqual([])
     })
 
     it('should have a fetchPopulationData function', () => {
-      const { fetchPopulationData } = useCensus('27')
+      const { fetchPopulationData } = useCensus('27', WINDOW)
       expect(typeof fetchPopulationData).toBe('function')
     })
   })
@@ -49,7 +75,7 @@ describe('useCensus Composable', () => {
         json: async () => mockResponse
       })
 
-      const { populationData, fetchPopulationData } = useCensus('27')
+      const { populationData, fetchPopulationData } = useCensus('27', WINDOW)
       await fetchPopulationData()
 
       expect(populationData.value).toHaveLength(2)
@@ -73,7 +99,7 @@ describe('useCensus Composable', () => {
         json: async () => mockResponse
       })
 
-      const { populationData, fetchPopulationData } = useCensus('27')
+      const { populationData, fetchPopulationData } = useCensus('27', WINDOW)
       await fetchPopulationData()
 
       // Header row should not be in data
@@ -94,7 +120,7 @@ describe('useCensus Composable', () => {
         json: async () => mockResponse
       })
 
-      const { populationData, fetchPopulationData } = useCensus('27')
+      const { populationData, fetchPopulationData } = useCensus('27', WINDOW)
       await fetchPopulationData()
 
       expect(populationData.value).toHaveLength(3)
@@ -103,27 +129,98 @@ describe('useCensus Composable', () => {
   })
 
   describe('fetchPopulationData Error Handling', () => {
-    it('should handle fetch errors gracefully', async () => {
+    // Every town needs its population, so failures reach the towns store
+
+    it('should throw when the connection fails', async () => {
       mockFetch.mockRejectedValue(new Error('Network error'))
 
-      const { populationData, fetchPopulationData } = useCensus('27')
+      const { populationData, fetchPopulationData } = useCensus('27', WINDOW)
 
-      // Should not throw
-      expect(async () => await fetchPopulationData()).not.toThrow()
+      await expect(fetchPopulationData()).rejects.toThrow('Network error')
       expect(populationData.value).toEqual([])
     })
 
-    it('should handle JSON parse errors', async () => {
+    it('should throw when the answer is not JSON', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
+        status: 200,
         json: async () => {
           throw new Error('Invalid JSON')
         }
       })
 
-      const { populationData, fetchPopulationData } = useCensus('27')
+      const { populationData, fetchPopulationData } = useCensus('27', WINDOW)
 
-      expect(async () => await fetchPopulationData()).not.toThrow()
+      await expect(fetchPopulationData()).rejects.toThrow('Invalid JSON')
+      expect(populationData.value).toEqual([])
+    })
+
+    it('should try again when the API fails, and use the answer that works', async () => {
+      mockFetch
+        .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })
+        .mockResolvedValueOnce(oneMsa)
+
+      const { populationData, fetchPopulationData } = useCensus('27', WINDOW)
+      await fetchPopulationData()
+
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+      expect(populationData.value).toHaveLength(1)
+    })
+
+    it('should throw when the API fails three times running', async () => {
+      mockFetch.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) })
+
+      const { fetchPopulationData } = useCensus('27', WINDOW)
+
+      await expect(fetchPopulationData()).rejects.toThrow('500')
+      expect(mockFetch).toHaveBeenCalledTimes(3)
+    })
+
+    it('should throw a refusal when the API turns the request down', async () => {
+      mockFetch.mockResolvedValue({ ok: false, status: 400, json: async () => ({}) })
+
+      const { fetchPopulationData } = useCensus('27', WINDOW)
+      const failure = await fetchPopulationData().catch((error) => error)
+
+      expect(isRefusal(failure)).toBe(true)
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('Choosing the ACS release', () => {
+    it('should use the release ending at the last year of the data window', async () => {
+      mockFetch.mockResolvedValue(oneMsa)
+
+      const { populationData, fetchPopulationData } = useCensus('27', WINDOW)
+      await fetchPopulationData()
+
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+      expect(mockFetch.mock.calls[0][0]).toContain('/data/2025/acs/acs5?')
+      expect(populationData.value).toHaveLength(1)
+    })
+
+    it('should step back a year at a time until a release exists', async () => {
+      mockFetch
+        .mockResolvedValueOnce(noSuchRelease)
+        .mockResolvedValueOnce(noSuchRelease)
+        .mockResolvedValueOnce(oneMsa)
+
+      const { populationData, fetchPopulationData } = useCensus('27', WINDOW)
+      await fetchPopulationData()
+
+      const years = mockFetch.mock.calls.map(([url]) => url.match(/data\/(\d{4})\/acs/)[1])
+      expect(years).toEqual(['2025', '2024', '2023'])
+      expect(populationData.value[0].msa_code).toBe('12345')
+    })
+
+    it('should not look before the first year of the window', async () => {
+      mockFetch.mockResolvedValue(noSuchRelease)
+
+      const { populationData, fetchPopulationData } = useCensus('27', WINDOW)
+      await expect(fetchPopulationData()).rejects.toThrow('No ACS 5-year release')
+
+      const years = mockFetch.mock.calls.map(([url]) => url.match(/data\/(\d{4})\/acs/)[1])
+      expect(years).toEqual(['2025', '2024', '2023', '2022', '2021'])
       expect(populationData.value).toEqual([])
     })
   })
@@ -135,12 +232,12 @@ describe('useCensus Composable', () => {
         json: async () => [['NAME', 'B01001_001E', 'state', 'msa']]
       })
 
-      const { fetchPopulationData } = useCensus('27')
+      const { fetchPopulationData } = useCensus('27', WINDOW)
       await fetchPopulationData()
 
       const callArgs = mockFetch.mock.calls[0][0]
       expect(callArgs).toContain('state:27')
-      expect(callArgs).toContain('https://api.census.gov/data/2022/acs/acs5')
+      expect(callArgs).toContain('https://api.census.gov/data/2025/acs/acs5')
     })
 
     it('should include API key in URL', async () => {
@@ -149,7 +246,7 @@ describe('useCensus Composable', () => {
         json: async () => [['NAME', 'B01001_001E', 'state', 'msa']]
       })
 
-      const { fetchPopulationData } = useCensus('27')
+      const { fetchPopulationData } = useCensus('27', WINDOW)
       await fetchPopulationData()
 
       const callArgs = mockFetch.mock.calls[0][0]
@@ -162,7 +259,7 @@ describe('useCensus Composable', () => {
         json: async () => [['NAME', 'B01001_001E', 'state', 'msa']]
       })
 
-      const { fetchPopulationData } = useCensus('27')
+      const { fetchPopulationData } = useCensus('27', WINDOW)
       await fetchPopulationData()
 
       const callArgs = mockFetch.mock.calls[0][0]
@@ -176,7 +273,7 @@ describe('useCensus Composable', () => {
         json: async () => [['NAME', 'B01001_001E', 'state', 'msa']]
       })
 
-      const { fetchPopulationData } = useCensus('27')
+      const { fetchPopulationData } = useCensus('27', WINDOW)
       await fetchPopulationData()
 
       const callArgs = mockFetch.mock.calls[0][0]
@@ -191,8 +288,8 @@ describe('useCensus Composable', () => {
         json: async () => [['NAME', 'B01001_001E', 'state', 'msa']]
       })
 
-      const { fetchPopulationData: fetch1 } = useCensus('27') // Minnesota
-      const { fetchPopulationData: fetch2 } = useCensus('06') // California
+      const { fetchPopulationData: fetch1 } = useCensus('27', WINDOW) // Minnesota
+      const { fetchPopulationData: fetch2 } = useCensus('06', WINDOW) // California
 
       await fetch1()
       await fetch2()
@@ -215,7 +312,7 @@ describe('useCensus Composable', () => {
         json: async () => mockResponse
       })
 
-      const { populationData, fetchPopulationData } = useCensus('27')
+      const { populationData, fetchPopulationData } = useCensus('27', WINDOW)
       await fetchPopulationData()
 
       const item = populationData.value[0]

@@ -7,24 +7,37 @@
  * API: https://api.census.gov/data/timeseries/qwi/sa
  * Requires: VITE_QWI_KEY environment variable
  *
- * Data returned includes employment counts (Emp) by MSA over the last 5 years.
+ * Data returned includes employment counts (Emp) by MSA, by quarter, over the
+ * game's data window (see dataWindow.js).
  *
  * @module composables/setup/useQWI
  */
 
 import { ref } from 'vue'
-import { fetchWithTimeout } from '@/composables/utils'
+import {
+  CENSUS_ATTEMPT_TIMEOUT_MS,
+  fetchWithRetries,
+  isRefusal,
+  RequestError
+} from '@/composables/utils'
 
 /**
  * Composable for fetching QWI employment data.
  *
  * @param {string} state - Two-digit state FIPS code (e.g., "27" for Minnesota)
  * @param {number} industry - NAICS industry code to query
- * @returns {Object} { data, error, fetchQWI }
+ * @param {{start: number, end: number}} dataWindow - The years to fetch, inclusive
+ * @returns {Object} { data, error, refused, fetchQWI }
  */
-export default function useQWI(state, industry) {
+export default function useQWI(state, industry, dataWindow) {
   const data = ref([])
   const error = ref(null)
+
+  /**
+   * Whether the error is the API turning the request down (see `isRefusal`):
+   * an answer that asking again would not change, unlike a failure
+   */
+  const refused = ref(false)
 
   const fetchQWI = async () => {
     // Import the QWI configuration
@@ -40,9 +53,8 @@ export default function useQWI(state, industry) {
       for: `metropolitan statistical area/micropolitan statistical area:*`,
       // for: `metropolitan statistical area/micropolitan statistical area:33460`,
       in: `state:${state}`, // FIPS code for the state
-      // set up time range to get data from the last five years
-      // time: `${new Date().getFullYear() - 5}-Q1`,
-      time: `from ${new Date().getFullYear() - 5} to ${new Date().getFullYear()}`,
+      // every quarter of the data window's years
+      time: `from ${dataWindow.start} to ${dataWindow.end}`,
       industry: industry // NAICS code for all industries
       // ind_level: '3',  // Level of industry detail
     }
@@ -68,8 +80,10 @@ export default function useQWI(state, industry) {
       console.log('QWI url:', url)
 
       // Send the request
+      // Tried a few times: the API fails now and then for no reason of the
+      // request's own, and an industry lost here is missing from the game
       console.log('Sending GET request to the API...')
-      const response = await fetchWithTimeout(url)
+      const response = await fetchWithRetries(url, { timeoutMs: CENSUS_ATTEMPT_TIMEOUT_MS })
 
       // Check if the request was successful
       if (!response.ok) {
@@ -81,7 +95,7 @@ export default function useQWI(state, industry) {
         const errorMessage = `HTTP error! status: ${response.status} - ${responseText}`
         console.error('About to throw an error with message:', errorMessage)
 
-        throw new Error(errorMessage)
+        throw new RequestError(errorMessage, response.status)
       }
 
       // skip this industry if there is nothing to process from the server
@@ -121,12 +135,14 @@ export default function useQWI(state, industry) {
       const errorMessage = err.message || 'No error message available'
       console.error('Setting error value to:', errorMessage)
       error.value = errorMessage
+      refused.value = isRefusal(err)
     }
   }
 
   return {
     data,
     error,
+    refused,
     fetchQWI
   }
 }

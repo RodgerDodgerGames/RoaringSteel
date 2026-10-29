@@ -5,7 +5,7 @@
  * - Initial state
  * - Loading state transitions
  * - Error handling
- * - Cache usage
+ * - Cache usage, and the data window it was built for
  * - Town classification
  */
 
@@ -16,16 +16,25 @@ const mockUseLocalStorage = vi.hoisted(() => vi.fn())
 const mockFetchPopulationData = vi.hoisted(() => vi.fn())
 const mockPopulationData = vi.hoisted(() => ({ value: [] }))
 const mockGetMSALatLon = vi.hoisted(() => vi.fn())
+const mockUseCensus = vi.hoisted(() => vi.fn())
+const mockFetchDataWindow = vi.hoisted(() => vi.fn())
 
 vi.mock('@vueuse/core', () => ({
   useLocalStorage: mockUseLocalStorage
 }))
 
 vi.mock('@/composables/setup/useCensus', () => ({
-  default: () => ({
-    populationData: mockPopulationData,
-    fetchPopulationData: mockFetchPopulationData
-  })
+  default: (...args) => {
+    mockUseCensus(...args)
+    return {
+      populationData: mockPopulationData,
+      fetchPopulationData: mockFetchPopulationData
+    }
+  }
+}))
+
+vi.mock('@/composables/setup/dataWindow', () => ({
+  fetchDataWindow: mockFetchDataWindow
 }))
 
 vi.mock('@/composables/setup/useTigerWeb', () => ({
@@ -34,6 +43,34 @@ vi.mock('@/composables/setup/useTigerWeb', () => ({
 
 import { useTownsStore } from '@/stores/towns'
 import { useIndustryStore } from '@/stores/industry'
+import { RequestError } from '@/composables/utils'
+
+/** The state's data window: QWI from 2021 to 2025 */
+const WINDOW = { start: 2021, end: 2025, middle: 2023 }
+
+/** The window a year earlier, before the latest year of QWI came out */
+const EARLIER_WINDOW = { start: 2020, end: 2024, middle: 2022 }
+
+/** A town as the cache holds it */
+const CACHED_TOWN = { msa: '12345', name: 'Minneapolis', population: 400000, size: 'large' }
+
+/**
+ * localStorage holding the given towns cache. Writes land in `written`.
+ * @param {*} cached - What the towns key holds
+ * @param {Object} [written] - Collects what is written, by key
+ */
+function townsCache(cached, written = {}) {
+  return (key, defaultValue) => {
+    const ref = { _value: key.startsWith('towns_') ? cached : defaultValue }
+    return Object.defineProperty(ref, 'value', {
+      get: () => ref._value,
+      set: (value) => {
+        ref._value = value
+        written[key] = value
+      }
+    })
+  }
+}
 
 describe('Towns Store', () => {
   let townsStore
@@ -50,8 +87,12 @@ describe('Towns Store', () => {
       centroidLongitude: '-93.2650',
       centroidLatitude: '44.9778'
     })
+    mockFetchDataWindow.mockResolvedValue(WINDOW)
 
     industryStore = useIndustryStore()
+    // The industry fetch is the industry store's to test. Stubbed here, the
+    // industry data a test seeds is what town setup works from.
+    industryStore.useIndustryData = vi.fn(async () => {})
     townsStore = useTownsStore()
   })
 
@@ -73,25 +114,143 @@ describe('Towns Store', () => {
     })
   })
 
+  /** Sets the stubbed lookups up to build one town, Duluth */
+  function oneTownToBuild() {
+    industryStore.MSAs.push('20260')
+    mockPopulationData.value = [
+      { msa_code: '20260', name: 'Duluth, MN-WI', population: '280000', state_code: '27' }
+    ]
+  }
+
   describe('setupTowns with cached data', () => {
-    it('should use cached towns data when available', async () => {
-      const cachedTowns = [{ msa: '12345', name: 'Minneapolis', population: 400000, size: 'large' }]
-      mockUseLocalStorage.mockReturnValue({ value: cachedTowns })
+    it('should use cached towns built for the same data window', async () => {
+      mockUseLocalStorage.mockImplementation(
+        townsCache({ dataWindow: WINDOW, towns: [CACHED_TOWN] })
+      )
 
       await townsStore.setupTowns('27')
 
-      expect(townsStore.towns).toEqual(cachedTowns)
-    })
-
-    it('should not fetch data when cache exists', async () => {
-      mockUseLocalStorage.mockReturnValue({
-        value: [{ msa: '12345', name: 'Minneapolis', population: 400000 }]
-      })
-
-      await townsStore.setupTowns('27')
-
+      expect(townsStore.towns).toEqual([CACHED_TOWN])
+      expect(townsStore.dataWindow).toEqual(WINDOW)
       expect(mockFetchPopulationData).not.toHaveBeenCalled()
       expect(mockGetMSALatLon).not.toHaveBeenCalled()
+    })
+
+    it('should build the towns again once the data window has moved on', async () => {
+      mockUseLocalStorage.mockImplementation(
+        townsCache({ dataWindow: EARLIER_WINDOW, towns: [CACHED_TOWN] })
+      )
+      oneTownToBuild()
+
+      await townsStore.setupTowns('27')
+
+      expect(industryStore.useIndustryData).toHaveBeenCalledWith('27', WINDOW)
+      expect(townsStore.towns.map((town) => town.msa)).toEqual(['20260'])
+      expect(townsStore.dataWindow).toEqual(WINDOW)
+    })
+
+    it('should build the towns again from a cache that records no window', async () => {
+      // How towns were cached before windows were recorded: a bare list
+      mockUseLocalStorage.mockImplementation(townsCache([CACHED_TOWN]))
+      oneTownToBuild()
+
+      await townsStore.setupTowns('27')
+
+      expect(townsStore.towns.map((town) => town.msa)).toEqual(['20260'])
+    })
+
+    it('should cache new towns with the window they were built for', async () => {
+      const written = {}
+      mockUseLocalStorage.mockImplementation(townsCache({}, written))
+      oneTownToBuild()
+
+      await townsStore.setupTowns('27')
+
+      expect(written.towns_27).toEqual({ dataWindow: WINDOW, towns: townsStore.towns })
+    })
+
+    it('should keep playing the cached towns when the new ones come out empty', async () => {
+      // The window has moved on, but every lookup for the new towns failed
+      const written = {}
+      mockUseLocalStorage.mockImplementation(
+        townsCache({ dataWindow: EARLIER_WINDOW, towns: [CACHED_TOWN] }, written)
+      )
+
+      await townsStore.setupTowns('27')
+
+      expect(townsStore.towns).toEqual([CACHED_TOWN])
+      expect(townsStore.dataWindow).toEqual(EARLIER_WINDOW)
+      expect(townsStore.error).toBeNull()
+      expect(written).toEqual({})
+    })
+
+    it('should keep playing the cached towns when the population fetch fails', async () => {
+      mockUseLocalStorage.mockImplementation(
+        townsCache({ dataWindow: EARLIER_WINDOW, towns: [CACHED_TOWN] })
+      )
+      oneTownToBuild()
+      mockFetchPopulationData.mockRejectedValue(new Error('Census API error'))
+
+      await townsStore.setupTowns('27')
+
+      expect(townsStore.towns).toEqual([CACHED_TOWN])
+      expect(townsStore.error).toBeNull()
+    })
+
+    it('should report an error when no towns can be built and none are cached', async () => {
+      const written = {}
+      mockUseLocalStorage.mockImplementation(townsCache({}, written))
+
+      await townsStore.setupTowns('27')
+
+      expect(townsStore.towns).toEqual([])
+      expect(townsStore.error).toMatch(/towns/)
+      expect(written).toEqual({})
+    })
+
+    it("should fetch population for the data window's years", async () => {
+      await townsStore.setupTowns('27')
+
+      expect(mockUseCensus).toHaveBeenCalledWith('27', WINDOW)
+    })
+  })
+
+  describe('setupTowns when the data window cannot be looked up', () => {
+    beforeEach(() => {
+      mockFetchDataWindow.mockRejectedValue(new Error('QWI year lookup failed: 500'))
+    })
+
+    it('should play with the cached towns, whatever window they were built for', async () => {
+      mockUseLocalStorage.mockImplementation(
+        townsCache({ dataWindow: EARLIER_WINDOW, towns: [CACHED_TOWN] })
+      )
+
+      await townsStore.setupTowns('27')
+
+      expect(townsStore.towns).toEqual([CACHED_TOWN])
+      expect(townsStore.dataWindow).toEqual(EARLIER_WINDOW)
+      expect(townsStore.error).toBeNull()
+      expect(mockFetchPopulationData).not.toHaveBeenCalled()
+    })
+
+    it('should report an error when nothing is cached', async () => {
+      await townsStore.setupTowns('27')
+
+      expect(townsStore.error).toMatch(/Census Bureau/)
+      expect(townsStore.towns).toEqual([])
+      expect(industryStore.useIndustryData).not.toHaveBeenCalled()
+      expect(mockFetchPopulationData).not.toHaveBeenCalled()
+    })
+
+    it('should clear the error when setup is tried again and works', async () => {
+      await townsStore.setupTowns('27')
+      mockFetchDataWindow.mockResolvedValue(WINDOW)
+      oneTownToBuild()
+
+      await townsStore.setupTowns('27')
+
+      expect(townsStore.error).toBeNull()
+      expect(townsStore.dataWindow).toEqual(WINDOW)
     })
   })
 
@@ -197,6 +356,125 @@ describe('Towns Store', () => {
       // Should have one town (the second one that didn't error)
       expect(townsStore.towns.length).toBe(1)
       expect(townsStore.towns[0].msa).toBe('12346')
+    })
+  })
+
+  describe('setupTowns when some lookups fail', () => {
+    // Two towns to build: Duluth and Rochester
+    beforeEach(() => {
+      industryStore.MSAs.push('20260', '40340')
+      mockPopulationData.value = [
+        { msa_code: '20260', name: 'Duluth, MN-WI', population: '280000', state_code: '27' },
+        { msa_code: '40340', name: 'Rochester, MN', population: '220000', state_code: '27' }
+      ]
+    })
+
+    /** Coordinates for Rochester; Duluth's lookup does what `duluth` does */
+    function lookUpDuluth(duluth) {
+      mockGetMSALatLon.mockImplementation(async (msaCode) =>
+        msaCode === '20260' ? duluth() : { centroidLongitude: '-92.5', centroidLatitude: '44.0' }
+      )
+    }
+
+    it('should play without a town whose lookup failed, and not cache the towns', async () => {
+      const written = {}
+      mockUseLocalStorage.mockImplementation(
+        townsCache({ dataWindow: EARLIER_WINDOW, towns: [CACHED_TOWN] }, written)
+      )
+      lookUpDuluth(() => {
+        throw new Error('TIGERweb lookup failed: 500')
+      })
+
+      await townsStore.setupTowns('27')
+
+      expect(townsStore.towns.map((town) => town.msa)).toEqual(['40340'])
+      expect(townsStore.dataWindow).toEqual(WINDOW)
+      expect(townsStore.error).toBeNull()
+      // The cache keeps the last complete build
+      expect(written).toEqual({})
+    })
+
+    it('should leave out a town TIGERweb does not have, and still cache the towns', async () => {
+      // A lookup that finds nothing once made a town with no coordinates
+      const written = {}
+      mockUseLocalStorage.mockImplementation(townsCache({}, written))
+      lookUpDuluth(() => false)
+
+      await townsStore.setupTowns('27')
+
+      expect(townsStore.towns.map((town) => town.msa)).toEqual(['40340'])
+      expect(townsStore.towns.every((town) => Number.isFinite(town.lon))).toBe(true)
+      expect(written.towns_27.towns).toHaveLength(1)
+    })
+
+    it('should leave out a town whose lookup was turned down, and still cache the towns', async () => {
+      // It would be turned down again next game
+      const written = {}
+      mockUseLocalStorage.mockImplementation(townsCache({}, written))
+      lookUpDuluth(() => {
+        throw new RequestError('TIGERweb query failed: 400 Failed to execute query.', 400)
+      })
+
+      await townsStore.setupTowns('27')
+
+      expect(townsStore.towns.map((town) => town.msa)).toEqual(['40340'])
+      expect(written.towns_27.towns).toHaveLength(1)
+    })
+
+    it('should play without an industry whose fetch failed, and not cache the towns', async () => {
+      const written = {}
+      mockUseLocalStorage.mockImplementation(townsCache({}, written))
+      industryStore.useIndustryData = vi.fn(async () => {
+        industryStore.failedIndustries = [111]
+      })
+
+      await townsStore.setupTowns('27')
+
+      expect(townsStore.towns).toHaveLength(2)
+      expect(written).toEqual({})
+    })
+  })
+
+  describe('setupTowns error messages', () => {
+    it('should tell the player to check their connection when Census cannot be reached', async () => {
+      mockFetchDataWindow.mockRejectedValue(new Error('Network error'))
+
+      await townsStore.setupTowns('27')
+
+      expect(townsStore.error).toMatch(/jobs data/)
+      expect(townsStore.error).toMatch(/Check your connection/)
+    })
+
+    it('should not blame the connection when Census turns the request down', async () => {
+      mockFetchDataWindow.mockRejectedValue(new RequestError('QWI year lookup failed: 400', 400))
+
+      await townsStore.setupTowns('27')
+
+      expect(townsStore.error).toMatch(/turned down/)
+      expect(townsStore.error).toMatch(/error 400/)
+      expect(townsStore.error).not.toMatch(/connection/)
+    })
+
+    it('should say so when the population request is turned down', async () => {
+      oneTownToBuild()
+      mockFetchPopulationData.mockRejectedValue(
+        new RequestError('ACS population request failed: 400', 400)
+      )
+
+      await townsStore.setupTowns('27')
+
+      expect(townsStore.error).toMatch(/population/)
+      expect(townsStore.error).toMatch(/turned down/)
+    })
+
+    it('should tell the player to check their connection when the population fetch fails', async () => {
+      oneTownToBuild()
+      mockFetchPopulationData.mockRejectedValue(new Error('Network error'))
+
+      await townsStore.setupTowns('27')
+
+      expect(townsStore.error).toMatch(/population/)
+      expect(townsStore.error).toMatch(/Check your connection/)
     })
   })
 

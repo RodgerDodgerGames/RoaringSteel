@@ -25,13 +25,36 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useLocalStorage } from '@vueuse/core'
-import { useElevationAPI } from '../composables/setup/useElevationAPI'
+import { useElevationTiles } from '../composables/setup/useElevationTiles'
 import { useLandCoverAPI } from '../composables/setup/useLandCoverAPI'
 import {
   metersToLatitudeDegrees,
   metersToLongitudeDegrees
 } from '../composables/setup/useMapSupport'
+import { isWaterCell } from '@/composables/map/water'
 import { gridApiConfig } from '@/config/grid'
+import { isRefusal, refusalMessage } from '@/composables/utils'
+
+/**
+ * Whether a cell, with its terrain filled in, belongs on the board.
+ *
+ * It needs both a height and a land cover. The NLCD has no land cover beyond
+ * the US border or out at sea, so those cells drop out here.
+ *
+ * Water at or below sea level is the sea, and drops out too, as it always
+ * has: the sea is not part of the board. A lake stays — it is water above sea
+ * level — and is bridged like any other water. (The rare lake below sea
+ * level, such as the Salton Sea, cannot be told from the sea this way and
+ * drops out with it.) Land stays at any height, including at sea level or
+ * below it (coastal Louisiana, Death Valley).
+ *
+ * @param {Object} cell - A grid cell
+ * @returns {boolean} True if the cell is kept
+ */
+function isUsableCell(cell) {
+  if (!Number.isFinite(cell.elevation) || cell.landCover == null) return false
+  return !(isWaterCell(cell) && cell.elevation <= 0)
+}
 
 export const useGridStore = defineStore('gridStore', () => {
   /** Array of grid cells with terrain and cost data */
@@ -61,12 +84,12 @@ export const useGridStore = defineStore('gridStore', () => {
   /**
    * Combined progress percentage across both fetch phases.
    *
-   * Neither cell count nor request count tracks the wait the player actually
-   * experiences, because the two phases are shaped differently: elevation
-   * makes few, slow, spaced-out requests while land cover makes thousands of
-   * fast ones through a throttled pool. Each phase is weighted by the wall
-   * time it is expected to cost — pacing plus request latency — so the bar
-   * moves at a roughly even rate throughout.
+   * Progress is counted in requests — elevation tiles and land cover
+   * pictures — but a request count alone does not track the wait the player
+   * sees, because the two are shaped differently: elevation is many small
+   * tiles, land cover a few large pictures. Each phase is weighted by the
+   * wall time it is expected to cost, so the bar moves at a roughly even rate
+   * throughout.
    */
   const progressPercent = computed(() => {
     const totalMs =
@@ -78,36 +101,27 @@ export const useGridStore = defineStore('gridStore', () => {
       estimatedElevationMs(elevationProgress.value.completed) +
       estimatedLandCoverMs(landCoverProgress.value.completed)
 
-    // Floor, not round: 397 of 399 cells rounds to 100% and reads as a finished
+    // Floor, not round: 397 of 399 rounds to 100% and reads as a finished
     // setup, which is exactly how a stalled run disguised itself as a hang (#85).
     // Only a genuinely complete run should ever show 100.
     return Math.min(100, Math.floor((doneMs / totalMs) * 100))
   })
 
-  /** Wall time the elevation phase is expected to cost, in ms. */
-  function estimatedElevationMs(cellCount) {
-    const averagePause = (gridApiConfig.elevationPauseMinMs + gridApiConfig.elevationPauseMaxMs) / 2
-    const batches = Math.ceil(cellCount / gridApiConfig.elevationBatchSize)
-    // Batches run one after another, each costing its own request. Pauses sit
-    // between batches, and the fetcher deliberately skips the one before the
-    // first, so there is always one fewer pause than there are requests.
-    return batches * gridApiConfig.elevationRequestMs + Math.max(0, batches - 1) * averagePause
+  /**
+   * Wall time a number of elevation tiles is expected to cost, in ms: each
+   * takes about `elevationRequestMs`, `elevationConcurrency` at a time.
+   */
+  function estimatedElevationMs(tileCount) {
+    return (tileCount * gridApiConfig.elevationRequestMs) / gridApiConfig.elevationConcurrency
   }
 
-  /** Wall time the land cover phase is expected to cost, in ms. */
-  function estimatedLandCoverMs(cellCount) {
-    // Two ceilings apply and the slower one wins: the pool-wide interval floor
-    // between request starts, and how fast `landCoverConcurrency` workers can
-    // retire requests of the observed latency.
-    const perCellMs = Math.max(
-      gridApiConfig.landCoverMinIntervalMs,
-      gridApiConfig.landCoverRequestMs / gridApiConfig.landCoverConcurrency
-    )
-    return cellCount * perCellMs
+  /** The same for land cover pictures */
+  function estimatedLandCoverMs(imageCount) {
+    return (imageCount * gridApiConfig.landCoverRequestMs) / gridApiConfig.landCoverConcurrency
   }
 
-  const { fetchElevationsInBatches } = useElevationAPI()
-  const { fetchLandCoverInBatches } = useLandCoverAPI()
+  const { planElevations } = useElevationTiles()
+  const { landCoverYearFor, planLandCover } = useLandCoverAPI()
 
   /**
    * `useLocalStorage` registers storage listeners and a deep watcher that
@@ -119,7 +133,7 @@ export const useGridStore = defineStore('gridStore', () => {
   function cachedGridFor(stateFipsCode) {
     const key = `cachedGrid_${stateFipsCode}`
     if (!cacheBindings.has(key)) {
-      cacheBindings.set(key, useLocalStorage(key, []))
+      cacheBindings.set(key, useLocalStorage(key, {}))
     }
     return cacheBindings.get(key)
   }
@@ -129,12 +143,26 @@ export const useGridStore = defineStore('gridStore', () => {
    * Fetches elevation and land cover data for each cell, then calculates costs.
    * Uses localStorage caching to avoid redundant API calls.
    *
+   * The cache holds the year of land cover the grid was drawn from: the year
+   * the server served, which is the closest it has to the year asked for.
+   * Each new game asks the server which year that is now, one small request,
+   * and uses the cache only when it is the same year. So a game whose data
+   * window has moved on builds its grid again, as does one where the server
+   * has since added a year closer to the one asked for, or a cache from
+   * before the year was recorded.
+   *
+   * If the server cannot say — it is down, or the player is offline — the
+   * cached grid is used as it is, whatever year it was drawn from, as the
+   * towns are when the Census Bureau is down.
+   *
    * @param {string} stateFipsCode - State FIPS code for cache key
    * @param {Array<number>} bounds - Bounding box [minLng, minLat, maxLng, maxLat]
    * @param {number} cellSize - Grid cell size in meters
+   * @param {number} landCoverYear - The year to take land cover from: the
+   *   middle year of the game's data window (see dataWindow.js)
    * @returns {Promise<boolean>} True when a usable grid was produced
    */
-  async function generateGrid(stateFipsCode, bounds, cellSize) {
+  async function generateGrid(stateFipsCode, bounds, cellSize, landCoverYear) {
     elevationProgress.value = { completed: 0, total: 0 }
     landCoverProgress.value = { completed: 0, total: 0 }
     currentPhase.value = 'initializing'
@@ -144,13 +172,34 @@ export const useGridStore = defineStore('gridStore', () => {
     // `useLocalStorage` automatically binds `grid` to `localStorage`
     const cachedGrid = cachedGridFor(stateFipsCode)
 
-    // check if grid already exists in cache
-    if (cachedGrid.value.length > 0) {
-      grid.value = cachedGrid.value
+    const { landCoverYear: cachedYear, cells: cachedCells } = cachedGrid.value
+    const hasCachedCells = Array.isArray(cachedCells) && cachedCells.length > 0
+
+    /** Plays with the cached grid */
+    function loadCachedGrid() {
+      grid.value = cachedCells
       isGridGenerated.value = true
       currentPhase.value = ''
       return true
     }
+
+    // The year of land cover the server will draw: the one asked for, or the
+    // closest it has
+    let servedYear
+    try {
+      servedYear = await landCoverYearFor(landCoverYear)
+    } catch (e) {
+      console.error('Error looking up land cover years:', e)
+      if (hasCachedCells) return loadCachedGrid()
+      return fail(
+        isRefusal(e)
+          ? refusalMessage('The land cover server', 'its years', e)
+          : 'Could not reach the land cover server. Check your connection and retry.'
+      )
+    }
+
+    // check if grid already exists in cache, drawn from the same year
+    if (cachedYear === servedYear && hasCachedCells) return loadCachedGrid()
 
     // cell size is in meters so convert to degrees
     // find mean latitude
@@ -191,24 +240,30 @@ export const useGridStore = defineStore('gridStore', () => {
       return fail('That region is too small to build a grid from. Try selecting a larger area.')
     }
 
-    // Both totals start at the full cell count so the bar has a stable
-    // denominator; the land cover total is narrowed once elevation says which
-    // cells are actually worth querying.
-    elevationProgress.value = { completed: 0, total: locations.length }
-    landCoverProgress.value = { completed: 0, total: locations.length }
+    // Work out both downloads before starting either, so the progress bar
+    // knows the size of the whole job from the first moment. Planning is only
+    // arithmetic, but if it ever throws, setup must still end on its error
+    // screen with a retry, not hang on the progress bar.
+    let elevationPlan
+    let landCoverPlan
+    try {
+      elevationPlan = planElevations(locations, cellSize)
+      landCoverPlan = planLandCover(locations, cellSize, servedYear)
+    } catch (e) {
+      console.error('Error planning terrain downloads:', e)
+      return fail('Could not plan the terrain downloads for this region.')
+    }
+    elevationProgress.value = { completed: 0, total: elevationPlan.requestCount }
+    landCoverProgress.value = { completed: 0, total: landCoverPlan.requestCount }
 
     // Fetch elevation for all locations
-    let elevationResults
+    let elevations
     isLoadingElevation.value = true
     currentPhase.value = 'elevation'
     try {
-      elevationResults = await fetchElevationsInBatches(
-        locations,
-        gridApiConfig.elevationBatchSize,
-        (completed, total) => {
-          elevationProgress.value = { completed, total }
-        }
-      )
+      elevations = await elevationPlan.fetch((completed, total) => {
+        elevationProgress.value = { completed, total }
+      })
     } catch (e) {
       console.error('Error fetching elevation data:', e)
       return fail('Could not load elevation data for this region. Check your connection and retry.')
@@ -216,59 +271,28 @@ export const useGridStore = defineStore('gridStore', () => {
       isLoadingElevation.value = false
     }
 
-    // Keep only cells the elevation lookup actually answered for. A null entry
-    // is a failed lookup; a zero is open water or a gap in the dataset.
-    const pending = []
-    elevationResults.forEach((result, index) => {
-      if (result && result.elevation) {
-        cells[index].elevation = result.elevation
-        pending.push({ cell: cells[index], location: locations[index] })
-      }
-    })
-
-    if (pending.length === 0) {
+    // A tile that fails leaves its cells null rather than throwing, so a run
+    // that lost most of its tiles still looks like a success here and would
+    // be cached permanently. The tiles cover the whole world, sea included,
+    // so every null is a failed download. A zero is a real reading.
+    const failedElevations = elevations.filter((elevation) => elevation == null).length
+    if (failedElevations === elevations.length) {
       return fail('No elevation data came back for this region. Check your connection and retry.')
     }
-
-    // fetchElevationBatch turns every failure into nulls rather than throwing,
-    // so a run that lost most of its batches still looks like a success here
-    // and would be cached permanently. Count only nulls: a zero is a real
-    // reading the filter above drops on purpose, not a failed lookup.
-    const failedElevations = elevationResults.filter((result) => result == null).length
-    if (failedElevations / elevationResults.length > gridApiConfig.maxElevationFailureRate) {
+    if (failedElevations / elevations.length > gridApiConfig.maxElevationFailureRate) {
       return fail(
-        `Elevation data was missing for ${failedElevations} of ${elevationResults.length} cells. Check your connection and retry.`
+        `Elevation data was missing for ${failedElevations} of ${elevations.length} cells. Check your connection and retry.`
       )
     }
 
-    landCoverProgress.value = { completed: 0, total: pending.length }
-
-    // Fetch land cover data for the surviving cells
+    // Fetch land cover for all locations
+    let landCover
     isLoadingLandCover.value = true
     currentPhase.value = 'landcover'
     try {
-      const landCoverResults = await fetchLandCoverInBatches(
-        pending.map((entry) => entry.location),
-        (completed, total) => {
-          landCoverProgress.value = { completed, total }
-        }
-      )
-
-      landCoverResults.forEach((cost, index) => {
-        pending[index].cell.landCover = cost
+      landCover = await landCoverPlan.fetch((completed, total) => {
+        landCoverProgress.value = { completed, total }
       })
-
-      // fetchLandCover turns every failure into a null rather than throwing, so
-      // a throttled run looks like success and would be cached permanently.
-      // Judge it on the share of lookups that failed, not on the share of cells
-      // dropped overall, which legitimately includes water and no-data terrain.
-      const failed = landCoverResults.filter((cost) => cost == null).length
-      if (failed / landCoverResults.length > gridApiConfig.maxLandCoverFailureRate) {
-        isLoadingLandCover.value = false
-        return fail(
-          `Land cover data was missing for ${failed} of ${landCoverResults.length} cells. Check your connection and retry.`
-        )
-      }
     } catch (e) {
       console.error('Error fetching land cover data:', e)
       return fail(
@@ -278,8 +302,21 @@ export const useGridStore = defineStore('gridStore', () => {
       isLoadingLandCover.value = false
     }
 
-    // remove all grid cells where either elevation or land cover is null or zero
-    const usableCells = cells.filter((cell) => cell.elevation && cell.landCover)
+    // Judged on the cells whose pictures failed, not on every cell without
+    // land cover: a region reaching over the border or out to sea has cells
+    // the NLCD rightly has nothing for.
+    if (landCover.failed / locations.length > gridApiConfig.maxLandCoverFailureRate) {
+      return fail(
+        `Land cover data was missing for ${landCover.failed} of ${locations.length} cells. Check your connection and retry.`
+      )
+    }
+
+    cells.forEach((cell, index) => {
+      cell.elevation = elevations[index]
+      cell.landCover = landCover.costs[index]
+    })
+
+    const usableCells = cells.filter(isUsableCell)
 
     if (usableCells.length === 0) {
       return fail('No terrain data came back for this region. Check your connection and retry.')
@@ -296,8 +333,8 @@ export const useGridStore = defineStore('gridStore', () => {
     currentPhase.value = 'calculating'
     focalOpElevation(grid)
 
-    // save grid to cache
-    cachedGrid.value = grid.value
+    // save grid to cache, with the year it was drawn from
+    cachedGrid.value = { landCoverYear: servedYear, cells: grid.value }
 
     isGridGenerated.value = true
     currentPhase.value = ''
@@ -386,9 +423,10 @@ export const useGridStore = defineStore('gridStore', () => {
 
     // Iterate over each cell in the grid
     grid.value.forEach((cell) => {
-      // if the landcover or elevation value is null
-      // set the cost to null and continue
-      if (!cell.landCover || !cell.elevation) {
+      // if the landcover or elevation value is missing
+      // set the cost to null and continue. A height of 0 is not missing:
+      // it is land at sea level.
+      if (cell.landCover == null || !Number.isFinite(cell.elevation)) {
         cell.cost = null
         return
       }

@@ -7,7 +7,8 @@
  *
  * Data Flow:
  * 1. Load industry definitions from CSV (NAICS codes and labels)
- * 2. For each industry, fetch QWI employment data for the state
+ * 2. For each industry, fetch QWI employment data for the state, over the
+ *    game's data window (see dataWindow.js)
  * 3. Calculate average employment per MSA
  * 4. Calculate each industry's proportion of total employment
  *
@@ -43,6 +44,15 @@ export const useIndustryStore = defineStore('qwiStore', () => {
   /** List of MSA codes found in the employment data */
   const MSAs = ref([])
 
+  /**
+   * NAICS codes of the industries whose QWI request failed in the last fetch,
+   * even after a few tries. They are missing from `employmentData`, and the
+   * fetch is not cached, so the next game asks for them again. An industry
+   * the API turned down is missing too, but not counted: it would be turned
+   * down again.
+   */
+  const failedIndustries = ref([])
+
   /** Loading state for CSV file loading */
   const isLoadingCSV = ref(false)
 
@@ -55,24 +65,46 @@ export const useIndustryStore = defineStore('qwiStore', () => {
    * Fetches and processes industry employment data for a state.
    * Uses localStorage caching to avoid redundant API calls.
    *
-   * @param {string} stateFipsCode - Two-digit FIPS code (default: "27" for Minnesota)
+   * The cache is used only when it was built for the same data window. Once
+   * a new year of QWI is out, the window moves on and the data is fetched
+   * again; a cache from before windows were recorded has none, and is
+   * fetched again too.
+   *
+   * An industry whose request fails is left out, and the fetch is not cached
+   * (see `failedIndustries`): a game can be played without it, but should not
+   * be stuck without it for the rest of the window.
+   *
+   * @param {string} stateFipsCode - Two-digit FIPS code (e.g. "27" for Minnesota)
+   * @param {{start: number, end: number}} dataWindow - The years to average over
    * @returns {Promise<void>}
    */
-  async function useIndustryData(stateFipsCode = '27') {
+  async function useIndustryData(stateFipsCode, dataWindow) {
     console.log('useIndustryData called with stateFipsCode:', stateFipsCode) // Log when the function is called
 
     // Use `localStorage` key for caching each state's industry data
     const cachedIndustries = useLocalStorage(`industries_${stateFipsCode}`, [])
     const cachedEmploymentData = useLocalStorage(`employmentData_${stateFipsCode}`, [])
     const cachedMSAs = useLocalStorage(`MSAs_${stateFipsCode}`, [])
+    const cachedWindow = useLocalStorage(`industryWindow_${stateFipsCode}`, {})
+
+    failedIndustries.value = []
 
     // Load cached data if available
-    if (cachedEmploymentData.value.length > 0) {
+    if (
+      cachedEmploymentData.value.length > 0 &&
+      cachedWindow.value.start === dataWindow.start &&
+      cachedWindow.value.end === dataWindow.end
+    ) {
       industries.value = cachedIndustries.value
       employmentData.value = cachedEmploymentData.value
       MSAs.value = cachedMSAs.value
       return
     }
+
+    // Start from nothing. The fetch below adds to these, and they may still
+    // hold an earlier game's state, or an earlier window's numbers.
+    employmentData.value = []
+    MSAs.value = []
 
     // load the industry data from the CSV file
     isLoadingCSV.value = true
@@ -93,10 +125,18 @@ export const useIndustryStore = defineStore('qwiStore', () => {
 
       // fetch the QWI data for the industry
       try {
-        const { data, error, fetchQWI } = useQWI(stateFipsCode, industry.naics_code)
+        const { data, error, refused, fetchQWI } = useQWI(
+          stateFipsCode,
+          industry.naics_code,
+          dataWindow
+        )
         await fetchQWI()
         if (error.value) {
           console.error('useQWI error:', error.value)
+          // A refusal will come again in the next game too, so it is left
+          // out like an industry with no data, rather than keep the state
+          // from ever being cached
+          if (!refused.value) failedIndustries.value.push(industry.naics_code)
         } else {
           console.log('Fetched QWI data:', data.value) // Log the fetched QWI data
 
@@ -119,6 +159,7 @@ export const useIndustryStore = defineStore('qwiStore', () => {
         }
       } catch (error) {
         console.error('Error calling useQWI:', error)
+        failedIndustries.value.push(industry.naics_code)
       }
     }
     isLoadingQWI.value = false
@@ -129,10 +170,18 @@ export const useIndustryStore = defineStore('qwiStore', () => {
     // Log the average employment data
     console.log('Average employment data:', employmentData.value)
 
+    if (failedIndustries.value.length > 0) {
+      console.warn(
+        `Not caching industry data: the QWI requests failed for ${failedIndustries.value.join(', ')}`
+      )
+      return
+    }
+
     // cache data in local storage
     cachedIndustries.value = industries.value
     cachedEmploymentData.value = employmentData.value
     cachedMSAs.value = MSAs.value
+    cachedWindow.value = { start: dataWindow.start, end: dataWindow.end }
   }
 
   return {
@@ -140,6 +189,7 @@ export const useIndustryStore = defineStore('qwiStore', () => {
     employmentData,
     industries,
     MSAs,
+    failedIndustries,
     isLoadingCSV,
     isLoadingQWI,
     // ACTIONS

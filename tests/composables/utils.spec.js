@@ -2,16 +2,20 @@
  * utils Tests
  *
  * Tests for the shared helpers, focused on mapWithConcurrency since the grid
- * setup relies on it to stay inside the upstream APIs' tolerance, and on the
- * short money format the demand cards fall back to when space is tight.
+ * setup relies on it to stay inside the upstream APIs' tolerance, on the
+ * retries that carry setup past the Census Bureau's occasional failures, and
+ * on the short money format the demand cards fall back to when space is tight.
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   DEFAULT_REQUEST_TIMEOUT_MS,
+  fetchWithRetries,
   fetchWithTimeout,
   formatShortCurrency,
+  isRefusal,
   mapWithConcurrency,
+  RequestError,
   wait
 } from '@/composables/utils'
 
@@ -194,6 +198,19 @@ describe('fetchWithTimeout', () => {
     await expect(response.json()).rejects.toThrow(/timed out/i)
   })
 
+  it('should keep the ceiling armed while an image body is read', async () => {
+    // Terrain arrives as images, read with blob(). A stall part-way through
+    // an image must end the request just as one part-way through JSON does.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, status: 200, blob: () => new Promise(() => {}) })
+    )
+
+    const response = await fetchWithTimeout('https://example.test', { timeoutMs: 20 })
+
+    await expect(response.blob()).rejects.toThrow(/timed out/i)
+  })
+
   it('should spend one budget across headers and body, not one each', async () => {
     vi.useFakeTimers()
     vi.stubGlobal(
@@ -272,6 +289,133 @@ describe('fetchWithTimeout', () => {
     await vi.advanceTimersByTimeAsync(DEFAULT_REQUEST_TIMEOUT_MS)
 
     await assertion
+  })
+})
+
+describe('fetchWithRetries', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  /** An answer with the given status */
+  const answer = (status) => ({ ok: status < 400, status, json: async () => ({}) })
+
+  /** Stubs fetch with answers in turn; an Error in the list is thrown */
+  function serverAnswers(...answers) {
+    const mockFetch = vi.fn()
+    answers.forEach((next) => {
+      if (next instanceof Error) mockFetch.mockRejectedValueOnce(next)
+      else mockFetch.mockResolvedValueOnce(next)
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    return mockFetch
+  }
+
+  it('should ask once when the first answer works', async () => {
+    const mockFetch = serverAnswers(answer(200))
+
+    const response = await fetchWithRetries('https://example.test', { pauseMs: 0 })
+
+    expect(response.status).toBe(200)
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('should try again when the server fails, and return the answer that works', async () => {
+    const mockFetch = serverAnswers(answer(500), answer(200))
+
+    const response = await fetchWithRetries('https://example.test', { pauseMs: 0 })
+
+    expect(response.status).toBe(200)
+    expect(mockFetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('should try again when the connection fails', async () => {
+    serverAnswers(new Error('Network error'), answer(200))
+
+    const response = await fetchWithRetries('https://example.test', { pauseMs: 0 })
+
+    expect(response.status).toBe(200)
+  })
+
+  it('should try again when the server asks to slow down', async () => {
+    const mockFetch = serverAnswers(answer(429), answer(408), answer(200))
+
+    await fetchWithRetries('https://example.test', { pauseMs: 0 })
+
+    expect(mockFetch).toHaveBeenCalledTimes(3)
+  })
+
+  it('should return the last failure after three tries', async () => {
+    const mockFetch = serverAnswers(answer(500), answer(502), answer(503), answer(200))
+
+    const response = await fetchWithRetries('https://example.test', { pauseMs: 0 })
+
+    expect(response.status).toBe(503)
+    expect(mockFetch).toHaveBeenCalledTimes(3)
+  })
+
+  it('should throw when the connection fails three times running', async () => {
+    serverAnswers(new Error('one'), new Error('two'), new Error('three'))
+
+    await expect(fetchWithRetries('https://example.test', { pauseMs: 0 })).rejects.toThrow('three')
+  })
+
+  it('should not ask again when the server turns the request down', async () => {
+    const mockFetch = serverAnswers(answer(400), answer(200))
+
+    const response = await fetchWithRetries('https://example.test', { pauseMs: 0 })
+
+    expect(response.status).toBe(400)
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('should not try again once the caller has cancelled', async () => {
+    const controller = new AbortController()
+    const mockFetch = vi.fn(async () => {
+      controller.abort()
+      throw new DOMException('The operation was aborted.', 'AbortError')
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    await expect(
+      fetchWithRetries('https://example.test', { pauseMs: 0, signal: controller.signal })
+    ).rejects.toThrow('aborted')
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('should pause between tries', async () => {
+    vi.useFakeTimers()
+    try {
+      const mockFetch = serverAnswers(answer(500), answer(200))
+
+      const pending = fetchWithRetries('https://example.test', { pauseMs: 1000 })
+      await vi.advanceTimersByTimeAsync(999)
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(1)
+
+      expect((await pending).status).toBe(200)
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('isRefusal', () => {
+  it('should be true for a request the server turned down', () => {
+    expect(isRefusal(new RequestError('bad request', 400))).toBe(true)
+    expect(isRefusal(new RequestError('forbidden', 403))).toBe(true)
+  })
+
+  it('should be false for a failure a later try might not repeat', () => {
+    expect(isRefusal(new RequestError('server error', 500))).toBe(false)
+    expect(isRefusal(new RequestError('too many requests', 429))).toBe(false)
+    expect(isRefusal(new RequestError('timed out', 408))).toBe(false)
+  })
+
+  it('should be false for a connection that failed', () => {
+    expect(isRefusal(new Error('Network error'))).toBe(false)
+    expect(isRefusal(undefined)).toBe(false)
   })
 })
 

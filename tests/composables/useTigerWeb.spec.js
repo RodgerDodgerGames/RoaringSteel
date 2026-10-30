@@ -282,8 +282,8 @@ describe('useTigerWeb (getMSALatLon)', () => {
         })
       })
 
-      const result1 = await getMSALatLon('33460') // Minneapolis
-      const result2 = await getMSALatLon('34820') // St. Cloud
+      await getMSALatLon('33460') // Minneapolis
+      await getMSALatLon('34820') // St. Cloud
 
       expect(mockFetch).toHaveBeenCalledTimes(2)
       const calls = mockFetch.mock.calls

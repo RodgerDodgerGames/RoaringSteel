@@ -26,7 +26,7 @@ import { useGamePersistence } from '@/composables/useGamePersistence'
 const emit = defineEmits(['close', 'game-loaded'])
 
 // Get persistence functionality from game persistence composable
-const { getAutoSaves, loadAutoSave, hasAutoSaves, importFromFile } = useGamePersistence()
+const { getAutoSaves, loadAutoSave, importFromFile } = useGamePersistence()
 
 // Reactive state
 const autoSaves = ref([]) // List of available auto-save entries with metadata

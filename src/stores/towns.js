@@ -42,8 +42,13 @@ import { isRefusal, refusalMessage } from '../composables/utils'
 /** Size classification labels for towns based on population */
 const sizeClasses = ['small', 'medium', 'large']
 
-/** Maximum proportion of towns that can have any single industry (20%) */
-const maxTownsForIndustry = 0.2
+/**
+ * Maximum proportion of towns that can have any single industry (20%).
+ * Not enforced yet: assignIndustries() never checks it. Kept, commented out,
+ * for the upcoming review of how towns are set up, which will decide whether
+ * the cap belongs in the game.
+ */
+// const maxTownsForIndustry = 0.2
 
 /** Maximum number of industries a single town can have */
 const maxIndustries = 3
@@ -348,7 +353,7 @@ export const useTownsStore = defineStore('towns', () => {
    * 2. Use natural breaks to classify towns into low/medium/high density
    * 3. Assign industry to high-density towns first
    * 4. Fill remaining slots with medium-density towns
-   * 5. Respect maxIndustries per town and maxTownsPerIndustry limits
+   * 5. Respect maxIndustries per town (there is no per-industry cap yet)
    */
   function assignIndustries() {
     console.log('Starting industry assignment to towns...')

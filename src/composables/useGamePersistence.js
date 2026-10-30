@@ -405,14 +405,6 @@ export function useGamePersistence() {
   }
 
   /**
-   * Checks if any auto-saves exist.
-   * @returns {boolean} True if at least one auto-save exists
-   */
-  function hasAutoSaves() {
-    return getAutoSaves().length > 0
-  }
-
-  /**
    * Exports game state to a downloadable JSON file.
    * @param {string} filename - Name for the downloaded file (without .json extension)
    */
@@ -465,7 +457,6 @@ export function useGamePersistence() {
     autoSave,
     getAutoSaves,
     loadAutoSave,
-    hasAutoSaves,
     exportToFile,
     importFromFile,
     startNewGame

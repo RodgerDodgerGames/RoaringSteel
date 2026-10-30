@@ -13,8 +13,6 @@ import {
   longitudeDegreesToMeters
 } from '@/composables/setup/useMapSupport'
 
-const METERS_PER_DEGREE_LAT = 111320
-
 describe('useMapSupport Utilities', () => {
   describe('metersToLatitudeDegrees', () => {
     it('should convert meters to latitude degrees', () => {
@@ -170,7 +168,6 @@ describe('useMapSupport Utilities', () => {
     it('should calculate correct grid cell size for Minnesota', () => {
       // Minnesota grid with 10 km cells
       const cellSizeMeters = 10000
-      const minLatitude = 43 // Approximate Minnesota latitude
       const meanLatitude = 46
 
       const latDegrees = metersToLatitudeDegrees(cellSizeMeters)

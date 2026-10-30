@@ -1,30 +1,94 @@
 /**
  * Water Mask Tests
  *
- * The map shades every grid cell the game counts as water, as a square
- * around the cell's center, so players can see where a bridge is needed.
+ * The map shades every grid cell the game counts as water, so players can
+ * see where a bridge is needed. The water is one picture laid over the grid;
+ * the map stretches it unevenly north to south, so its rows must be drawn
+ * where each row of cells will actually land.
  */
 
 import { describe, it, expect } from 'vitest'
-import { waterSquares } from '@/composables/map/waterMask'
+import { waterPicture } from '@/composables/map/waterMask'
 import { nlcdCostMap } from '@/config/nlcd'
+import { makeTestGrid, CELL } from '../utils/testGrid'
 
-const lake = { id: '0-0', centroid: { lat: 40, lng: -100 }, landCover: nlcdCostMap[11] }
-const farm = { id: '0-1', centroid: { lat: 40, lng: -99.9 }, landCover: nlcdCostMap[82] }
+const WATER = nlcdCostMap[11]
+const FARM = nlcdCostMap[82]
 
-describe('waterSquares', () => {
+/** Whether the picture's pixel at a column and row (from the top) is water */
+const isShaded = (picture, col, y) => picture.pixels[(y * picture.width + col) * 4 + 3] > 0
+
+/** The latitude the map puts the middle of a row of pixels at (Web Mercator) */
+function latitudeOfPixelRow(picture, y) {
+  const project = (lat) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360))
+  const top = project(picture.bounds.north)
+  const bottom = project(picture.bounds.south)
+  const projected = top - ((y + 0.5) / picture.height) * (top - bottom)
+  return (Math.atan(Math.exp(projected)) * 360) / Math.PI - 90
+}
+
+describe('waterPicture', () => {
   it('should shade water cells and leave land alone', () => {
-    expect(waterSquares([lake, farm])).toHaveLength(1)
+    // A lake in the west cell, a farm in the east
+    const grid = makeTestGrid({
+      rows: 1,
+      cols: 2,
+      south: 40,
+      west: -100,
+      cell: (row, col) => ({ landCover: col === 0 ? WATER : FARM })
+    })
+
+    const picture = waterPicture(grid)
+
+    expect(picture.width).toBe(2)
+    for (let y = 0; y < picture.height; y++) {
+      expect(isShaded(picture, 0, y)).toBe(true)
+      expect(isShaded(picture, 1, y)).toBe(false)
+    }
   })
 
-  it("should shade a water cell's whole square, around its center", () => {
-    const [[corners]] = waterSquares([lake])
-    const lats = corners.map(([lat]) => lat)
-    const lngs = corners.map(([, lng]) => lng)
+  it('should cover the whole grid', () => {
+    const grid = makeTestGrid({
+      rows: 2,
+      cols: 3,
+      south: 40,
+      west: -100,
+      cell: () => ({ landCover: WATER })
+    })
 
-    expect(Math.min(...lats)).toBeLessThan(40)
-    expect(Math.max(...lats)).toBeGreaterThan(40)
-    expect(Math.min(...lngs)).toBeLessThan(-100)
-    expect(Math.max(...lngs)).toBeGreaterThan(-100)
+    expect(waterPicture(grid).bounds).toEqual({
+      south: 40,
+      west: -100,
+      north: 40 + 2 * CELL,
+      east: -100 + 3 * CELL
+    })
+  })
+
+  it('should give no picture when there is no water', () => {
+    const grid = makeTestGrid({ rows: 2, cols: 2, cell: () => ({ landCover: FARM }) })
+
+    expect(waterPicture(grid)).toBeNull()
+    expect(waterPicture(null)).toBeNull()
+  })
+
+  it('should put a row of water where the map will draw that row, across a state as tall as Texas', () => {
+    // 120 rows from 26°N to about 36.8°N, water only in row 60
+    const grid = makeTestGrid({
+      rows: 120,
+      cols: 1,
+      south: 26,
+      west: -100,
+      cell: (row) => ({ landCover: row === 60 ? WATER : FARM })
+    })
+    const rowSouth = 26 + 60 * CELL
+    const rowNorth = rowSouth + CELL
+
+    const picture = waterPicture(grid)
+
+    // Every pixel the map puts inside row 60 is water, and no other
+    for (let y = 0; y < picture.height; y++) {
+      const lat = latitudeOfPixelRow(picture, y)
+      expect(isShaded(picture, 0, y)).toBe(lat >= rowSouth && lat < rowNorth)
+    }
   })
 })

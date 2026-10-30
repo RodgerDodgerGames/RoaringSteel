@@ -145,9 +145,14 @@ export function useBot() {
     const held = holdings(playerId)
     const board = searchBoard(builder.buildRules.value, townsStore.towns)
 
+    // Every question the plan asks of a search is what track to some town
+    // would cost, or the line there, so each search stops once it has
+    // reached every town
+    const townPoints = townsStore.towns.map(pointOf)
+
     /** The plan if the player builds from these points */
     const planFrom = (sources, isJoined) => {
-      const field = costField(board, sources)
+      const field = costField(board, sources, { targets: townPoints })
       const costTo = (town) => field.costTo(pointOf(town))
       const options = demandOptions(held.lines, {
         towns: townsStore.towns,

@@ -19,6 +19,7 @@ import { useGridStore } from '@/stores/grid'
 import { useMapStore } from '@/stores/map'
 import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 import { useGamePersistence } from '@/composables/useGamePersistence'
+import { makeTestGrid, cellsOf } from '../utils/testGrid'
 
 describe('useGamePersistence', () => {
   let playerStore
@@ -167,6 +168,35 @@ describe('useGamePersistence', () => {
 
       expect(playerStore.players[0].cash).toBe(12500)
       expect(playerStore.availableForTrack(1)).toBe(12500)
+    })
+  })
+
+  describe('grid', () => {
+    it('should carry the grid through a save and reload', () => {
+      const grid = makeTestGrid({
+        rows: 2,
+        cols: 3,
+        south: 39,
+        west: -105,
+        cell: (row, col) =>
+          row === 1 && col === 2 ? null : { elevation: col * 100, cost: row + col }
+      })
+      useGridStore().setGrid(grid)
+      persistence.autoSave()
+      useGridStore().reset()
+
+      const [latest] = persistence.getAutoSaves()
+      expect(persistence.loadAutoSave(latest.index)).toBe(true)
+
+      expect(cellsOf(useGridStore().grid)).toEqual(cellsOf(grid))
+    })
+
+    it('should refuse a save holding the grid as a list of cells, from an older version', () => {
+      const save = persistence.serializeGameState()
+      save.grid = [{ id: '0-0', centroid: { lat: 40, lng: -100 }, cost: 100 }]
+
+      expect(persistence.validateSaveData(save).valid).toBe(false)
+      expect(persistence.deserializeGameState(save)).toBe(false)
     })
   })
 
@@ -458,7 +488,7 @@ describe('useGamePersistence', () => {
     beforeEach(() => {
       gameStore.advanceTurn()
       useTownsStore().setTowns([{ name: 'Denver', industries: [] }])
-      useGridStore().setGrid([{ id: '0-0', cost: 100 }])
+      useGridStore().setGrid(makeTestGrid({ rows: 1, cols: 1, cell: () => ({ cost: 100 }) }))
       trackStore.addSegment({
         ownerId: 1,
         coordinates: [
@@ -478,7 +508,7 @@ describe('useGamePersistence', () => {
       expect(gameStore.turn).toBe(0)
       expect(playerStore.players).toEqual([])
       expect(useTownsStore().towns).toEqual([])
-      expect(useGridStore().grid).toEqual([])
+      expect(useGridStore().grid).toBeNull()
       expect(trackStore.segments).toEqual([])
       expect(useDemandCardsStore().hands).toEqual({})
       expect(useMapStore().viewMode).toBe(PLAN_VIEW)

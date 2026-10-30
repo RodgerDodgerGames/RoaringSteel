@@ -39,10 +39,9 @@ import { useGameStore } from '@/stores/game'
 import { useGridStore } from '@/stores/grid'
 import { useTownsStore } from '@/stores/towns'
 import { formatCurrency } from '@/composables/utils'
-import { gridConfig } from '@/config/grid'
-import { metersToLatitudeDegrees } from '@/composables/setup/useMapSupport'
 import { gameRules } from '@/config/game'
 import { nlcdCostMap } from '@/config/nlcd'
+import { makeTestGrid, CELL } from '../utils/testGrid'
 
 /**
  * A stand-in for the Leaflet map, with just enough surface for the
@@ -108,7 +107,13 @@ function createFakeMap() {
 }
 
 /** A single grid cell, enough for drawing to be allowed to start */
-const pricedGrid = [{ id: 1, cost: 1000, centroid: { lat: 40, lng: -100 } }]
+const pricedGrid = makeTestGrid({
+  rows: 1,
+  cols: 1,
+  south: 40 - CELL / 2,
+  west: -100 - CELL / 2,
+  cell: () => ({ cost: 1000 })
+})
 
 /**
  * Mounts a bare component that does nothing but run the composable, the way
@@ -122,7 +127,7 @@ const pricedGrid = [{ id: 1, cost: 1000, centroid: { lat: 40, lng: -100 } }]
  *
  * @param {Object} map - Fake map from `createFakeMap`
  * @param {Object} [towns] - Layer group of town markers
- * @param {Array} [grid] - Cost grid; a non-empty one lets drawing start
+ * @param {Object|null} [grid] - Cost grid (see cellGrid.js); one with cells lets drawing start
  * @returns {Object} The mounted wrapper, plus the composable's exposed API
  */
 function mountBuildTrack(map, towns = L.layerGroup([L.marker([40, -100])]), grid = pricedGrid) {
@@ -514,14 +519,13 @@ describe('useBuildTrack', () => {
    * it is built. Each test draws along a row of cells running east from a town.
    */
   describe('pricing a line', () => {
-    /** Degrees one grid cell spans, east-west and north-south at the equator */
-    const CELL = metersToLatitudeDegrees(gridConfig.cellSize)
     /** A row of five cells along the equator, costing 100, 200, ... 500 */
-    const rowGrid = [100, 200, 300, 400, 500].map((cost, i) => ({
-      id: `0-${i}`,
-      centroid: { lat: 0, lng: (i + 0.5) * CELL },
-      cost
-    }))
+    const rowGrid = makeTestGrid({
+      rows: 1,
+      cols: 5,
+      south: -CELL / 2,
+      cell: (row, col) => ({ cost: (col + 1) * 100 })
+    })
     /** The center of cell `i` of the row */
     const centerOf = (i) => L.latLng(0, (i + 0.5) * CELL)
 
@@ -589,14 +593,13 @@ describe('useBuildTrack', () => {
   })
 
   describe('keeping track inside the region', () => {
-    /** Degrees one grid cell spans along the equator */
-    const CELL = metersToLatitudeDegrees(gridConfig.cellSize)
     /** A row of five cells along the equator, each costing 100 */
-    const rowGrid = [0, 1, 2, 3, 4].map((i) => ({
-      id: `0-${i}`,
-      centroid: { lat: 0, lng: (i + 0.5) * CELL },
-      cost: 100
-    }))
+    const rowGrid = makeTestGrid({
+      rows: 1,
+      cols: 5,
+      south: -CELL / 2,
+      cell: () => ({ cost: 100 })
+    })
     const centerOf = (i) => L.latLng(0, (i + 0.5) * CELL)
     /** A region covering the first three cells of the row, and not the last two */
     const region = {
@@ -700,17 +703,16 @@ describe('useBuildTrack', () => {
   })
 
   describe('bridging water', () => {
-    const CELL = metersToLatitudeDegrees(gridConfig.cellSize)
     const centerOf = (i) => L.latLng(0, (i + 0.5) * CELL)
     /** Land, then more water cells in a row than a bridge may cross, then land */
     const span = gameRules.bridges.maxCells + 1
-    const grid = Array.from({ length: span + 2 }, (_, i) => {
-      const isWater = i > 0 && i <= span
-      return {
-        id: `0-${i}`,
-        centroid: { lat: 0, lng: (i + 0.5) * CELL },
-        landCover: isWater ? nlcdCostMap[11] : 150,
-        cost: isWater ? 10000 : 100
+    const grid = makeTestGrid({
+      rows: 1,
+      cols: span + 2,
+      south: -CELL / 2,
+      cell: (row, col) => {
+        const isWater = col > 0 && col <= span
+        return { landCover: isWater ? nlcdCostMap[11] : 150, cost: isWater ? 10000 : 100 }
       }
     })
 
@@ -779,15 +781,8 @@ describe('useBuildTrack', () => {
   })
 
   describe('beside track already built', () => {
-    const CELL = metersToLatitudeDegrees(gridConfig.cellSize)
     /** A three-by-five block of cells north of the equator, each costing 100 */
-    const grid = [0, 1, 2].flatMap((row) =>
-      [0, 1, 2, 3, 4].map((col) => ({
-        id: `${row}-${col}`,
-        centroid: { lat: (row + 0.5) * CELL, lng: (col + 0.5) * CELL },
-        cost: 100
-      }))
-    )
+    const grid = makeTestGrid({ rows: 3, cols: 5, cell: () => ({ cost: 100 }) })
     const centerOf = (row, col) => L.latLng((row + 0.5) * CELL, (col + 0.5) * CELL)
 
     /** Finishes a line along the given cell centers, as Geoman hands it over */
@@ -853,7 +848,7 @@ describe('useBuildTrack', () => {
     })
 
     it('should stay in the Plan view when there is no grid to price a drawing', () => {
-      const { api } = mountBuildTrack(map, L.layerGroup(), [])
+      const { api } = mountBuildTrack(map, L.layerGroup(), null)
 
       api.startDrawingLine()
 

@@ -1,8 +1,8 @@
 /**
  * Grid Store (grid.js)
  *
- * Generates and manages the hex grid overlay for the game map.
- * Each grid cell contains terrain data that affects railroad building costs:
+ * Generates and manages the square grid laid over the game map.
+ * Each grid cell holds terrain data that affects railroad building costs:
  * - Elevation: Higher elevation differences = more expensive to build
  * - Land Cover: Different terrain types have different building costs
  *
@@ -10,20 +10,18 @@
  * across different terrain types. Costs are calculated using a focal
  * operation that considers neighboring cell elevations.
  *
- * Grid Cell Structure:
- * {
- *   id: string,         // Grid position "row-col" (e.g., "5-12")
- *   centroid: Object,   // {lat, lng} center coordinates
- *   elevation: number,  // Elevation in meters
- *   landCover: number,  // Land cover cost multiplier
- *   cost: number        // Total building cost (elevation diff + land cover)
- * }
+ * The grid is a `CellGrid` (see composables/map/cellGrid.js): rows and
+ * columns of cells with their terrain in typed arrays. It is kept out of
+ * Vue's reactivity on purpose — a shallow ref, holding an object marked raw
+ * — because it is only ever replaced whole, never changed in place, and
+ * reading it through reactive proxies made pricing a line many times slower.
+ * Anything watching `grid` still hears when a new grid replaces the old.
  *
  * @module stores/grid
  */
 
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, shallowRef, computed, markRaw } from 'vue'
 import { useLocalStorage } from '@vueuse/core'
 import { useElevationTiles } from '../composables/setup/useElevationTiles'
 import { useLandCoverAPI } from '../composables/setup/useLandCoverAPI'
@@ -31,7 +29,17 @@ import {
   metersToLatitudeDegrees,
   metersToLongitudeDegrees
 } from '../composables/setup/useMapSupport'
-import { isWaterCell } from '@/composables/map/water'
+import { WATER_LAND_COVER } from '@/composables/map/water'
+import {
+  createCellGrid,
+  setCell,
+  cellAt,
+  rowOf,
+  colOf,
+  isEmptyGrid,
+  packGrid,
+  unpackGrid
+} from '@/composables/map/cellGrid'
 import { gridApiConfig } from '@/config/grid'
 import { isRefusal, refusalMessage } from '@/composables/utils'
 
@@ -48,17 +56,18 @@ import { isRefusal, refusalMessage } from '@/composables/utils'
  * drops out with it.) Land stays at any height, including at sea level or
  * below it (coastal Louisiana, Death Valley).
  *
- * @param {Object} cell - A grid cell
+ * @param {number|null} elevation - The cell's height, in meters
+ * @param {number|null} landCover - The cell's land cover cost
  * @returns {boolean} True if the cell is kept
  */
-function isUsableCell(cell) {
-  if (!Number.isFinite(cell.elevation) || cell.landCover == null) return false
-  return !(isWaterCell(cell) && cell.elevation <= 0)
+function isUsableCell(elevation, landCover) {
+  if (!Number.isFinite(elevation) || landCover == null) return false
+  return !(landCover === WATER_LAND_COVER && elevation <= 0)
 }
 
 export const useGridStore = defineStore('gridStore', () => {
-  /** Array of grid cells with terrain and cost data */
-  const grid = ref([])
+  /** The grid (see cellGrid.js), or null before one is built or loaded */
+  const grid = shallowRef(null)
 
   /** Flag indicating if grid generation is complete */
   const isGridGenerated = ref(false)
@@ -172,12 +181,15 @@ export const useGridStore = defineStore('gridStore', () => {
     // `useLocalStorage` automatically binds `grid` to `localStorage`
     const cachedGrid = cachedGridFor(stateFipsCode)
 
-    const { landCoverYear: cachedYear, cells: cachedCells } = cachedGrid.value
-    const hasCachedCells = Array.isArray(cachedCells) && cachedCells.length > 0
+    // A cache from before grids were packed holds a list of cells instead,
+    // which does not unpack; it is built again like any other missing cache
+    const { landCoverYear: cachedYear, grid: packedCache } = cachedGrid.value
+    const cached = unpackGrid(packedCache)
+    const hasCachedCells = !isEmptyGrid(cached)
 
     /** Plays with the cached grid */
     function loadCachedGrid() {
-      grid.value = cachedCells
+      grid.value = markRaw(cached)
       isGridGenerated.value = true
       currentPhase.value = ''
       return true
@@ -211,27 +223,17 @@ export const useGridStore = defineStore('gridStore', () => {
     const rows = Math.floor((bounds[3] - bounds[1]) / latCellSize)
     const cols = Math.floor((bounds[2] - bounds[0]) / lngCellSize)
 
-    // Cells are built in a plain array and only published to `grid` once the
-    // data is in. Indexing into the store's array mid-build meant anything
-    // already there — a grid restored from a save, say — silently pushed every
-    // lookup onto the wrong cell.
+    // The center of every cell in the rectangle, row by row from the south,
+    // in the order the grid numbers its cells (see cellGrid.js): the terrain
+    // that comes back for location k is cell k's. The grid itself is only
+    // published to `grid` once the data is in, so nothing already there — a
+    // grid restored from a save, say — can mix with the new one.
     const locations = []
-    const cells = []
-
     for (let i = 0; i < rows; i++) {
       for (let j = 0; j < cols; j++) {
-        const centroid = {
+        locations.push({
           lat: bounds[1] + (i + 0.5) * latCellSize,
           lng: bounds[0] + (j + 0.5) * lngCellSize
-        }
-        locations.push(centroid)
-
-        cells.push({
-          id: `${i}-${j}`,
-          centroid,
-          elevation: null,
-          landCover: null,
-          cost: null
         })
       }
     }
@@ -311,30 +313,40 @@ export const useGridStore = defineStore('gridStore', () => {
       )
     }
 
-    cells.forEach((cell, index) => {
-      cell.elevation = elevations[index]
-      cell.landCover = landCover.costs[index]
+    // Every cell with the terrain it needs goes on the board; the rest are
+    // left as holes
+    const built = createCellGrid({
+      rows,
+      cols,
+      south: bounds[1],
+      west: bounds[0],
+      latStep: latCellSize,
+      lngStep: lngCellSize
+    })
+    locations.forEach((_, index) => {
+      const elevation = elevations[index]
+      const cover = landCover.costs[index]
+      if (isUsableCell(elevation, cover)) setCell(built, index, { elevation, landCover: cover })
     })
 
-    const usableCells = cells.filter(isUsableCell)
-
-    if (usableCells.length === 0) {
+    if (isEmptyGrid(built)) {
       return fail('No terrain data came back for this region. Check your connection and retry.')
     }
 
-    const dropped = cells.length - usableCells.length
+    const dropped = locations.length - built.count
     if (dropped > 0) {
-      console.warn(`Dropped ${dropped} of ${cells.length} grid cells with incomplete terrain data.`)
+      console.warn(
+        `Dropped ${dropped} of ${locations.length} grid cells with incomplete terrain data.`
+      )
     }
-
-    grid.value = usableCells
 
     // calculate total cost for grid
     currentPhase.value = 'calculating'
-    focalOpElevation(grid)
+    focalOpElevation(built)
+    grid.value = markRaw(built)
 
     // save grid to cache, with the year it was drawn from
-    cachedGrid.value = { landCoverYear: servedYear, cells: grid.value }
+    cachedGrid.value = { landCoverYear: servedYear, grid: packGrid(built) }
 
     isGridGenerated.value = true
     currentPhase.value = ''
@@ -370,7 +382,7 @@ export const useGridStore = defineStore('gridStore', () => {
    * Resets the grid store to initial state.
    */
   function reset() {
-    grid.value = []
+    grid.value = null
     isGridGenerated.value = false
     isLoadingElevation.value = false
     isLoadingLandCover.value = false
@@ -381,12 +393,12 @@ export const useGridStore = defineStore('gridStore', () => {
   }
 
   /**
-   * Sets the complete grid array (used for loading saved games).
-   * @param {Array} gridArray - Array of grid cell objects
+   * Sets the whole grid (used for loading saved games).
+   * @param {Object} cellGrid - A grid (see cellGrid.js)
    */
-  function setGrid(gridArray) {
-    if (Array.isArray(gridArray)) {
-      grid.value = gridArray
+  function setGrid(cellGrid) {
+    if (cellGrid) {
+      grid.value = markRaw(cellGrid)
       isGridGenerated.value = true
       error.value = null
     }
@@ -409,55 +421,37 @@ export const useGridStore = defineStore('gridStore', () => {
   }
 
   /**
-   * Runs a focal operation over the elevation values in the grid cells.
-   * Uses a 3x3 neighborhood.
-   * Combines output with land cover to get total cost for each cell.
-   * @param {Object} grid - The grid object with elevation and land cover data.
+   * Works out what track through each cell costs: its land cover, plus how
+   * steep the ground around it is.
+   *
+   * Steepness comes from a focal operation over the 3x3 neighborhood: the
+   * height differences between the cell and each of its up to eight
+   * neighbors on the board, added up. A cell at the edge of the board, or
+   * beside a hole, has fewer neighbors and so less added.
+   *
+   * @param {Object} built - The grid being built, every cell's elevation and
+   *   land cover filled in; its costs are written in place
    */
-  function focalOpElevation(grid) {
-    // Parse the flat grid to map each cell by its `id` for quick lookups
-    const cellMap = grid.value.reduce((map, cell) => {
-      map[cell.id] = cell
-      return map
-    }, {})
-
-    // Iterate over each cell in the grid
-    grid.value.forEach((cell) => {
-      // if the landcover or elevation value is missing
-      // set the cost to null and continue. A height of 0 is not missing:
-      // it is land at sea level.
-      if (cell.landCover == null || !Number.isFinite(cell.elevation)) {
-        cell.cost = null
-        return
-      }
-
-      // Parse cell ID to get grid coordinates (format: "row-col")
-      const [row, col] = cell.id.split('-').map(Number)
+  function focalOpElevation(built) {
+    const { elevation, landCover, cost, present } = built
+    for (let index = 0; index < present.length; index++) {
+      if (!present[index]) continue
+      const row = rowOf(built, index)
+      const col = colOf(built, index)
       let elevationCost = 0
 
-      // Check all 8 neighbors in a 3x3 window around this cell
       // dr/dc represent delta row/column (-1, 0, +1)
       for (let dr = -1; dr <= 1; dr++) {
         for (let dc = -1; dc <= 1; dc++) {
           if (dr === 0 && dc === 0) continue // Skip the center cell (self)
-
-          const neighborId = `${row + dr}-${col + dc}`
-          const neighborCell = cellMap[neighborId]
-
-          if (neighborCell) {
-            // Steeper elevation changes = higher building cost
-            // Sum up absolute elevation differences with all neighbors
-            elevationCost += Math.abs(cell.elevation - neighborCell.elevation)
-          }
+          const neighbor = cellAt(built, row + dr, col + dc)
+          // Steeper elevation changes = higher building cost
+          if (neighbor !== -1) elevationCost += Math.abs(elevation[index] - elevation[neighbor])
         }
       }
 
       // Total cost = terrain difficulty (land cover) + slope difficulty (elevation changes)
-      cell.cost = elevationCost + cell.landCover
-
-      console.log(
-        `Calculated cost for cell ${cell.id}: landcover ${cell.landCover}, elevation ${elevationCost}`
-      )
-    })
+      cost[index] = elevationCost + landCover[index]
+    }
   }
 })

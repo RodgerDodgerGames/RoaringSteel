@@ -28,15 +28,28 @@
  * way (the network only joins a town that track has a point on — see
  * network.js).
  *
+ * The search only goes as far as it has to: told which points it will be
+ * asked about, it stops once it has reached them all, and told only one, it
+ * heads for it (A*) rather than spreading out evenly in every direction.
+ *
+ * Cells are named by their index in the grid (see cellGrid.js).
+ *
  * Pure functions over plain data, so they can be tested without a map.
  *
  * @module composables/bot/botPathfinder
  */
 
 import { gameRules } from '@/config/game'
-import { findCell, pointsAlongLine, kmBetween, priceLine } from '@/composables/map/trackCost'
+import { pointsAlongLine, kmBetween, priceLine } from '@/composables/map/trackCost'
 import { lineBlock } from '@/composables/map/buildRules'
 import { isWaterCell, bridgeCellCost } from '@/composables/map/water'
+import {
+  findCell,
+  cellCenter,
+  cellIndexes,
+  cellNeighbors,
+  stepsBetween
+} from '@/composables/map/cellGrid'
 import { MinHeap } from '@/composables/network'
 
 /**
@@ -65,156 +78,46 @@ const STEP_COST = 50
 const MAX_ATTEMPTS = 6
 
 /**
- * The distinct values in a list of numbers, smallest first. Values a hair
- * apart (floating-point noise) count as one.
- * @param {Array<number>} values - The numbers
- * @returns {Array<number>} The distinct values
- */
-function distinctSorted(values) {
-  const sorted = [...values].sort((a, b) => a - b)
-  return sorted.filter((value, i) => i === 0 || value - sorted[i - 1] > 1e-9)
-}
-
-/**
- * The smallest gap between neighboring values: the grid's spacing.
- * @param {Array<number>} sorted - Distinct values, smallest first
- * @returns {number} The spacing; 1 when there is only one value
- */
-function spacing(sorted) {
-  let gap = Infinity
-  for (let i = 1; i < sorted.length; i++) gap = Math.min(gap, sorted[i] - sorted[i - 1])
-  return Number.isFinite(gap) ? gap : 1
-}
-
-/**
- * The grid as rows and columns, so a cell's neighbors can be found at once.
- *
- * The grid store lays cells out in rows of equal latitude and columns of
- * equal longitude (see grid.js), but saves do not always carry the
- * "row-col" ids it gives them, so the rows and columns are worked out from
- * the cells' centers instead.
- *
- * @param {Array<Object>} grid - Grid cells, each with a `centroid`
- * @returns {{cells: Array<Object>, rowOf: Int32Array, colOf: Int32Array,
- *   at: Function, cellNear: Function, neighbors: Function}} The lattice:
- *   `at(row, col)` is the index of the cell there (or -1); `cellNear(point)`
- *   the index of the cell a point is in; `neighbors(index)` the indexes of
- *   the up to eight cells around one, each with whether it is diagonal
- */
-export function gridLattice(grid) {
-  const lats = distinctSorted(grid.map(({ centroid }) => centroid.lat))
-  const lngs = distinctSorted(grid.map(({ centroid }) => centroid.lng))
-  const latStep = spacing(lats)
-  const lngStep = spacing(lngs)
-  const rowFor = (lat) => Math.round((lat - lats[0]) / latStep)
-  const colFor = (lng) => Math.round((lng - lngs[0]) / lngStep)
-
-  const rowOf = new Int32Array(grid.length)
-  const colOf = new Int32Array(grid.length)
-  const byPlace = new Map()
-  grid.forEach(({ centroid }, index) => {
-    rowOf[index] = rowFor(centroid.lat)
-    colOf[index] = colFor(centroid.lng)
-    byPlace.set(`${rowOf[index]},${colOf[index]}`, index)
-  })
-
-  const at = (row, col) => byPlace.get(`${row},${col}`) ?? -1
-
-  /**
-   * The cell a point is in, the way pricing finds it (`findCell`: the cell
-   * with the nearest center), but only looking at the cells around where
-   * the point falls rather than at the whole grid.
-   */
-  function cellNear(point) {
-    const row = rowFor(point.lat)
-    const col = colFor(point.lng)
-    const lngScale = Math.cos((point.lat * Math.PI) / 180)
-    let nearest = -1
-    let nearestDistance = Infinity
-    for (let dr = -1; dr <= 1; dr++) {
-      for (let dc = -1; dc <= 1; dc++) {
-        const index = at(row + dr, col + dc)
-        if (index === -1) continue
-        const { centroid } = grid[index]
-        const dLat = point.lat - centroid.lat
-        const dLng = (point.lng - centroid.lng) * lngScale
-        const distance = dLat * dLat + dLng * dLng
-        if (distance < nearestDistance) {
-          nearest = index
-          nearestDistance = distance
-        }
-      }
-    }
-    if (nearest !== -1) return nearest
-    // Off the edge of the lattice, or in a hole in it: ask the whole grid
-    return grid.indexOf(findCell(point, grid))
-  }
-
-  const OFFSETS = [
-    [-1, 0, false],
-    [1, 0, false],
-    [0, -1, false],
-    [0, 1, false],
-    [-1, -1, true],
-    [-1, 1, true],
-    [1, -1, true],
-    [1, 1, true]
-  ]
-
-  function neighbors(index) {
-    const list = []
-    OFFSETS.forEach(([dr, dc, isDiagonal]) => {
-      const next = at(rowOf[index] + dr, colOf[index] + dc)
-      if (next === -1) return
-      // A diagonal step passes the corner between the two cells beside it
-      const sides = isDiagonal
-        ? [at(rowOf[index] + dr, colOf[index]), at(rowOf[index], colOf[index] + dc)]
-        : []
-      list.push({ index: next, sides })
-    })
-    return list
-  }
-
-  return { cells: grid, rowOf, colOf, at, cellNear, neighbors }
-}
-
-/**
  * Everything the search needs to know about the board, worked out once per
  * search: which cells a line may pass through, which are water, which are
- * right beside track already built, and where the towns are.
+ * right beside track already built, where the towns are, and the least any
+ * step of a line can cost.
+ *
+ * The flags are per cell of the grid's whole rectangle, holes included (a
+ * hole is never open), so a cell's index looks its flags up directly.
  *
  * @param {Object} rules - What lines are judged against, as the track builder
  *   holds them (`buildRules` in trackBuilder.js): `grid`, `isInRegion`,
- *   `townCells` and `builtLegs`
+ *   `townCells` and `builtTrack`
  * @param {Array<Object>} towns - Every town, each with lat and lon
  * @returns {Object} The board, for `costField` and `planLine`
  */
 export function searchBoard(rules, towns) {
-  const lattice = gridLattice(rules.grid)
-  const count = rules.grid.length
+  const { grid } = rules
+  const size = grid.present.length
   const townCellSet = new Set(rules.townCells)
 
-  const isTownCell = new Uint8Array(count)
-  const isOpen = new Uint8Array(count)
-  const isWater = new Uint8Array(count)
-  rules.grid.forEach((cell, index) => {
-    isTownCell[index] = townCellSet.has(cell) ? 1 : 0
+  const isTownCell = new Uint8Array(size)
+  const isOpen = new Uint8Array(size)
+  const isWater = new Uint8Array(size)
+  cellIndexes(grid).forEach((index) => {
+    isTownCell[index] = townCellSet.has(index) ? 1 : 0
     // Town cells may be built in even where they reach outside the region
-    isOpen[index] = isTownCell[index] || rules.isInRegion(cell.centroid) ? 1 : 0
-    isWater[index] = isWaterCell(cell) ? 1 : 0
+    isOpen[index] = isTownCell[index] || rules.isInRegion(cellCenter(grid, index)) ? 1 : 0
+    isWater[index] = isWaterCell(grid, index) ? 1 : 0
   })
 
   // Cells with a center within the spacing distance of built track. Track is
   // walked at the points pricing checks it at, and the cells around each are
   // measured; a quarter-cell gap between points is allowed for.
   const { nearKm } = gameRules.trackSpacing
-  const isBeside = new Uint8Array(count)
-  ;(rules.builtLegs ?? []).forEach((leg) => {
+  const isBeside = new Uint8Array(size)
+  ;(rules.builtTrack?.legs ?? []).forEach((leg) => {
     pointsAlongLine(leg).forEach((point) => {
-      const middle = lattice.cellNear(point)
+      const middle = findCell(point, grid)
       if (middle === -1) return
-      ;[middle, ...lattice.neighbors(middle).map(({ index }) => index)].forEach((index) => {
-        if (!isTownCell[index] && kmBetween(point, rules.grid[index].centroid) <= nearKm) {
+      ;[middle, ...cellNeighbors(grid, middle).map(({ index }) => index)].forEach((index) => {
+        if (!isTownCell[index] && kmBetween(point, cellCenter(grid, index)) <= nearKm) {
           isBeside[index] = 1
         }
       })
@@ -224,24 +127,36 @@ export function searchBoard(rules, towns) {
   // The town in each town cell, so a line through the cell goes through it
   const townIn = new Map()
   towns.forEach((town) => {
-    const index = lattice.cellNear({ lat: town.lat, lng: town.lon })
+    const index = findCell({ lat: town.lat, lng: town.lon }, grid)
     if (index !== -1 && !townIn.has(index)) townIn.set(index, { lat: town.lat, lng: town.lon })
   })
 
-  return { lattice, rules, isOpen, isWater, isTownCell, isBeside, townIn }
+  // The least a step onto any open cell can add, for the A* estimate (see
+  // `costField`): the step cost, plus the cheapest cell to step onto — a
+  // bridge's first cell, for water
+  let cheapestCell = Infinity
+  for (let index = 0; index < size; index++) {
+    if (!isOpen[index]) continue
+    cheapestCell = Math.min(cheapestCell, cellCost(grid, index, isWater[index], 1))
+  }
+  const minStep = STEP_COST + (Number.isFinite(cheapestCell) ? cheapestCell : 0)
+
+  return { grid, rules, isOpen, isWater, isTownCell, isBeside, townIn, minStep }
 }
 
 /**
  * What one grid cell costs a line passing through it, in the search: its
  * price as land, or a bridge's price by how far into its crossing it is.
- * @param {Object} cell - The grid cell
+ * @param {Object} grid - The grid
+ * @param {number} cell - The cell
  * @param {boolean} isWater - Whether it is water
  * @param {number} crossing - Its place in its row of water cells, from 1
  * @returns {number} The cost
  */
-function cellCost(cell, isWater, crossing) {
+function cellCost(grid, cell, isWater, crossing) {
   if (isWater) return bridgeCellCost(crossing)
-  return Number.isFinite(cell.cost) ? cell.cost : 0
+  const cost = grid.cost[cell]
+  return Number.isFinite(cost) ? cost : 0
 }
 
 /**
@@ -253,19 +168,31 @@ function cellCost(cell, isWater, crossing) {
  * through in a row, because both rules depend on what came before: the same
  * cell may be fine to enter after land and not after a long bridge.
  *
+ * Given `targets`, the points it will be asked about, the search stops as
+ * soon as it has reached every one, rather than going on over the whole
+ * grid. Given a single target it also heads for it (A*): each cell waiting
+ * to be searched from is ranked by its cost so far plus the least the rest
+ * of the way could cost — the fewest steps left, each at the board's
+ * cheapest step (`minStep`). That estimate never overstates the cost, and
+ * shrinks by at most one step's worth per step, so the line found is still
+ * the cheapest; only far fewer cells are looked at on the way to it.
+ *
  * @param {Object} board - From `searchBoard`
  * @param {Array<{lat: number, lng: number}>} sources - Where the player may
  *   start building (see `startPoints` in trackBuilder.js)
  * @param {Object} [options]
  * @param {Set<number>} [options.shut] - Cells the line may not pass through
+ * @param {Array<{lat: number, lng: number}>} [options.targets] - The only
+ *   points that will be asked about; without them, the whole grid is searched
  * @returns {{costTo: Function, lineTo: Function}} `costTo(point)` is what
  *   the cheapest line to a point costs (Infinity if none can reach it);
  *   `lineTo(point)` is that line's points, from its start to the point
- *   itself, or null
+ *   itself, or null. Both throw for a point that was not among the targets
+ *   of a search that stopped early, which cannot answer for it.
  */
-export function costField(board, sources, { shut = new Set() } = {}) {
-  const { lattice, isOpen, isWater, isTownCell, isBeside, townIn } = board
-  const cells = lattice.cells
+export function costField(board, sources, { shut = new Set(), targets } = {}) {
+  const { grid, isOpen, isWater, isTownCell, isBeside, townIn, minStep } = board
+  const size = grid.present.length
   const { maxCells } = gameRules.bridges
 
   // A search state is a cell plus the two running counts, packed into one
@@ -274,25 +201,38 @@ export function costField(board, sources, { shut = new Set() } = {}) {
   const STATES = (maxCells + 1) * besideStates
   const pack = (cell, water, beside) => cell * STATES + water * besideStates + beside
 
-  const cost = new Float64Array(cells.length * STATES).fill(Infinity)
-  const previous = new Int32Array(cells.length * STATES).fill(-1)
+  const cost = new Float64Array(size * STATES).fill(Infinity)
+  const previous = new Int32Array(size * STATES).fill(-1)
   // Where each starting cell's line begins: the source point in it
   const startIn = new Map()
   const frontier = new MinHeap()
   // States whose cheapest cost is known. A state is pushed again each time a
   // cheaper way to it is found; the dearer copies are skipped as they come out.
-  const settled = new Uint8Array(cells.length * STATES)
+  const settled = new Uint8Array(size * STATES)
+
+  // The cells of the targets, and how many are still to be reached. A cell
+  // is reached the first time any state of it is settled: that state is the
+  // cheapest way into the cell, whatever its running counts.
+  const targetCells = new Set(
+    (targets ?? []).map((point) => findCell(point, grid)).filter((index) => index !== -1)
+  )
+  const isReached = new Uint8Array(size)
+  let unreached = targetCells.size
+  // The one cell headed for, for the A* estimate, or -1 to spread out evenly
+  const goal = targetCells.size === 1 ? [...targetCells][0] : -1
+  const estimate = (index) => (goal === -1 ? 0 : stepsBetween(grid, index, goal) * minStep)
+  let stoppedEarly = false
 
   const mayEnter = (index) => index !== -1 && isOpen[index] && !shut.has(index)
 
   sources.forEach((point) => {
-    const index = lattice.cellNear(point)
+    const index = findCell(point, grid)
     if (!mayEnter(index) || startIn.has(index)) return
     startIn.set(index, point)
     const water = isWater[index] && !isTownCell[index] ? 1 : 0
     const state = pack(index, water, isBeside[index])
-    cost[state] = cellCost(cells[index], isWater[index], 1)
-    frontier.push(cost[state], state)
+    cost[state] = cellCost(grid, index, isWater[index], 1)
+    frontier.push(cost[state] + estimate(index), state)
   })
 
   while (frontier.size) {
@@ -300,11 +240,19 @@ export function costField(board, sources, { shut = new Set() } = {}) {
     if (settled[state]) continue
     settled[state] = 1
     const index = Math.floor(state / STATES)
+    if (targetCells.has(index) && !isReached[index]) {
+      isReached[index] = 1
+      unreached--
+      if (unreached === 0) {
+        stoppedEarly = true
+        break
+      }
+    }
     const water = Math.floor((state % STATES) / besideStates)
     const beside = state % besideStates
     const here = cost[state]
 
-    lattice.neighbors(index).forEach(({ index: next, sides }) => {
+    cellNeighbors(grid, index).forEach(({ index: next, sides }) => {
       if (!mayEnter(next)) return
       // Cutting a corner passes by the two cells beside it, so they have to
       // be somewhere a line may go too
@@ -317,14 +265,14 @@ export function costField(board, sources, { shut = new Set() } = {}) {
       if (nextBeside > MAX_BESIDE_CELLS) return
 
       const step =
-        cellCost(cells[next], isWater[next], water + 1) +
+        cellCost(grid, next, isWater[next], water + 1) +
         STEP_COST +
         (isBeside[next] ? BESIDE_PENALTY : 0)
       const nextState = pack(next, nextWater, nextBeside)
       if (here + step < cost[nextState]) {
         cost[nextState] = here + step
         previous[nextState] = state
-        frontier.push(cost[nextState], nextState)
+        frontier.push(cost[nextState] + estimate(next), nextState)
       }
     })
   }
@@ -339,15 +287,28 @@ export function costField(board, sources, { shut = new Set() } = {}) {
     return best
   }
 
+  /**
+   * The cell a point asked about is in, or -1. A search that stopped early
+   * only knows the cheapest way to its targets; anything else it has found
+   * so far may not be the cheapest, so it is not given out as if it were.
+   */
+  function askedCell(point) {
+    const index = findCell(point, grid)
+    if (stoppedEarly && index !== -1 && !targetCells.has(index)) {
+      throw new Error('costField was asked about a point that was not one of its targets')
+    }
+    return index
+  }
+
   function costTo(point) {
-    const index = lattice.cellNear(point)
+    const index = askedCell(point)
     if (index === -1) return Infinity
     const best = bestState(index)
     return best === -1 ? Infinity : cost[best]
   }
 
   function lineTo(point) {
-    const index = lattice.cellNear(point)
+    const index = askedCell(point)
     if (index === -1) return null
     const best = bestState(index)
     if (best === -1) return null
@@ -359,7 +320,7 @@ export function costField(board, sources, { shut = new Set() } = {}) {
     }
     const start = startIn.get(path[0])
     // Through the middle cells' centers, or through the town in a town cell
-    const middle = path.slice(1, -1).map((cell) => townIn.get(cell) ?? cells[cell].centroid)
+    const middle = path.slice(1, -1).map((cell) => townIn.get(cell) ?? cellCenter(grid, cell))
     const line = [start, ...middle, point].map(({ lat, lng }) => ({ lat, lng }))
     // A start and end in one cell may be the same point: nothing to build
     return line.length === 2 && kmBetween(line[0], line[1]) === 0 ? null : line
@@ -404,13 +365,15 @@ function pointsThatPass(line, rules) {
  *   start building
  * @param {{lat: number, lng: number}} target - Where the track should reach
  * @param {Object} [field] - A search already made from the same sources
- *   (see `costField`), used for the first try instead of searching again
+ *   (see `costField`), with the target among its targets if it was given
+ *   any, used for the first try instead of searching again
  * @returns {Array<Object>|null} The line's points, or null
  */
 export function planLine(board, sources, target, field = null) {
   const shut = new Set()
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const search = attempt === 0 && field ? field : costField(board, sources, { shut })
+    const search =
+      attempt === 0 && field ? field : costField(board, sources, { shut, targets: [target] })
     const line = search.lineTo(target)
     if (!line) return null
     if (!lineBlock(line, board.rules, { isFinished: true })) return line
@@ -422,7 +385,7 @@ export function planLine(board, sources, target, field = null) {
     const badPoint = Math.min(passing, line.length - 1)
     const movable = badPoint < line.length - 1 ? badPoint : badPoint - 1
     if (movable < 1) return null
-    shut.add(board.lattice.cellNear(line[movable]))
+    shut.add(findCell(line[movable], board.grid))
   }
   return null
 }
@@ -455,7 +418,9 @@ export function affordableSection(line, budget, rules) {
   }
   for (let count = affordable; count >= 2; count--) {
     const end = findCell(line[count - 1], rules.grid)
-    if (!isWaterCell(end) || rules.townCells.includes(end)) return line.slice(0, count)
+    if (!isWaterCell(rules.grid, end) || rules.townCells.includes(end)) {
+      return line.slice(0, count)
+    }
   }
   return null
 }

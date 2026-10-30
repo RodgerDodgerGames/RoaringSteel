@@ -13,6 +13,8 @@
  * cursor entered one, so wandering out and back while placing a leg kept
  * adding cells the track would never cross, and the price only ever went up.
  *
+ * Cells are named by their index in the grid (see cellGrid.js).
+ *
  * Pure functions over plain data, so the rules can be tested without a map.
  *
  * @module composables/map/trackCost
@@ -20,11 +22,10 @@
 
 import { gridConfig } from '@/config/grid'
 import { isWaterCell, bridgeCellCost } from '@/composables/map/water'
+import { findCell } from '@/composables/map/cellGrid'
 import {
   latitudeDegreesToMeters,
-  longitudeDegreesToMeters,
-  metersToLatitudeDegrees,
-  metersToLongitudeDegrees
+  longitudeDegreesToMeters
 } from '@/composables/setup/useMapSupport'
 
 /**
@@ -33,47 +34,6 @@ import {
  * corner of, while a long leg is still only a few hundred lookups.
  */
 const SAMPLE_SPACING_METERS = gridConfig.cellSize / 4
-
-/**
- * Finds the grid cell a point lies in: the one whose center is nearest.
- *
- * Distances are measured on a flat projection (longitude shrunk by the cosine
- * of the latitude) rather than over the globe. At the size of a grid cell the
- * difference is nothing, and it is cheap enough to run for every point of
- * every leg as the cursor moves.
- *
- * @param {{lat: number, lng: number}} latlng - The point
- * @param {Array<Object>} grid - Grid cells, each with a `centroid` {lat, lng}
- * @returns {Object|null} The nearest cell, or null for an empty grid
- */
-export function findCell(latlng, grid) {
-  const lngScale = Math.cos((latlng.lat * Math.PI) / 180)
-  let closestCell = null
-  let minDistance = Infinity
-  grid.forEach((cell) => {
-    const dLat = latlng.lat - cell.centroid.lat
-    const dLng = (latlng.lng - cell.centroid.lng) * lngScale
-    const distance = dLat * dLat + dLng * dLng
-    if (distance < minDistance) {
-      minDistance = distance
-      closestCell = cell
-    }
-  })
-  return closestCell
-}
-
-/**
- * The edges of a grid cell: half a cell's width each way from its center.
- * @param {Object} cell - Grid cell with a `centroid`
- * @returns {{south: number, west: number, north: number, east: number}} The
- *   cell's edges, in degrees
- */
-export function cellBounds({ centroid: { lat, lng } }) {
-  const halfSize = gridConfig.cellSize / 2
-  const dLat = metersToLatitudeDegrees(halfSize)
-  const dLng = metersToLongitudeDegrees(halfSize, lat)
-  return { south: lat - dLat, west: lng - dLng, north: lat + dLat, east: lng + dLng }
-}
 
 /**
  * The distance between two points, in km. Measured on a flat projection —
@@ -127,8 +87,8 @@ export function pointsAlongLine(latlngs) {
  * line reaches them. The line is checked at points a quarter of a cell apart,
  * so a cell whose corner it clips by less than that may be left out.
  * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
- * @param {Array<Object>} grid - Grid cells
- * @returns {Array<Object>} The cells crossed
+ * @param {Object} grid - The grid
+ * @returns {Array<number>} The cells crossed
  */
 export function cellsAlongLine(latlngs, grid) {
   return [...new Set(cellPath(latlngs, grid))]
@@ -140,14 +100,14 @@ export function cellsAlongLine(latlngs, grid) {
  * where the line goes in and out of water; it is only listed once for as long
  * as the line stays in it.
  * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
- * @param {Array<Object>} grid - Grid cells
- * @returns {Array<Object>} The cells, in order along the line
+ * @param {Object} grid - The grid
+ * @returns {Array<number>} The cells, in order along the line
  */
 export function cellPath(latlngs, grid) {
   const path = []
   pointsAlongLine(latlngs).forEach((point) => {
     const cell = findCell(point, grid)
-    if (cell && cell !== path.at(-1)) path.push(cell)
+    if (cell !== -1 && cell !== path.at(-1)) path.push(cell)
   })
   return path
 }
@@ -164,7 +124,7 @@ export function cellPath(latlngs, grid) {
  * nothing rather than making the whole line unpriceable.
  *
  * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
- * @param {Array<Object>} grid - Grid cells
+ * @param {Object} grid - The grid
  * @returns {{total: number, bridges: number}} The price, and the part of it
  *   that is bridges
  */
@@ -177,9 +137,10 @@ export function linePrice(latlngs, grid) {
   const crossing = new Set()
 
   cellPath(latlngs, grid).forEach((cell) => {
-    if (!isWaterCell(cell)) {
+    if (!isWaterCell(grid, cell)) {
       crossing.clear()
-      if (!charged.has(cell) && Number.isFinite(cell.cost)) total += cell.cost
+      const cost = grid.cost[cell]
+      if (!charged.has(cell) && Number.isFinite(cost)) total += cost
       charged.add(cell)
       return
     }
@@ -197,7 +158,7 @@ export function linePrice(latlngs, grid) {
 /**
  * What a line of track costs to build (see `linePrice`).
  * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
- * @param {Array<Object>} grid - Grid cells
+ * @param {Object} grid - The grid
  * @returns {number} The price
  */
 export function priceLine(latlngs, grid) {

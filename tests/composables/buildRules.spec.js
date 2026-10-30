@@ -14,15 +14,17 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { townCells, builtLegs, lineBlock, blockMessage } from '@/composables/map/buildRules'
+import {
+  townCells,
+  builtLegs,
+  trackIndex,
+  lineBlock,
+  blockMessage
+} from '@/composables/map/buildRules'
 import { regionTest } from '@/composables/map/region'
-import { gridConfig } from '@/config/grid'
 import { gameRules } from '@/config/game'
 import { nlcdCostMap } from '@/config/nlcd'
-import { metersToLatitudeDegrees } from '@/composables/setup/useMapSupport'
-
-/** Degrees one grid cell spans along the equator, where these tests are set */
-const CELL = metersToLatitudeDegrees(gridConfig.cellSize)
+import { makeTestGrid, CELL } from '../utils/testGrid'
 
 /** A square of the region, `size` cells across, starting `x` cells east */
 const square = (x, size) => [
@@ -43,10 +45,7 @@ const islands = {
 }
 
 /** A row of eight cells along the equator, just north of it */
-const grid = Array.from({ length: 8 }, (_, i) => ({
-  id: `0-${i}`,
-  centroid: { lat: CELL / 2, lng: (i + 0.5) * CELL }
-}))
+const grid = makeTestGrid({ rows: 1, cols: 8 })
 
 /** The point in the middle of cell `i`, or `along` cells east of its west edge */
 const at = (i, along = 0.5) => ({ lat: CELL / 2, lng: (i + along) * CELL })
@@ -63,7 +62,7 @@ describe('townCells', () => {
       { lat: CELL / 2, lon: 3.2 * CELL }
     ]
 
-    expect(townCells(towns, grid).map(({ id }) => id)).toEqual(['0-0', '0-3'])
+    expect(townCells(towns, grid)).toEqual([0, 3])
   })
 })
 
@@ -81,13 +80,13 @@ describe('lineBlock', () => {
   })
 
   it('should let a line reach a town whose cell is outside the region', () => {
-    const townRules = { ...rules, townCells: [grid[2]] }
+    const townRules = { ...rules, townCells: [2] }
 
     expect(lineBlock([at(1), at(2, 0.9)], townRules)).toBeNull()
   })
 
   it('should refuse a line that goes on past the town cell', () => {
-    const townRules = { ...rules, townCells: [grid[2]] }
+    const townRules = { ...rules, townCells: [2] }
 
     expect(lineBlock([at(1), at(3)], townRules)).not.toBeNull()
   })
@@ -95,7 +94,7 @@ describe('lineBlock', () => {
   it("should refuse a point beyond the grid's edge, even nearest a town's cell", () => {
     // Past the last cell, the town's cell is the nearest there is, but the
     // point is nowhere near inside it
-    const townRules = { ...rules, townCells: [grid[7]] }
+    const townRules = { ...rules, townCells: [7] }
 
     expect(lineBlock([at(5), at(12)], townRules)).not.toBeNull()
   })
@@ -110,10 +109,11 @@ describe('lineBlock over water', () => {
 
   /** The row of cells, with the cells listed made water */
   const gridWithWater = (waterCells) =>
-    grid.map((cell, i) => ({
-      ...cell,
-      landCover: waterCells.includes(i) ? nlcdCostMap[11] : 150
-    }))
+    makeTestGrid({
+      rows: 1,
+      cols: 8,
+      cell: (row, col) => ({ landCover: waterCells.includes(col) ? nlcdCostMap[11] : 150 })
+    })
 
   const rulesWith = (waterCells) => ({
     grid: gridWithWater(waterCells),
@@ -149,7 +149,7 @@ describe('lineBlock over water', () => {
     const water = Array.from({ length: gameRules.bridges.maxCells + 1 }, (_, i) => i + 1)
     const rules = rulesWith(water)
     // The last water cell is a town's: the land the bridge reaches
-    const town = rules.grid[water.at(-1)]
+    const town = water.at(-1)
 
     expect(lineBlock([at(0), at(water.at(-1))], { ...rules, townCells: [town] })).toBeNull()
   })
@@ -166,9 +166,7 @@ describe('lineBlock over water', () => {
   it('should let a finished line end at a town whose cell is water', () => {
     const rules = rulesWith([1])
 
-    expect(
-      lineBlock([at(0), at(1)], { ...rules, townCells: [rules.grid[1]] }, { isFinished: true })
-    ).toBeNull()
+    expect(lineBlock([at(0), at(1)], { ...rules, townCells: [1] }, { isFinished: true })).toBeNull()
   })
 })
 
@@ -183,7 +181,7 @@ describe('lineBlock beside track already built', () => {
     grid,
     isInRegion: everywhere,
     townCells: towns,
-    builtLegs: builtLegs(bosTrack)
+    builtTrack: trackIndex(builtLegs(bosTrack))
   })
 
   it('should let a line cross it square on', () => {
@@ -234,13 +232,25 @@ describe('lineBlock beside track already built', () => {
   })
 
   it("should not count the stretch inside a town's cell", () => {
-    // Out of a town along Bo's track for 24 km: 19 of them past the town's
-    // cell, which is within the limit
-    const town = { id: 'town', centroid: pt(0, 0) }
+    // Out of a town along Bo's track for 24 km: 14 of them past the town's
+    // cell (the first cell of the row), which is within the limit
     const line = [pt(0, 0.1), pt(2.4, 0.1)]
 
     expect(lineBlock(line, rules())).toEqual({ reason: 'alongside' })
-    expect(lineBlock(line, rules([town]))).toBeNull()
+    expect(lineBlock(line, rules([0]))).toBeNull()
+  })
+
+  it('should notice track built far from where the line starts', () => {
+    // Many legs of track elsewhere, and one beside the end of the line
+    const elsewhere = Array.from({ length: 50 }, (_, i) => ({
+      coordinates: [pt(i * 3, 40), pt(i * 3 + 2, 40)]
+    }))
+    const farRules = {
+      ...rules(),
+      builtTrack: trackIndex(builtLegs([...elsewhere, { coordinates: [pt(30, 0), pt(36, 0)] }]))
+    }
+
+    expect(lineBlock([pt(20, 0.2), pt(35, 0.2)], farRules)).toEqual({ reason: 'alongside' })
   })
 })
 
@@ -256,6 +266,31 @@ describe('builtLegs', () => {
       [pt(1, 0), pt(2, 0)],
       [pt(5, 0), pt(6, 0)]
     ])
+  })
+})
+
+describe('trackIndex', () => {
+  const legs = builtLegs([
+    { coordinates: [pt(0, 0), pt(1, 0)] },
+    // A long leg, 200 km east
+    { coordinates: [pt(10, 5), pt(30, 5)] }
+  ])
+  const index = trackIndex(legs)
+
+  it('should find a leg near a point', () => {
+    expect(index.near(pt(0.5, 0.2), 5)).toContain(legs[0])
+  })
+
+  it('should find a long leg partway along it, far from either end', () => {
+    expect(index.near(pt(20, 5.1), 5)).toContain(legs[1])
+  })
+
+  it('should list a leg once, however many of the squares looked in it crosses', () => {
+    expect(index.near(pt(20, 5.1), 30).filter((leg) => leg === legs[1])).toHaveLength(1)
+  })
+
+  it('should leave out legs nowhere near', () => {
+    expect(index.near(pt(60, 60), 5)).toEqual([])
   })
 })
 

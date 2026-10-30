@@ -8,13 +8,13 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import { lineBlock, townCells, builtLegs } from '@/composables/map/buildRules'
+import { lineBlock, townCells, builtLegs, trackIndex } from '@/composables/map/buildRules'
 import { regionTest } from '@/composables/map/region'
-import { priceLine, cellPath, findCell } from '@/composables/map/trackCost'
+import { priceLine, cellPath } from '@/composables/map/trackCost'
+import { findCell, rowOf, colOf } from '@/composables/map/cellGrid'
 import { isWaterCell } from '@/composables/map/water'
 import { pointKey } from '@/composables/network'
 import {
-  gridLattice,
   searchBoard,
   costField,
   planLine,
@@ -42,15 +42,12 @@ function rulesWith(segments = []) {
     grid,
     isInRegion: regionTest(makeRegion()),
     townCells: townCells(towns, grid),
-    builtLegs: builtLegs(segments)
+    builtTrack: trackIndex(builtLegs(segments))
   }
 }
 
-/** The row and column of the cell a point is in */
-function placeOf(point, grid) {
-  const [row, col] = findCell(point, grid).id.split('-').map(Number)
-  return { row, col }
-}
+/** The row and column of a cell */
+const placeOf = (cell, grid) => ({ row: rowOf(grid, cell), col: colOf(grid, cell) })
 
 describe('botPathfinder', () => {
   let rules
@@ -59,40 +56,6 @@ describe('botPathfinder', () => {
   beforeEach(() => {
     rules = rulesWith()
     board = searchBoard(rules, towns)
-  })
-
-  describe('gridLattice', () => {
-    it('should find cells and their neighbors from the centers alone', () => {
-      // Ids that say nothing about where a cell is, as some saves have
-      const grid = makeGrid().map((cell, i) => ({ ...cell, id: i * 7 }))
-      const lattice = gridLattice(grid)
-
-      const middle = lattice.cellNear(centerAt(5, 5))
-      expect(grid[middle].centroid).toEqual(centerAt(5, 5))
-      const around = lattice
-        .neighbors(middle)
-        .map(({ index }) => grid[index].centroid)
-        .sort((a, b) => a.lat - b.lat || a.lng - b.lng)
-      const expected = [
-        [4, 4],
-        [4, 5],
-        [4, 6],
-        [5, 4],
-        [5, 6],
-        [6, 4],
-        [6, 5],
-        [6, 6]
-      ].map(([row, col]) => centerAt(row, col))
-      expect(around).toEqual(expected)
-    })
-
-    it('should agree with pricing on which cell a point is in', () => {
-      const grid = makeGrid()
-      const lattice = gridLattice(grid)
-      towns.forEach((town) => {
-        expect(grid[lattice.cellNear(pointOf(town))]).toBe(findCell(pointOf(town), grid))
-      })
-    })
   })
 
   describe('planLine', () => {
@@ -110,7 +73,7 @@ describe('botPathfinder', () => {
       const line = planLine(board, [pointOf(townNamed('Ivy'))], pointOf(townNamed('Elm')))
 
       expect(lineBlock(line, rules, { isFinished: true })).toBeNull()
-      const crossed = cellPath(line, rules.grid).map((cell) => placeOf(cell.centroid, rules.grid))
+      const crossed = cellPath(line, rules.grid).map((cell) => placeOf(cell, rules.grid))
       expect(crossed.some(({ row, col }) => isLake(row, col))).toBe(false)
     })
 
@@ -120,15 +83,15 @@ describe('botPathfinder', () => {
 
       expect(lineBlock(line, rules, { isFinished: true })).toBeNull()
       const crossed = cellPath(line, rules.grid)
-      expect(crossed.some((cell) => isWaterCell(cell))).toBe(true)
-      const places = crossed.map((cell) => placeOf(cell.centroid, rules.grid))
+      expect(crossed.some((cell) => isWaterCell(rules.grid, cell))).toBe(true)
+      const places = crossed.map((cell) => placeOf(cell, rules.grid))
       expect(places.some(({ row, col }) => isRiver(row, col))).toBe(true)
     })
 
     it('should go through the pass rather than over the ridge', () => {
       const line = planLine(board, [pointOf(townNamed('Juniper'))], pointOf(townNamed('Gum')))
 
-      const places = cellPath(line, rules.grid).map((cell) => placeOf(cell.centroid, rules.grid))
+      const places = cellPath(line, rules.grid).map((cell) => placeOf(cell, rules.grid))
       expect(places.some(({ row, col }) => isRidge(row, col))).toBe(false)
       expect(places.some(({ row, col }) => row === 3 && col === 12)).toBe(true)
     })
@@ -158,14 +121,13 @@ describe('botPathfinder', () => {
     it('should go through the towns it passes, so they join the network', () => {
       // A corridor one cell high, with a town part way along it, off the
       // middle of its cell as towns are
-      const grid = makeGrid().filter((cell) => cell.id.startsWith('0-'))
+      const grid = makeGrid((row) => row === 0)
       const middle = { name: 'Mid', lat: centerAt(0, 3).lat + 0.01, lon: centerAt(0, 3).lng - 0.02 }
       const corridorTowns = [{ ...middle, industries: [] }]
       const corridor = {
         grid,
         isInRegion: regionTest(makeRegion()),
-        townCells: townCells(corridorTowns, grid),
-        builtLegs: []
+        townCells: townCells(corridorTowns, grid)
       }
 
       const line = planLine(searchBoard(corridor, corridorTowns), [centerAt(0, 0)], centerAt(0, 6))
@@ -188,6 +150,41 @@ describe('botPathfinder', () => {
 
       expect(field.costTo(pointOf(townNamed('Kauri')))).toBe(Infinity)
       expect(field.lineTo(pointOf(townNamed('Kauri')))).toBeNull()
+    })
+
+    it('should stop once its targets are reached, costing them as the whole search does', () => {
+      const sources = [pointOf(townNamed('Alder'))]
+      const everywhere = costField(board, sources)
+      const targets = ['Juniper', 'Elm', 'Dogwood'].map((name) => pointOf(townNamed(name)))
+
+      const targeted = costField(board, sources, { targets })
+
+      targets.forEach((point) => {
+        expect(targeted.costTo(point)).toBe(everywhere.costTo(point))
+        expect(priceLine(targeted.lineTo(point), rules.grid)).toBe(
+          priceLine(everywhere.lineTo(point), rules.grid)
+        )
+      })
+    })
+
+    it('should head for a single target and find a line as cheap as the whole search does', () => {
+      const sources = [pointOf(townNamed('Ivy'))]
+      const everywhere = costField(board, sources)
+
+      // Round the lake, over the ridge's pass, and over the river
+      ;['Gum', 'Cedar', 'Dogwood', 'Hazel'].forEach((name) => {
+        const target = pointOf(townNamed(name))
+        const headed = costField(board, sources, { targets: [target] })
+        expect(headed.costTo(target)).toBe(everywhere.costTo(target))
+      })
+    })
+
+    it('should not answer for a point it was not asked about once it has stopped', () => {
+      const field = costField(board, [pointOf(townNamed('Alder'))], {
+        targets: [pointOf(townNamed('Juniper'))]
+      })
+
+      expect(() => field.costTo(pointOf(townNamed('Dogwood')))).toThrow()
     })
 
     it('should cost a far town more than a near one', () => {
@@ -223,7 +220,7 @@ describe('botPathfinder', () => {
       for (let budget = 1000; budget < priceLine(line, rules.grid); budget += 500) {
         const section = affordableSection(line, budget, rules)
         if (!section) continue
-        expect(isWaterCell(findCell(section.at(-1), rules.grid))).toBe(false)
+        expect(isWaterCell(rules.grid, findCell(section.at(-1), rules.grid))).toBe(false)
       }
     })
 

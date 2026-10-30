@@ -10,27 +10,26 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { findCell, cellsAlongLine, priceLine, linePrice } from '@/composables/map/trackCost'
-import { gridConfig } from '@/config/grid'
+import { cellsAlongLine, priceLine, linePrice } from '@/composables/map/trackCost'
 import { gameRules } from '@/config/game'
 import { nlcdCostMap } from '@/config/nlcd'
-import { metersToLatitudeDegrees } from '@/composables/setup/useMapSupport'
-
-/** Degrees of latitude one grid cell spans */
-const CELL = metersToLatitudeDegrees(gridConfig.cellSize)
+import { makeTestGrid, CELL } from '../utils/testGrid'
 
 /**
  * A single row of square cells running east along latitude 0, where a degree
- * of longitude is as long as a degree of latitude. Cell `i` costs `costs[i]`.
+ * of longitude is as long as a degree of latitude. Cell `i` costs `costs[i]`
+ * and has the land cover `covers[i]`, if given.
  * @param {Array<number|null>} costs - One cost per cell, west to east
- * @returns {Array<Object>} The grid
+ * @param {Array<number>} [covers] - One land cover per cell
+ * @returns {Object} The grid
  */
-function rowOfCells(costs) {
-  return costs.map((cost, i) => ({
-    id: `0-${i}`,
-    centroid: { lat: 0, lng: (i + 0.5) * CELL },
-    cost
-  }))
+function rowOfCells(costs, covers = []) {
+  return makeTestGrid({
+    rows: 1,
+    cols: costs.length,
+    south: -CELL / 2,
+    cell: (row, col) => ({ cost: costs[col], landCover: covers[col] })
+  })
 }
 
 /**
@@ -41,25 +40,13 @@ function rowOfCells(costs) {
 const centerOf = (i) => ({ lat: 0, lng: (i + 0.5) * CELL })
 
 describe('trackCost', () => {
-  describe('findCell', () => {
-    it('should find the cell a point lies in', () => {
-      const grid = rowOfCells([1, 2, 3])
-
-      expect(findCell({ lat: 0.1 * CELL, lng: 1.9 * CELL }, grid).id).toBe('0-1')
-    })
-
-    it('should find nothing on an empty grid', () => {
-      expect(findCell({ lat: 0, lng: 0 }, [])).toBeNull()
-    })
-  })
-
   describe('cellsAlongLine', () => {
     it('should list every cell a leg passes through, not only its ends', () => {
       const grid = rowOfCells([1, 2, 3, 4, 5])
 
       const cells = cellsAlongLine([centerOf(0), centerOf(4)], grid)
 
-      expect(cells.map((cell) => cell.id)).toEqual(['0-0', '0-1', '0-2', '0-3', '0-4'])
+      expect(cells).toEqual([0, 1, 2, 3, 4])
     })
 
     it('should list a cell once when the line comes back through it', () => {
@@ -67,7 +54,7 @@ describe('trackCost', () => {
 
       const cells = cellsAlongLine([centerOf(0), centerOf(2), centerOf(1)], grid)
 
-      expect(cells.map((cell) => cell.id)).toEqual(['0-0', '0-1', '0-2'])
+      expect(cells).toEqual([0, 1, 2])
     })
   })
 
@@ -121,8 +108,9 @@ describe('trackCost', () => {
      * gives water) and a number is a land cell costing that much.
      */
     function rowWithWater(cells) {
-      return rowOfCells(cells.map((cell) => (cell === 'W' ? 10000 : cell))).map((cell, i) =>
-        cells[i] === 'W' ? { ...cell, landCover: nlcdCostMap[11] } : { ...cell, landCover: 150 }
+      return rowOfCells(
+        cells.map((cell) => (cell === 'W' ? 10000 : cell)),
+        cells.map((cell) => (cell === 'W' ? nlcdCostMap[11] : 150))
       )
     }
 

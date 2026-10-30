@@ -28,7 +28,14 @@ import { usePlayerStore } from '@/stores/players'
 import { useTownsStore } from '@/stores/towns'
 import { useTrackStore } from '@/stores/track'
 import { priceLine } from '@/composables/map/trackCost'
-import { lineBlock, blockMessage, townCells, builtLegs } from '@/composables/map/buildRules'
+import {
+  lineBlock,
+  blockMessage,
+  townCells,
+  builtLegs,
+  trackIndex
+} from '@/composables/map/buildRules'
+import { isEmptyGrid } from '@/composables/map/cellGrid'
 import { regionTest } from '@/composables/map/region'
 import { pointKey } from '@/composables/network'
 import { formatCurrency } from '@/composables/utils'
@@ -47,31 +54,30 @@ export function useTrackBuilder() {
   /**
    * What every line is checked against before it is built (see buildRules.js):
    * the grid, the region being played, the cells the towns sit in, and the
-   * track built so far. Worked out once rather than on every move of the
-   * cursor; the board parts and the track are kept apart, so building or
-   * tearing up track does not work the board out again.
+   * track built so far, indexed by where it is. Worked out once rather than
+   * on every move of the cursor; the board parts and the track are kept
+   * apart, so building or tearing up track does not work the board out again.
    *
-   * The rules are checked against the plain grid cells and track points, not
-   * the store's reactive copies of them. Checking a line looks up the cell
-   * under every point along it in the whole grid, and going through Vue's
-   * reactive wrappers for each of those lookups made it about twenty times
-   * slower — slow enough to notice on a big state. The grid is only ever
-   * replaced whole, never changed in place, so reading the store's `grid`
-   * here is still enough for these to be worked out again when it changes;
-   * the track is read through the store, so a section added is noticed, and
-   * only its points are unwrapped.
+   * The grid is never reactive (see stores/grid.js), so it is used as it is.
+   * The track's points are unwrapped from the store's reactive copies:
+   * checking a line measures every point along it against the track nearby,
+   * and going through Vue's reactive wrappers for each of those made it many
+   * times slower. The track is still read through the store, so a section
+   * added is noticed.
    */
   const boardRules = computed(() => {
-    const grid = toRaw(gridStore.grid ?? [])
+    const grid = gridStore.grid
     return {
       grid,
       isInRegion: regionTest(gameStore.region),
-      townCells: townCells(townsStore.towns, grid)
+      townCells: isEmptyGrid(grid) ? [] : townCells(townsStore.towns, grid)
     }
   })
   const buildRules = computed(() => ({
     ...boardRules.value,
-    builtLegs: builtLegs(trackStore.segments).map((leg) => leg.map((point) => toRaw(point)))
+    builtTrack: trackIndex(
+      builtLegs(trackStore.segments).map((leg) => leg.map((point) => toRaw(point)))
+    )
   }))
 
   /**
@@ -162,7 +168,7 @@ export function useTrackBuilder() {
     }
     // Cost comes from the grid cells a line crosses, so with no grid every
     // line would price at zero and be built for nothing
-    if (!gridStore.grid?.length) {
+    if (isEmptyGrid(gridStore.grid)) {
       return {
         ok: false,
         error: 'The map has not finished loading, so track cannot be priced yet.'
@@ -176,7 +182,6 @@ export function useTrackBuilder() {
     const blocked = whyNotBuildable(latlngs, { isFinished: true })
     if (blocked) return { ok: false, error: blocked }
 
-    // Priced on the plain grid, for speed (see `boardRules`)
     const cost = priceLine(latlngs, buildRules.value.grid)
     const affordable = playerStore.availableForTrack(playerId)
     // Whether building had started this turn, to put back if this one fails

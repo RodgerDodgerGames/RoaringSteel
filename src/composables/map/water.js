@@ -26,14 +26,15 @@ import { gridConfig } from '@/config/grid'
  * keeps a cell's land cover only as its cost, so this is how water is told
  * apart from land.
  */
-const WATER_LAND_COVER = nlcdCostMap[11]
+export const WATER_LAND_COVER = nlcdCostMap[11]
 
 /**
- * @param {Object} cell - A grid cell
+ * @param {Object} grid - The grid (see cellGrid.js)
+ * @param {number} cell - A cell's index
  * @returns {boolean} True if the cell is water
  */
-export function isWaterCell(cell) {
-  return cell.landCover === WATER_LAND_COVER
+export function isWaterCell(grid, cell) {
+  return grid.landCover[cell] === WATER_LAND_COVER
 }
 
 /**
@@ -54,18 +55,20 @@ export const MAX_BRIDGE_KM = (gameRules.bridges.maxCells * gridConfig.cellSize) 
  * The longest crossing of water along a line: the most water cells it
  * passes through between one land cell and the next. A water cell the line
  * comes back to within a crossing counts once.
- * @param {Array<Object>} path - Grid cells in order along a line (see
+ * @param {Array<number>} path - Grid cells in order along a line (see
  *   `cellPath` in trackCost.js)
- * @param {Array<Object>} [landCells] - Cells to count as land whatever their
+ * @param {Object} grid - The grid the cells are in
+ * @param {Array<number>} [landCells] - Cells to count as land whatever their
  *   land cover: the cells towns sit in, since a town on the shore is the
  *   land a bridge reaches even when its cell's center is in the water
  * @returns {number} How many water cells the longest crossing has; 0 for none
  */
-export function longestCrossing(path, landCells = []) {
+export function longestCrossing(path, grid, landCells = []) {
+  const land = new Set(landCells)
   let longest = 0
   const crossing = new Set()
   path.forEach((cell) => {
-    if (isWaterCell(cell) && !landCells.includes(cell)) crossing.add(cell)
+    if (isWaterCell(grid, cell) && !land.has(cell)) crossing.add(cell)
     else crossing.clear()
     longest = Math.max(longest, crossing.size)
   })

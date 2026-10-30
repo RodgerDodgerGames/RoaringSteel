@@ -14,15 +14,12 @@ import { useGridStore } from '@/stores/grid'
 import { useTownsStore } from '@/stores/towns'
 import { useTrackStore } from '@/stores/track'
 import { gameRules } from '@/config/game'
-import { gridConfig } from '@/config/grid'
-import { metersToLatitudeDegrees } from '@/composables/setup/useMapSupport'
+import { makeTestGrid, CELL } from '../utils/testGrid'
 
-/** Degrees one grid cell spans along the equator */
-const CELL = metersToLatitudeDegrees(gridConfig.cellSize)
 /** The center of cell `i` of a row of cells along the equator */
 const centerOf = (i) => ({ lat: 0, lng: (i + 0.5) * CELL })
 /** A row of six cells along the equator, each costing 1000 */
-const grid = [0, 1, 2, 3, 4, 5].map((i) => ({ id: i, centroid: centerOf(i), cost: 1000 }))
+const grid = makeTestGrid({ rows: 1, cols: 6, south: -CELL / 2, cell: () => ({ cost: 1000 }) })
 
 const ANN = 1
 const BO = 2
@@ -100,7 +97,7 @@ describe('useTrackBuilder', () => {
   })
 
   it('should not build before the grid is there to price it', () => {
-    useGridStore().setGrid([])
+    useGridStore().reset()
 
     expect(builder.buildSection(ANN, [centerOf(0), centerOf(2)]).ok).toBe(false)
   })
@@ -126,19 +123,17 @@ describe('useTrackBuilder', () => {
   })
 
   it('should check and price a long line on a big grid quickly', () => {
-    // A state-sized grid: 60 rows of 60 cells. Checking a line looks up the
-    // cell under every point along it, which once went through the store's
-    // reactive wrappers and took most of a second here.
-    const bigGrid = []
-    for (let row = 0; row < 60; row++) {
-      for (let col = 0; col < 60; col++) {
-        bigGrid.push({
-          id: `${row}-${col}`,
-          centroid: { lat: row * CELL, lng: col * CELL },
-          cost: 10
-        })
-      }
-    }
+    // A state-sized grid: 60 rows of 60 cells, centered on whole multiples
+    // of a cell. Checking a line looks up the cell under every point along
+    // it, which once went through the store's reactive wrappers and took most
+    // of a second here.
+    const bigGrid = makeTestGrid({
+      rows: 60,
+      cols: 60,
+      south: -CELL / 2,
+      west: -CELL / 2,
+      cell: () => ({ cost: 10 })
+    })
     useGridStore().setGrid(bigGrid)
     useTownsStore().setTowns([
       { name: 'Big', msa: 'B', lat: 0, lon: 0, size: 'large', industries: [] }

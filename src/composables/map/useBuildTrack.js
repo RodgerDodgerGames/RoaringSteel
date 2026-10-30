@@ -13,6 +13,7 @@ import { useGameStore } from '@/stores/game'
 import { useGridStore } from '@/stores/grid'
 import { linePrice } from '@/composables/map/trackCost'
 import { lineBlock } from '@/composables/map/buildRules'
+import { isEmptyGrid } from '@/composables/map/cellGrid'
 import { useTrackBuilder, START_RULE } from '@/composables/trackBuilder'
 import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 import {
@@ -299,7 +300,7 @@ export default function useBuildTrack(formatCurrency) {
     // Cost comes from the grid cells a line crosses, so with no grid every
     // line prices at zero and is built for nothing. Refuse rather than give
     // the map away.
-    if (!grid.value?.length) {
+    if (isEmptyGrid(grid.value)) {
       buildError.value = 'The map has not finished loading, so track cannot be priced yet.'
       return
     }
@@ -733,11 +734,8 @@ export default function useBuildTrack(formatCurrency) {
    */
   function repriceLine(cursorLatLng) {
     const placed = workingLayer.value.getLatLngs()
-    // Priced on the plain grid cells: the store's reactive ones make every
-    // lookup along the line slow, and this runs as the cursor moves
-    const cells = toRaw(grid.value)
-    const without = linePrice(placed, cells)
-    const withLeg = cursorLatLng ? linePrice([...placed, cursorLatLng], cells) : without
+    const without = linePrice(placed, grid.value)
+    const withLeg = cursorLatLng ? linePrice([...placed, cursorLatLng], grid.value) : without
     pendingCost.value = withLeg.total
     return { cost: withLeg.total - without.total, bridges: withLeg.bridges - without.bridges }
   }

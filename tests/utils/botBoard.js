@@ -19,6 +19,7 @@ import {
   metersToLatitudeDegrees,
   metersToLongitudeDegrees
 } from '@/composables/setup/useMapSupport'
+import { makeTestGrid } from './testGrid'
 
 export const ROWS = 20
 export const COLS = 26
@@ -48,22 +49,29 @@ export const isRiver = (row, col) => col === 18
 /** Whether a cell is on the ridge (column 12), apart from the pass at row 3 */
 export const isRidge = (row, col) => col === 12 && row !== 3
 
-/** Every cell of the board */
-export function makeGrid() {
-  const grid = []
-  for (let row = 0; row < ROWS; row++) {
-    for (let col = 0; col < COLS; col++) {
-      const water = isLake(row, col) || isRiver(row, col)
-      grid.push({
-        id: `${row}-${col}`,
-        centroid: centerAt(row, col),
-        elevation: 100,
-        landCover: water ? WATER : 300,
-        cost: isRidge(row, col) ? 6000 : 400 + ((row * 7 + col * 13) % 9) * 120
-      })
-    }
-  }
-  return grid
+/**
+ * The board's grid.
+ * @param {Function} [keep] - `(row, col)` → whether the cell is on the
+ *   board; every cell is, unless told otherwise
+ * @returns {Object} The grid
+ */
+export function makeGrid(keep = () => true) {
+  return makeTestGrid({
+    rows: ROWS,
+    cols: COLS,
+    south: SOUTH,
+    west: WEST,
+    latStep: LAT_STEP,
+    lngStep: LNG_STEP,
+    cell: (row, col) =>
+      keep(row, col)
+        ? {
+            elevation: 100,
+            landCover: isLake(row, col) || isRiver(row, col) ? WATER : 300,
+            cost: isRidge(row, col) ? 6000 : 400 + ((row * 7 + col * 13) % 9) * 120
+          }
+        : null
+  })
 }
 
 /**

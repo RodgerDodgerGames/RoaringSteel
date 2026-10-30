@@ -19,7 +19,7 @@ import { useDemandCardsStore } from '@/stores/demandCards'
 import { useTurn } from '@/composables/useTurn'
 import { useBot } from '@/composables/bot/useBot'
 import { pointKey } from '@/composables/network'
-import { findCell } from '@/composables/map/trackCost'
+import { findCell } from '@/composables/map/cellGrid'
 import { gameRules } from '@/config/game'
 import { makeGrid, makeRegion, makeTowns, seededRandom, centerAt } from '../../utils/botBoard'
 

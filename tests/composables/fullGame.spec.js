@@ -19,15 +19,12 @@ import { useDemandCardsStore } from '@/stores/demandCards'
 import { useTrackBuilder } from '@/composables/trackBuilder'
 import { useTurn } from '@/composables/useTurn'
 import { gameRules } from '@/config/game'
-import { gridConfig } from '@/config/grid'
-import { metersToLatitudeDegrees } from '@/composables/setup/useMapSupport'
+import { makeTestGrid, CELL } from '../utils/testGrid'
 
-/** Degrees one grid cell spans along the equator */
-const CELL = metersToLatitudeDegrees(gridConfig.cellSize)
 const centerOf = (i) => ({ lat: 0, lng: (i + 0.5) * CELL })
 
 /** Twelve cheap cells in a row along the equator */
-const grid = Array.from({ length: 12 }, (_, i) => ({ id: i, centroid: centerOf(i), cost: 100 }))
+const grid = makeTestGrid({ rows: 1, cols: 12, south: -CELL / 2, cell: () => ({ cost: 100 }) })
 
 /** Two major cities six cells (60 km) apart, and a small town further east */
 const town = (name, cell, size, industry) => ({

@@ -23,8 +23,10 @@ import { useSettingsStore } from '@/stores/settings'
 import { useTrainsStore } from '@/stores/trains'
 import { useBotsStore } from '@/stores/bots'
 import { turnAfter } from '@/composables/turnOrder'
+import { packGrid, unpackGrid } from '@/composables/map/cellGrid'
 
-const SAVE_VERSION = '1.0.0'
+// 2.0.0: the grid is packed (see cellGrid.js); saves before it are not read
+const SAVE_VERSION = '2.0.0'
 const AUTOSAVE_PREFIX = 'roaringsteel_autosave_'
 const AUTOSAVE_INDEX_KEY = 'roaringsteel_autosave_index'
 const MAX_AUTOSAVES = 3
@@ -63,7 +65,8 @@ export function useGamePersistence() {
         center: mapStore.mapCenter
       },
       towns: townsStore.towns,
-      grid: gridStore.grid,
+      // Packed into base64 text (see cellGrid.js); null before there is one
+      grid: gridStore.grid ? packGrid(gridStore.grid) : null,
       // The undealt deck, the cards played, every player's hand, and the
       // demand lines each player has pinned to the map. Saves from before
       // hands existed held only the deck, under `demandCards`.
@@ -110,7 +113,7 @@ export function useGamePersistence() {
         ensureSingleActivePlayer()
       }
       if (data.towns) townsStore.setTowns(data.towns)
-      if (data.grid) gridStore.setGrid(data.grid)
+      if (data.grid) gridStore.setGrid(unpackGrid(data.grid))
       restoreDemandDeck(data)
       // Saves written before track was persisted have no `track` field; that is
       // a game with no track, not a broken save
@@ -249,6 +252,13 @@ export function useGamePersistence() {
     // Check required nested fields
     if (data.game && !data.game.region) errors.push('Missing game.region')
     if (data.players && !Array.isArray(data.players)) errors.push('players must be an array')
+
+    // The grid is saved packed (see cellGrid.js). A save from before that
+    // holds a list of cells, which this version of the game does not read:
+    // old saves are not carried over.
+    if (data.grid && !unpackGrid(data.grid)) {
+      errors.push('grid is not a packed grid (a save from an older version of the game)')
+    }
 
     // Exactly one player should hold the turn, so the right player resumes play
     if (Array.isArray(data.players) && data.players.length > 0) {

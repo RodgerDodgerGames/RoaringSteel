@@ -32,19 +32,16 @@
  * neck of gray, or skirt the edge of another line's band, by up to that much
  * between two of them unnoticed.
  *
+ * Cells are named by their index in the grid (see cellGrid.js).
+ *
  * Pure functions over plain data, so the rules can be tested without a map.
  *
  * @module composables/map/buildRules
  */
 
 import { gameRules } from '@/config/game'
-import {
-  findCell,
-  pointsAlongLine,
-  cellPath,
-  cellBounds,
-  kmBetween
-} from '@/composables/map/trackCost'
+import { pointsAlongLine, cellPath, kmBetween } from '@/composables/map/trackCost'
+import { findCell, cellContaining } from '@/composables/map/cellGrid'
 import {
   latitudeDegreesToMeters,
   longitudeDegreesToMeters,
@@ -54,26 +51,15 @@ import {
 import { isWaterCell, longestCrossing, MAX_BRIDGE_KM } from '@/composables/map/water'
 
 /**
- * Whether a point lies inside a grid cell.
- * @param {{lat: number, lng: number}} point - The point
- * @param {Object} cell - Grid cell with a `centroid`
- * @returns {boolean} True if the point is in the cell
- */
-function isInCell({ lat, lng }, cell) {
-  const { south, west, north, east } = cellBounds(cell)
-  return lat >= south && lat <= north && lng >= west && lng <= east
-}
-
-/**
  * The grid cells the towns sit in. Track may go into these even where they
  * reach outside the region.
  * @param {Array<Object>} towns - Towns, each with lat and lon
- * @param {Array<Object>} grid - Grid cells
- * @returns {Array<Object>} The cells, each once
+ * @param {Object} grid - The grid
+ * @returns {Array<number>} The cells, each once
  */
 export function townCells(towns, grid) {
   const cells = towns.map((town) => findCell({ lat: town.lat, lng: town.lon }, grid))
-  return [...new Set(cells.filter(Boolean))]
+  return [...new Set(cells.filter((cell) => cell !== -1))]
 }
 
 /**
@@ -89,19 +75,90 @@ export function builtLegs(segments) {
 }
 
 /**
+ * The size, in km, of the squares built track is sorted into by
+ * `trackIndex`. Bigger than the spacing distance, so a point's
+ * neighborhood is only ever a few squares, and small enough that each square
+ * holds only the track close by.
+ */
+const TRACK_SQUARE_KM = 20
+
+/**
+ * Built track, sorted by where it is, so the legs near a point can be found
+ * without measuring the distance to every leg on the map.
+ *
+ * The map is cut into squares `TRACK_SQUARE_KM` tall (and as many degrees
+ * wide as tall, so narrower in km away from the equator, which only means a
+ * few more of them to look in). Each leg is filed under every square its
+ * bounding box touches. A long leg is filed under many, a short one under
+ * one or two.
+ *
+ * The rules ask about every point of a line as it is drawn, so the index is
+ * built once each time the track changes (see trackBuilder.js), not on every
+ * move of the cursor.
+ *
+ * @param {Array<Array<Object>>} legs - Built legs, as [from, to] pairs (see
+ *   `builtLegs`)
+ * @returns {{legs: Array<Array<Object>>, near: Function}} Every leg, and
+ *   `near(point, km)`: the legs that may be within that distance of a point,
+ *   each once. It can list a leg that is further off; it never leaves out one
+ *   that is near.
+ */
+export function trackIndex(legs) {
+  const size = metersToLatitudeDegrees(TRACK_SQUARE_KM * 1000)
+  const squares = new Map()
+  const keyOf = (row, col) => `${row},${col}`
+
+  legs.forEach((leg) => {
+    const [a, b] = leg
+    const top = Math.floor(Math.max(a.lat, b.lat) / size)
+    const right = Math.floor(Math.max(a.lng, b.lng) / size)
+    for (let row = Math.floor(Math.min(a.lat, b.lat) / size); row <= top; row++) {
+      for (let col = Math.floor(Math.min(a.lng, b.lng) / size); col <= right; col++) {
+        const key = keyOf(row, col)
+        if (!squares.has(key)) squares.set(key, [])
+        squares.get(key).push(leg)
+      }
+    }
+  })
+
+  /** The legs filed under every square within `km` of a point */
+  function near(point, km) {
+    const padLat = metersToLatitudeDegrees(km * 1000)
+    const padLng = metersToLongitudeDegrees(km * 1000, point.lat)
+    const top = Math.floor((point.lat + padLat) / size)
+    const right = Math.floor((point.lng + padLng) / size)
+    // A leg that crosses several of the squares looked in is filed under each
+    const found = new Set()
+    for (let row = Math.floor((point.lat - padLat) / size); row <= top; row++) {
+      for (let col = Math.floor((point.lng - padLng) / size); col <= right; col++) {
+        squares.get(keyOf(row, col))?.forEach((leg) => found.add(leg))
+      }
+    }
+    return [...found]
+  }
+
+  return { legs, near }
+}
+
+/** No track built yet */
+const NO_TRACK = trackIndex([])
+
+/**
  * How far a point is from the nearest of some legs of track, in km.
  * @param {{lat: number, lng: number}} point - The point
  * @param {Array<Array<Object>>} legs - Legs, as [from, to] pairs
+ * @param {number} [count] - Only the first this many legs are measured
  * @returns {number} Kilometers; Infinity when there are no legs
  */
-function kmToTrack(point, legs) {
+function kmToTrack(point, legs, count = legs.length) {
   // Each leg is measured on a flat projection centered on the point
   const toKm = ({ lat, lng }) => ({
     x: longitudeDegreesToMeters(lng - point.lng, point.lat) / 1000,
     y: latitudeDegreesToMeters(lat - point.lat) / 1000
   })
   let nearest = Infinity
-  legs.forEach(([from, to]) => {
+  for (let i = 0; i < count; i++) {
+    const [from, to] = legs[i]
     const a = toKm(from)
     const b = toKm(to)
     const dx = b.x - a.x
@@ -110,36 +167,8 @@ function kmToTrack(point, legs) {
     // How far along the leg the point's nearest spot is, from 0 to 1
     const t = lengthSquared ? Math.max(0, Math.min(1, -(a.x * dx + a.y * dy) / lengthSquared)) : 0
     nearest = Math.min(nearest, Math.hypot(a.x + t * dx, a.y + t * dy))
-  })
+  }
   return nearest
-}
-
-/**
- * The legs of built track that come anywhere near a line: those whose
- * bounding box, widened by `nearKm`, overlaps the line's. Only these can be
- * beside the line, so the rest are left out before any distance is measured.
- * @param {Array<Array<Object>>} legs - Built legs, as [from, to] pairs
- * @param {Array<{lat: number, lng: number}>} points - The line's sample points
- * @param {number} nearKm - How close counts as beside
- * @returns {Array<Array<Object>>} The legs that may be near
- */
-function legsNear(legs, points, nearKm) {
-  const lats = points.map(({ lat }) => lat)
-  const lngs = points.map(({ lng }) => lng)
-  const widestLat = Math.max(...lats.map(Math.abs))
-  const padLat = metersToLatitudeDegrees(nearKm * 1000)
-  const padLng = metersToLongitudeDegrees(nearKm * 1000, widestLat)
-  const south = Math.min(...lats) - padLat
-  const north = Math.max(...lats) + padLat
-  const west = Math.min(...lngs) - padLng
-  const east = Math.max(...lngs) + padLng
-  return legs.filter(
-    ([a, b]) =>
-      Math.max(a.lat, b.lat) >= south &&
-      Math.min(a.lat, b.lat) <= north &&
-      Math.max(a.lng, b.lng) >= west &&
-      Math.min(a.lng, b.lng) <= east
-  )
 }
 
 /**
@@ -158,21 +187,24 @@ function legsNear(legs, points, nearKm) {
  * @param {Array<Array<Object>>} legPoints - Each leg's sample points
  * @param {Array<boolean>} inTown - Per sample point, in order, whether it is
  *   in a town's cell, where being beside track does not count
- * @param {Array<Array<Object>>} builtLegs - Built track, as [from, to] pairs
+ * @param {Object} builtTrack - Built track (see `trackIndex`)
  * @returns {boolean} True if the line runs alongside track
  */
-function runsAlongside(legPoints, inTown, builtLegs) {
+function runsAlongside(legPoints, inTown, builtTrack) {
   const { nearKm, maxBesideKm } = gameRules.trackSpacing
-  const nearby = legsNear(builtLegs, legPoints.flat(), nearKm)
   const ownLegs = legPoints.map((points) => [points[0], points.at(-1)])
+
+  /** Whether a point on leg number `leg` is within the spacing of track */
+  const isNearTrack = (point, leg) =>
+    kmToTrack(point, ownLegs, leg) <= nearKm ||
+    kmToTrack(point, builtTrack.near(point, nearKm)) <= nearKm
 
   let besideKm = 0
   let previous = null
   let index = 0
   for (const [leg, points] of legPoints.entries()) {
-    const track = [...nearby, ...ownLegs.slice(0, leg)]
     for (const point of points) {
-      const isBeside = !inTown[index++] && kmToTrack(point, track) <= nearKm
+      const isBeside = !inTown[index++] && isNearTrack(point, leg)
       if (!isBeside) besideKm = 0
       else if (previous?.isBeside) besideKm += kmBetween(previous.point, point)
       if (besideKm > maxBesideKm) return true
@@ -192,12 +224,12 @@ function runsAlongside(legPoints, inTown, builtLegs) {
  *
  * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
  * @param {Object} rules - What the line is checked against
- * @param {Array<Object>} rules.grid - Grid cells
+ * @param {Object} rules.grid - The grid
  * @param {Function} rules.isInRegion - Whether a point is inside the region
  *   being played (see `regionTest` in region.js)
- * @param {Array<Object>} rules.townCells - The cells towns sit in (see `townCells`)
- * @param {Array<Array<Object>>} [rules.builtLegs] - The legs of the track
- *   built so far (see `builtLegs`)
+ * @param {Array<number>} rules.townCells - The cells towns sit in (see `townCells`)
+ * @param {Object} [rules.builtTrack] - The track built so far (see
+ *   `trackIndex`)
  * @param {Object} [options]
  * @param {boolean} [options.isFinished] - True for a finished line, which may
  *   not end on water; a line still being drawn may stop there for now
@@ -208,7 +240,7 @@ function runsAlongside(legPoints, inTown, builtLegs) {
  */
 export function lineBlock(
   latlngs,
-  { grid, isInRegion, townCells, builtLegs = [] },
+  { grid, isInRegion, townCells, builtTrack = NO_TRACK },
   { isFinished = false } = {}
 ) {
   // Each leg's sample points, and whether each point is in a town's cell,
@@ -218,20 +250,21 @@ export function lineBlock(
       ? [[latlngs[0]]]
       : latlngs.slice(1).map((to, i) => pointsAlongLine([latlngs[i], to]))
   const points = legPoints.flat()
-  const inTown = points.map((point) => townCells.some((cell) => isInCell(point, cell)))
+  const towns = new Set(townCells)
+  const inTown = points.map((point) => towns.has(cellContaining(point, grid)))
 
   const outside = points.findIndex((point, i) => !inTown[i] && !isInRegion(point))
   if (outside !== -1) return { reason: 'outside', point: points[outside] }
 
   const path = cellPath(latlngs, grid)
-  if (longestCrossing(path, townCells) > gameRules.bridges.maxCells) {
+  if (longestCrossing(path, grid, townCells) > gameRules.bridges.maxCells) {
     return { reason: 'water' }
   }
 
-  if (runsAlongside(legPoints, inTown, builtLegs)) return { reason: 'alongside' }
+  if (runsAlongside(legPoints, inTown, builtTrack)) return { reason: 'alongside' }
 
   const end = path.at(-1)
-  if (isFinished && end && isWaterCell(end) && !townCells.includes(end)) {
+  if (isFinished && end !== undefined && isWaterCell(grid, end) && !towns.has(end)) {
     return { reason: 'endsOnWater' }
   }
   return null

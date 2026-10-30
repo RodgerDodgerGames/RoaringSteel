@@ -161,14 +161,17 @@ describe('useTurn', () => {
       expect(playerStore.availableForTrack(1)).toBe(gameRules.trackBudgetPerTurn)
     })
 
-    it('should auto-save after each turn', () => {
+    it('should auto-save once a round, as the round ends', () => {
       seedPlayers()
       const { endTurn } = useTurn()
 
-      endTurn()
-      endTurn()
+      endTurn() // Alice -> Bob
+      endTurn() // Bob -> Charlie
+      expect(autoSave).not.toHaveBeenCalled()
 
-      expect(autoSave).toHaveBeenCalledTimes(2)
+      endTurn() // Charlie -> Charlie, round two
+      expect(autoSave).toHaveBeenCalledTimes(1)
+      expect(gameStore.turn).toBe(1)
     })
 
     it('should not auto-save when the turn could not be ended', () => {

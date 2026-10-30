@@ -490,30 +490,6 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
   watch(() => settingsStore.settings.pinLimit, trimPins)
 
   /**
-   * Prices every demand in the game afresh by the payoff rule (see
-   * payoffs.js): in the deck, the discard pile and every hand. Used on saves
-   * made before the rule changed, whose cards pay a small fraction of what
-   * track costs, so the game could never be won by delivering.
-   *
-   * A destination is found by name, as everywhere demands are read; one
-   * whose town is not in the game keeps its old payoff.
-   */
-  function repriceDemands() {
-    const townsData = towns.value
-    const reprice = (card) => {
-      // A damaged save could hold anything here; what is not a card is left be
-      if (!Array.isArray(card?.demands)) return
-      card.demands.forEach((demand) => {
-        const destination = townsData.find((town) => town.name === demand.destination)
-        if (destination) demand.payoff = demandPayoff(destination, demand.industry, townsData)
-      })
-    }
-    drawPile.value.forEach(reprice)
-    discardPile.value.forEach(reprice)
-    Object.values(hands.value).forEach((hand) => Array.isArray(hand) && hand.forEach(reprice))
-  }
-
-  /**
    * Resets the demand cards store to initial state.
    */
   function reset() {
@@ -562,27 +538,18 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
   /**
    * Restores the deck and hands from a saved game.
    *
-   * Saves written before hands existed hold the deck as a bare list of cards,
-   * each a bare list of three demands with no id. Those cards are given ids
-   * by their place in the deck, which is unique because such a save has no
-   * hands to collide with. The caller deals those players their hands.
-   *
    * @param {Object} deck - Saved deck state
    * @param {Array} deck.drawPile - Cards not yet dealt
-   * @param {Array} [deck.discardPile] - Cards played or thrown in; saves
-   *   from before cards could be played have none
+   * @param {Array} [deck.discardPile] - Cards played or thrown in
    * @param {Object} [deck.hands] - Each player's hand, keyed by player id
    * @param {Object} [deck.pins] - Each player's pinned lines, keyed by player
-   *   id; saves from before pins existed have none, and unusable pins are
-   *   left out
+   *   id; unusable pins are left out
    * @returns {boolean} True if the deck was restored
    */
   function setDeck(deck) {
     if (!Array.isArray(deck?.drawPile)) return false
 
-    drawPile.value = deck.drawPile.map((card, index) =>
-      Array.isArray(card) ? { id: index + 1, demands: card } : card
-    )
+    drawPile.value = deck.drawPile
     discardPile.value = Array.isArray(deck.discardPile) ? deck.discardPile : []
     hands.value = deck.hands ?? {}
     pins.value = usablePins(deck.pins)
@@ -604,7 +571,6 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
     dealHands,
     discardCard,
     discardHand,
-    repriceDemands,
     togglePin,
     hoverLine,
     endHover,

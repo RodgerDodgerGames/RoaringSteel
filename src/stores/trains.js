@@ -497,8 +497,9 @@ export const useTrainsStore = defineStore('trains', () => {
   }
 
   /**
-   * Restores every train from a saved game. Saves from before trains have
-   * none, and their players get new ones as they need them (see `trainOf`).
+   * Restores every train from a saved game. Anything but trains keyed by
+   * player id restores none, and the players get new ones as they need them
+   * (see `trainOf`).
    * @param {Object} [saved] - Trains, keyed by player id
    */
   function setTrains(saved) {

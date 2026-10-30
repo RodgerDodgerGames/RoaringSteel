@@ -32,12 +32,12 @@
 
 import { ref } from 'vue'
 import { defineStore, storeToRefs } from 'pinia'
-import { useLocalStorage } from '@vueuse/core'
 import { useIndustryStore } from './industry'
 import useCensus from '../composables/setup/useCensus'
 import getMSALatLon from '../composables/setup/useTigerWeb'
 import { fetchDataWindow } from '../composables/setup/dataWindow'
 import { isRefusal, refusalMessage } from '../composables/utils'
+import { readCache, writeCache } from '../composables/database'
 
 /** Size classification labels for towns based on population */
 const sizeClasses = ['small', 'medium', 'large']
@@ -89,7 +89,8 @@ export const useTownsStore = defineStore('towns', () => {
 
   /**
    * Initializes towns for the selected state by fetching and processing MSA data.
-   * Uses localStorage caching to avoid redundant API calls.
+   * Keeps each state's towns in the browser's database (see database.js) to
+   * avoid redundant API calls.
    *
    * Every new game first looks up the state's data window, one small request.
    * The cached towns are used when they were built for that same window;
@@ -115,10 +116,10 @@ export const useTownsStore = defineStore('towns', () => {
     error.value = null
     console.log('Selected state:', stateFipsCode)
 
-    // Use `localStorage` key for caching each state's towns data, along with
-    // the data window they were built for
-    const cachedTowns = useLocalStorage(`towns_${stateFipsCode}`, {})
-    const saved = savedTowns(cachedTowns.value)
+    // Each state's towns are kept under their own name, along with the data
+    // window they were built for
+    const cacheName = `towns_${stateFipsCode}`
+    const saved = savedTowns(await readCache(cacheName))
 
     let latestWindow
     try {
@@ -234,8 +235,8 @@ export const useTownsStore = defineStore('towns', () => {
       return
     }
 
-    // Cache the towns data in localStorage
-    cachedTowns.value = { dataWindow: latestWindow, towns: towns.value }
+    // Keep the towns for the next game in this state
+    await writeCache(cacheName, { dataWindow: latestWindow, towns: towns.value })
     console.log(`Cached towns data for state ${stateFipsCode}:`, towns.value)
   }
 
@@ -251,10 +252,9 @@ export const useTownsStore = defineStore('towns', () => {
 
   /**
    * The cached towns, if they can be played with: some towns, and the data
-   * window they were built for. A cache from before windows were recorded is
-   * a bare list of towns, and does not count — it is built again.
+   * window they were built for.
    *
-   * @param {Object|Array} cached - What localStorage holds for the state
+   * @param {Object|undefined} cached - What the database holds for the state
    * @returns {{dataWindow: Object, towns: Array}|null} The saved towns, or null
    */
   function savedTowns(cached) {

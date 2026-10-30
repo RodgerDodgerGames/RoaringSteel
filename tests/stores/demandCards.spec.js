@@ -3,8 +3,7 @@
  *
  * Every player holds a hand of three demand cards, dealt from the deck. These
  * tests cover building the deck, dealing hands from it, and restoring both
- * from a save — including saves made before hands existed, which carried only
- * a bare list of cards.
+ * from a save.
  *
  * They also cover the demand lines a player picks out to see on the map:
  * pinned lines, each in its own color, and the line under the pointer.
@@ -17,7 +16,6 @@ import { useTownsStore } from '@/stores/towns'
 import { usePlayerStore } from '@/stores/players'
 import { useSettingsStore } from '@/stores/settings'
 import { PIN_COLORS } from '@/config/demands'
-import { demandPayoff } from '@/composables/payoffs'
 
 /**
  * A card with an id and placeholder contracts, for tests that only care
@@ -173,18 +171,6 @@ describe('demandCards store', () => {
 
       expect(idsOf(store.drawPile)).toEqual([1, 2])
       expect(idsOf(store.handOf(1))).toEqual([5])
-    })
-
-    it('should give ids to cards from a save made before hands existed', () => {
-      // Old saves held each card as a bare list of its three contracts
-      const oldCard = card(0).demands
-
-      store.setDeck({ drawPile: [oldCard, oldCard] })
-
-      expect(store.drawPile).toEqual([
-        { id: 1, demands: oldCard },
-        { id: 2, demands: oldCard }
-      ])
     })
 
     it('should refuse a deck with no draw pile and leave the store alone', () => {
@@ -562,43 +548,6 @@ describe('demandCards store', () => {
       store.reset()
 
       expect(store.discardPile).toEqual([])
-    })
-  })
-
-  describe('repriceDemands', () => {
-    it('should price every demand by the payoff rule, wherever the card is', () => {
-      const denver = { name: 'Denver', lat: 39.7, lon: -105, industries: [] }
-      const pueblo = { name: 'Pueblo', lat: 38.3, lon: -104.6, industries: [{ name: 'Steel' }] }
-      useTownsStore().setTowns([denver, pueblo])
-      const old = (id) => ({
-        id,
-        demands: [{ destination: 'Denver', industry: 'Steel', payoff: 600 }]
-      })
-      store.setDeck({ drawPile: [old(1)], discardPile: [old(2)], hands: { 1: [old(3)] } })
-
-      store.repriceDemands()
-
-      const expected = demandPayoff(denver, 'Steel', [denver, pueblo])
-      expect(expected).toBeGreaterThan(600)
-      expect(store.drawPile[0].demands[0].payoff).toBe(expected)
-      expect(store.discardPile[0].demands[0].payoff).toBe(expected)
-      expect(store.handOf(1)[0].demands[0].payoff).toBe(expected)
-    })
-
-    it('should pass over a damaged card rather than fail', () => {
-      useTownsStore().setTowns([])
-      store.setDeck({ drawPile: [card(1)], hands: { 1: [{ id: 9 }] } })
-
-      expect(() => store.repriceDemands()).not.toThrow()
-    })
-
-    it('should leave a demand for a town not in the game as it was', () => {
-      useTownsStore().setTowns([])
-      store.setDeck({ drawPile: [card(1)] })
-
-      store.repriceDemands()
-
-      expect(store.drawPile[0].demands[0].payoff).toBe(10)
     })
   })
 })

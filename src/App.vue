@@ -22,6 +22,7 @@ import { gridConfig } from '@/config/grid'
 
 // import composables
 import { useGamePersistence } from '@/composables/useGamePersistence'
+import { keepStorage } from '@/composables/database'
 
 // setup stores
 const townsStore = useTownsStore()
@@ -89,6 +90,10 @@ async function handlePlayGameClick() {
 
   isSettingUpGame.value = true
   isSetupRunning.value = true
+
+  // Ask the browser to keep the saves and grids. Not waited for: Firefox
+  // asks the player, and setup should not sit behind the question.
+  keepStorage()
 
   try {
     // run setup towns after the region is selected

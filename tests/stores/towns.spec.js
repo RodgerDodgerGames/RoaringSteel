@@ -12,16 +12,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 // Create hoisted mocks
-const mockUseLocalStorage = vi.hoisted(() => vi.fn())
 const mockFetchPopulationData = vi.hoisted(() => vi.fn())
 const mockPopulationData = vi.hoisted(() => ({ value: [] }))
 const mockGetMSALatLon = vi.hoisted(() => vi.fn())
 const mockUseCensus = vi.hoisted(() => vi.fn())
 const mockFetchDataWindow = vi.hoisted(() => vi.fn())
-
-vi.mock('@vueuse/core', () => ({
-  useLocalStorage: mockUseLocalStorage
-}))
 
 vi.mock('@/composables/setup/useCensus', () => ({
   default: (...args) => {
@@ -44,6 +39,7 @@ vi.mock('@/composables/setup/useTigerWeb', () => ({
 import { useTownsStore } from '@/stores/towns'
 import { useIndustryStore } from '@/stores/industry'
 import { RequestError } from '@/composables/utils'
+import { readCache, writeCache } from '@/composables/database'
 
 /** The state's data window: QWI from 2021 to 2025 */
 const WINDOW = { start: 2021, end: 2025, middle: 2023 }
@@ -54,23 +50,11 @@ const EARLIER_WINDOW = { start: 2020, end: 2024, middle: 2022 }
 /** A town as the cache holds it */
 const CACHED_TOWN = { msa: '12345', name: 'Minneapolis', population: 400000, size: 'large' }
 
-/**
- * localStorage holding the given towns cache. Writes land in `written`.
- * @param {*} cached - What the towns key holds
- * @param {Object} [written] - Collects what is written, by key
- */
-function townsCache(cached, written = {}) {
-  return (key, defaultValue) => {
-    const ref = { _value: key.startsWith('towns_') ? cached : defaultValue }
-    return Object.defineProperty(ref, 'value', {
-      get: () => ref._value,
-      set: (value) => {
-        ref._value = value
-        written[key] = value
-      }
-    })
-  }
-}
+/** The towns an earlier game kept for state 27, for an earlier window */
+const EARLIER_CACHE = { dataWindow: EARLIER_WINDOW, towns: [CACHED_TOWN] }
+
+/** What the database keeps for state 27's towns */
+const cachedTowns = () => readCache('towns_27')
 
 describe('Towns Store', () => {
   let townsStore
@@ -81,7 +65,6 @@ describe('Towns Store', () => {
     // Reset mock data
     mockPopulationData.value = []
     // Default mock implementations
-    mockUseLocalStorage.mockImplementation((key, defaultValue) => ({ value: defaultValue }))
     mockFetchPopulationData.mockResolvedValue(undefined)
     mockGetMSALatLon.mockResolvedValue({
       centroidLongitude: '-93.2650',
@@ -124,9 +107,7 @@ describe('Towns Store', () => {
 
   describe('setupTowns with cached data', () => {
     it('should use cached towns built for the same data window', async () => {
-      mockUseLocalStorage.mockImplementation(
-        townsCache({ dataWindow: WINDOW, towns: [CACHED_TOWN] })
-      )
+      await writeCache('towns_27', { dataWindow: WINDOW, towns: [CACHED_TOWN] })
 
       await townsStore.setupTowns('27')
 
@@ -137,9 +118,7 @@ describe('Towns Store', () => {
     })
 
     it('should build the towns again once the data window has moved on', async () => {
-      mockUseLocalStorage.mockImplementation(
-        townsCache({ dataWindow: EARLIER_WINDOW, towns: [CACHED_TOWN] })
-      )
+      await writeCache('towns_27', EARLIER_CACHE)
       oneTownToBuild()
 
       await townsStore.setupTowns('27')
@@ -149,45 +128,28 @@ describe('Towns Store', () => {
       expect(townsStore.dataWindow).toEqual(WINDOW)
     })
 
-    it('should build the towns again from a cache that records no window', async () => {
-      // How towns were cached before windows were recorded: a bare list
-      mockUseLocalStorage.mockImplementation(townsCache([CACHED_TOWN]))
-      oneTownToBuild()
-
-      await townsStore.setupTowns('27')
-
-      expect(townsStore.towns.map((town) => town.msa)).toEqual(['20260'])
-    })
-
     it('should cache new towns with the window they were built for', async () => {
-      const written = {}
-      mockUseLocalStorage.mockImplementation(townsCache({}, written))
       oneTownToBuild()
 
       await townsStore.setupTowns('27')
 
-      expect(written.towns_27).toEqual({ dataWindow: WINDOW, towns: townsStore.towns })
+      expect(await cachedTowns()).toEqual({ dataWindow: WINDOW, towns: townsStore.towns })
     })
 
     it('should keep playing the cached towns when the new ones come out empty', async () => {
       // The window has moved on, but every lookup for the new towns failed
-      const written = {}
-      mockUseLocalStorage.mockImplementation(
-        townsCache({ dataWindow: EARLIER_WINDOW, towns: [CACHED_TOWN] }, written)
-      )
+      await writeCache('towns_27', EARLIER_CACHE)
 
       await townsStore.setupTowns('27')
 
       expect(townsStore.towns).toEqual([CACHED_TOWN])
       expect(townsStore.dataWindow).toEqual(EARLIER_WINDOW)
       expect(townsStore.error).toBeNull()
-      expect(written).toEqual({})
+      expect(await cachedTowns()).toEqual(EARLIER_CACHE)
     })
 
     it('should keep playing the cached towns when the population fetch fails', async () => {
-      mockUseLocalStorage.mockImplementation(
-        townsCache({ dataWindow: EARLIER_WINDOW, towns: [CACHED_TOWN] })
-      )
+      await writeCache('towns_27', EARLIER_CACHE)
       oneTownToBuild()
       mockFetchPopulationData.mockRejectedValue(new Error('Census API error'))
 
@@ -198,14 +160,11 @@ describe('Towns Store', () => {
     })
 
     it('should report an error when no towns can be built and none are cached', async () => {
-      const written = {}
-      mockUseLocalStorage.mockImplementation(townsCache({}, written))
-
       await townsStore.setupTowns('27')
 
       expect(townsStore.towns).toEqual([])
       expect(townsStore.error).toMatch(/towns/)
-      expect(written).toEqual({})
+      expect(await cachedTowns()).toBeUndefined()
     })
 
     it("should fetch population for the data window's years", async () => {
@@ -221,9 +180,7 @@ describe('Towns Store', () => {
     })
 
     it('should play with the cached towns, whatever window they were built for', async () => {
-      mockUseLocalStorage.mockImplementation(
-        townsCache({ dataWindow: EARLIER_WINDOW, towns: [CACHED_TOWN] })
-      )
+      await writeCache('towns_27', EARLIER_CACHE)
 
       await townsStore.setupTowns('27')
 
@@ -377,10 +334,7 @@ describe('Towns Store', () => {
     }
 
     it('should play without a town whose lookup failed, and not cache the towns', async () => {
-      const written = {}
-      mockUseLocalStorage.mockImplementation(
-        townsCache({ dataWindow: EARLIER_WINDOW, towns: [CACHED_TOWN] }, written)
-      )
+      await writeCache('towns_27', EARLIER_CACHE)
       lookUpDuluth(() => {
         throw new Error('TIGERweb lookup failed: 500')
       })
@@ -391,26 +345,22 @@ describe('Towns Store', () => {
       expect(townsStore.dataWindow).toEqual(WINDOW)
       expect(townsStore.error).toBeNull()
       // The cache keeps the last complete build
-      expect(written).toEqual({})
+      expect(await cachedTowns()).toEqual(EARLIER_CACHE)
     })
 
     it('should leave out a town TIGERweb does not have, and still cache the towns', async () => {
       // A lookup that finds nothing once made a town with no coordinates
-      const written = {}
-      mockUseLocalStorage.mockImplementation(townsCache({}, written))
       lookUpDuluth(() => false)
 
       await townsStore.setupTowns('27')
 
       expect(townsStore.towns.map((town) => town.msa)).toEqual(['40340'])
       expect(townsStore.towns.every((town) => Number.isFinite(town.lon))).toBe(true)
-      expect(written.towns_27.towns).toHaveLength(1)
+      expect((await cachedTowns()).towns).toHaveLength(1)
     })
 
     it('should leave out a town whose lookup was turned down, and still cache the towns', async () => {
       // It would be turned down again next game
-      const written = {}
-      mockUseLocalStorage.mockImplementation(townsCache({}, written))
       lookUpDuluth(() => {
         throw new RequestError('TIGERweb query failed: 400 Failed to execute query.', 400)
       })
@@ -418,12 +368,10 @@ describe('Towns Store', () => {
       await townsStore.setupTowns('27')
 
       expect(townsStore.towns.map((town) => town.msa)).toEqual(['40340'])
-      expect(written.towns_27.towns).toHaveLength(1)
+      expect((await cachedTowns()).towns).toHaveLength(1)
     })
 
     it('should play without an industry whose fetch failed, and not cache the towns', async () => {
-      const written = {}
-      mockUseLocalStorage.mockImplementation(townsCache({}, written))
       industryStore.useIndustryData = vi.fn(async () => {
         industryStore.failedIndustries = [111]
       })
@@ -431,7 +379,7 @@ describe('Towns Store', () => {
       await townsStore.setupTowns('27')
 
       expect(townsStore.towns).toHaveLength(2)
-      expect(written).toEqual({})
+      expect(await cachedTowns()).toBeUndefined()
     })
   })
 

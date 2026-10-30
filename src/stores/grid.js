@@ -22,7 +22,6 @@
 
 import { defineStore } from 'pinia'
 import { ref, shallowRef, computed, markRaw } from 'vue'
-import { useLocalStorage } from '@vueuse/core'
 import { useElevationTiles } from '../composables/setup/useElevationTiles'
 import { useLandCoverAPI } from '../composables/setup/useLandCoverAPI'
 import {
@@ -36,10 +35,9 @@ import {
   cellAt,
   rowOf,
   colOf,
-  isEmptyGrid,
-  packGrid,
-  unpackGrid
+  isEmptyGrid
 } from '@/composables/map/cellGrid'
+import { getGrid, getGridYears, putGrid } from '@/composables/database'
 import { gridApiConfig } from '@/config/grid'
 import { isRefusal, refusalMessage } from '@/composables/utils'
 
@@ -63,6 +61,26 @@ import { isRefusal, refusalMessage } from '@/composables/utils'
 function isUsableCell(elevation, landCover) {
   if (!Number.isFinite(elevation) || landCover == null) return false
   return !(landCover === WATER_LAND_COVER && elevation <= 0)
+}
+
+/**
+ * Of the years a state's grid is kept for, the one closest to the year asked
+ * for; between two equally close, the later. Used when the land cover server
+ * cannot say which year it would serve.
+ *
+ * @param {Array<number>} keptYears - The years grids are kept for
+ * @param {number} year - The year asked for
+ * @returns {number|undefined} The closest, or undefined if none is kept
+ */
+function closestYear(keptYears, year) {
+  return keptYears.reduce((best, kept) => {
+    if (best === undefined) return kept
+    const distance = Math.abs(kept - year)
+    const bestDistance = Math.abs(best - year)
+    if (distance < bestDistance) return kept
+    if (distance === bestDistance && kept > best) return kept
+    return best
+  }, undefined)
 }
 
 export const useGridStore = defineStore('gridStore', () => {
@@ -89,6 +107,16 @@ export const useGridStore = defineStore('gridStore', () => {
 
   /** Player-facing message when generation fails, otherwise null */
   const error = ref(null)
+
+  /**
+   * What the grid in play was built from, or null while there is none:
+   * `{ state, bounds, cellSize, landCoverYear }` — the state's FIPS code,
+   * its bounding box, the cell size in meters and the year of land cover
+   * drawn. Autosaves record this in place of the grid itself, which is kept
+   * apart in the browser's database; a load finds the grid again by it (see
+   * `gridForSave`).
+   */
+  const source = ref(null)
 
   /**
    * Combined progress percentage across both fetch phases.
@@ -133,38 +161,33 @@ export const useGridStore = defineStore('gridStore', () => {
   const { landCoverYearFor, planLandCover } = useLandCoverAPI()
 
   /**
-   * `useLocalStorage` registers storage listeners and a deep watcher that
-   * nothing here disposes of. Binding once per state rather than once per
-   * attempt keeps a retry loop from stacking up live bindings to the same key.
+   * Starts the progress shown while a grid is found or built: nothing
+   * downloaded yet, and no error from an earlier attempt.
    */
-  const cacheBindings = new Map()
-
-  function cachedGridFor(stateFipsCode) {
-    const key = `cachedGrid_${stateFipsCode}`
-    if (!cacheBindings.has(key)) {
-      cacheBindings.set(key, useLocalStorage(key, {}))
-    }
-    return cacheBindings.get(key)
+  function startProgress() {
+    elevationProgress.value = { completed: 0, total: 0 }
+    landCoverProgress.value = { completed: 0, total: 0 }
+    currentPhase.value = 'initializing'
+    error.value = null
   }
 
   /**
-   * Generates a grid of cells covering the specified bounds.
-   * Fetches elevation and land cover data for each cell, then calculates costs.
-   * Uses localStorage caching to avoid redundant API calls.
+   * Puts a new game on a grid of cells covering the specified bounds.
    *
-   * The cache holds the year of land cover the grid was drawn from: the year
-   * the server served, which is the closest it has to the year asked for.
-   * Each new game asks the server which year that is now, one small request,
-   * and uses the cache only when it is the same year. So a game whose data
-   * window has moved on builds its grid again, as does one where the server
-   * has since added a year closer to the one asked for, or a cache from
-   * before the year was recorded.
+   * Each grid built is kept in the browser's database (see database.js),
+   * with the year of land cover it was drawn from: the year the server
+   * served, which is the closest it has to the year asked for. Each new game
+   * asks the server which year that is now, one small request, and uses a
+   * kept grid only when it was drawn from that same year. So a game whose
+   * data window has moved on builds its grid again, as does one where the
+   * server has since added a year closer to the one asked for. Grids of
+   * other years are kept too, for the saved games played on them.
    *
    * If the server cannot say — it is down, or the player is offline — the
-   * cached grid is used as it is, whatever year it was drawn from, as the
+   * kept grid whose year is closest to the one asked for is used, as the
    * towns are when the Census Bureau is down.
    *
-   * @param {string} stateFipsCode - State FIPS code for cache key
+   * @param {string} stateFipsCode - State FIPS code the grid is kept under
    * @param {Array<number>} bounds - Bounding box [minLng, minLat, maxLng, maxLat]
    * @param {number} cellSize - Grid cell size in meters
    * @param {number} landCoverYear - The year to take land cover from: the
@@ -172,28 +195,17 @@ export const useGridStore = defineStore('gridStore', () => {
    * @returns {Promise<boolean>} True when a usable grid was produced
    */
   async function generateGrid(stateFipsCode, bounds, cellSize, landCoverYear) {
-    elevationProgress.value = { completed: 0, total: 0 }
-    landCoverProgress.value = { completed: 0, total: 0 }
-    currentPhase.value = 'initializing'
-    error.value = null
+    startProgress()
     isGridGenerated.value = false
 
-    // `useLocalStorage` automatically binds `grid` to `localStorage`
-    const cachedGrid = cachedGridFor(stateFipsCode)
-
-    // A cache from before grids were packed holds a list of cells instead,
-    // which does not unpack; it is built again like any other missing cache
-    const { landCoverYear: cachedYear, grid: packedCache } = cachedGrid.value
-    const cached = unpackGrid(packedCache)
-    const hasCachedCells = !isEmptyGrid(cached)
-
-    /** Plays with the cached grid */
-    function loadCachedGrid() {
-      grid.value = markRaw(cached)
-      isGridGenerated.value = true
-      currentPhase.value = ''
-      return true
-    }
+    /** Plays with a kept grid */
+    const playKept = (record) =>
+      setGrid(record.grid, {
+        state: stateFipsCode,
+        bounds,
+        cellSize,
+        landCoverYear: record.landCoverYear
+      })
 
     // The year of land cover the server will draw: the one asked for, or the
     // closest it has
@@ -202,7 +214,9 @@ export const useGridStore = defineStore('gridStore', () => {
       servedYear = await landCoverYearFor(landCoverYear)
     } catch (e) {
       console.error('Error looking up land cover years:', e)
-      if (hasCachedCells) return loadCachedGrid()
+      const year = closestYear(await keptYears(stateFipsCode, cellSize), landCoverYear)
+      const closest = year === undefined ? undefined : await keptGrid(stateFipsCode, cellSize, year)
+      if (closest) return playKept(closest)
       return fail(
         isRefusal(e)
           ? refusalMessage('The land cover server', 'its years', e)
@@ -210,9 +224,55 @@ export const useGridStore = defineStore('gridStore', () => {
       )
     }
 
-    // check if grid already exists in cache, drawn from the same year
-    if (cachedYear === servedYear && hasCachedCells) return loadCachedGrid()
+    const sameYear = await keptGrid(stateFipsCode, cellSize, servedYear)
+    if (sameYear) return playKept(sameYear)
 
+    const built = await buildGrid(bounds, cellSize, servedYear)
+    if (!built) return false
+    const gridSource = { state: stateFipsCode, bounds, cellSize, landCoverYear: servedYear }
+    await keepGrid(gridSource, built)
+    return setGrid(built, gridSource)
+  }
+
+  /**
+   * The grid a saved game was played on, found by what the save recorded
+   * about it (see `source`): the kept grid for the same state, cell size and
+   * year or, if this browser has none, the same grid built again from the
+   * same year of land cover. Building it again shows the same progress as
+   * setting up a new game, and fails the same way, with `error` set.
+   *
+   * The grid is handed back rather than put in play: the game being
+   * replaced is still on screen until the load has everything it needs, so a
+   * load that fails here leaves that game as it was.
+   *
+   * @param {Object} gridSource - What the save recorded (see `source`)
+   * @returns {Promise<Object|false>} The grid (see cellGrid.js), or false if
+   *   it could not be built
+   */
+  async function gridForSave(gridSource) {
+    const { state, bounds, cellSize, landCoverYear } = gridSource
+    // Looked for before any progress is shown, so a quick load from the
+    // kept grid does not flash the progress modal
+    const kept = await keptGrid(state, cellSize, landCoverYear)
+    if (kept) return kept.grid
+
+    startProgress()
+    const built = await buildGrid(bounds, cellSize, landCoverYear)
+    if (built) await keepGrid(gridSource, built)
+    return built
+  }
+
+  /**
+   * Builds a grid of cells covering the specified bounds: fetches elevation
+   * and land cover for each cell, then works out what track through each
+   * costs. Reports its progress as it goes, and on failure sets `error`.
+   *
+   * @param {Array<number>} bounds - Bounding box [minLng, minLat, maxLng, maxLat]
+   * @param {number} cellSize - Grid cell size in meters
+   * @param {number} year - The year of land cover to draw, one the server has
+   * @returns {Promise<Object|false>} The grid (see cellGrid.js), or false
+   */
+  async function buildGrid(bounds, cellSize, year) {
     // cell size is in meters so convert to degrees
     // find mean latitude
     // bounds is in [minX, minY, maxX, maxY]
@@ -225,9 +285,9 @@ export const useGridStore = defineStore('gridStore', () => {
 
     // The center of every cell in the rectangle, row by row from the south,
     // in the order the grid numbers its cells (see cellGrid.js): the terrain
-    // that comes back for location k is cell k's. The grid itself is only
-    // published to `grid` once the data is in, so nothing already there — a
-    // grid restored from a save, say — can mix with the new one.
+    // that comes back for location k is cell k's. The grid is built apart
+    // from `grid` and handed back, so nothing already in play — a grid
+    // restored from a save, say — can mix with the new one.
     const locations = []
     for (let i = 0; i < rows; i++) {
       for (let j = 0; j < cols; j++) {
@@ -250,7 +310,7 @@ export const useGridStore = defineStore('gridStore', () => {
     let landCoverPlan
     try {
       elevationPlan = planElevations(locations, cellSize)
-      landCoverPlan = planLandCover(locations, cellSize, servedYear)
+      landCoverPlan = planLandCover(locations, cellSize, year)
     } catch (e) {
       console.error('Error planning terrain downloads:', e)
       return fail('Could not plan the terrain downloads for this region.')
@@ -343,14 +403,8 @@ export const useGridStore = defineStore('gridStore', () => {
     // calculate total cost for grid
     currentPhase.value = 'calculating'
     focalOpElevation(built)
-    grid.value = markRaw(built)
-
-    // save grid to cache, with the year it was drawn from
-    cachedGrid.value = { landCoverYear: servedYear, grid: packGrid(built) }
-
-    isGridGenerated.value = true
     currentPhase.value = ''
-    return true
+    return built
   }
 
   /**
@@ -365,7 +419,6 @@ export const useGridStore = defineStore('gridStore', () => {
     console.error('Grid generation failed:', message)
     error.value = message
     currentPhase.value = ''
-    isGridGenerated.value = false
     return false
   }
 
@@ -390,17 +443,69 @@ export const useGridStore = defineStore('gridStore', () => {
     landCoverProgress.value = { completed: 0, total: 0 }
     currentPhase.value = ''
     error.value = null
+    source.value = null
   }
 
   /**
-   * Sets the whole grid (used for loading saved games).
+   * Puts a grid in play: one just built or kept, or one from a saved game.
    * @param {Object} cellGrid - A grid (see cellGrid.js)
+   * @param {Object|null} gridSource - What it was built from (see `source`);
+   *   null for a grid from a save that did not record it
+   * @returns {true}
    */
-  function setGrid(cellGrid) {
-    if (cellGrid) {
-      grid.value = markRaw(cellGrid)
-      isGridGenerated.value = true
-      error.value = null
+  function setGrid(cellGrid, gridSource) {
+    grid.value = markRaw(cellGrid)
+    source.value = gridSource
+    isGridGenerated.value = true
+    currentPhase.value = ''
+    error.value = null
+    return true
+  }
+
+  // HELPERS
+
+  /**
+   * The years a grid is kept for, for a state at a cell size. A database that
+   * cannot be read counts as keeping none: the grid is built afresh instead.
+   * @param {string} state - The state's FIPS code
+   * @param {number} cellSize - Cell size in meters
+   * @returns {Promise<Array<number>>} The years
+   */
+  async function keptYears(state, cellSize) {
+    try {
+      return await getGridYears(state, cellSize)
+    } catch (e) {
+      console.warn('Could not read the kept grids:', e)
+      return []
+    }
+  }
+
+  /**
+   * The grid kept for a state, cell size and year, read as `keptYears` reads.
+   * @returns {Promise<Object|undefined>} The record, or undefined
+   */
+  async function keptGrid(state, cellSize, landCoverYear) {
+    try {
+      return await getGrid(state, cellSize, landCoverYear)
+    } catch (e) {
+      console.warn('Could not read the kept grid:', e)
+      return undefined
+    }
+  }
+
+  /**
+   * Keeps a grid — one just built, or one a save file brought — so the next
+   * game on it, and the autosaves of this one, need not build it again. A
+   * grid that cannot be kept is still played; it is only built again next
+   * time.
+   * @param {Object} gridSource - What it was built from (see `source`)
+   * @param {Object} built - The grid
+   */
+  async function keepGrid({ state, cellSize, landCoverYear }, built) {
+    try {
+      await putGrid({ state, cellSize, landCoverYear, grid: built })
+    } catch (e) {
+      console.warn('Could not keep the grid:', e)
     }
   }
 
@@ -414,7 +519,10 @@ export const useGridStore = defineStore('gridStore', () => {
     currentPhase,
     progressPercent,
     error,
+    source,
     generateGrid,
+    gridForSave,
+    keepGrid,
     clearError,
     reset,
     setGrid

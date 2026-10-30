@@ -27,7 +27,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import useQWI from '../composables/setup/useQWI'
 import Papa from 'papaparse'
-import { useLocalStorage } from '@vueuse/core'
+import { readCache, writeCache } from '../composables/database'
 
 /** Path to curated industry definitions CSV */
 const csvFile = '/data/label_industry_curated_test.csv'
@@ -63,12 +63,12 @@ export const useIndustryStore = defineStore('qwiStore', () => {
 
   /**
    * Fetches and processes industry employment data for a state.
-   * Uses localStorage caching to avoid redundant API calls.
+   * Keeps each state's data in the browser's database (see database.js) to
+   * avoid redundant API calls.
    *
    * The cache is used only when it was built for the same data window. Once
    * a new year of QWI is out, the window moves on and the data is fetched
-   * again; a cache from before windows were recorded has none, and is
-   * fetched again too.
+   * again.
    *
    * An industry whose request fails is left out, and the fetch is not cached
    * (see `failedIndustries`): a game can be played without it, but should not
@@ -81,23 +81,22 @@ export const useIndustryStore = defineStore('qwiStore', () => {
   async function useIndustryData(stateFipsCode, dataWindow) {
     console.log('useIndustryData called with stateFipsCode:', stateFipsCode) // Log when the function is called
 
-    // Use `localStorage` key for caching each state's industry data
-    const cachedIndustries = useLocalStorage(`industries_${stateFipsCode}`, [])
-    const cachedEmploymentData = useLocalStorage(`employmentData_${stateFipsCode}`, [])
-    const cachedMSAs = useLocalStorage(`MSAs_${stateFipsCode}`, [])
-    const cachedWindow = useLocalStorage(`industryWindow_${stateFipsCode}`, {})
+    // Each state's industry data is kept under its own name, along with the
+    // data window it was built for
+    const cacheName = `industry_${stateFipsCode}`
+    const cached = await readCache(cacheName)
 
     failedIndustries.value = []
 
     // Load cached data if available
     if (
-      cachedEmploymentData.value.length > 0 &&
-      cachedWindow.value.start === dataWindow.start &&
-      cachedWindow.value.end === dataWindow.end
+      cached?.employmentData?.length > 0 &&
+      cached.dataWindow?.start === dataWindow.start &&
+      cached.dataWindow?.end === dataWindow.end
     ) {
-      industries.value = cachedIndustries.value
-      employmentData.value = cachedEmploymentData.value
-      MSAs.value = cachedMSAs.value
+      industries.value = cached.industries
+      employmentData.value = cached.employmentData
+      MSAs.value = cached.MSAs
       return
     }
 
@@ -177,11 +176,13 @@ export const useIndustryStore = defineStore('qwiStore', () => {
       return
     }
 
-    // cache data in local storage
-    cachedIndustries.value = industries.value
-    cachedEmploymentData.value = employmentData.value
-    cachedMSAs.value = MSAs.value
-    cachedWindow.value = { start: dataWindow.start, end: dataWindow.end }
+    // Keep the data for the next game in this state
+    await writeCache(cacheName, {
+      dataWindow: { start: dataWindow.start, end: dataWindow.end },
+      industries: industries.value,
+      employmentData: employmentData.value,
+      MSAs: MSAs.value
+    })
   }
 
   return {

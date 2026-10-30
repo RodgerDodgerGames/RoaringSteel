@@ -19,6 +19,7 @@ import { useGridStore } from '@/stores/grid'
 import { useMapStore } from '@/stores/map'
 import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 import { useGamePersistence } from '@/composables/useGamePersistence'
+import { getGrid, putGrid } from '@/composables/database'
 import { makeTestGrid, cellsOf } from '../utils/testGrid'
 
 describe('useGamePersistence', () => {
@@ -26,6 +27,18 @@ describe('useGamePersistence', () => {
   let gameStore
   let trackStore
   let persistence
+
+  /** A short line of track, for a game with something to lose */
+  const A_LINE = [
+    { lat: 44.98, lng: -93.27 },
+    { lat: 44.94, lng: -93.09 }
+  ]
+
+  /** Loads the newest autosave */
+  async function loadLatest() {
+    const [latest] = await persistence.getAutoSaves()
+    return persistence.loadAutoSave(latest.id)
+  }
 
   beforeEach(() => {
     // Persistence logs save/restore progress; keep test output readable
@@ -63,31 +76,29 @@ describe('useGamePersistence', () => {
       expect(persistence.serializeGameState().game.turn).toBe(2)
     })
 
-    it('should restore the active player so the right player resumes play', () => {
+    it('should restore the active player so the right player resumes play', async () => {
       playerStore.setActivePlayer(2) // Bob is mid-turn when the game is saved
-      persistence.autoSave()
+      await persistence.autoSave()
 
       playerStore.reset()
       gameStore.reset()
       expect(playerStore.activePlayer).toBeUndefined()
 
-      const [latest] = persistence.getAutoSaves()
-      expect(persistence.loadAutoSave(latest.index)).toBe(true)
+      expect(await loadLatest()).toBe(true)
 
       expect(playerStore.activePlayer.name).toBe('Bob')
       expect(playerStore.players.filter((p) => p.isTurn)).toHaveLength(1)
     })
 
-    it('should restore the turn number alongside the active player', () => {
+    it('should restore the turn number alongside the active player', async () => {
       playerStore.setActivePlayer(3)
       gameStore.advanceTurn()
-      persistence.autoSave()
+      await persistence.autoSave()
 
       playerStore.reset()
       gameStore.reset()
 
-      const [latest] = persistence.getAutoSaves()
-      persistence.loadAutoSave(latest.index)
+      await loadLatest()
 
       expect(gameStore.turn).toBe(1)
       expect(playerStore.activePlayer.name).toBe('Charlie')
@@ -96,18 +107,18 @@ describe('useGamePersistence', () => {
     // The second building round is played from the last player back to the
     // first, so restarting it with the first player would end it at once and
     // skip everyone else's second building turn
-    it("should resume a save with no active player at the round's first player", () => {
+    it("should resume a save with no active player at the round's first player", async () => {
       vi.spyOn(console, 'warn').mockImplementation(() => {})
       gameStore.advanceTurn() // the second building round
       const save = persistence.serializeGameState()
       save.players = save.players.map((p) => ({ ...p, isTurn: false }))
 
-      persistence.deserializeGameState(save)
+      await persistence.deserializeGameState(save)
 
       expect(playerStore.activePlayer.name).toBe('Charlie')
     })
 
-    it('should warn but still load when the save records no active player', () => {
+    it('should warn but still load when the save records no active player', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const save = persistence.serializeGameState()
       // Simulate a save whose turn state was lost
@@ -117,14 +128,14 @@ describe('useGamePersistence', () => {
       expect(persistence.validateSaveData(save).warnings).toContain(
         'Expected 1 active player, found 0'
       )
-      expect(persistence.deserializeGameState(save)).toBe(true)
+      expect(await persistence.deserializeGameState(save)).toBe(true)
 
       // Repaired to the first player rather than left with nobody to play
       expect(playerStore.activePlayer.name).toBe('Alice')
       expect(warn).toHaveBeenCalled()
     })
 
-    it('should repair a save with more than one active player', () => {
+    it('should repair a save with more than one active player', async () => {
       vi.spyOn(console, 'warn').mockImplementation(() => {})
       const save = persistence.serializeGameState()
       save.players = save.players.map((p, i) => ({ ...p, isTurn: i !== 0 }))
@@ -132,7 +143,7 @@ describe('useGamePersistence', () => {
       expect(persistence.validateSaveData(save).warnings).toContain(
         'Expected 1 active player, found 2'
       )
-      persistence.deserializeGameState(save)
+      await persistence.deserializeGameState(save)
 
       // Keeps the earliest player already flagged rather than resetting the round
       expect(playerStore.activePlayer.name).toBe('Bob')
@@ -146,25 +157,23 @@ describe('useGamePersistence', () => {
       expect(validation.warnings).toEqual([])
     })
 
-    it('should restore player cash so spending survives a reload', () => {
+    it('should restore player cash so spending survives a reload', async () => {
       playerStore.updatePlayer(1, { cash: 12500 })
-      persistence.autoSave()
+      await persistence.autoSave()
 
       playerStore.reset()
-      const [latest] = persistence.getAutoSaves()
-      persistence.loadAutoSave(latest.index)
+      await loadLatest()
 
       expect(playerStore.players[0].cash).toBe(12500)
     })
 
-    it('should restore how much of the build allowance is already used', () => {
+    it('should restore how much of the build allowance is already used', async () => {
       // Without this a player reloads mid-turn with a fresh $20k to build with
       playerStore.spendOnTrack(1, 7500)
-      persistence.autoSave()
+      await persistence.autoSave()
 
       playerStore.reset()
-      const [latest] = persistence.getAutoSaves()
-      persistence.loadAutoSave(latest.index)
+      await loadLatest()
 
       expect(playerStore.players[0].cash).toBe(12500)
       expect(playerStore.availableForTrack(1)).toBe(12500)
@@ -172,31 +181,154 @@ describe('useGamePersistence', () => {
   })
 
   describe('grid', () => {
-    it('should carry the grid through a save and reload', () => {
-      const grid = makeTestGrid({
-        rows: 2,
-        cols: 3,
-        south: 39,
-        west: -105,
-        cell: (row, col) =>
-          row === 1 && col === 2 ? null : { elevation: col * 100, cost: row + col }
-      })
-      useGridStore().setGrid(grid)
-      persistence.autoSave()
+    /** A 2x3 grid with one hole, and what it was built from */
+    const grid = makeTestGrid({
+      rows: 2,
+      cols: 3,
+      south: 39,
+      west: -105,
+      cell: (row, col) =>
+        row === 1 && col === 2 ? null : { elevation: col * 100, cost: row + col }
+    })
+    const SOURCE = {
+      state: '08',
+      bounds: [-105, 39, -104, 40],
+      cellSize: 10000,
+      landCoverYear: 2023
+    }
+
+    /** Puts the grid in play, kept in the database as a new game's would be */
+    async function playOnGrid() {
+      await putGrid({ state: '08', cellSize: 10000, landCoverYear: 2023, grid })
+      useGridStore().setGrid(grid, SOURCE)
+    }
+
+    it('should leave the grid out of an autosave, and record where it came from', async () => {
+      await playOnGrid()
+      await persistence.autoSave()
+
+      const [latest] = await persistence.getAutoSaves()
+      expect(latest.data.grid).toBeNull()
+      expect(latest.data.terrain).toEqual(SOURCE)
+    })
+
+    it("should bring back an autosave's grid from the database", async () => {
+      await playOnGrid()
+      await persistence.autoSave()
       useGridStore().reset()
 
-      const [latest] = persistence.getAutoSaves()
-      expect(persistence.loadAutoSave(latest.index)).toBe(true)
+      expect(await loadLatest()).toBe(true)
+
+      expect(cellsOf(useGridStore().grid)).toEqual(cellsOf(grid))
+      expect(useGridStore().source).toEqual(SOURCE)
+    })
+
+    it('should build the grid again from the same year when the database has lost it', async () => {
+      useGridStore().setGrid(grid, SOURCE) // never kept
+      await persistence.autoSave()
+      const gridForSave = vi.spyOn(useGridStore(), 'gridForSave').mockResolvedValue(grid)
+
+      expect(await loadLatest()).toBe(true)
+
+      expect(gridForSave).toHaveBeenCalledWith(SOURCE)
+      expect(cellsOf(useGridStore().grid)).toEqual(cellsOf(grid))
+    })
+
+    it('should leave the game being played as it was when the grid cannot be built again', async () => {
+      useGridStore().setGrid(grid, SOURCE)
+      await persistence.autoSave()
+      trackStore.addSegment({ ownerId: 1, coordinates: A_LINE, cost: 500, turn: 0 })
+      vi.spyOn(useGridStore(), 'gridForSave').mockResolvedValue(false)
+
+      expect(await loadLatest()).toBe(false)
+
+      expect(trackStore.segments).toHaveLength(1)
+      expect(useGridStore().grid).toBe(grid)
+    })
+
+    it('should carry the grid itself through a file', async () => {
+      useGridStore().setGrid(grid, SOURCE) // not in the database: a file loads anywhere
+      const file = JSON.parse(
+        JSON.stringify(persistence.serializeGameState('file', { withGrid: true }))
+      )
+      useGridStore().reset()
+
+      expect(await persistence.deserializeGameState(file)).toBe(true)
 
       expect(cellsOf(useGridStore().grid)).toEqual(cellsOf(grid))
     })
 
-    it('should refuse a save holding the grid as a list of cells, from an older version', () => {
+    it("should keep a file's grid, so the game's autosaves load without building it", async () => {
+      useGridStore().setGrid(grid, SOURCE)
+      const file = JSON.parse(
+        JSON.stringify(persistence.serializeGameState('file', { withGrid: true }))
+      )
+
+      await persistence.deserializeGameState(file)
+
+      const kept = await getGrid('08', 10000, 2023)
+      expect(cellsOf(kept.grid)).toEqual(cellsOf(grid))
+    })
+
+    it('should refuse a file that does not hold its grid', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      useGridStore().setGrid(grid, SOURCE)
+      const save = persistence.serializeGameState('file') // no grid, as an autosave
+      const file = new File([JSON.stringify(save)], 'file.json')
+      const gridForSave = vi.spyOn(useGridStore(), 'gridForSave')
+
+      expect(await persistence.importFromFile(file)).toBe(false)
+      expect(gridForSave).not.toHaveBeenCalled()
+    })
+
+    it('should refuse a file whose grid cannot be read', async () => {
       const save = persistence.serializeGameState()
       save.grid = [{ id: '0-0', centroid: { lat: 40, lng: -100 }, cost: 100 }]
 
       expect(persistence.validateSaveData(save).valid).toBe(false)
-      expect(persistence.deserializeGameState(save)).toBe(false)
+      expect(await persistence.deserializeGameState(save)).toBe(false)
+    })
+
+    it('should refuse a save that does not say where its grid came from', async () => {
+      const save = persistence.serializeGameState()
+      save.terrain = { state: '08', landCoverYear: 2023 } // no bounds or cell size
+
+      expect(persistence.validateSaveData(save).valid).toBe(false)
+    })
+  })
+
+  describe('saves from other versions', () => {
+    it('should refuse a save from an older version of the game', async () => {
+      const save = persistence.serializeGameState()
+      save.version = '2.0.0'
+      trackStore.addSegment({ ownerId: 1, coordinates: A_LINE, cost: 500, turn: 0 })
+
+      expect(persistence.validateSaveData(save).errors).toContain(
+        'Saved by another version of the game (2.0.0); only 3.0.0 saves load'
+      )
+      expect(await persistence.deserializeGameState(save)).toBe(false)
+      // Nothing of the game being played was cleared
+      expect(trackStore.segments).toHaveLength(1)
+    })
+
+    it('should refuse a save with no version', () => {
+      const save = persistence.serializeGameState()
+      delete save.version
+
+      expect(persistence.validateSaveData(save).valid).toBe(false)
+    })
+  })
+
+  describe('autosaves', () => {
+    it('should keep only the newest three, newest first', async () => {
+      for (let turn = 0; turn < 5; turn++) {
+        if (turn > 0) gameStore.advanceTurn()
+        await persistence.autoSave()
+      }
+
+      const saves = await persistence.getAutoSaves()
+
+      expect(saves.map((save) => save.metadata.turn)).toEqual([4, 3, 2])
     })
   })
 
@@ -206,56 +338,45 @@ describe('useGamePersistence', () => {
       { lat: 44.94, lng: -93.09 }
     ]
 
-    it('should carry built track through a save and reload', () => {
+    it('should carry built track through a save and reload', async () => {
       trackStore.addSegment({ ownerId: 2, coordinates: line, cost: 3000, turn: 1 })
-      persistence.autoSave()
+      await persistence.autoSave()
 
       trackStore.reset()
       playerStore.reset()
       gameStore.reset()
 
-      const [latest] = persistence.getAutoSaves()
-      expect(persistence.loadAutoSave(latest.index)).toBe(true)
+      expect(await loadLatest()).toBe(true)
 
       expect(trackStore.segments).toHaveLength(1)
       expect(trackStore.segments[0]).toMatchObject({ ownerId: 2, cost: 3000, turn: 1 })
       expect(trackStore.segments[0].coordinates).toEqual(line)
     })
 
-    it('should keep track attributed to the player who built it', () => {
+    it('should keep track attributed to the player who built it', async () => {
       trackStore.addSegment({ ownerId: 1, coordinates: line, cost: 1000, turn: 0 })
       trackStore.addSegment({ ownerId: 3, coordinates: line, cost: 2000, turn: 0 })
-      persistence.autoSave()
+      await persistence.autoSave()
 
       trackStore.reset()
-      const [latest] = persistence.getAutoSaves()
-      persistence.loadAutoSave(latest.index)
+      await loadLatest()
 
       expect(trackStore.segmentsForOwner(1).map((s) => s.cost)).toEqual([1000])
       expect(trackStore.segmentsForOwner(3).map((s) => s.cost)).toEqual([2000])
     })
 
-    it('should load a save written before track was persisted', () => {
-      const save = persistence.serializeGameState()
-      delete save.track
-
-      expect(persistence.deserializeGameState(save)).toBe(true)
-      expect(trackStore.segments).toEqual([])
-    })
-
-    it('should not bring back a section the player tore up', () => {
+    it('should not bring back a section the player tore up', async () => {
       const segment = trackStore.addSegment({ ownerId: 1, coordinates: line, cost: 500, turn: 0 })
       trackStore.removeSegment(segment.id)
-      persistence.autoSave()
+      await persistence.autoSave()
 
       trackStore.reset()
-      const [latest] = persistence.getAutoSaves()
-      persistence.loadAutoSave(latest.index)
+      await loadLatest()
 
       expect(trackStore.segments).toEqual([])
     })
 
-    it('should keep the edited shape of a reshaped section', () => {
+    it('should keep the edited shape of a reshaped section', async () => {
       const segment = trackStore.addSegment({ ownerId: 1, coordinates: line, cost: 500, turn: 0 })
       const reshaped = [
         { lat: 44.98, lng: -93.27 },
@@ -263,21 +384,19 @@ describe('useGamePersistence', () => {
         { lat: 44.94, lng: -93.09 }
       ]
       trackStore.updateSegmentCoordinates(segment.id, reshaped)
-      persistence.autoSave()
+      await persistence.autoSave()
 
       trackStore.reset()
-      const [latest] = persistence.getAutoSaves()
-      persistence.loadAutoSave(latest.index)
+      await loadLatest()
 
       expect(trackStore.segments[0].coordinates).toEqual(reshaped)
     })
 
-    it('should clear track left over from the previous game on load', () => {
-      persistence.autoSave() // a save taken before any track was built
+    it('should clear track left over from the previous game on load', async () => {
+      await persistence.autoSave() // a save taken before any track was built
       trackStore.addSegment({ ownerId: 1, coordinates: line, cost: 500, turn: 0 })
 
-      const [latest] = persistence.getAutoSaves()
-      persistence.loadAutoSave(latest.index)
+      await loadLatest()
 
       expect(trackStore.segments).toEqual([])
     })
@@ -307,79 +426,62 @@ describe('useGamePersistence', () => {
       demandCardsStore = useDemandCardsStore()
     })
 
-    it('should carry every hand and the rest of the deck through a save and reload', () => {
+    it('should carry every hand and the rest of the deck through a save and reload', async () => {
       demandCardsStore.setDeck({ drawPile: deckOf(12) })
       demandCardsStore.dealHands(playerIds())
       const handsBefore = playerIds().map(handIds)
-      persistence.autoSave()
+      await persistence.autoSave()
 
       demandCardsStore.reset()
-      const [latest] = persistence.getAutoSaves()
-      expect(persistence.loadAutoSave(latest.index)).toBe(true)
+      expect(await loadLatest()).toBe(true)
 
       expect(playerIds().map(handIds)).toEqual(handsBefore)
       expect(demandCardsStore.drawPile.map((c) => c.id)).toEqual([10, 11, 12])
     })
 
-    it("should carry the active player's pinned demand lines through a save and reload", () => {
+    it("should carry the active player's pinned demand lines through a save and reload", async () => {
       demandCardsStore.setDeck({ drawPile: deckOf(12) })
       demandCardsStore.dealHands(playerIds())
       const [firstCard] = demandCardsStore.handOf(playerStore.activePlayer.id)
       demandCardsStore.togglePin(firstCard.id, 0)
       const pinsBefore = demandCardsStore.pinsOf(playerStore.activePlayer.id)
-      persistence.autoSave()
+      await persistence.autoSave()
 
       demandCardsStore.reset()
-      const [latest] = persistence.getAutoSaves()
-      persistence.loadAutoSave(latest.index)
+      await loadLatest()
 
       expect(pinsBefore).toHaveLength(1)
       expect(demandCardsStore.pinsOf(playerStore.activePlayer.id)).toEqual(pinsBefore)
     })
 
-    it('should deal hands when loading a save made before hands existed', () => {
-      const save = persistence.serializeGameState()
-      delete save.demandDeck
-      // Old saves held the deck under `demandCards`, each card a bare list of
-      // its contracts with no id
-      save.demandCards = deckOf(12).map((c) => c.demands)
-
-      expect(persistence.deserializeGameState(save)).toBe(true)
-
-      playerIds().forEach((id) => expect(demandCardsStore.handOf(id)).toHaveLength(3))
-      expect(demandCardsStore.drawPile).toHaveLength(3)
-    })
-
-    it('should load a short hand exactly as saved rather than dealing to it', () => {
+    it('should load a short hand exactly as saved rather than dealing to it', async () => {
       const [firstId] = playerIds()
       demandCardsStore.setDeck({ drawPile: deckOf(5), hands: { [firstId]: deckOf(1) } })
-      persistence.autoSave()
+      await persistence.autoSave()
 
-      const [latest] = persistence.getAutoSaves()
-      persistence.loadAutoSave(latest.index)
+      await loadLatest()
 
       expect(handIds(firstId)).toEqual([1])
       expect(demandCardsStore.drawPile).toHaveLength(5)
     })
 
-    it('should still load a save whose deck is damaged, and say so', () => {
+    it('should still load a save whose deck is damaged, and say so', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const save = persistence.serializeGameState()
       save.demandDeck = { hands: {} } // no draw pile
 
-      expect(persistence.deserializeGameState(save)).toBe(true)
+      expect(await persistence.deserializeGameState(save)).toBe(true)
 
       expect(demandCardsStore.drawPile).toEqual([])
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('demand deck could not be read'))
     })
 
-    it('should clear hands left over from the previous game on load', () => {
-      persistence.autoSave() // a save taken before any cards were dealt
+    it('should clear hands left over from the previous game on load', async () => {
+      await persistence.autoSave() // a save taken before any cards were dealt
       demandCardsStore.setDeck({ drawPile: deckOf(9) })
       demandCardsStore.dealHands(playerIds())
 
-      const [latest] = persistence.getAutoSaves()
-      persistence.loadAutoSave(latest.index)
+      await loadLatest()
 
       playerIds().forEach((id) => expect(demandCardsStore.handOf(id)).toEqual([]))
     })
@@ -387,69 +489,45 @@ describe('useGamePersistence', () => {
 
   describe('trains and the end of the game', () => {
     /** Saves the game to a file's worth of JSON and loads it straight back */
-    function roundTrip() {
+    async function roundTrip() {
       const save = JSON.parse(JSON.stringify(persistence.serializeGameState()))
-      expect(persistence.deserializeGameState(save)).toBe(true)
+      expect(await persistence.deserializeGameState(save)).toBe(true)
     }
 
-    it("should carry every player's train through a save and reload", () => {
+    it("should carry every player's train through a save and reload", async () => {
       const trainsStore = useTrainsStore()
       trainsStore.changeTrain(1, 'fastFreight')
 
-      roundTrip()
+      await roundTrip()
 
       expect(useTrainsStore().trainOf(1).type).toBe('fastFreight')
       expect(useTrainsStore().trainOf(2).type).toBe('freight')
     })
 
-    it('should give every player a new train for a save written before trains', () => {
-      const save = persistence.serializeGameState()
-      delete save.trains
-
-      expect(persistence.deserializeGameState(save)).toBe(true)
-      expect(useTrainsStore().trainOf(1)).toMatchObject({ type: 'freight', position: null })
-    })
-
-    it('should keep the winner of a game that is over', () => {
+    it('should keep the winner of a game that is over', async () => {
       gameStore.declareWinner(2)
 
-      roundTrip()
+      await roundTrip()
 
       expect(gameStore.winnerId).toBe(2)
     })
 
-    it('should price afresh the demands of a save from before trains', () => {
-      useTownsStore().setTowns([
-        { name: 'Denver', lat: 39.7, lon: -105, industries: [] },
-        { name: 'Pueblo', lat: 38.3, lon: -104.6, industries: [{ name: 'Steel' }] }
-      ])
-      useDemandCardsStore().setDeck({
-        drawPile: [{ id: 1, demands: [{ destination: 'Denver', industry: 'Steel', payoff: 600 }] }]
-      })
-      const save = persistence.serializeGameState()
-      delete save.trains
-
-      persistence.deserializeGameState(JSON.parse(JSON.stringify(save)))
-
-      expect(useDemandCardsStore().drawPile[0].demands[0].payoff).toBeGreaterThan(600)
-    })
-
-    it('should keep the prices of a current save as they are', () => {
+    it('should keep the prices of a current save as they are', async () => {
       useTownsStore().setTowns([{ name: 'Denver', lat: 39.7, lon: -105, industries: [] }])
       useDemandCardsStore().setDeck({
         drawPile: [{ id: 1, demands: [{ destination: 'Denver', industry: 'Steel', payoff: 600 }] }]
       })
 
-      roundTrip()
+      await roundTrip()
 
       expect(useDemandCardsStore().drawPile[0].demands[0].payoff).toBe(600)
     })
 
-    it('should keep the played demand cards', () => {
+    it('should keep the played demand cards', async () => {
       const demandCardsStore = useDemandCardsStore()
       demandCardsStore.setDeck({ drawPile: [], discardPile: [{ id: 9, demands: [] }] })
 
-      roundTrip()
+      await roundTrip()
 
       expect(demandCardsStore.discardPile.map((c) => c.id)).toEqual([9])
     })
@@ -462,23 +540,12 @@ describe('useGamePersistence', () => {
       settingsStore = useSettingsStore()
     })
 
-    it('should bring back the settings the game was saved with', () => {
+    it('should bring back the settings the game was saved with', async () => {
       settingsStore.settings.showDeckCount = true
-      persistence.autoSave()
+      await persistence.autoSave()
 
       settingsStore.settings.showDeckCount = false
-      const [latest] = persistence.getAutoSaves()
-      persistence.loadAutoSave(latest.index)
-
-      expect(settingsStore.settings.showDeckCount).toBe(true)
-    })
-
-    it("should leave the player's settings alone when the save has none", () => {
-      const save = persistence.serializeGameState()
-      delete save.settings // a save made before settings existed
-      settingsStore.settings.showDeckCount = true
-
-      expect(persistence.deserializeGameState(save)).toBe(true)
+      await loadLatest()
 
       expect(settingsStore.settings.showDeckCount).toBe(true)
     })

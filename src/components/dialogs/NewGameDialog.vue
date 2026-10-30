@@ -6,7 +6,7 @@
 
   Saving here downloads a save file, as the Save Game dialog does. The
   game's auto-saves stay in the browser too, but the new game's own
-  auto-saves replace them after a few turns, so a file is the safe way to
+  auto-saves replace them after a few rounds, so a file is the safe way to
   keep a game to come back to.
 
   Saving does not start the new game by itself. The browser may ask where

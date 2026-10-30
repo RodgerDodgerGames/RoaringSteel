@@ -68,7 +68,8 @@ export function useTurn() {
 
   /**
    * Ends the active player's turn and passes play to the next player.
-   * Advances the game turn when the round ends, then auto-saves.
+   * Advances the game turn when the round ends, and auto-saves then, once a
+   * round rather than after every turn, and when the game is won.
    * @returns {boolean} True if the turn was ended successfully.
    */
   function endTurn() {
@@ -104,9 +105,10 @@ export function useTurn() {
     // Likewise the train's run: the next turn is a full one
     if (finishingId !== undefined) trainsStore.endTurn(finishingId)
 
-    if (endsRound) gameStore.advanceTurn()
-
-    autoSave()
+    if (endsRound) {
+      gameStore.advanceTurn()
+      autoSave()
+    }
     return true
   }
 

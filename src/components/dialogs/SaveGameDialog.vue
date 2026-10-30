@@ -9,7 +9,7 @@
   - Provides filename customization for exported saves
   - Shows success/error feedback for export operations
 
-  The game is automatically saved to browser localStorage after each turn,
+  The game is automatically saved in the browser at the end of each round,
   with the last 3 auto-saves being retained. This dialog provides an
   additional manual export option for creating portable backup files.
 
@@ -63,7 +63,7 @@ function handleClose() {
       <section class="modal-card-body">
         <!-- Auto-save Info -->
         <div class="notification is-info is-light">
-          <p class="has-text-weight-bold mb-2">Your game is auto-saved after each turn</p>
+          <p class="has-text-weight-bold mb-2">Your game is auto-saved at the end of each round</p>
           <p class="is-size-7">
             The last 3 auto-saves are stored in your browser. Use the Load Game option to restore
             them.

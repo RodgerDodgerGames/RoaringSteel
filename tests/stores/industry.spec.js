@@ -12,7 +12,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 // Create hoisted mocks
-const mockUseLocalStorage = vi.hoisted(() => vi.fn())
 const mockFetchQWI = vi.hoisted(() => vi.fn())
 const mockQWIData = vi.hoisted(() => ({ value: [] }))
 const mockQWIError = vi.hoisted(() => ({ value: null }))
@@ -20,10 +19,6 @@ const mockQWIError = vi.hoisted(() => ({ value: null }))
 // Mock fetch globally
 const mockFetch = vi.hoisted(() => vi.fn())
 vi.stubGlobal('fetch', mockFetch)
-
-vi.mock('@vueuse/core', () => ({
-  useLocalStorage: mockUseLocalStorage
-}))
 
 const mockUseQWI = vi.hoisted(() =>
   vi.fn(() => ({
@@ -38,34 +33,30 @@ vi.mock('@/composables/setup/useQWI', () => ({
 }))
 
 import { useIndustryStore } from '@/stores/industry'
+import { readCache, writeCache } from '@/composables/database'
 
 /** A game's data window: QWI from 2021 to 2025 */
 const WINDOW = { start: 2021, end: 2025, middle: 2023 }
 
 /**
- * localStorage as it stands after an earlier fetch of one industry for one
- * MSA, built for the given window (none, for a cache from before windows were
- * recorded). Writes land in `written`, by key.
+ * Keeps state 27's industry data as an earlier fetch of one industry for one
+ * MSA would have, built for the given window.
+ * @param {{start: number, end: number}} dataWindow - The window it was built for
+ * @returns {Promise<Object>} What was kept
  */
-function cacheFrom(window, written = {}) {
-  const stored = {
-    industries_: [{ naics_code: 111, label: 'Agriculture' }],
-    employmentData_: [{ industry: 111, meanEmp: { 12345: 100 } }],
-    MSAs_: ['12345'],
-    industryWindow_: window ?? {}
+async function cacheFrom(dataWindow) {
+  const cached = {
+    dataWindow,
+    industries: [{ naics_code: 111, label: 'Agriculture' }],
+    employmentData: [{ industry: 111, meanEmp: { 12345: 100 } }],
+    MSAs: ['12345']
   }
-  return (key, defaultValue) => {
-    const prefix = Object.keys(stored).find((name) => key.startsWith(name))
-    const ref = { _value: prefix ? stored[prefix] : defaultValue }
-    return Object.defineProperty(ref, 'value', {
-      get: () => ref._value,
-      set: (value) => {
-        ref._value = value
-        written[key] = value
-      }
-    })
-  }
+  await writeCache('industry_27', cached)
+  return cached
 }
+
+/** What the database keeps for state 27's industry data */
+const cachedIndustry = () => readCache('industry_27')
 
 describe('Industry Store', () => {
   let industryStore
@@ -76,7 +67,6 @@ describe('Industry Store', () => {
     mockQWIData.value = []
     mockQWIError.value = null
     // Default mock implementations
-    mockUseLocalStorage.mockImplementation((key, defaultValue) => ({ value: defaultValue }))
     mockFetchQWI.mockResolvedValue(undefined)
     mockFetch.mockResolvedValue({
       text: async () => 'naics_code,label,ind_level\n'
@@ -108,29 +98,19 @@ describe('Industry Store', () => {
 
   describe('useIndustryData with cached data', () => {
     it('should use cached data when available', async () => {
-      const cachedIndustries = [{ naics_code: 111, label: 'Agriculture' }]
-      const cachedEmploymentData = [{ industry: 111, meanEmp: { 12345: 100 } }]
-      const cachedMSAs = ['12345']
-
-      mockUseLocalStorage.mockImplementation((key) => {
-        if (key.includes('industries_')) return { value: cachedIndustries }
-        if (key.includes('employmentData_')) return { value: cachedEmploymentData }
-        if (key.includes('MSAs_')) return { value: cachedMSAs }
-        if (key.includes('industryWindow_')) return { value: { start: 2021, end: 2025 } }
-        return { value: [] }
-      })
+      const cached = await cacheFrom({ start: 2021, end: 2025 })
 
       await industryStore.useIndustryData('27', WINDOW)
 
-      expect(industryStore.industries).toEqual(cachedIndustries)
-      expect(industryStore.employmentData).toEqual(cachedEmploymentData)
-      expect(industryStore.MSAs).toEqual(cachedMSAs)
+      expect(industryStore.industries).toEqual(cached.industries)
+      expect(industryStore.employmentData).toEqual(cached.employmentData)
+      expect(industryStore.MSAs).toEqual(cached.MSAs)
       // Should not fetch when cached
       expect(mockFetch).not.toHaveBeenCalled()
     })
 
     it('should fetch again when the cache was built for another window', async () => {
-      mockUseLocalStorage.mockImplementation(cacheFrom({ start: 2020, end: 2024 }))
+      await cacheFrom({ start: 2020, end: 2024 })
       mockFetch.mockResolvedValue({
         text: async () => 'naics_code,label,ind_level\n112,Livestock,2'
       })
@@ -145,14 +125,6 @@ describe('Industry Store', () => {
       expect(industryStore.MSAs).toEqual(['22222'])
     })
 
-    it('should fetch again when the cache records no window', async () => {
-      mockUseLocalStorage.mockImplementation(cacheFrom(null))
-
-      await industryStore.useIndustryData('27', WINDOW)
-
-      expect(mockFetch).toHaveBeenCalled()
-    })
-
     it("should fetch each industry over the data window's years", async () => {
       mockFetch.mockResolvedValue({
         text: async () => 'naics_code,label,ind_level\n111,Agriculture,2'
@@ -163,9 +135,7 @@ describe('Industry Store', () => {
       expect(mockUseQWI).toHaveBeenCalledWith('27', 111, WINDOW)
     })
 
-    it('should record the window the cache was built for', async () => {
-      const written = {}
-      mockUseLocalStorage.mockImplementation(cacheFrom(null, written))
+    it('should cache the data with the window it was built for', async () => {
       mockFetch.mockResolvedValue({
         text: async () => 'naics_code,label,ind_level\n111,Agriculture,2'
       })
@@ -175,7 +145,12 @@ describe('Industry Store', () => {
 
       await industryStore.useIndustryData('27', WINDOW)
 
-      expect(written.industryWindow_27).toEqual({ start: 2021, end: 2025 })
+      expect(await cachedIndustry()).toEqual({
+        dataWindow: { start: 2021, end: 2025 },
+        industries: industryStore.industries,
+        employmentData: industryStore.employmentData,
+        MSAs: ['12345']
+      })
     })
 
     it("should not add a fetch onto an earlier fetch's data", async () => {
@@ -333,17 +308,14 @@ describe('Industry Store', () => {
     })
 
     it('should not cache a fetch with an industry missing', async () => {
-      const written = {}
-      mockUseLocalStorage.mockImplementation(cacheFrom(null, written))
-
       await industryStore.useIndustryData('27', WINDOW)
 
-      expect(written).toEqual({})
+      expect(await cachedIndustry()).toBeUndefined()
     })
 
     it('should forget the failures once a later fetch comes from the cache', async () => {
       await industryStore.useIndustryData('27', WINDOW)
-      mockUseLocalStorage.mockImplementation(cacheFrom({ start: 2021, end: 2025 }))
+      await cacheFrom({ start: 2021, end: 2025 })
 
       await industryStore.useIndustryData('27', WINDOW)
 
@@ -351,8 +323,6 @@ describe('Industry Store', () => {
     })
 
     it('should not count an industry the API turned down, and still cache the fetch', async () => {
-      const written = {}
-      mockUseLocalStorage.mockImplementation(cacheFrom(null, written))
       mockUseQWI.mockImplementation((state, industry) => ({
         data: { value: industry === 111 ? [] : [{ Emp: 100, msa_code: '12345' }] },
         error: { value: industry === 111 ? 'HTTP error! status: 400' : null },
@@ -363,7 +333,7 @@ describe('Industry Store', () => {
       await industryStore.useIndustryData('27', WINDOW)
 
       expect(industryStore.failedIndustries).toEqual([])
-      expect(written.industryWindow_27).toEqual({ start: 2021, end: 2025 })
+      expect((await cachedIndustry()).dataWindow).toEqual({ start: 2021, end: 2025 })
     })
 
     it('should not count an industry with no jobs as failed', async () => {

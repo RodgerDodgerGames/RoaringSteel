@@ -7,7 +7,8 @@
  * - Progress reporting
  * - Error handling and surfacing
  * - Which cells are kept
- * - Cache usage, and the land cover year it was drawn from
+ * - Kept grids, and the land cover year each was drawn from
+ * - Finding a saved game's grid again
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -20,13 +21,8 @@ const mockFetchLandCover = vi.hoisted(() => vi.fn())
 const mockPlanElevations = vi.hoisted(() => vi.fn())
 const mockPlanLandCover = vi.hoisted(() => vi.fn())
 const mockLandCoverYearFor = vi.hoisted(() => vi.fn())
-const mockUseLocalStorage = vi.hoisted(() => vi.fn())
 
 // Mock dependencies before any imports
-vi.mock('@vueuse/core', () => ({
-  useLocalStorage: mockUseLocalStorage
-}))
-
 vi.mock('@/composables/setup/useElevationTiles', () => ({
   useElevationTiles: () => ({ planElevations: mockPlanElevations })
 }))
@@ -47,7 +43,7 @@ vi.mock('@/composables/setup/useMapSupport', () => ({
 import { useGridStore } from '@/stores/grid'
 import { nlcdCostMap } from '@/config/nlcd'
 import { RequestError } from '@/composables/utils'
-import { packGrid, unpackGrid } from '@/composables/map/cellGrid'
+import { getGrid, getGridYears, putGrid } from '@/composables/database'
 import { makeTestGrid, cellsOf } from '../utils/testGrid'
 
 /**
@@ -63,37 +59,26 @@ const BOUNDS_NO_CELLS = [-95, 44, -94.9, 44.1] // 1 row x 0 cols
 /** The year land cover is asked for: the middle of a 2021-2025 data window */
 const YEAR = 2023
 
-/** A grid in the cache, and the cache's packed copy of it */
+/** The cell size the tests keep grids under, in meters */
+const CELL_SIZE = 10000
+
+/** A grid kept in the database */
 const CACHED_GRID = makeTestGrid({
   rows: 1,
   cols: 1,
   cell: () => ({ elevation: 100, landCover: 5, cost: 10 })
 })
-const CACHED = packGrid(CACHED_GRID)
-
-/** How grids were cached before they were packed: a list of cells */
-const OLD_CACHED_CELLS = [{ id: '0-0', elevation: 100, landCover: 5, cost: 10 }]
 
 /** The ids of the store's cells, "row-col", in order */
 const idsOf = (grid) => cellsOf(grid).map((cell) => cell.id)
 
 /**
- * localStorage holding the given grid cache. Writes land in `written`.
- * @param {*} cached - What the grid key holds
- * @param {Object} [written] - Collects what is written, by key
+ * Keeps a grid in the database for state 27, as an earlier game would have.
+ * @param {number} landCoverYear - The year it was drawn from
+ * @param {Object} [grid] - The grid
  */
-function gridCache(cached, written = {}) {
-  return (key) => {
-    const ref = { _value: cached }
-    return Object.defineProperty(ref, 'value', {
-      get: () => ref._value,
-      set: (value) => {
-        ref._value = value
-        written[key] = value
-      }
-    })
-  }
-}
+const keep = (landCoverYear, grid = CACHED_GRID) =>
+  putGrid({ state: '27', cellSize: CELL_SIZE, landCoverYear, grid })
 
 /** The land cover cost of open water, which is how a water cell is known */
 const WATER = nlcdCostMap[11]
@@ -107,7 +92,6 @@ describe('Grid Store', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     // Default mock implementations
-    mockUseLocalStorage.mockImplementation((key, defaultValue) => ({ value: defaultValue }))
     mockPlanElevations.mockImplementation(() => ({ requestCount: 3, fetch: mockFetchElevations }))
     mockPlanLandCover.mockImplementation(() => ({ requestCount: 1, fetch: mockFetchLandCover }))
     mockFetchElevations.mockResolvedValue([])
@@ -143,11 +127,11 @@ describe('Grid Store', () => {
     })
   })
 
-  describe('generateGrid with cached data', () => {
-    it('should use a cached grid drawn from the year the server serves', async () => {
-      mockUseLocalStorage.mockImplementation(gridCache({ landCoverYear: YEAR, grid: CACHED }))
+  describe('generateGrid with kept grids', () => {
+    it('should use a kept grid drawn from the year the server serves', async () => {
+      await keep(YEAR)
 
-      const result = await gridStore.generateGrid('27', [-95, 44, -94, 45], 10000, YEAR)
+      const result = await gridStore.generateGrid('27', [-95, 44, -94, 45], CELL_SIZE, YEAR)
 
       expect(result).toBe(true)
       expect(cellsOf(gridStore.grid)).toEqual(cellsOf(CACHED_GRID))
@@ -156,12 +140,12 @@ describe('Grid Store', () => {
       expect(mockFetchLandCover).not.toHaveBeenCalled()
     })
 
-    it('should use the cache when the server serves the year it was drawn from, not the one asked', async () => {
+    it('should use the kept grid when the server serves the year it was drawn from, not the one asked', async () => {
       // The server lacks 2023; the grid was drawn from 2022, its closest
-      mockUseLocalStorage.mockImplementation(gridCache({ landCoverYear: YEAR - 1, grid: CACHED }))
+      await keep(YEAR - 1)
       mockLandCoverYearFor.mockResolvedValue(YEAR - 1)
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, CELL_SIZE, YEAR)
 
       expect(cellsOf(gridStore.grid)).toEqual(cellsOf(CACHED_GRID))
       expect(mockFetchLandCover).not.toHaveBeenCalled()
@@ -169,66 +153,150 @@ describe('Grid Store', () => {
 
     it('should build the grid again once the server has a closer year', async () => {
       // Drawn from 2022 when the server lacked 2023; now it has 2023
-      mockUseLocalStorage.mockImplementation(gridCache({ landCoverYear: YEAR - 1, grid: CACHED }))
+      await keep(YEAR - 1)
       mockFetchElevations.mockResolvedValue([100, 200])
       mockFetchLandCover.mockResolvedValue(landCover(5, 7))
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, CELL_SIZE, YEAR)
 
       expect(mockFetchLandCover).toHaveBeenCalled()
       expect(idsOf(gridStore.grid)).toEqual(['0-0', '0-1'])
     })
 
-    it('should build the grid again for another year', async () => {
-      // A game whose data window has moved on asks for a later year
-      mockUseLocalStorage.mockImplementation(gridCache({ landCoverYear: YEAR - 1, grid: CACHED }))
+    it('should not use a grid kept for another state', async () => {
+      await putGrid({ state: '06', cellSize: CELL_SIZE, landCoverYear: YEAR, grid: CACHED_GRID })
       mockFetchElevations.mockResolvedValue([100, 200])
       mockFetchLandCover.mockResolvedValue(landCover(5, 7))
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, CELL_SIZE, YEAR)
 
-      expect(mockFetchLandCover).toHaveBeenCalled()
       expect(idsOf(gridStore.grid)).toEqual(['0-0', '0-1'])
     })
 
-    it('should build the grid again from a cache of the old list of cells', async () => {
-      // How grids were cached before they were packed, for the same year
-      mockUseLocalStorage.mockImplementation(
-        gridCache({ landCoverYear: YEAR, cells: OLD_CACHED_CELLS })
-      )
-      mockFetchElevations.mockResolvedValue([100, 200])
-      mockFetchLandCover.mockResolvedValue(landCover(5, 7))
-
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
-
-      expect(mockFetchLandCover).toHaveBeenCalled()
-      expect(idsOf(gridStore.grid)).toEqual(['0-0', '0-1'])
-    })
-
-    it('should cache a new grid with the year it was drawn from', async () => {
-      const written = {}
-      mockUseLocalStorage.mockImplementation(gridCache({}, written))
+    it('should keep a new grid with the year it was drawn from', async () => {
       // The server's closest year differs from the one asked
       mockLandCoverYearFor.mockResolvedValue(YEAR - 1)
       mockFetchElevations.mockResolvedValue([100, 200])
       mockFetchLandCover.mockResolvedValue(landCover(5, 7))
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, CELL_SIZE, YEAR)
 
-      expect(written.cachedGrid_27.landCoverYear).toBe(YEAR - 1)
-      expect(cellsOf(unpackGrid(written.cachedGrid_27.grid))).toEqual(cellsOf(gridStore.grid))
+      const kept = await getGrid('27', CELL_SIZE, YEAR - 1)
+      expect(cellsOf(kept.grid)).toEqual(cellsOf(gridStore.grid))
     })
 
-    it("should use the cached grid, whatever its year, when the server's years cannot be had", async () => {
-      mockUseLocalStorage.mockImplementation(gridCache({ landCoverYear: YEAR - 2, grid: CACHED }))
+    it('should keep the grids of other years alongside a new one', async () => {
+      // Saved games played on the older grid still need it
+      await keep(YEAR - 1)
+      mockFetchElevations.mockResolvedValue([100, 200])
+      mockFetchLandCover.mockResolvedValue(landCover(5, 7))
+
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, CELL_SIZE, YEAR)
+
+      expect(await getGridYears('27', CELL_SIZE)).toEqual([YEAR - 1, YEAR])
+    })
+
+    it('should record what the grid in play was built from', async () => {
+      mockLandCoverYearFor.mockResolvedValue(YEAR - 1)
+      mockFetchElevations.mockResolvedValue([100, 200])
+      mockFetchLandCover.mockResolvedValue(landCover(5, 7))
+
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, CELL_SIZE, YEAR)
+
+      expect(gridStore.source).toEqual({
+        state: '27',
+        bounds: BOUNDS_2_CELLS,
+        cellSize: CELL_SIZE,
+        landCoverYear: YEAR - 1
+      })
+    })
+
+    it("should use a kept grid, whatever its year, when the server's years cannot be had", async () => {
+      await keep(YEAR - 2)
       mockLandCoverYearFor.mockRejectedValue(new Error('Network error'))
 
-      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
+      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, CELL_SIZE, YEAR)
 
       expect(result).toBe(true)
       expect(cellsOf(gridStore.grid)).toEqual(cellsOf(CACHED_GRID))
+      expect(gridStore.source.landCoverYear).toBe(YEAR - 2)
       expect(gridStore.error).toBeNull()
       expect(mockFetchElevations).not.toHaveBeenCalled()
+    })
+
+    it("should use the kept grid closest to the year asked when the server's years cannot be had", async () => {
+      // 2019 and 2027 are both four years off 2023; the later wins the tie
+      await keep(YEAR - 4)
+      await keep(YEAR + 4)
+      await keep(YEAR - 1)
+      mockLandCoverYearFor.mockRejectedValue(new Error('Network error'))
+
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, CELL_SIZE, YEAR)
+      expect(gridStore.source.landCoverYear).toBe(YEAR - 1)
+
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, CELL_SIZE, YEAR + 1)
+      expect(gridStore.source.landCoverYear).toBe(YEAR - 1)
+
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, CELL_SIZE, YEAR - 3)
+      expect(gridStore.source.landCoverYear).toBe(YEAR - 4)
+
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, CELL_SIZE, YEAR + 2)
+      expect(gridStore.source.landCoverYear).toBe(YEAR + 4)
+    })
+  })
+
+  describe('gridForSave', () => {
+    /** What a save made on a 2-cell grid drawn from 2022 records */
+    const SAVED_SOURCE = {
+      state: '27',
+      bounds: BOUNDS_2_CELLS,
+      cellSize: CELL_SIZE,
+      landCoverYear: YEAR - 1
+    }
+
+    it('should hand back the kept grid without downloading anything', async () => {
+      await keep(YEAR - 1)
+
+      const found = await gridStore.gridForSave(SAVED_SOURCE)
+
+      expect(cellsOf(found)).toEqual(cellsOf(CACHED_GRID))
+      expect(mockLandCoverYearFor).not.toHaveBeenCalled()
+      expect(mockFetchElevations).not.toHaveBeenCalled()
+    })
+
+    it('should build the grid again from the same year when none is kept', async () => {
+      // A grid of another year is no use: the save was played on 2022's
+      await keep(YEAR)
+      mockFetchElevations.mockResolvedValue([100, 200])
+      mockFetchLandCover.mockResolvedValue(landCover(5, 7))
+
+      const found = await gridStore.gridForSave(SAVED_SOURCE)
+
+      expect(idsOf(found)).toEqual(['0-0', '0-1'])
+      expect(mockLandCoverYearFor).not.toHaveBeenCalled()
+      expect(mockPlanLandCover).toHaveBeenCalledWith(expect.any(Array), CELL_SIZE, YEAR - 1)
+    })
+
+    it('should keep a grid it builds again', async () => {
+      mockFetchElevations.mockResolvedValue([100, 200])
+      mockFetchLandCover.mockResolvedValue(landCover(5, 7))
+
+      const found = await gridStore.gridForSave(SAVED_SOURCE)
+
+      const kept = await getGrid('27', CELL_SIZE, YEAR - 1)
+      expect(cellsOf(kept.grid)).toEqual(cellsOf(found))
+    })
+
+    it('should not put the grid in play, so a failed load leaves the game as it was', async () => {
+      gridStore.setGrid(CACHED_GRID, { ...SAVED_SOURCE, landCoverYear: YEAR })
+      mockFetchElevations.mockRejectedValue(new Error('Network error'))
+
+      const found = await gridStore.gridForSave(SAVED_SOURCE)
+
+      expect(found).toBe(false)
+      expect(gridStore.error).toMatch(/elevation/i)
+      expect(cellsOf(gridStore.grid)).toEqual(cellsOf(CACHED_GRID))
+      expect(gridStore.source.landCoverYear).toBe(YEAR)
     })
   })
 
@@ -394,15 +462,13 @@ describe('Grid Store', () => {
       expect(mockFetchLandCover).not.toHaveBeenCalled()
     })
 
-    it('should not cache a grid from a mostly-failed elevation pass', async () => {
-      const cacheEntry = { value: [] }
-      mockUseLocalStorage.mockReturnValue(cacheEntry)
+    it('should not keep a grid from a mostly-failed elevation pass', async () => {
       mockFetchElevations.mockResolvedValue([100, null, null, null])
 
-      await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000, YEAR)
+      await gridStore.generateGrid('27', BOUNDS_4_CELLS, CELL_SIZE, YEAR)
 
-      // A cached fragment would be reused on every future game in this state
-      expect(cacheEntry.value).toEqual([])
+      // A kept fragment would be reused on every future game in this state
+      expect(await getGridYears('27', CELL_SIZE)).toEqual([])
     })
 
     it('should not count a sea-level reading as an elevation failure', async () => {
@@ -430,16 +496,14 @@ describe('Grid Store', () => {
       expect(gridStore.error).toMatch(/land cover data was missing for 3 of 4/i)
     })
 
-    it('should not cache a grid from a mostly-failed land cover pass', async () => {
-      const cacheEntry = { value: [] }
-      mockUseLocalStorage.mockReturnValue(cacheEntry)
+    it('should not keep a grid from a mostly-failed land cover pass', async () => {
       mockFetchElevations.mockResolvedValue([100, 200, 300, 400])
       mockFetchLandCover.mockResolvedValue({ costs: [5, null, null, null], failed: 3 })
 
-      await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000, YEAR)
+      await gridStore.generateGrid('27', BOUNDS_4_CELLS, CELL_SIZE, YEAR)
 
-      // A cached fragment would be reused on every future game in this state
-      expect(cacheEntry.value).toEqual([])
+      // A kept fragment would be reused on every future game in this state
+      expect(await getGridYears('27', CELL_SIZE)).toEqual([])
     })
 
     it('should report a failure when every land cover picture fails', async () => {
@@ -616,7 +680,7 @@ describe('Grid Store', () => {
         cols: 3,
         cell: () => ({ elevation: 999, landCover: 999, cost: 999 })
       })
-      gridStore.setGrid(stale)
+      gridStore.setGrid(stale, null)
 
       mockFetchElevations.mockResolvedValue([100, 200])
       mockFetchLandCover.mockResolvedValue(landCover(5, 7))
@@ -741,6 +805,19 @@ describe('Grid Store', () => {
       expect(gridStore.elevationProgress).toEqual({ completed: 0, total: 0 })
       expect(gridStore.landCoverProgress).toEqual({ completed: 0, total: 0 })
       expect(gridStore.progressPercent).toBe(0)
+    })
+
+    it('should forget what the grid was built from', () => {
+      gridStore.setGrid(CACHED_GRID, {
+        state: '27',
+        bounds: BOUNDS_2_CELLS,
+        cellSize: CELL_SIZE,
+        landCoverYear: YEAR
+      })
+
+      gridStore.reset()
+
+      expect(gridStore.source).toBeNull()
     })
   })
 })

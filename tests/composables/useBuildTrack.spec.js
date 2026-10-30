@@ -134,7 +134,7 @@ function mountBuildTrack(map, towns = L.layerGroup([L.marker([40, -100])]), grid
   const mapStore = useMapStore()
   mapStore.setMap(map)
   mapStore.setTownsLayer(towns)
-  useGridStore().setGrid(grid)
+  if (grid) useGridStore().setGrid(grid)
   useTownsStore().setTowns(
     towns.getLayers().map((marker, i) => ({
       name: `City ${i}`,

@@ -6,33 +6,49 @@
   Features:
   - Displays list of available auto-saved games with metadata
   - Shows turn number, save date/time, and player names for each auto-save
-  - Allows loading from browser localStorage auto-saves (last 3 saves)
+  - Allows loading from the browser's auto-saves (last 3 saves)
   - Supports importing game state from uploaded JSON files
   - Provides error feedback for failed load operations
   - Interactive hover effects on save entries
 
   Users can restore their game progress either from the automatic saves
-  created after each turn, or by uploading a previously exported save file.
+  created at the end of each round, or by uploading a previously exported
+  save file.
+
+  An auto-save does not hold the grid, only where it came from (see
+  useGamePersistence.js). If this browser no longer has that grid, loading
+  builds it again, behind the same progress modal as setting up a new game,
+  with the same Try Again and Back if building it fails.
 
   @emits close - Emitted when user clicks the close button or modal background
   @emits game-loaded - Emitted when a game is successfully loaded from any source
 -->
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useGamePersistence } from '@/composables/useGamePersistence'
+import { useGridStore } from '@/stores/grid'
+import GridProgressModal from '@/components/setup/GridProgressModal.vue'
 
 // Component events
 const emit = defineEmits(['close', 'game-loaded'])
 
 // Get persistence functionality from game persistence composable
 const { getAutoSaves, loadAutoSave, importFromFile } = useGamePersistence()
+const gridStore = useGridStore()
 
 // Reactive state
 const autoSaves = ref([]) // List of available auto-save entries with metadata
 const fileInput = ref(null) // Reference to file input element for resetting after upload
 const isLoading = ref(false) // Loading state during load operations
 const errorMessage = ref('') // Error feedback message
+const loadingId = ref(null) // The auto-save being loaded, kept for Try Again
+
+// The progress modal shows while an auto-save's grid is being built again,
+// and stays up with its error if that fails
+const showGridProgress = computed(
+  () => loadingId.value !== null && (gridStore.currentPhase !== '' || !!gridStore.error)
+)
 
 // Load the auto-saves list when component mounts
 onMounted(() => {
@@ -42,33 +58,51 @@ onMounted(() => {
 /**
  * Retrieves and populates the list of available auto-saved games.
  *
- * Fetches auto-saves from localStorage and updates the reactive autoSaves list
- * with metadata including turn number, save date, and player names.
+ * Reads the auto-saves from the browser's database and updates the reactive
+ * autoSaves list with metadata including turn number, save date, and player
+ * names.
  */
-function loadAutoSavesList() {
-  autoSaves.value = getAutoSaves()
+async function loadAutoSavesList() {
+  autoSaves.value = await getAutoSaves()
 }
 
 /**
  * Handles loading a game from an auto-save entry.
  *
- * @param {number} index - The index of the auto-save to load (0-2 for the 3 most recent saves)
+ * @param {number} id - The id of the auto-save to load
  *
- * Loads the game state from the specified auto-save slot and emits 'game-loaded'
- * on success or displays an error message on failure.
+ * Loads the game state from the specified auto-save and emits 'game-loaded'
+ * on success. If the save's grid could not be built again, the progress
+ * modal is left showing why, with Try Again and Back; any other failure is
+ * shown as an error message in this dialog.
  */
-async function handleLoadAutoSave(index) {
+async function handleLoadAutoSave(id) {
   isLoading.value = true
   errorMessage.value = ''
+  loadingId.value = id
 
-  const success = loadAutoSave(index)
+  const success = await loadAutoSave(id)
   isLoading.value = false
 
   if (success) {
+    loadingId.value = null
     emit('game-loaded')
-  } else {
+  } else if (!gridStore.error) {
+    loadingId.value = null
     errorMessage.value = 'Failed to load save. The save file may be corrupted.'
   }
+}
+
+/** Player asked to try building the auto-save's grid again */
+function handleGridRetry() {
+  gridStore.clearError()
+  handleLoadAutoSave(loadingId.value)
+}
+
+/** Player gave up loading the auto-save whose grid could not be built */
+function handleGridCancel() {
+  gridStore.clearError()
+  loadingId.value = null
 }
 
 /**
@@ -145,7 +179,7 @@ function handleClose() {
           </div>
 
           <div v-else>
-            <div v-for="save in autoSaves" :key="save.index" class="box mb-3">
+            <div v-for="save in autoSaves" :key="save.id" class="box mb-3">
               <div class="columns is-vcentered is-mobile">
                 <div class="column">
                   <p class="has-text-weight-bold">Turn {{ save.metadata.turn }}</p>
@@ -159,7 +193,7 @@ function handleClose() {
                     class="button is-primary"
                     :class="{ 'is-loading': isLoading }"
                     :disabled="isLoading"
-                    @click="handleLoadAutoSave(save.index)"
+                    @click="handleLoadAutoSave(save.id)"
                   >
                     Load
                   </button>
@@ -198,6 +232,11 @@ function handleClose() {
         <button class="button" @click="handleClose">Close</button>
       </footer>
     </div>
+    <GridProgressModal
+      :is-active="showGridProgress"
+      @retry="handleGridRetry"
+      @cancel="handleGridCancel"
+    />
   </div>
 </template>
 

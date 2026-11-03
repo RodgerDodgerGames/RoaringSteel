@@ -187,20 +187,21 @@ function openDialog(name) {
   align-items: center;
   gap: 1rem;
   padding: 0.5rem 1rem;
-  background: var(--bulma-primary);
+  /* Boxcar red in light and dark mode alike (see roaring-steel.scss) */
+  background: var(--top-bar-background);
   color: var(--bulma-primary-invert);
 }
 
 .top-bar__brand {
   font-family: var(--font-brand);
-  font-size: 2.5rem;
+  font-size: 1.75rem;
   line-height: 1;
   white-space: nowrap;
-  margin-block: -0.5rem; /* counter the top-bar's padding */
   margin-right: auto; /* soaks up spare space */
 }
 
 .top-bar__round {
+  font-family: var(--font-label);
   font-size: 0.85rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;

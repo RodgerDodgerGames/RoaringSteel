@@ -83,7 +83,7 @@ function handleConfirmed() {
     <div class="hero-body">
       <div id="welcomeContainer" class="container has-text-centered">
         <h1 class="title roaring-title">Welcome to Roaring Steel</h1>
-        <h2 class="subtitle is-3">Your adventure begins here</h2>
+        <h2 class="subtitle is-3 roaring-subtitle">Your adventure begins here</h2>
 
         <!-- conditionally show user interactioncontent here -->
 
@@ -92,8 +92,8 @@ function handleConfirmed() {
           v-if="activePane === 'gameButtons'"
           class="buttons are-large mt-6 is-flex is-justify-content-center"
         >
-          <button class="button is-info is-outlined mr-6" @click="newGame">New Game</button>
-          <button class="button is-link is-outlined" @click="loadGame">Load Game</button>
+          <button class="button is-light is-outlined mr-6" @click="newGame">New Game</button>
+          <button class="button is-light is-outlined" @click="loadGame">Load Game</button>
         </div>
 
         <!-- Add player form -->
@@ -130,6 +130,13 @@ function handleConfirmed() {
 .roaring-title {
   font-family: var(--font-welcome-title);
   font-size: 4rem;
+}
+/* The night-sky picture is dark in light and dark mode alike, so the
+   title and subtitle are always timetable paper, and the buttons are pale
+   outlines (is-light is-outlined) */
+.roaring-title,
+.roaring-subtitle {
+  color: var(--timetable-paper);
 }
 #welcomeContainer {
   margin-bottom: 30%;

@@ -2,12 +2,19 @@
 /// 1. Define Custom Variables
 /////////////////////////////////////////////////////////////
 
-// Set your brand colors
-$purple: #8a4d76;
-$pink: #fa7c91;
-$brown: #757763;
-$beige-light: #d0d1cd;
-$beige-lighter: #eff0eb;
+// The "Western Line" palette: boxcars, brass fittings and timetable paper.
+// Each color is named for what it looks like; section 2 hands them to Bulma
+// under Bulma's own names (primary, link, info, ...), which is how the rest
+// of the app refers to them. The town shapes on the map have a color of
+// their own, TOWN_COLOR in composables/map/townIcons.js.
+$boxcar-red: #7a2e22; // primary: main buttons, step numbers; the top bar
+$denim: #2f5d73; // link: links, the selected tab
+$steel-blue: #4a6f86; // info: notices
+$signal-green: #3f5b47; // success: payouts
+$brass: #c48a2c; // warning: warnings, and the meters
+$signal-vermilion: #b8401f; // danger: errors, throwing in a hand
+$coal: #2a211b; // dark, and the text
+$timetable-paper: #f1e6cf; // the panels, and light (drawn a shade deeper)
 
 /////////////////////////////////////////////////////////////
 /// 2. Import Bulma and Override Variables
@@ -15,14 +22,32 @@ $beige-lighter: #eff0eb;
 
 // Path to Bulma's sass folder
 @use "bulma/sass" with (
-  $grey-dark: $brown,
-  $grey-light: $beige-light,
-  $primary: $purple,
-  $link: $pink,
-  // Override Bulma's fonts
+  $primary: $boxcar-red,
+  $link: $denim,
+  $info: $steel-blue,
+  $success: $signal-green,
+  $warning: $brass,
+  $danger: $signal-vermilion,
+  $dark: $coal,
+  $light: $timetable-paper,
+  $text: $coal,
+  // Bulma's grays (the has-text-grey* helpers), warm browns from coal to
+  // dust rather than Bulma's own blue-grays
+  $grey-darker: hsl(28, 20%, 18%),
+  $grey-dark: hsl(28, 18%, 27%),
+  $grey: hsl(32, 15%, 40%),
+  $grey-light: hsl(34, 14%, 52%),
+  $grey-lighter: hsl(36, 18%, 75%),
+  $grey-lightest: hsl(38, 25%, 86%),
+  // Bulma tints every background and border with one hue and saturation,
+  // set here to the timetable paper's. Section 4 sets how light each is.
+  $scheme-h: 41,
+  $scheme-s: 55%,
+  // Override Bulma's fonts. Oswald is both the "secondary" and the sans
+  // serif font, so `is-family-secondary` and `is-family-sans-serif` match.
   $family-primary: '"Averia Serif Libre", serif',
-  $family-secondary: 'Eutemia, serif',
-  $family-sans-serif: 'Roboto, sans-serif',
+  $family-secondary: '"Oswald", sans-serif',
+  $family-sans-serif: '"Oswald", sans-serif',
   // Override font sizes
   $size-1: 3.25rem,
   $size-2: 2.5rem,
@@ -40,89 +65,161 @@ $beige-lighter: #eff0eb;
 /////////////////////////////////////////////////////////////
 
 // Towns, popups and commodity icons on the Leaflet map. Pulled in here so
-// main.js has a single stylesheet to import.
+// main.js has a single stylesheet to import. (Sass needs every @use before
+// any style rules, so this comes ahead of the themes.)
 @use 'map';
 
 /////////////////////////////////////////////////////////////
-/// 4. Fonts
+/// 4. Light and Dark Themes
 /////////////////////////////////////////////////////////////
 
-// The fonts downloaded into ./fonts (each folder keeps its license).
-// `font-display: swap` shows the text in the fallback font while the file
-// loads, rather than hiding it.
-@font-face {
-  font-family: 'Eutemia';
-  src: url('./fonts/eutemia-i/Eutemia.ttf') format('truetype');
-  font-display: swap;
+// Bulma builds its backgrounds, borders and text from a hue, a saturation
+// and a ladder of lightness values. Its own ladder starts at pure white
+// panels and mid-gray text; these lines move the light theme onto timetable
+// paper with coal text. They have to come after Bulma, so they win.
+:root {
+  --bulma-scheme-main-l: 88%; // panels: timetable paper, #f1e6cf
+  --bulma-scheme-main-bis-l: 85%;
+  --bulma-scheme-main-ter-l: 82%;
+  --bulma-background-l: 84%;
+  --bulma-border-weak-l: 80%;
+  --bulma-border-l: 74%;
+  --bulma-text-l: 14%; // coal, #2a211b
+  --bulma-text-strong-l: 10%;
+  --bulma-text-title-l: 8%;
+  --bulma-text-weak-l: 35%; // weathered brown, close to #6a5a48
+
+  // Bulma draws its pale buttons (is-light) in the light color, and the
+  // pale tinted buttons (is-warning is-light, ...) at its lightness. At the
+  // paper's own 88% they would vanish into the paper panels, so they are
+  // drawn a shade deeper, kraft paper, #e8d6b0.
+  --bulma-light-l: 80%;
+
+  // The game screen's top bar. Dark mode lightens primary below, but the
+  // bar keeps the boxcar red in both modes.
+  --top-bar-background: #{$boxcar-red};
+
+  // The paper color itself, for text set on a picture or on the map, which
+  // look the same in both modes (the welcome title, town-name glows)
+  --timetable-paper: #{$timetable-paper};
 }
 
-@font-face {
-  font-family: 'Saddlebag';
-  src: url('./fonts/saddlebag/Saddlebag.ttf') format('truetype');
-  font-display: swap;
+// Dark mode, which follows the computer's own light/dark setting. Bulma
+// already has a dark theme; these lines give it the Western Line look:
+// coal-black panels, paper-colored text, and each named color lifted so it
+// still reads on the dark panels. A color keeps its hue from section 1 and
+// only its lightness changes: `-l` is the color of a filled button, and
+// `-on-scheme-l` is the color of text and outlines drawn on a panel.
+// The top bar and the town shapes look the same in both modes.
+@media (prefers-color-scheme: dark) {
+  :root {
+    // Panels: coal night, #1f1a16, with raised panels at #28211c
+    --bulma-scheme-h: 26;
+    --bulma-scheme-s: 17%;
+    --bulma-scheme-main-l: 10%;
+    --bulma-scheme-main-bis-l: 13%;
+    --bulma-scheme-main-ter-l: 16%;
+    --bulma-background-l: 13%;
+    --bulma-border-weak-l: 20%;
+    --bulma-border-l: 26%;
+
+    // Text: paper, #eadcc0. The weak text, dust, is a grayer brown than the
+    // paper's hue allows, so it is set outright.
+    --bulma-text-h: 40;
+    --bulma-text-s: 52%;
+    --bulma-text-l: 83%;
+    --bulma-text-strong-l: 90%;
+    --bulma-text-title-l: 95%;
+    --bulma-text-weak: #a89880;
+
+    --bulma-primary-l: 40%; // #a13d2c, still dark enough for white text
+    --bulma-primary-on-scheme-l: 66%; // ember, for outlines and red text
+    --bulma-link-on-scheme-l: 64%; // #7fb0c8
+    --bulma-info-on-scheme-l: 56%; // #6f98b0
+    --bulma-success-on-scheme-l: 59%; // #7fae88
+    --bulma-warning-l: 56%; // #d9a043
+    --bulma-warning-on-scheme-l: 56%;
+    --bulma-danger-l: 46%; // buttons, about #c2472a, for white text
+    --bulma-danger-on-scheme-l: 59%; // #e46a47
+  }
 }
 
-@font-face {
-  font-family: 'Steelplate Textura';
-  src: url('./fonts/steelplate-textura/SteelplateTextura.ttf') format('truetype');
-  font-display: swap;
-}
+/////////////////////////////////////////////////////////////
+/// 5. Fonts
+/////////////////////////////////////////////////////////////
 
-// Google fonts: Averia Serif Libre is the body font (Bulma's $family-primary
-// above); Fredericka the Great and Stint Ultra Condensed are here to try out
-@import url('https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Fredericka+the+Great&family=Stint+Ultra+Condensed&display=swap');
+// All from Google Fonts:
+// - Averia Serif Libre: the body text and the side panel (Bulma's
+//   $family-primary, section 2)
+// - Oswald: labels and buttons
+// - Rye: the game's name, in the top bar and on the welcome screen
+// - Libre Baskerville: town names on the map, in capitals
+@import url('https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Libre+Baskerville:wght@400;700&family=Oswald:wght@400..700&family=Rye&display=swap');
 
 // Font slots: which font each part of the game uses. To try a different font
 // for a part, change its line here. The body text's font, which the town
 // popups on the map use too, is Bulma's $family-primary, set in section 2.
 :root {
   // The "Roaring Steel" name in the game screen's top bar
-  --font-brand: 'Eutemia', serif;
+  --font-brand: 'Rye', serif;
   // The welcome screen's title
-  --font-welcome-title: 'Saddlebag', serif;
+  --font-welcome-title: 'Rye', serif;
   // Town names on the map
-  --font-town-name: 'Saddlebag', serif;
+  --font-town-name: 'Libre Baskerville', serif;
+  // Buttons and small capitals labels
+  --font-label: 'Oswald', sans-serif;
 }
 
 // One class per font, to try a font on any element straight from the
-// markup, e.g. <h1 class="title is-family-steelplate">. Like Bulma's own
+// markup, e.g. <h1 class="title is-family-rye">. Like Bulma's own
 // is-family-* helpers, they win over a component's styles.
 .is-family-averia {
   font-family: 'Averia Serif Libre', serif !important;
 }
 
-.is-family-eutemia {
-  font-family: 'Eutemia', serif !important;
+.is-family-oswald {
+  font-family: 'Oswald', sans-serif !important;
 }
 
-.is-family-saddlebag {
-  font-family: 'Saddlebag', serif !important;
+.is-family-rye {
+  font-family: 'Rye', serif !important;
 }
 
-.is-family-steelplate {
-  font-family: 'Steelplate Textura', serif !important;
-}
-
-.is-family-fredericka {
-  font-family: 'Fredericka the Great', serif !important;
-}
-
-.is-family-stint {
-  font-family: 'Stint Ultra Condensed', serif !important;
+.is-family-baskerville {
+  font-family: 'Libre Baskerville', serif !important;
 }
 
 /////////////////////////////////////////////////////////////
-/// 5. Shared Custom Styles
+/// 6. Shared Custom Styles
 /////////////////////////////////////////////////////////////
 
-// A small, bold, gray, spaced-out capitals label: the titles of the game
-// screen's sections, the map legend's headings, and the player card's
-// "Your turn" and "Cash". Bulma has no class for this look, so it lives here
-// once instead of in each component. Add `is-size-7` for the larger titles.
+// Every button is set in the label font. Oswald is narrow and tall, so a
+// touch of letter spacing keeps short words like "Plan" from looking cramped.
+.button {
+  font-family: var(--font-label);
+  letter-spacing: 0.03em;
+}
+
+// Bulma's pale tinted notices (is-warning is-light, ...) are drawn at a
+// fixed 90% lightness, which on the paper panels leaves a warning box
+// barely visible. 80% keeps them pale but plainly set apart. Bulma sets the
+// 90% on `.notification.is-warning.is-light` and so on, so each color is
+// named here too, for a selector just as specific that comes later and wins.
+@each $name in (primary, link, info, success, warning, danger) {
+  .notification.is-#{$name}.is-light {
+    --bulma-notification-background-l: 80%;
+  }
+}
+
+// A small, gray, spaced-out capitals label: the titles of the game screen's
+// sections, the map legend's headings, and the player card's "Your turn"
+// and "Cash". Bulma has no class for this look, so it lives here once
+// instead of in each component. Add `is-size-7` for the larger titles.
 .caps-label {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-family: var(--font-label);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--bulma-text-weak);
 }

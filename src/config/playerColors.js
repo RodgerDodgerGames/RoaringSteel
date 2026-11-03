@@ -14,6 +14,11 @@
  * - as track on the terrain map, drawn with a dark outline, so none is so pale
  *   it washes out against the light background.
  *
+ * None may be too close to the plum the towns are drawn in (TOWN_COLOR in
+ * composables/map/townIcons.js), or a player's track would blend into the
+ * towns it runs through. That is why there is no pink: it was the closest.
+ * The tests check every color against the towns'.
+ *
  * Order matters: a new setup row is given the first color nobody has yet, so
  * the first few are the most distinct from each other.
  *
@@ -30,7 +35,6 @@ export const playerColors = [
   '#42D4F4', // sky
   '#F032E6', // magenta
   '#B5E61D', // lime
-  '#FF9FC8', // pink
   '#2EC4B6', // teal
   '#C08A55' // brown
 ]

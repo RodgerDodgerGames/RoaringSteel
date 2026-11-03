@@ -88,7 +88,7 @@ const progressDetail = computed(() => {
         <p class="subtitle is-6 mb-4">{{ phaseLabel }}</p>
 
         <progress
-          class="progress is-primary is-medium"
+          class="progress is-warning is-medium"
           :value="isIndeterminate ? undefined : progressPercent"
           max="100"
         >

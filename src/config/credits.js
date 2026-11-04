@@ -88,9 +88,9 @@ export const CREDIT_GROUPS = [
         note: 'Commodity icons (CC BY 3.0); each icon’s author is listed in the source'
       },
       {
-        name: '1001 Fonts',
-        url: 'https://www.1001fonts.com/',
-        note: 'The Eutemia I, Saddlebag and Steelplate Textura typefaces'
+        name: 'Google Fonts',
+        url: 'https://fonts.google.com/',
+        note: 'The Rye, Oswald, Averia Serif Libre and Libre Baskerville typefaces'
       },
       { name: 'Font Awesome', url: 'https://fontawesome.com/', note: 'Interface icons' }
     ]

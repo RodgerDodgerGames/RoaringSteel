@@ -12,11 +12,9 @@
  * map stays clear for the commodity icons fanned round each town.
  *
  * Shapes and buildings are solid, so the track running into a town passes
- * under it rather than showing through it. The shapes are filled with the
- * app's primary color (Bulma's `--bulma-primary`, set from `$purple` in
- * roaring-steel.scss), so changing that color changes the towns too. That is
- * why the shapes are drawn as inline SVG rather than image files: an image
- * cannot pick up a CSS color.
+ * under it rather than showing through it. The shapes are filled with
+ * TOWN_COLOR, drawn as inline SVG so the color can be set here rather than
+ * baked into image files.
  *
  * @module composables/map/townIcons
  */
@@ -26,9 +24,18 @@ import housesUrl from '@/assets/icons/towns/houses.png'
 import cityUrl from '@/assets/icons/towns/city.png'
 
 /**
+ * The color every town shape is filled with: plum, the game's original
+ * purple. It is kept apart from the app's palette, so restyling the buttons
+ * and panels never recolors the towns. No player may have a color too close
+ * to it, or their track would blend into the towns it runs through; the
+ * player colors' tests check that (tests/config/playerColors.spec.js).
+ */
+export const TOWN_COLOR = '#8A4D76'
+
+/**
  * Each shape's outline, inside a 24×24 box. The white rim keeps a town
- * standing out on dark terrain. The fill is left to the stylesheet
- * (`.town-shape__fill`), which gives it the primary color.
+ * standing out on dark terrain; the stylesheet (`.town-shape__fill`) draws
+ * it, and townIconHtml fills the shape with TOWN_COLOR.
  */
 const SHAPE_MARKUP = {
   circle: '<circle cx="12" cy="12" r="10" stroke-width="3"/>',
@@ -94,8 +101,8 @@ export function buildingPosition(size) {
 }
 
 /**
- * The markup for a town's icon on the map: its shape, filled with the
- * primary color, with its building standing on it. The building is always
+ * The markup for a town's icon on the map: its shape, filled with
+ * TOWN_COLOR, with its building standing on it. The building is always
  * there; the Plan view hides it with CSS, so switching views needs no
  * redrawing.
  * @param {string} size - The town's size
@@ -104,7 +111,7 @@ export function buildingPosition(size) {
 export function townIconHtml(size) {
   const icon = townIcon(size)
   const { left, top } = buildingPosition(size)
-  const shape = `<svg class="town-shape" viewBox="0 0 24 24" width="${icon.size}" height="${icon.size}" aria-hidden="true"><g class="town-shape__fill">${SHAPE_MARKUP[icon.shape]}</g></svg>`
+  const shape = `<svg class="town-shape" viewBox="0 0 24 24" width="${icon.size}" height="${icon.size}" aria-hidden="true"><g class="town-shape__fill" fill="${TOWN_COLOR}">${SHAPE_MARKUP[icon.shape]}</g></svg>`
   const buildingStyle = `left:${left}px;top:${top}px;width:${icon.buildingSize}px;height:${icon.buildingSize}px`
   const building = `<img class="town-building" src="${icon.buildingUrl}" alt="" style="${buildingStyle}" draggable="false">`
   return shape + building

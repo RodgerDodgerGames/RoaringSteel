@@ -73,7 +73,7 @@ const sectionsTotal = computed(() =>
         <span class="build-controls__available">{{ formatCurrency(availableToSpend) }}</span>
       </div>
       <progress
-        class="progress is-small is-primary mt-2 mb-1"
+        class="progress is-small is-warning mt-2 mb-1"
         :value="spentThisTurn"
         :max="gameRules.trackBudgetPerTurn"
         :aria-label="`Building allowance used: ${formatCurrency(spentThisTurn)}`"

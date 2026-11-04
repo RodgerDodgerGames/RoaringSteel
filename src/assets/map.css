@@ -7,16 +7,16 @@
 }
 
 /*
-  A town's icon (see townIcons.js): its shape, in the app's primary color
-  with a white rim, and the building standing on it, placed from the shape's
-  top-left corner and overflowing above it.
+  A town's icon (see townIcons.js): its shape, in the town color with a
+  white rim, and the building standing on it, placed from the shape's
+  top-left corner and overflowing above it. The fill is set in townIcons.js,
+  where the player colors are checked against it.
 */
 .town-shape {
   display: block;
 }
 
 .town-shape__fill {
-  fill: var(--bulma-primary);
   stroke: #fff;
 }
 
@@ -33,18 +33,36 @@
   display: none;
 }
 
-/* town tooltip (town display names under the icon) */
+/* town tooltip (town display names under the icon), in small bold
+   capitals like the names on the Empire Builder board */
 .town-tooltip {
   font-family: var(--font-town-name);
-  font-size: 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  /* Coal letters in a soft glow of timetable paper. The glow keeps a name
+     readable on dark forest and lifts it off any track running under it,
+     without the box a solid backing would draw over the terrain. The map
+     is the same in light and dark mode, so these colors do not change. */
+  color: #2a211b;
+  /* A blurred shadow alone is too faint round letters this small, so a
+     2px paper stroke, painted under the letters (paint-order) so only its
+     outer 1px shows, lays a solid rim first; the two blurred shadows then
+     fade it into the terrain. One stroke and two shadows keep the many
+     always-showing names cheap to redraw as the map zooms. */
+  -webkit-text-stroke: 2px var(--timetable-paper);
+  paint-order: stroke fill;
+  text-shadow:
+    0 0 3px var(--timetable-paper),
+    0 0 6px rgba(241, 230, 207, 0.9);
   border: none;
   box-shadow: none;
-  /* A pale backing, so track running under a name passes behind it rather
-     than through its letters, and the name stays readable on dark terrain */
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 3px;
+  background: none;
   padding: 0 0.25em;
-  line-height: 1.2;
+  /* 0.75rem × 1.5 keeps the name 18px tall, which NAME_HALF_HEIGHT in
+     townIcons.js counts on to hang the name just below its town */
+  line-height: 1.5;
 }
 
 /* town popup */

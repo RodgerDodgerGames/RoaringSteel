@@ -35,7 +35,7 @@ import { useTownsStore } from './towns'
 import { usePlayerStore } from './players'
 import { useSettingsStore } from './settings'
 import { PIN_COLORS } from '@/config/demands'
-import { demandPayoff } from '@/composables/payoffs'
+import { demandPayoff, mapSpanKm } from '@/composables/payoffs'
 import { debug } from '@/composables/debug'
 
 /** How many demand cards each player holds, per the Empire Builder rules */
@@ -236,6 +236,11 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
     const totalWeight = townWeights.reduce((a, b) => a + b, 0)
     const normalizedTownWeights = townWeights.map((w) => w / totalWeight)
 
+    // The distance between the map's two furthest-apart towns, which the
+    // long-haul bonus is measured against. Worked out once here because it
+    // compares every pair of towns (see payoffs.js)
+    const spanKm = mapSpanKm(townsData)
+
     // Generate demand options
     const options = []
     for (let i = 0; i < totalDemands; i++) {
@@ -282,8 +287,9 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
         const selectedIndustry = weightedRandomSelect(availableIndustries, 'proportion')
         debug.log(`selected industry: ${selectedIndustry.name}`)
 
-        // Pays by how far the commodity has to come (see payoffs.js)
-        const payoff = demandPayoff(destination, selectedIndustry.name, townsData)
+        // Pays by how far the commodity has to come, with a bonus for long
+        // hauls (see payoffs.js)
+        const payoff = demandPayoff(destination, selectedIndustry.name, townsData, spanKm)
 
         // Create a demand option
         demandOptions.push({

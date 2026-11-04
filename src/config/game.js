@@ -104,10 +104,20 @@ export const gameRules = {
    * costs (an ordinary 10 km cell is about $630), so a first delivery on a
    * new line roughly pays for the line, and every later one on it is profit.
    * `minimum` keeps a delivery between neighbors worth making.
+   *
+   * `longHaul.maxBonus` rewards the risk of reaching for distant towns: the
+   * per-km payoff is multiplied by a bonus that grows logarithmically with
+   * the haul's share of the map's span (its two furthest-apart towns), up to
+   * 1 + maxBonus for the longest possible haul. At 1, that haul pays double;
+   * one a quarter of the way across pays about 1.3×. Raise it to pull players
+   * across the map harder, or set it to 0 for plain per-km payoffs.
    */
   payoffs: {
     perKm: 100,
     roundTo: 1000,
-    minimum: 3000
+    minimum: 3000,
+    longHaul: {
+      maxBonus: 1
+    }
   }
 }

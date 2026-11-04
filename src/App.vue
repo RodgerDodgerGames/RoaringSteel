@@ -23,6 +23,7 @@ import { gridConfig } from '@/config/grid'
 // import composables
 import { useGamePersistence } from '@/composables/useGamePersistence'
 import { keepStorage } from '@/composables/database'
+import { debug } from '@/composables/debug'
 
 // setup stores
 const townsStore = useTownsStore()
@@ -74,13 +75,13 @@ const viewComponents = {
 
 // Handle players confirmed event from WelcomeView
 function handlePlayersConfirmed() {
-  console.log('Players confirmed, navigating to area select')
+  debug.log('Players confirmed, navigating to area select')
   currentView.value = 'areaSelect'
 }
 
 // Handle game loaded event from WelcomeView
 function handleGameLoaded() {
-  console.log('Game loaded, navigating to game view')
+  debug.log('Game loaded, navigating to game view')
   currentView.value = 'game'
 }
 

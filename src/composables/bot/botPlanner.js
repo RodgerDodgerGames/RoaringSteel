@@ -65,17 +65,31 @@ export function produces(town, industry) {
 }
 
 /**
- * The demands worth working toward, cheapest to connect first.
+ * Why a demand line cannot be worked toward right now (see `reviewDemands`).
+ */
+export const REJECTIONS = Object.freeze({
+  noDestination: 'no track can reach the town that wants it',
+  noProducer: 'no track can reach a town that produces it',
+  tooDear: 'connecting it costs more than the cash in hand'
+})
+
+/**
+ * Every demand line in hand, weighed up: what connecting it to the player's
+ * network would cost, what it would pay and leave over, and — for a line
+ * that cannot be worked toward now — why not (see `REJECTIONS`).
  *
- * For each demand line: the cheapest town that wants it (towns sharing the
- * name are all candidates) and the cheapest town producing it — none needed
- * if the train already carries the load. A town already on the player's
- * network costs nothing; any other costs what track to it would (`costTo`).
- * A town is never its own producer: a load picked up where it is wanted
- * would make a delivery out of standing still.
+ * For each line: the cheapest town that wants it (towns sharing the name are
+ * all candidates) and the cheapest town producing it — none needed if the
+ * train already carries the load. A town already on the player's network
+ * costs nothing; any other costs what track to it would (`costTo`). A town
+ * is never its own producer: a load picked up where it is wanted would make
+ * a delivery out of standing still.
  *
- * Demands that cannot be connected, or would cost more than the player has,
- * are left out. Ties go to the bigger payoff.
+ * The profit is the payoff less the cost of connecting: a rough guide, since
+ * the track stays and may serve other demands later.
+ *
+ * Kept apart from choosing among them (`workableDemands`) so that what a
+ * computer player passed over, and why, can be shown in debug mode.
  *
  * @param {Array<Object>} lines - Demand lines (see `demandLines`)
  * @param {Object} board
@@ -84,11 +98,15 @@ export function produces(town, industry) {
  * @param {Function} board.costTo - What track to a town would cost
  * @param {Array<string>} board.loads - What the train carries
  * @param {number} board.cash - The player's cash
- * @returns {Array<{cardId: number, line: number, demand: Object, cost: number,
- *   toJoin: Array<Object>}>} The demands, with what connecting them costs and
- *   the towns still to be joined, cheapest of those first
+ * @returns {Array<{cardId: number, line: number, demand: Object,
+ *   from?: Object|null, to?: Object, cost?: number, profit?: number,
+ *   toJoin?: Array<Object>, rejected: string|null}>} One per line, in hand
+ *   order: the producing town it would come from (null if carried), the town
+ *   it goes to, the cost, profit and towns still to be joined (cheapest
+ *   first), and why it is rejected or null. A line no track can reach has
+ *   no cost or profit, and one with no reachable producer no `from` either.
  */
-export function demandOptions(lines, { towns, isJoined, costTo, loads, cash }) {
+export function reviewDemands(lines, { towns, isJoined, costTo, loads, cash }) {
   /** What joining a town costs: nothing if it is on the network already */
   const joinCost = (town) => (isJoined(town) ? 0 : costTo(town))
   /** The cheapest town to join from some candidates, or null */
@@ -98,10 +116,10 @@ export function demandOptions(lines, { towns, isJoined, costTo, loads, cash }) {
       .filter(({ cost }) => Number.isFinite(cost))
       .sort((a, b) => a.cost - b.cost)[0] ?? null
 
-  const options = []
-  lines.forEach(({ cardId, line, demand }) => {
+  return lines.map(({ cardId, line, demand }) => {
+    const entry = { cardId, line, demand }
     const destination = cheapest(towns.filter((town) => town.name === demand.destination))
-    if (!destination) return
+    if (!destination) return { ...entry, rejected: REJECTIONS.noDestination }
 
     const isCarried = loads.includes(demand.industry)
     const producer = isCarried
@@ -111,19 +129,39 @@ export function demandOptions(lines, { towns, isJoined, costTo, loads, cash }) {
             (town) => town.name !== demand.destination && produces(town, demand.industry)
           )
         )
-    if (!isCarried && !producer) return
+    if (!isCarried && !producer) {
+      return { ...entry, to: destination.town, rejected: REJECTIONS.noProducer }
+    }
 
     const cost = destination.cost + (producer?.cost ?? 0)
-    if (cost > cash) return
-
     const toJoin = [destination, producer]
       .filter((end) => end && !isJoined(end.town))
       .sort((a, b) => a.cost - b.cost)
       .map(({ town }) => town)
-    options.push({ cardId, line, demand, cost, toJoin })
+    return {
+      ...entry,
+      from: producer?.town ?? null,
+      to: destination.town,
+      cost,
+      profit: demand.payoff - cost,
+      toJoin,
+      rejected: cost > cash ? REJECTIONS.tooDear : null
+    }
   })
+}
 
-  return options.sort((a, b) => a.cost - b.cost || b.demand.payoff - a.demand.payoff)
+/**
+ * The demands worth working toward, out of a review (see `reviewDemands`):
+ * those not rejected, cheapest to connect first, ties going to the bigger
+ * payoff. Only demands the player can afford to connect are kept, so a
+ * computer player never spends itself into a corner.
+ * @param {Array<Object>} review - From `reviewDemands`
+ * @returns {Array<Object>} The workable entries, best first
+ */
+export function workableDemands(review) {
+  return review
+    .filter(({ rejected }) => !rejected)
+    .sort((a, b) => a.cost - b.cost || b.demand.payoff - a.demand.payoff)
 }
 
 /**

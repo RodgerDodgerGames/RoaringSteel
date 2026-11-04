@@ -203,8 +203,6 @@ export function useTowns() {
       })
     }
 
-    console.log('GeoJSON data prepared:', geojson)
-
     // Create Leaflet layer from GeoJSON with custom marker rendering
     townsLayer.value = L.geoJSON(geojson, {
       // pointToLayer is called for each Point feature to create its marker

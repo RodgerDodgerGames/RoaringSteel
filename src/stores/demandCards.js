@@ -36,6 +36,7 @@ import { usePlayerStore } from './players'
 import { useSettingsStore } from './settings'
 import { PIN_COLORS } from '@/config/demands'
 import { demandPayoff } from '@/composables/payoffs'
+import { debug } from '@/composables/debug'
 
 /** How many demand cards each player holds, per the Empire Builder rules */
 export const HAND_SIZE = 3
@@ -197,7 +198,7 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
    * Deals nothing — `dealHands` does that once the deck exists.
    */
   const generateDemandCards = () => {
-    console.log('Generating demand cards...')
+    debug.log('Generating demand cards...')
 
     // A new deck means a new game, so the last game's cards go first — even if
     // no new deck can be built, the old one must not be dealt from
@@ -267,7 +268,7 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
         // Increment the selection count for the chosen town
         townSelectionCounts[randTownIdx]++
 
-        console.log(
+        debug.log(
           `Destination: ${destination.name} (selected ${townSelectionCounts[randTownIdx]} times)`
         )
 
@@ -279,7 +280,7 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
         if (availableIndustries.length === 0) continue
 
         const selectedIndustry = weightedRandomSelect(availableIndustries, 'proportion')
-        console.log(`selected industry: ${selectedIndustry.name}`)
+        debug.log(`selected industry: ${selectedIndustry.name}`)
 
         // Pays by how far the commodity has to come (see payoffs.js)
         const payoff = demandPayoff(destination, selectedIndustry.name, townsData)
@@ -300,7 +301,7 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
     drawPile.value = options
 
     // Summarize the demand cards
-    console.log('demand card generated', summarizeDemandCards(options))
+    debug.log('demand card generated', summarizeDemandCards(options))
   }
 
   /**

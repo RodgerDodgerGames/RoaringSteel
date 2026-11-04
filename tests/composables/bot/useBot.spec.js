@@ -208,6 +208,9 @@ describe('useBot', () => {
 
       expect(report).toMatchObject({ endedTurn: true, errors: [] })
       expect(report.events).toEqual([{ type: 'discard' }])
+      // Every line is in the trace, each rejected: Kauri is out of reach
+      expect(report.trace.demands).toHaveLength(9)
+      expect(report.trace.demands.every(({ rejected }) => rejected)).toBe(true)
       expect(
         useDemandCardsStore()
           .handOf(1)
@@ -238,6 +241,66 @@ describe('useBot', () => {
       expect(report).toMatchObject({ endedTurn: false, errors: [] })
       expect(useTrainsStore().trainOf(1).position).toBeNull()
       expect(useTrackStore().segmentsForOwner(1).length).toBeGreaterThan(0)
+    })
+
+    it('should record why it played the turn as it did', () => {
+      useGameStore().setGameState({ turn: gameRules.buildingRounds })
+      useDemandCardsStore().setDeck({
+        drawPile: [],
+        hands: {
+          1: [{ id: 9, demands: [{ destination: 'Birch', industry: 'Coal', payoff: 9000 }] }]
+        }
+      })
+
+      const { trace } = useBot().playTurn(1)
+
+      // With no track, it picked a major city to start from
+      const cities = makeTowns().filter(({ size }) => size === 'large')
+      expect(cities.map(({ name }) => name)).toContain(trace.startCity)
+      expect(trace.trainStop).toBe('no track of its own to put the train on yet')
+      // The one demand was workable, and costed
+      expect(trace.demands).toHaveLength(1)
+      expect(trace.demands[0]).toMatchObject({ rejected: null, to: { name: 'Birch' } })
+      expect(trace.demands[0].profit).toBe(9000 - trace.demands[0].cost)
+      // What the build steps say was built is what the player paid
+      const built = trace.build.reduce((sum, step) => sum + (step.built ?? 0), 0)
+      expect(built).toBeGreaterThan(0)
+      expect(trace.cashBefore - trace.cashAfter).toBe(built)
+      trace.build
+        .filter((step) => step.built !== undefined)
+        .forEach((step) => {
+          expect(step.built).toBeLessThanOrEqual(step.budget)
+          expect(step.builtCells).toBeLessThanOrEqual(step.lineCells)
+        })
+      expect(trace.buildStop).toEqual(expect.any(String))
+    })
+
+    it('should hand back what it had weighed up when its turn goes wrong', () => {
+      useGameStore().setGameState({ turn: gameRules.buildingRounds })
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      useDemandCardsStore().setDeck({
+        drawPile: [],
+        hands: {
+          1: [{ id: 9, demands: [{ destination: 'Birch', industry: 'Coal', payoff: 9000 }] }]
+        }
+      })
+      // Building breaks: the first look at its track, weighing up the hand,
+      // goes through; the second, planning what to build, throws
+      const trackStore = useTrackStore()
+      const ownTrack = trackStore.segmentsForOwner
+      vi.spyOn(trackStore, 'segmentsForOwner')
+        .mockImplementationOnce(ownTrack)
+        .mockImplementation(() => {
+          throw new Error('lost')
+        })
+
+      const report = useBot().playTurn(1)
+
+      expect(report.errors).toEqual([{ action: 'turn', error: 'Error: lost' }])
+      // The hand was weighed up and the train run before it went wrong
+      expect(report.trace.demands).toHaveLength(1)
+      expect(report.trace.trainStop).toBe('no track of its own to put the train on yet')
+      expect(report.trace.cashAfter).toBe(report.trace.cashBefore)
     })
   })
 

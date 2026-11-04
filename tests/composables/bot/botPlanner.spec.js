@@ -9,7 +9,9 @@ import { describe, it, expect } from 'vitest'
 import {
   upgradeFor,
   demandLines,
-  demandOptions,
+  reviewDemands,
+  workableDemands,
+  REJECTIONS,
   loadsToPickUp,
   loadsToDrop,
   nextStop
@@ -46,6 +48,9 @@ const board = (overrides = {}) => ({
   ...overrides
 })
 
+/** The demands worth working toward, as the computer player picks them */
+const demandOptions = (lines, onBoard) => workableDemands(reviewDemands(lines, onBoard))
+
 describe('botPlanner', () => {
   describe('upgradeFor', () => {
     it('should upgrade to a Fast Freight at $80,000 and a Superfreight at $140,000', () => {
@@ -57,7 +62,52 @@ describe('botPlanner', () => {
     })
   })
 
-  describe('demandOptions', () => {
+  describe('reviewDemands', () => {
+    it('should weigh up every line, with where it comes from and goes, cost and profit', () => {
+      const lines = demandLines([card(1, ['Steelton', 'Coal', 12000])])
+
+      const [entry] = reviewDemands(lines, board())
+
+      // Coal from Coaltown (1000) to Steelton (2000)
+      expect(entry).toMatchObject({
+        cardId: 1,
+        from: coalTown,
+        to: steelTown,
+        cost: 3000,
+        profit: 9000,
+        rejected: null
+      })
+    })
+
+    it('should say why each line it cannot work toward is rejected', () => {
+      const lines = demandLines([
+        card(1, ['Nowhere', 'Coal']),
+        card(2, ['Steelton', 'Gold']),
+        card(3, ['Faraway', 'Steel'])
+      ])
+
+      const review = reviewDemands(lines, board({ cash: 31999 }))
+
+      expect(review.map(({ rejected }) => rejected)).toEqual([
+        REJECTIONS.noDestination,
+        REJECTIONS.noProducer,
+        // Steel to Faraway from Steelton: 30000 + 2000
+        REJECTIONS.tooDear
+      ])
+      // Too dear is still costed, so the log can show by how much
+      expect(review[2]).toMatchObject({ cost: 32000, profit: 10000 - 32000 })
+    })
+
+    it('should come from nowhere for a load the train already carries', () => {
+      const lines = demandLines([card(1, ['Faraway', 'Gold'])])
+
+      const [entry] = reviewDemands(lines, board({ loads: ['Gold'] }))
+
+      expect(entry).toMatchObject({ from: null, to: farTown, cost: 30000, rejected: null })
+    })
+  })
+
+  describe('workableDemands', () => {
     it('should put the demand cheapest to connect first', () => {
       const lines = demandLines([card(1, ['Faraway', 'Steel']), card(2, ['Steelton', 'Coal'])])
 

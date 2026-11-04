@@ -36,6 +36,7 @@ import { useBotsStore } from '@/stores/bots'
 import { turnAfter } from '@/composables/turnOrder'
 import { packGrid, unpackGrid } from '@/composables/map/cellGrid'
 import { addAutoSave, getAutoSave, getAutoSaves as readAutoSaves, plain } from './database'
+import { debug } from '@/composables/debug'
 
 // 3.0.0: autosaves record where the grid came from instead of holding it.
 // Only saves of this version are loaded.
@@ -158,7 +159,7 @@ export function useGamePersistence() {
       // picks up looking as it was saved)
       settingsStore.applySettings(data.settings)
 
-      console.log('Game state restored successfully')
+      debug.log('Game state restored successfully')
       return true
     } catch (e) {
       console.error('Error deserializing game state:', e)
@@ -341,7 +342,7 @@ export function useGamePersistence() {
     try {
       const saveData = plain(serializeGameState('Auto-save'))
       const id = await addAutoSave(saveData)
-      console.log(`Auto-saved as save ${id}`)
+      debug.log(`Auto-saved as save ${id}`)
       return true
     } catch (e) {
       console.error('Error auto-saving game:', e)
@@ -414,7 +415,7 @@ export function useGamePersistence() {
       // Clean up the URL object
       URL.revokeObjectURL(url)
 
-      console.log(`Exported game to ${filename}.json`)
+      debug.log(`Exported game to ${filename}.json`)
       return true
     } catch (e) {
       console.error('Error exporting game to file:', e)

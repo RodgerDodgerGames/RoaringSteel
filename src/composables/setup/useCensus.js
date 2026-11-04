@@ -19,6 +19,7 @@
 
 import { ref } from 'vue'
 import { CENSUS_ATTEMPT_TIMEOUT_MS, fetchWithRetries, RequestError } from '@/composables/utils'
+import { debug } from '@/composables/debug'
 
 /**
  * Composable for fetching Census population data by state.
@@ -54,10 +55,10 @@ export default function useCensus(state, dataWindow) {
     let response = null
     for (let year = dataWindow.end; year >= dataWindow.start; year--) {
       const url = setupRequest(year)
-      console.log('Fetching population data:', url)
+      debug.log('Fetching population data:', url)
       response = await fetchWithRetries(url, { timeoutMs: CENSUS_ATTEMPT_TIMEOUT_MS })
       if (response.status !== 404) break
-      console.log(`No ACS 5-year release for ${year} yet`)
+      debug.log(`No ACS 5-year release for ${year} yet`)
     }
     if (response.status === 404) {
       throw new RequestError(
@@ -70,7 +71,6 @@ export default function useCensus(state, dataWindow) {
     }
 
     const censusData = await response.json()
-    console.log('Census data:', censusData)
 
     // Census API returns array-of-arrays with header row first
     // Example: [["NAME", "B01001_001E", "state", "msa"], ["Minneapolis...", "3500000", "27", "33460"], ...]
@@ -85,7 +85,6 @@ export default function useCensus(state, dataWindow) {
       state_code, // State FIPS code
       msa_code // Metropolitan Statistical Area code
     }))
-    console.log('Population data:', populationData.value)
   }
 
   return {

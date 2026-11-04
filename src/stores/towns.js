@@ -38,6 +38,7 @@ import getMSALatLon from '../composables/setup/useTigerWeb'
 import { fetchDataWindow } from '../composables/setup/dataWindow'
 import { isRefusal, refusalMessage } from '../composables/utils'
 import { readCache, writeCache } from '../composables/database'
+import { debug } from '@/composables/debug'
 
 /** Size classification labels for towns based on population */
 const sizeClasses = ['small', 'medium', 'large']
@@ -114,7 +115,7 @@ export const useTownsStore = defineStore('towns', () => {
   async function setupTowns(stateFipsCode) {
     selectedState.value = stateFipsCode
     error.value = null
-    console.log('Selected state:', stateFipsCode)
+    debug.log('Selected state:', stateFipsCode)
 
     // Each state's towns are kept under their own name, along with the data
     // window they were built for
@@ -149,7 +150,6 @@ export const useTownsStore = defineStore('towns', () => {
     isLoadingIndustry.value = true
     try {
       await industryStore.useIndustryData(stateFipsCode, latestWindow)
-      console.log('Industry data fetched:', industryStore.employmentData)
     } catch (e) {
       console.error('Error fetching industry data:', e)
       isLoadingIndustry.value = false
@@ -163,7 +163,6 @@ export const useTownsStore = defineStore('towns', () => {
     const { populationData, fetchPopulationData } = useCensus(stateFipsCode, latestWindow)
     try {
       await fetchPopulationData()
-      console.log('Population data fetched:', populationData.value)
     } catch (e) {
       console.error('Error fetching population data:', e)
       isLoadingPopulation.value = false
@@ -177,7 +176,7 @@ export const useTownsStore = defineStore('towns', () => {
     // Whether any town was left out because its lookup failed
     let missedTowns = false
     for (const msaCode of MSAs.value) {
-      console.log('Fetching lat/lon data for MSA:', msaCode)
+      debug.log('Fetching lat/lon data for MSA:', msaCode)
       let coordinates
       try {
         coordinates = await getMSALatLon(msaCode)
@@ -196,7 +195,7 @@ export const useTownsStore = defineStore('towns', () => {
         continue
       }
       const { centroidLongitude, centroidLatitude } = coordinates
-      console.log('Lat/Lon data fetched:', centroidLongitude, centroidLatitude)
+      debug.log('Lat/Lon data fetched:', centroidLongitude, centroidLatitude)
 
       const popData = populationData.value.find((data) => data.msa_code === msaCode)
 
@@ -227,7 +226,6 @@ export const useTownsStore = defineStore('towns', () => {
 
     // Assign tourism, industries, and sizes to towns
     assignTowns()
-    console.log('Towns after assignment:', towns.value)
 
     // Play with what came back, but leave a build with gaps out of the cache
     if (missedTowns || industryStore.failedIndustries.length > 0) {
@@ -237,7 +235,7 @@ export const useTownsStore = defineStore('towns', () => {
 
     // Keep the towns for the next game in this state
     await writeCache(cacheName, { dataWindow: latestWindow, towns: towns.value })
-    console.log(`Cached towns data for state ${stateFipsCode}:`, towns.value)
+    debug.log(`Cached towns data for state ${stateFipsCode}`)
   }
 
   /**
@@ -299,7 +297,7 @@ export const useTownsStore = defineStore('towns', () => {
   function loadSavedTowns(saved) {
     towns.value = saved.towns
     dataWindow.value = saved.dataWindow
-    console.log(`Loaded cached towns data for state ${selectedState.value}:`, towns.value)
+    debug.log(`Loaded cached towns data for state ${selectedState.value}`)
   }
 
   /**
@@ -307,10 +305,9 @@ export const useTownsStore = defineStore('towns', () => {
    * assigns tourism to large towns, and distributes industries.
    */
   function assignTowns() {
-    console.log('Assigning towns...')
+    debug.log('Assigning towns...')
     // group towns by population
     towns.value = naturalBreaks(towns.value, 'population', sizeClasses)
-    console.log('Towns grouped by population:', towns.value)
     assignTourism()
     assignIndustries()
   }
@@ -320,7 +317,7 @@ export const useTownsStore = defineStore('towns', () => {
    * Tourism is a special industry that large population centers always have.
    */
   function assignTourism() {
-    console.log('Assigning tourism to towns...')
+    debug.log('Assigning tourism to towns...')
     towns.value.forEach((town) => {
       if (town.size === 'large') {
         town.industries.push({ name: 'Tourism', industry: 9999 })
@@ -339,7 +336,7 @@ export const useTownsStore = defineStore('towns', () => {
       industry: industry.industry,
       maxTowns: Math.floor(towns.value.length * industry.proportion) || 1
     }))
-    console.log('Max towns per industry:', maxTowns)
+    debug.log('Max towns per industry:', maxTowns)
     return maxTowns
   }
 
@@ -356,7 +353,7 @@ export const useTownsStore = defineStore('towns', () => {
    * 5. Respect maxIndustries per town (there is no per-industry cap yet)
    */
   function assignIndustries() {
-    console.log('Starting industry assignment to towns...')
+    debug.log('Starting industry assignment to towns...')
 
     // Enrich employment data with industry labels
     const enrichedEmploymentData = enrichEmploymentData(
@@ -373,7 +370,7 @@ export const useTownsStore = defineStore('towns', () => {
     // Step 2: Loop through each industry, applying natural breaks to the normalized employment data
     for (const industry of enrichedEmploymentData) {
       const { industry: industryId, label, meanEmp } = industry
-      console.log(`\nAssigning industry: ${label} (ID: ${industryId})`)
+      debug.log(`\nAssigning industry: ${label} (ID: ${industryId})`)
 
       // Get the maximum number of towns allowed for this industry
       const maxAllowed = maxTownsPerIndustry.find((ind) => ind.industry === industryId).maxTowns
@@ -393,7 +390,7 @@ export const useTownsStore = defineStore('towns', () => {
         'high'
       ])
       const highDensityTowns = groupedTowns.filter((town) => town.size === 'high')
-      console.log(`Top towns: ${highDensityTowns.map((town) => town.name)}`)
+      debug.log(`Top towns: ${highDensityTowns.map((town) => town.name)}`)
 
       // Assign industry to towns in the 'high' density group first
       let assignments = 0
@@ -404,7 +401,7 @@ export const useTownsStore = defineStore('towns', () => {
         town.industries.push({ name: label, industry: industryId })
         industryAssignmentCounts.set(industryId, assignedCount + 1)
         assignments++
-        console.log(`Assigned ${label} to ${town.name} based on high employment density`)
+        debug.log(`Assigned ${label} to ${town.name} based on high employment density`)
       }
 
       // Step 3: If industry hasn't reached max allowed, assign to 'medium' group next
@@ -412,7 +409,7 @@ export const useTownsStore = defineStore('towns', () => {
         const mediumDensityTowns = groupedTowns.filter((town) => town.size === 'medium')
         // sort medium towns by employment density
         mediumDensityTowns.sort((a, b) => b.employmentDensity - a.employmentDensity)
-        console.log(`Medium density towns: ${mediumDensityTowns.map((town) => town.name)}`)
+        debug.log(`Medium density towns: ${mediumDensityTowns.map((town) => town.name)}`)
 
         for (const town of mediumDensityTowns) {
           if (
@@ -425,19 +422,17 @@ export const useTownsStore = defineStore('towns', () => {
               (industryAssignmentCounts.get(industryId) || 0) + 1
             )
             assignments++
-            console.log(`Assigned ${label} to ${town.fullName} from medium density groups`)
+            debug.log(`Assigned ${label} to ${town.fullName} from medium density groups`)
           }
           if (assignments >= maxAllowed) break
         }
       }
 
-      console.log(
+      debug.log(
         `Final assignments for industry ${label}:`,
         industryAssignmentCounts.get(industryId)
       )
     }
-
-    console.log('Final industry assignments for all towns:', towns.value)
   }
 
   /**

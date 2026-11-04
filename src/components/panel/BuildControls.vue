@@ -16,7 +16,7 @@
 -->
 
 <script setup>
-import { inject, computed } from 'vue'
+import { inject, computed, useTemplateRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { buildTrackKey } from '@/composables/map/useBuildTrack'
 import { usePlayerStore } from '@/stores/players'
@@ -24,6 +24,7 @@ import { useTrackStore } from '@/stores/track'
 import { useGameStore } from '@/stores/game'
 import { gameRules } from '@/config/game'
 import { formatCurrency } from '@/composables/utils'
+import { useRevealOnChange } from '@/composables/useRevealOnChange'
 
 // The game view's build-track instance; see the note at the top
 const {
@@ -61,6 +62,18 @@ const sectionsThisTurn = computed(() =>
 const sectionsTotal = computed(() =>
   sectionsThisTurn.value.reduce((total, section) => total + section.cost, 0)
 )
+
+// Whatever appears here as track is drawn is scrolled into sight in the dock,
+// each piece on its own, so a long list of sections cannot push a new warning
+// out of view (see useRevealOnChange). Not on every change of the running
+// cost, which only rewrites a figure already on screen.
+
+/** The running cost, as drawing starts */
+useRevealOnChange(useTemplateRef('pending'), [isDrawingActive])
+/** A warning that the line is over budget, or why it could not be built */
+useRevealOnChange(useTemplateRef('notice'), [isOverBudget, buildError])
+/** The total under the sections built this turn, as one more is added above it */
+useRevealOnChange(useTemplateRef('sectionsTotalRow'), [() => sectionsThisTurn.value.length])
 </script>
 
 <template>
@@ -100,16 +113,17 @@ const sectionsTotal = computed(() =>
     </button>
 
     <!-- The line being drawn: its running cost, and whether it can be paid for -->
-    <div v-if="isDrawingActive" class="build-controls__pending">
+    <div v-if="isDrawingActive" ref="pending" class="build-controls__pending">
       <span>This line so far</span>
       <span class="has-text-weight-bold">{{ formatCurrency(pendingCost) }}</span>
     </div>
 
-    <p v-if="isOverBudget" class="notification is-warning is-light p-2 mt-2 mb-0">
+    <!-- Both share one ref: at most one of them is shown -->
+    <p v-if="isOverBudget" ref="notice" class="notification is-warning is-light p-2 mt-2 mb-0">
       This line costs {{ formatCurrency(pendingCost) }} — more than the
       {{ formatCurrency(availableToSpend) }} you have to spend. It cannot be built.
     </p>
-    <p v-else-if="buildError" class="notification is-danger is-light p-2 mt-2 mb-0">
+    <p v-else-if="buildError" ref="notice" class="notification is-danger is-light p-2 mt-2 mb-0">
       {{ buildError }}
     </p>
 
@@ -131,7 +145,7 @@ const sectionsTotal = computed(() =>
           <span>{{ formatCurrency(section.cost) }}</span>
         </li>
       </ol>
-      <div class="build-controls__total">
+      <div ref="sectionsTotalRow" class="build-controls__total">
         <span>Total</span>
         <span>{{ formatCurrency(sectionsTotal) }}</span>
       </div>

@@ -6,7 +6,9 @@
  * 1. a moment's wait (`THINK_DELAY_MS`), so the screen can show whose turn
  *    it is before the work of the turn holds the browser up;
  * 2. the whole turn is played at once (see useBot.js), and what it did is
- *    put up for everyone to read (see the bots store);
+ *    put up for everyone to read (see the bots store) — and, in debug
+ *    mode, printed to the console with the reasoning behind it (see
+ *    botTurnLog.js);
  * 3. a pause (`BOT_PAUSE_MS`), so the map and the summary can be taken in;
  * 4. the turn is ended, and the next player is up — another computer
  *    player's turn starts over at step 1.
@@ -29,6 +31,7 @@ import { usePlayerStore } from '@/stores/players'
 import { useBotsStore } from '@/stores/bots'
 import { useTurn } from '@/composables/useTurn'
 import { useBot, describeTurn } from './useBot'
+import { logBotTurn } from './botTurnLog'
 
 /** How long a computer player's finished turn stays up before play moves on, in ms */
 export const BOT_PAUSE_MS = 1000
@@ -79,6 +82,7 @@ export function useBotRunner() {
     if (!stillTheirTurn(player)) return schedule()
 
     const round = gameStore.turn
+    const isBuildingRound = gameStore.isBuildingRound
     let report
     try {
       report = playTurn(player.id)
@@ -86,6 +90,8 @@ export function useBotRunner() {
       console.error(`Computer player ${player.name} could not finish their turn:`, error)
       report = { events: [], errors: [{ action: 'turn', error: String(error) }], endedTurn: false }
     }
+    // In debug mode, the turn and the reasoning behind it, in the console
+    logBotTurn({ name: player.name, round, isBuildingRound, report })
     botsStore.addReport({
       playerId: player.id,
       round,

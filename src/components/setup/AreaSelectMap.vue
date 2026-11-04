@@ -25,6 +25,7 @@ import { onMounted, ref } from 'vue'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import MapCreditsLink from '@/components/map/MapCreditsLink.vue'
+import { debug } from '@/composables/debug'
 
 // define emit
 const emit = defineEmits(['state-click'])
@@ -93,7 +94,7 @@ function highlightFeature(layer) {
 
 // Handle state click event and emit to parent
 function stateClickHandler(selectedState) {
-  console.log('Selected state:', selectedState.properties.NAME)
+  debug.log('Selected state:', selectedState.properties.NAME)
   emit('state-click', selectedState)
 }
 </script>

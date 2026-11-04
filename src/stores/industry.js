@@ -28,6 +28,7 @@ import { ref } from 'vue'
 import useQWI from '../composables/setup/useQWI'
 import Papa from 'papaparse'
 import { readCache, writeCache } from '../composables/database'
+import { debug } from '@/composables/debug'
 
 /** Path to curated industry definitions CSV */
 const csvFile = '/data/label_industry_curated_test.csv'
@@ -79,7 +80,7 @@ export const useIndustryStore = defineStore('qwiStore', () => {
    * @returns {Promise<void>}
    */
   async function useIndustryData(stateFipsCode, dataWindow) {
-    console.log('useIndustryData called with stateFipsCode:', stateFipsCode) // Log when the function is called
+    debug.log('useIndustryData called with stateFipsCode:', stateFipsCode)
 
     // Each state's industry data is kept under its own name, along with the
     // data window it was built for
@@ -109,7 +110,6 @@ export const useIndustryStore = defineStore('qwiStore', () => {
     isLoadingCSV.value = true
     try {
       industries.value = await loadCSV(csvFile)
-      console.log('Loaded industry data:', industries.value)
     } catch (e) {
       console.error('Error loading industry CSV:', e)
       isLoadingCSV.value = false
@@ -120,7 +120,7 @@ export const useIndustryStore = defineStore('qwiStore', () => {
     // iterate over each industry and fetch the QWI data
     isLoadingQWI.value = true
     for (const industry of industries.value) {
-      console.log('Fetching QWI data for industry:', industry) // Log the industry being processed
+      debug.log('Fetching QWI data for industry:', industry)
 
       // fetch the QWI data for the industry
       try {
@@ -137,13 +137,11 @@ export const useIndustryStore = defineStore('qwiStore', () => {
           // from ever being cached
           if (!refused.value) failedIndustries.value.push(industry.naics_code)
         } else {
-          console.log('Fetched QWI data:', data.value) // Log the fetched QWI data
-
           // check if all of the data is either null or zero
           // if so, skip this industry
           const allZero = data.value.every((row) => row.Emp === null || row.Emp === 0)
           if (allZero) {
-            console.log('All zero data for industry:', industry) // Log that all data is zero
+            debug.log('All zero data for industry:', industry)
             continue
           }
 
@@ -165,9 +163,6 @@ export const useIndustryStore = defineStore('qwiStore', () => {
 
     // Calculate and assign proportions
     calculateAndAssignProportions()
-
-    // Log the average employment data
-    console.log('Average employment data:', employmentData.value)
 
     if (failedIndustries.value.length > 0) {
       console.warn(

@@ -21,6 +21,7 @@ import { ref } from 'vue'
 import PlayerSelect from '@/components/setup/PlayerSelect.vue'
 import PlayerConfirm from '@/components/setup/PlayerConfirm.vue'
 import LoadGameDialog from '@/components/dialogs/LoadGameDialog.vue'
+import { debug } from '@/composables/debug'
 
 const props = defineProps({
   initialPane: {
@@ -41,12 +42,12 @@ const selectedPlayers = ref([])
 const showLoadDialog = ref(false)
 
 function newGame() {
-  console.log('new game clicked')
+  debug.log('new game clicked')
   activePane.value = 'playerSelect'
 }
 
 function loadGame() {
-  console.log('load game clicked')
+  debug.log('load game clicked')
   showLoadDialog.value = true
 }
 
@@ -72,7 +73,7 @@ function handleGoBack() {
 
 // Handle final confirmation
 function handleConfirmed() {
-  console.log('Players confirmed and saved to store!')
+  debug.log('Players confirmed and saved to store!')
   // Navigate to area select view
   emit('players-confirmed')
 }

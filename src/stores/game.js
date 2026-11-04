@@ -45,7 +45,6 @@ export const useGameStore = defineStore('gameStore', () => {
    * @param {Object} newRegion - GeoJSON FeatureCollection defining the play area
    */
   function setRegion(newRegion) {
-    console.log('setting new region', newRegion)
     region.value = newRegion
   }
 

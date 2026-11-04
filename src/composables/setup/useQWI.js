@@ -20,6 +20,7 @@ import {
   isRefusal,
   RequestError
 } from '@/composables/utils'
+import { debug } from '@/composables/debug'
 
 /**
  * Composable for fetching QWI employment data.
@@ -69,20 +70,17 @@ export default function useQWI(state, industry, dataWindow) {
     }, `${rootUrl}?`)
 
     // Log the key and URL for debugging purposes
-    console.log('QWI URL:', url)
+    debug.log('QWI URL:', url)
 
     // Construct the URL for the API request
     // const url = `${rootUrl}?industry=${params.industry}&get=${params.get}&for=${params.for}&in=${params.in}&time=${params.time}&key=${key}`;
 
     // Use fetch to send a GET request to the API
     try {
-      // log the url being used
-      console.log('QWI url:', url)
-
       // Send the request
       // Tried a few times: the API fails now and then for no reason of the
       // request's own, and an industry lost here is missing from the game
-      console.log('Sending GET request to the API...')
+      debug.log('Sending GET request to the API...')
       const response = await fetchWithRetries(url, { timeoutMs: CENSUS_ATTEMPT_TIMEOUT_MS })
 
       // Check if the request was successful
@@ -105,12 +103,12 @@ export default function useQWI(state, industry, dataWindow) {
       }
 
       // If it was, parse the response as JSON
-      console.log('Parsing response as JSON...')
+      debug.log('Parsing response as JSON...')
       const jsonData = await response.json()
 
       // Process the data - Census API returns data as array of arrays
       // First row is headers, subsequent rows are data
-      console.log('Processing the data...')
+      debug.log('Processing the data...')
 
       // The Census API uses a long column name for MSA codes - rename it for easier access
       jsonData[0][

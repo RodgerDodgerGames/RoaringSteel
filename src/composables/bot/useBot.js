@@ -45,11 +45,13 @@ import { useTurn } from '@/composables/useTurn'
 import { useVictory } from '@/composables/victory'
 import { townKey } from '@/composables/network'
 import { formatCurrency } from '@/composables/utils'
+import { priceLine } from '@/composables/map/trackCost'
 import { searchBoard, costField, planLine, affordableSection } from './botPathfinder'
 import {
   upgradeFor,
   demandLines,
-  demandOptions,
+  reviewDemands,
+  workableDemands,
   loadsToPickUp,
   loadsToDrop,
   nextStop
@@ -126,7 +128,8 @@ export function useBot() {
   /**
    * Everything the player needs to plan building: what they hold, the search
    * board, where they would build from, what track to anywhere would cost,
-   * and the demands worth working toward (see `demandOptions`). Runs searches
+   * every demand in hand weighed up (see `reviewDemands`) and those worth
+   * working toward (see `workableDemands`). Runs searches
    * over the whole grid, so it is only asked for when building or deciding
    * whether to throw in the hand.
    *
@@ -139,7 +142,9 @@ export function useBot() {
    * @param {number} playerId - The player
    * @returns {Object} The picture: `sources` to build from and the search
    *   from them (`field`, see `costField`), `isJoined` and `costTo` for any
-   *   town, and the demand `options`, besides what `holdings` gives
+   *   town, the demand `review` and the workable `options` from it, and —
+   *   for a player with no track yet — the `start` city picked, besides what
+   *   `holdings` gives
    */
   function survey(playerId) {
     const held = holdings(playerId)
@@ -154,14 +159,14 @@ export function useBot() {
     const planFrom = (sources, isJoined) => {
       const field = costField(board, sources, { targets: townPoints })
       const costTo = (town) => field.costTo(pointOf(town))
-      const options = demandOptions(held.lines, {
+      const review = reviewDemands(held.lines, {
         towns: townsStore.towns,
         isJoined,
         costTo,
         loads: trainsStore.trainOf(playerId).loads,
         cash: cashOf(playerId)
       })
-      return { sources, field, isJoined, costTo, options }
+      return { sources, field, isJoined, costTo, review, options: workableDemands(review) }
     }
 
     const own = trackStore.segmentsForOwner(playerId).flatMap(({ coordinates }) => coordinates)
@@ -169,10 +174,21 @@ export function useBot() {
 
     const starts = townsStore.towns
       .filter((town) => town.size === 'large')
-      .map((city) => planFrom([pointOf(city)], (town) => town.msa === city.msa))
+      .map((city) => ({
+        start: city,
+        ...planFrom([pointOf(city)], (town) => town.msa === city.msa)
+      }))
+    // The city whose cheapest demand costs least to connect. Whenever any
+    // demand is workable from some city, the cheapest one anywhere is, so
+    // this is the city with the cheapest workable demand. When none is, it
+    // still picks the city that comes closest, so the review it hands back
+    // says what each demand would cost from there — "too dear", not "out of
+    // reach" — though there is then nothing to work toward either way.
+    const cheapestDemand = ({ review }) =>
+      Math.min(...review.map(({ cost }) => cost).filter(Number.isFinite))
     const [best] = starts
-      .filter(({ options }) => options.length)
-      .sort((a, b) => a.options[0].cost - b.options[0].cost)
+      .filter((start) => Number.isFinite(cheapestDemand(start)))
+      .sort((a, b) => cheapestDemand(a) - cheapestDemand(b))
     return { ...held, board, ...(best ?? planFrom([], held.isJoined)) }
   }
 
@@ -183,15 +199,34 @@ export function useBot() {
    * Every action the stores refuse is recorded in `errors`. The plan only
    * asks for what the rules allow, so a refusal means the plan and the rules
    * disagree: the turn carries on without that action, and the refusal is
-   * logged so it can be found.
+   * logged so it can be found. A turn that goes wrong in a way nobody
+   * foresaw (the code throws) is caught here too: the error is logged and
+   * recorded in `errors` as a `turn` problem, and the report comes back as
+   * far as the turn got, trace and all, so debug mode can show what led up
+   * to it. The caller ends the turn as it stands.
+   *
+   * Besides what it did, the report keeps a `trace` of why — what the
+   * player weighed up and where each part of the turn stopped — for debug
+   * mode to print (see botTurnLog.js):
+   * - `cashBefore`, `cashAfter`: the player's cash either side of the turn
+   * - `demands`: every demand in hand, weighed up (see `reviewDemands`), as
+   *   last seen when deciding to throw in the hand or to build; `demandsWhen`
+   *   says which. Absent if neither was looked at.
+   * - `startCity`: for a player with no track yet, the major city their
+   *   building was planned from (see `survey`)
+   * - `trainStop`: why the train stopped where it did
+   * - `build`: each try at building, in order (see `buildTrack`), and
+   *   `buildStop`: why building stopped
    *
    * @param {number} playerId - The computer player whose turn it is
-   * @returns {{events: Array<Object>, errors: Array<Object>, endedTurn: boolean}}
-   *   What it did, what was refused, and whether the turn has already ended
+   * @returns {{events: Array<Object>, errors: Array<Object>, endedTurn: boolean,
+   *   trace: Object}} What it did, what was refused, whether the turn has
+   *   already ended, and why it played as it did
    */
   function playTurn(playerId) {
-    const report = { events: [], errors: [], endedTurn: false }
+    const report = { events: [], errors: [], endedTurn: false, trace: { build: [] } }
     if (gameStore.isOver || playerStore.activePlayer?.id !== playerId) return report
+    report.trace.cashBefore = cashOf(playerId)
 
     /** Records a refused action; true if it went through */
     const tried = (action, result) => {
@@ -201,20 +236,35 @@ export function useBot() {
       return false
     }
 
+    try {
+      playParts(playerId, report, tried)
+    } catch (error) {
+      console.error(`Computer player ${playerId} could not finish their turn:`, error)
+      report.errors.push({ action: 'turn', error: String(error) })
+    }
+    report.trace.cashAfter = cashOf(playerId)
+    return report
+  }
+
+  /**
+   * The parts of a turn, in order (see the module notes), each recording
+   * what it did in the report. Apart from `playTurn` only so that every way
+   * the turn can end passes back through it to note the cash left.
+   */
+  function playParts(playerId, report, tried) {
     if (!gameStore.isBuildingRound) {
-      if (canDiscardHand.value && shouldThrowInHand(playerId)) {
+      if (canDiscardHand.value && shouldThrowInHand(playerId, report.trace)) {
         if (discardHand()) {
           report.events.push({ type: 'discard' })
           report.endedTurn = true
-          return report
+          return
         }
       }
-      runTrain(playerId, report, tried)
-      if (gameStore.isOver) return report
+      report.trace.trainStop = runTrain(playerId, report, tried)
+      if (gameStore.isOver) return
       upgradeTrain(playerId, report, tried)
     }
-    buildTrack(playerId, report, tried)
-    return report
+    report.trace.buildStop = buildTrack(playerId, report, tried)
   }
 
   /**
@@ -233,29 +283,39 @@ export function useBot() {
    * the cash the player has, so a new hand is worth the turn. Never while
    * the player is joining cities, which needs the turn and not the hand.
    * @param {number} playerId - The player
+   * @param {Object} trace - The turn's trace (see `playTurn`), given the
+   *   demands as weighed up here
    * @returns {boolean} True to throw it in
    */
-  function shouldThrowInHand(playerId) {
-    return !isJoiningCities(playerId) && survey(playerId).options.length === 0
+  function shouldThrowInHand(playerId, trace) {
+    if (isJoiningCities(playerId)) return false
+    const { review, options } = survey(playerId)
+    trace.demands = review
+    trace.demandsWhen = 'deciding whether to throw in the hand'
+    return options.length === 0
   }
 
   /**
    * Runs the train for the turn: placed on the network the first time, then
    * from stop to stop, delivering and loading in each town (see the module
-   * notes).
+   * notes). Each move records the distance the train has left after it.
+   * @returns {string} Why the train stopped where it did, for the trace
    */
   function runTrain(playerId, report, tried) {
     if (!trainsStore.trainOf(playerId).position) {
       const town = placementTown(playerId)
       // With no track of its own yet there is nowhere useful to put it
-      if (!town) return
-      if (!tried('place train', trainsStore.placeTrain(playerId, town.msa))) return
+      if (!town) return 'no track of its own to put the train on yet'
+      if (!tried('place train', trainsStore.placeTrain(playerId, town.msa))) {
+        return 'placing the train was refused'
+      }
       report.events.push({ type: 'place', town: town.name })
     }
 
-    for (let stop = 0; stop < MAX_STOPS && !gameStore.isOver; stop++) {
+    for (let stop = 0; stop < MAX_STOPS; stop++) {
       if (trainsStore.townOf(playerId)) workTown(playerId, report, tried)
-      if (gameStore.isOver || trainsStore.kmLeft(playerId) <= 0) return
+      if (gameStore.isOver) return 'the game is won'
+      if (trainsStore.kmLeft(playerId) <= 0) return 'its distance for the turn is used up'
 
       const { lines, joinedNames } = holdings(playerId)
       const train = trainsStore.trainOf(playerId)
@@ -269,13 +329,19 @@ export function useBot() {
         lines,
         joinedNames
       )
-      if (!destination) return
+      if (!destination) return 'nowhere on its own track has anything to deliver or load'
 
       const result = trainsStore.moveTrain(playerId, destination.town.msa)
-      if (!tried('move train', result)) return
-      report.events.push({ type: 'move', town: destination.town.name, arrived: result.arrived })
-      if (!result.arrived) return
+      if (!tried('move train', result)) return 'the move was refused'
+      report.events.push({
+        type: 'move',
+        town: destination.town.name,
+        arrived: result.arrived,
+        kmLeft: trainsStore.kmLeft(playerId)
+      })
+      if (!result.arrived) return `its distance ran out on the way to ${destination.town.name}`
     }
+    return `it made the most stops allowed in a turn (${MAX_STOPS})`
   }
 
   /**
@@ -367,8 +433,9 @@ export function useBot() {
    * @param {number} playerId - The player
    * @param {Object} picture - From `survey`
    * @param {Set<string>} given - Towns already given up on this turn
-   * @returns {{town: Object, spendable: number}|null} The town, and the most
-   *   that may be spent on it beyond the turn's own limits
+   * @returns {{town: Object, spendable: number, why: string}|null} The town,
+   *   the most that may be spent on it beyond the turn's own limits, and in
+   *   a few words why it was picked
    */
   function buildTarget(playerId, picture, given) {
     if (isJoiningCities(playerId)) {
@@ -377,12 +444,21 @@ export function useBot() {
         .map((town) => ({ town, cost: picture.costTo(town) }))
         .filter(({ cost }) => Number.isFinite(cost))
         .sort((a, b) => a.cost - b.cost)
-      if (city) return { town: city.town, spendable: cashOf(playerId) - gameRules.victory.cash }
+      if (city) {
+        return {
+          town: city.town,
+          spendable: cashOf(playerId) - gameRules.victory.cash,
+          why: 'a major city still needed to win'
+        }
+      }
     }
 
     for (const option of picture.options) {
       const town = option.toJoin.find((candidate) => !given.has(candidate.msa))
-      if (town) return { town, spendable: Infinity }
+      if (town) {
+        const { industry, destination } = option.demand
+        return { town, spendable: Infinity, why: `for ${industry} to ${destination}` }
+      }
     }
     return null
   }
@@ -391,8 +467,20 @@ export function useBot() {
    * Builds track toward the planner's targets with what the player can spend
    * this turn, a section at a time. A section that cannot all be paid for
    * now is built as far as the money goes, and finished on later turns.
+   *
+   * Each try is recorded in the turn's trace (`trace.build`): the town aimed
+   * for and why, what the player could spend (`available`, the turn's
+   * allowance or cash, whichever is less) and the `budget` for this town
+   * after any limit of its own, then — once a line is found — the whole
+   * line's price and length in cells (`linePrice`, `lineCells`) against what
+   * was built (`built`, `builtCells`), or `noLine` when no buildable line
+   * reaches the town. The first try also records the demands as weighed up
+   * for building (see `playTurn`).
+   *
+   * @returns {string} Why building stopped, for the trace
    */
   function buildTrack(playerId, report, tried) {
+    const { trace } = report
     // Towns no buildable line could be found to, not tried again this turn
     const given = new Set()
     let sections = 0
@@ -400,30 +488,49 @@ export function useBot() {
     // Each pass either builds, gives up on a town, or stops; there are only
     // so many towns to give up on, so the passes are capped as well
     for (let pass = 0; pass < MAX_PASSES && sections < MAX_SECTIONS; pass++) {
-      if (playerStore.availableForTrack(playerId) <= 0) return
+      const available = playerStore.availableForTrack(playerId)
+      if (available <= 0) return 'nothing left to spend on track this turn'
 
       const picture = survey(playerId)
+      if (pass === 0) {
+        trace.demands = picture.review
+        trace.demandsWhen = 'deciding what to build'
+        if (picture.start) trace.startCity = picture.start.name
+      }
       const target = buildTarget(playerId, picture, given)
-      if (!target) return
-      const budget = Math.min(playerStore.availableForTrack(playerId), target.spendable)
-      if (budget <= 0) return
+      if (!target) return 'nothing left to build toward'
+      const budget = Math.min(available, target.spendable)
+      const step = { toward: target.town.name, why: target.why, available, budget }
+      trace.build.push(step)
+      if (budget <= 0) return 'no cash to spare above what winning needs'
 
       // The survey's own search is the planner's first try
       const line = planLine(picture.board, picture.sources, pointOf(target.town), picture.field)
       if (!line) {
+        step.noLine = true
         given.add(target.town.msa)
         continue
       }
+      step.linePrice = priceLine(line, picture.board.rules.grid)
+      step.lineCells = line.length
       const section = affordableSection(line, budget, picture.board.rules)
-      if (!section) return
+      if (!section) {
+        return `the budget does not stretch to the first cell toward ${target.town.name}`
+      }
 
       const result = builder.buildSection(playerId, section)
-      if (!tried('build track', result)) return
+      if (!tried('build track', result)) return 'the section was refused'
       sections++
+      step.built = result.cost
+      step.builtCells = section.length
       report.events.push({ type: 'build', cost: result.cost, toward: target.town.name })
-      // Out of money before the town was reached: the rest waits for next turn
-      if (section.length < line.length) return
+      if (section.length < line.length) {
+        return `the money ran out short of ${target.town.name}; the rest waits for a later turn`
+      }
     }
+    return sections >= MAX_SECTIONS
+      ? `built the most sections allowed in a turn (${MAX_SECTIONS})`
+      : `gave up after ${MAX_PASSES} tries`
   }
 
   return { playTurn }

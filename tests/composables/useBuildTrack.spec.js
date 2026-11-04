@@ -436,6 +436,137 @@ describe('useBuildTrack', () => {
     })
   })
 
+  /**
+   * While a player chooses where a line starts, the cursor turns to "not
+   * allowed" over places it cannot start. It is set on the map's container,
+   * so it has to be taken off again once the choosing is over.
+   */
+  describe('the "not allowed" cursor', () => {
+    /** Far from the one major city, at [40, -100], so no line may start here */
+    const awayFromCity = L.latLng(45, -90)
+
+    /**
+     * Moves the cursor over the map, the way Leaflet reports it.
+     * @param {Object} latlng - Where the cursor goes
+     */
+    function moveCursor(latlng) {
+      map.fire('mousemove', { latlng })
+    }
+
+    beforeEach(() => vi.useFakeTimers())
+    afterEach(() => vi.useRealTimers())
+
+    it('should show over a place a line cannot start', () => {
+      const { api } = mountBuildTrack(map)
+      api.startDrawingLine()
+
+      moveCursor(awayFromCity)
+      vi.advanceTimersByTime(100)
+
+      expect(map.getContainer().style.cursor).toBe('not-allowed')
+    })
+
+    // The bug: it stayed up over the whole map after building stopped, until
+    // the next drawing began
+    it('should be cleared when building stops', async () => {
+      const { api } = mountBuildTrack(map)
+      api.startDrawingLine()
+      await nextTick()
+      moveCursor(awayFromCity)
+      vi.advanceTimersByTime(100)
+
+      api.cancelDrawing()
+      await nextTick()
+
+      expect(map.getContainer().style.cursor).toBe('')
+    })
+
+    // The check waits for the cursor to rest, so it can still be due when
+    // building stops
+    it('should not be put back by a check still due when building stopped', async () => {
+      const { api } = mountBuildTrack(map)
+      api.startDrawingLine()
+      await nextTick()
+      moveCursor(awayFromCity)
+
+      api.cancelDrawing()
+      await nextTick()
+      vi.advanceTimersByTime(100)
+
+      expect(map.getContainer().style.cursor).not.toBe('not-allowed')
+    })
+
+    // A click where a line cannot start begins the drawing again at once,
+    // and the cursor is still over that place
+    it('should stay up after a click where a line cannot start', async () => {
+      const { api } = mountBuildTrack(map)
+      api.startDrawingLine()
+      const workingLayer = L.polyline([])
+      map.fire('pm:drawstart', { workingLayer })
+      await nextTick()
+      moveCursor(awayFromCity)
+      vi.advanceTimersByTime(100)
+
+      workingLayer.fire('pm:vertexadded', { latlng: awayFromCity })
+      await nextTick()
+
+      expect(map.getContainer().style.cursor).toBe('not-allowed')
+    })
+  })
+
+  /**
+   * A line being drawn snaps only to the drawing player's own track. Geoman
+   * leaves out of its snapping any layer whose `snapIgnore` option is true,
+   * and snaps to a track rail with no such option.
+   */
+  describe('snapping', () => {
+    /** Each player's section, as the track store holds it */
+    const sectionOf = (ownerId) => ({ ...savedSegment, ownerId })
+
+    /** The rail of the section drawn for a player's track */
+    const railOf = (ownerId) => map.trackLayers().find((layer) => layer.segment.ownerId === ownerId)
+
+    /** Whether Geoman would snap to a rail */
+    const snapsTo = (rail) => rail.options.snapIgnore !== true
+
+    it("should snap to the drawing player's own track, not to another player's", () => {
+      trackStore.addSegment(sectionOf(1))
+      trackStore.addSegment(sectionOf(2))
+      const { api } = mountBuildTrack(map)
+
+      api.startDrawingLine()
+
+      expect(snapsTo(railOf(1))).toBe(true)
+      expect(snapsTo(railOf(2))).toBe(false)
+    })
+
+    // Set to false, the option would make Geoman snap to the rail even if
+    // it were otherwise kept out of Geoman's reach
+    it('should leave the option off own track rather than set it to false', () => {
+      trackStore.addSegment(sectionOf(1))
+      const { api } = mountBuildTrack(map)
+
+      api.startDrawingLine()
+
+      expect(railOf(1).options).not.toHaveProperty('snapIgnore')
+    })
+
+    it('should follow whose turn it is', () => {
+      playerStore.addPlayer({ name: 'Bo', color: 'blue', cash: 20000 })
+      trackStore.addSegment(sectionOf(1))
+      trackStore.addSegment(sectionOf(2))
+      const { api } = mountBuildTrack(map)
+      api.startDrawingLine()
+      api.cancelDrawing()
+
+      playerStore.setActivePlayer(2)
+      api.startDrawingLine()
+
+      expect(snapsTo(railOf(1))).toBe(false)
+      expect(snapsTo(railOf(2))).toBe(true)
+    })
+  })
+
   describe('a newly built section', () => {
     /**
      * The rail is the thinnest of the three lines, so if it is not on top the
@@ -577,6 +708,26 @@ describe('useBuildTrack', () => {
 
       moveCursor(hintMarker, centerOf(1))
       expect(api.pendingCost.value).toBe(300)
+    })
+
+    // It used to wait for the cursor to rest, so the price stood still for as
+    // long as the cursor kept moving
+    it('should keep repricing while the cursor is still moving', () => {
+      const { api, hintMarker } = startLineAtTown()
+      const prices = []
+
+      // Out along the row without a pause long enough to count as a rest
+      for (let i = 1; i <= 4; i++) {
+        hintMarker.setLatLng(centerOf(i))
+        vi.advanceTimersByTime(60)
+        prices.push(api.pendingCost.value)
+      }
+
+      // Priced on the way, not only once it stopped
+      expect(prices.slice(0, 3).some((price) => price > 100)).toBe(true)
+      // And once it does stop, priced where it stopped
+      vi.advanceTimersByTime(200)
+      expect(api.pendingCost.value).toBe(1500)
     })
 
     it('should charge the cells under the finished line, however the cursor wandered', () => {

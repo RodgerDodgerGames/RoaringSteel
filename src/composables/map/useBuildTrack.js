@@ -3,7 +3,7 @@
 // Organizes and manages all drawing-related logic, including setup, drawing controls, cost calculations, and utility functions.
 
 import { ref, computed, onMounted, onBeforeUnmount, watch, markRaw, toRaw } from 'vue'
-import { useDebounceFn, onKeyStroke } from '@vueuse/core'
+import { useDebounceFn, useThrottleFn, onKeyStroke } from '@vueuse/core'
 import L from 'leaflet'
 import { storeToRefs } from 'pinia'
 import { useMapStore } from '@/stores/map'
@@ -126,6 +126,13 @@ export default function useBuildTrack(formatCurrency) {
     () => isDrawingActive.value && pendingCost.value > availableToSpend.value
   )
 
+  /**
+   * True while the player is choosing where a line starts: drawing is on and
+   * no vertex has been placed yet. This is the only time the cursor shows
+   * where a line may begin (see `debouncedCursorValidation`).
+   */
+  const isChoosingStart = computed(() => isDrawingActive.value && !isFirstVertexAdded.value)
+
   // ================== TURN HANDLING ==================
 
   /**
@@ -154,6 +161,29 @@ export default function useBuildTrack(formatCurrency) {
    */
   watch(hasRemovableTrack, (canRemove) => {
     if (!canRemove) stopRemoving()
+  })
+
+  /**
+   * Puts the map's own cursor back once the player is no longer choosing
+   * where a line starts — the first vertex is down, or drawing has stopped,
+   * however it stopped (Stop building, Escape, a finished line, the turn
+   * passing on).
+   *
+   * The "not allowed" cursor is set straight on the map's container, so
+   * nothing else ever takes it off. Without this it stayed up after drawing
+   * stopped, over the whole map, until the next drawing began.
+   *
+   * Deferred to the end of the tick on purpose. A click where a line cannot
+   * start stops the drawing and starts a fresh one in the same breath (see
+   * `setupDrawingEvents`); the player is still choosing, with the cursor
+   * still over a place a line cannot start, and a deferred watcher sees no
+   * change and leaves "not allowed" up.
+   *
+   * Watchers stop when the host unmounts, before this could run for the
+   * drawing the unmount cancels, so the unmount clears the cursor itself.
+   */
+  watch(isChoosingStart, (choosing) => {
+    if (!choosing && isAttached) mapStore.map.getContainer().style.cursor = ''
   })
 
   /**
@@ -308,8 +338,37 @@ export default function useBuildTrack(formatCurrency) {
     // Before drawing starts, so the map is already zoomed in and limited to
     // the Build view's range by the time the player places a first point
     mapStore.setViewMode(BUILD_VIEW)
+    snapToOwnTrackOnly(playerStore.activePlayer?.id)
     mapStore.map.pm.enableDraw('Line', drawingLineStyles(playerStore.activePlayer?.id))
     mapStore.setIsDrawingActive(true)
+  }
+
+  /**
+   * Lets the line about to be drawn snap to the drawing player's own track,
+   * and not to anyone else's.
+   *
+   * A player builds out from their own network, so that is the only track
+   * worth catching the cursor on. Snapping to another player's line pulled
+   * the cursor onto it when the player only meant to pass near it or cross
+   * it. Crossing is still allowed (see the build rules); the line just no
+   * longer jumps onto the other track on the way.
+   *
+   * Geoman skips any layer whose `snapIgnore` option is true, and builds its
+   * list of layers to snap to afresh for each drawing, so setting the option
+   * here, just before drawing starts, is enough. Every section is gone over
+   * each time, because whose track is "own" changes with the turn. Own track
+   * has the option taken off rather than set to false: to Geoman, false
+   * means "snap to this even if it is otherwise ignored", which is more than
+   * is meant here. Only the rails need it: their casing and ties never snap
+   * (see trackStyles.js).
+   *
+   * @param {number} playerId - The player about to draw
+   */
+  function snapToOwnTrackOnly(playerId) {
+    allTrackLayers().forEach((layer) => {
+      if (layer.segment?.ownerId === playerId) delete layer.options.snapIgnore
+      else layer.options.snapIgnore = true
+    })
   }
 
   /**
@@ -520,7 +579,7 @@ export default function useBuildTrack(formatCurrency) {
         buildError.value = ''
 
         // Priced here from the vertex itself, not left to the cursor handler:
-        // that one is debounced, so it can still be a step behind the click
+        // that one is throttled, so it can still be a step behind the click
         repriceLine()
 
         // Check if the added vertex is on a town marker
@@ -693,10 +752,18 @@ export default function useBuildTrack(formatCurrency) {
   function addHintMarkerMoveHandler() {
     const hintMarker = mapStore.map.pm.Draw.Line._hintMarker
     if (hintMarker && !hintMarkerMoveHandler.value) {
-      hintMarkerMoveHandler.value = useDebounceFn(
+      // Throttled, not debounced, so the price keeps up while the cursor is
+      // still moving: it is redone at most every 100ms, the first move priced
+      // at once (leading) and the last one priced once the cursor stops
+      // (trailing), so the figure left showing is always where the cursor
+      // ended up. A debounce waited for the cursor to rest, so the price
+      // stood still for as long as the cursor kept moving.
+      hintMarkerMoveHandler.value = useThrottleFn(
         (e) => updateRunningCostTooltip(e.latlng, hintMarker),
-        100
-      ) // Throttle to reduce lag
+        100,
+        true,
+        true
+      )
       // Held so the handler can be taken off the marker it was put on, rather
       // than off whichever marker happens to be current when it is released
       costedHintMarker.value = markRaw(hintMarker)
@@ -747,7 +814,7 @@ export default function useBuildTrack(formatCurrency) {
    * @param {Object} hintMarker - The hint marker element to update
    */
   function updateRunningCostTooltip(latlng, hintMarker) {
-    // The handler is debounced, so a call can land after its drawing ended,
+    // The handler is throttled, so a call can land after its drawing ended,
     // or even after the next one began. Geoman gives every drawing a fresh
     // hint marker, so a call from any marker but the current one is stale.
     if (!workingLayer.value || hintMarker !== costedHintMarker.value) return
@@ -819,9 +886,14 @@ export default function useBuildTrack(formatCurrency) {
    * Shows a "not allowed" cursor over places a line cannot start from, so a
    * player can see where track may begin before they click.
    *
-   * Debounced because mousemove fires on every pixel.
+   * Debounced because mousemove fires on every pixel. That means a check can
+   * land after the player has stopped choosing — placed the first vertex,
+   * or stopped building — so it checks again before touching the cursor;
+   * otherwise a late check would put "not allowed" back up after the watcher
+   * on `isChoosingStart` had cleared it.
    */
   const debouncedCursorValidation = useDebounceFn((latlng) => {
+    if (!isChoosingStart.value) return
     const cursorStyle = validateStartPoint(latlng) ? 'default' : 'not-allowed'
     mapStore.map.getContainer().style.cursor = cursorStyle
   }, 50)
@@ -832,7 +904,7 @@ export default function useBuildTrack(formatCurrency) {
    * @param {Object} e - Leaflet mousemove event
    */
   function handleCursorMove(e) {
-    if (isDrawingActive.value && !isFirstVertexAdded.value) {
+    if (isChoosingStart.value) {
       debouncedCursorValidation(e.latlng)
     }
   }

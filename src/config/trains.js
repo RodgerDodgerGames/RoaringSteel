@@ -7,29 +7,28 @@
  * Every player starts with a Freight. A train's speed is how far it may run
  * in a turn; its capacity is how many loads it can carry at once.
  *
- * The board game measures speed in mileposts. Its track is built milepost to
- * milepost; here track is built across grid cells 10 km wide (see grid.js),
- * so a milepost is taken to be one cell, 10 km. A Freight's 9 mileposts are
- * then 90 km of track a turn.
+ * Speed is Empire Builder's: 9 for a Freight, 12 for a Fast Freight. It is
+ * all the player is shown. How far a speed of 9 runs depends on the board: a
+ * train runs its speed in the board's speed units each turn, and the speed
+ * unit is set so that a Freight takes about as many turns to cross a board as
+ * one of its size should take (see composables/boardScale.js).
  *
  * @module config/trains
  */
-
-/** How many kilometers of track one of the board game's mileposts stands for */
-export const KM_PER_MILEPOST = 10
 
 /** The kind of train every player starts the game with */
 export const STARTING_TRAIN = 'freight'
 
 /**
  * Every kind of train, by key. The key is what a save records.
- * `mileposts` is the train's speed per turn, `capacity` the loads it carries.
+ * `speed` is how far the train runs per turn, in the board's speed units;
+ * `capacity` the loads it carries.
  */
 export const TRAIN_TYPES = Object.freeze({
-  freight: { name: 'Freight', mileposts: 9, capacity: 2 },
-  fastFreight: { name: 'Fast Freight', mileposts: 12, capacity: 2 },
-  heavyFreight: { name: 'Heavy Freight', mileposts: 9, capacity: 3 },
-  superfreight: { name: 'Superfreight', mileposts: 12, capacity: 3 }
+  freight: { name: 'Freight', speed: 9, capacity: 2 },
+  fastFreight: { name: 'Fast Freight', speed: 12, capacity: 2 },
+  heavyFreight: { name: 'Heavy Freight', speed: 9, capacity: 3 },
+  superfreight: { name: 'Superfreight', speed: 12, capacity: 3 }
 })
 
 /**
@@ -51,10 +50,12 @@ export const TRAIN_CHANGES = Object.freeze([
 ])
 
 /**
- * How far a kind of train runs in one turn, in km.
+ * How far a kind of train runs in one turn, in km: its speed in the board's
+ * speed units.
  * @param {string} type - A key of TRAIN_TYPES
+ * @param {number} speedUnitKm - The board's speed unit (see boardScale.js)
  * @returns {number} Kilometers per turn; 0 for an unknown type
  */
-export function trainRangeKm(type) {
-  return (TRAIN_TYPES[type]?.mileposts ?? 0) * KM_PER_MILEPOST
+export function trainRangeKm(type, speedUnitKm) {
+  return (TRAIN_TYPES[type]?.speed ?? 0) * speedUnitKm
 }

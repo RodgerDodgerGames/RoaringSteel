@@ -9,7 +9,7 @@
  * building.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { useTrainsStore } from '@/stores/trains'
 import { usePlayerStore } from '@/stores/players'
 import { useGameStore } from '@/stores/game'
@@ -19,6 +19,10 @@ import { useDemandCardsStore } from '@/stores/demandCards'
 import { gameRules } from '@/config/game'
 import { trainRangeKm } from '@/config/trains'
 import { kmBetween } from '@/composables/map/trackCost'
+import { pinSpeedUnit } from '../utils/boardScale'
+
+// The board's speed unit, pinned so a Freight (speed 9) runs 90 km a turn
+const SPEED_UNIT_KM = 10
 
 // Towns along the equator, 0.3 degrees of longitude (about 33 km) apart, so a
 // Freight (90 km a turn) reaches two towns along but not three
@@ -60,7 +64,9 @@ describe('trains store', () => {
   /** A player's cash */
   const cashOf = (id) => playerStore.players.find((p) => p.id === id).cash
 
+  let restoreScale
   beforeEach(() => {
+    restoreScale = pinSpeedUnit(SPEED_UNIT_KM)
     localStorage.clear()
     store = useTrainsStore()
     playerStore = usePlayerStore()
@@ -78,11 +84,12 @@ describe('trains store', () => {
     lay(ANN, 'West', 'Middle', 'East')
     lay(BO, 'East', 'Far')
   })
+  afterEach(() => restoreScale())
 
   describe('a new train', () => {
     it('should be an empty Freight, not yet placed', () => {
       expect(store.trainOf(ANN)).toMatchObject({ type: 'freight', loads: [], position: null })
-      expect(store.kmLeft(ANN)).toBe(trainRangeKm('freight'))
+      expect(store.kmLeft(ANN)).toBe(trainRangeKm('freight', SPEED_UNIT_KM))
     })
   })
 
@@ -139,7 +146,7 @@ describe('trains store', () => {
       expect(result).toMatchObject({ ok: true, arrived: true, paid: [] })
       expect(result.km).toBeCloseTo(2 * LEG_KM)
       expect(store.townOf(ANN).name).toBe('East')
-      expect(store.kmLeft(ANN)).toBeCloseTo(trainRangeKm('freight') - 2 * LEG_KM)
+      expect(store.kmLeft(ANN)).toBeCloseTo(trainRangeKm('freight', SPEED_UNIT_KM) - 2 * LEG_KM)
     })
 
     it('should stop part way when the town is beyond this turn', () => {
@@ -437,7 +444,7 @@ describe('trains store', () => {
       store.changeTrain(ANN, 'fastFreight')
       store.endTurn(ANN)
 
-      expect(store.kmLeft(ANN)).toBe(trainRangeKm('fastFreight'))
+      expect(store.kmLeft(ANN)).toBe(trainRangeKm('fastFreight', SPEED_UNIT_KM))
     })
   })
 

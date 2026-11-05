@@ -40,7 +40,8 @@
  */
 
 import { gameRules } from '@/config/game'
-import { pointsAlongLine, kmBetween, priceLine } from '@/composables/map/trackCost'
+import { pointsAlongLine, kmBetween, landCellPrice } from '@/composables/map/trackCost'
+import { townEntryFee } from '@/composables/townEntry'
 import { lineBlock } from '@/composables/map/buildRules'
 import { isWaterCell, bridgeCellCost } from '@/composables/map/water'
 import {
@@ -50,7 +51,7 @@ import {
   cellNeighbors,
   stepsBetween
 } from '@/composables/map/cellGrid'
-import { MinHeap } from '@/composables/network'
+import { MinHeap, townKey } from '@/composables/network'
 
 /**
  * How many cells right beside built track a line may pass through in a row.
@@ -62,15 +63,18 @@ const MAX_BESIDE_CELLS = 2
 
 /**
  * What passing through a cell beside built track adds to a line's cost in
- * the search, in dollars. Not a real cost: it only makes the search prefer
- * to keep its distance and cross track squarely, which the build rules like.
+ * the search, in points of terrain cost (turned into dollars by the board's
+ * price scale, as land cells are, so it keeps its weight against them on
+ * every board). Not a real cost: it only makes the search prefer to keep its
+ * distance and cross track squarely, which the build rules like.
  */
 const BESIDE_PENALTY = 400
 
 /**
- * What every cell adds to a line's cost in the search, on top of its price.
- * Keeps the search from taking a long way round to save a few dollars, and
- * from treating cells with no price (missing terrain data) as free to wander.
+ * What every cell adds to a line's cost in the search, on top of its price,
+ * in points of terrain cost (scaled like `BESIDE_PENALTY`). Keeps the search
+ * from taking a long way round to save a few dollars, and from treating cells
+ * with no price (missing terrain data) as free to wander.
  */
 const STEP_COST = 50
 
@@ -80,20 +84,24 @@ const MAX_ATTEMPTS = 6
 /**
  * Everything the search needs to know about the board, worked out once per
  * search: which cells a line may pass through, which are water, which are
- * right beside track already built, where the towns are, and the least any
- * step of a line can cost.
+ * right beside track already built, where the towns are and what entering
+ * each costs this player, and the least any step of a line can cost.
  *
  * The flags are per cell of the grid's whole rectangle, holes included (a
  * hole is never open), so a cell's index looks its flags up directly.
  *
  * @param {Object} rules - What lines are judged against, as the track builder
- *   holds them (`buildRules` in trackBuilder.js): `grid`, `isInRegion`,
+ *   holds them (`buildRules` in trackBuilder.js): `grid`, `priceScale` (the
+ *   dollars per point of terrain cost, see `trackPriceScale`), `isInRegion`,
  *   `townCells` and `builtTrack`
- * @param {Array<Object>} towns - Every town, each with lat and lon
+ * @param {Array<Object>} towns - Every town, each with lat, lon and size
+ * @param {Set<string>} [reached] - The points the player's track is drawn
+ *   through, as network keys: towns on them are entered for free. None for
+ *   a player with no track.
  * @returns {Object} The board, for `costField` and `planLine`
  */
-export function searchBoard(rules, towns) {
-  const { grid } = rules
+export function searchBoard(rules, towns, reached = new Set()) {
+  const { grid, priceScale } = rules
   const size = grid.present.length
   const townCellSet = new Set(rules.townCells)
 
@@ -124,11 +132,17 @@ export function searchBoard(rules, towns) {
     })
   })
 
-  // The town in each town cell, so a line through the cell goes through it
+  // The town in each town cell, so a line through the cell goes through it,
+  // and what entering that town costs this player: a line through a town's
+  // cell is drawn through the town, so building it pays the town's entry fee
+  // unless the player's track reaches the town already (see townEntry.js)
   const townIn = new Map()
+  const townFee = new Float64Array(size)
   towns.forEach((town) => {
     const index = findCell({ lat: town.lat, lng: town.lon }, grid)
-    if (index !== -1 && !townIn.has(index)) townIn.set(index, { lat: town.lat, lng: town.lon })
+    if (index === -1 || townIn.has(index)) return
+    townIn.set(index, { lat: town.lat, lng: town.lon })
+    if (!reached.has(townKey(town))) townFee[index] = townEntryFee(town)
   })
 
   // The least a step onto any open cell can add, for the A* estimate (see
@@ -137,26 +151,41 @@ export function searchBoard(rules, towns) {
   let cheapestCell = Infinity
   for (let index = 0; index < size; index++) {
     if (!isOpen[index]) continue
-    cheapestCell = Math.min(cheapestCell, cellCost(grid, index, isWater[index], 1))
+    cheapestCell = Math.min(cheapestCell, cellCost(grid, index, isWater[index], 1, priceScale))
   }
-  const minStep = STEP_COST + (Number.isFinite(cheapestCell) ? cheapestCell : 0)
+  const minStep = STEP_COST * priceScale + (Number.isFinite(cheapestCell) ? cheapestCell : 0)
 
-  return { grid, rules, isOpen, isWater, isTownCell, isBeside, townIn, minStep }
+  return {
+    grid,
+    rules,
+    priceScale,
+    isOpen,
+    isWater,
+    isTownCell,
+    isBeside,
+    townIn,
+    townFee,
+    minStep
+  }
 }
 
 /**
  * What one grid cell costs a line passing through it, in the search: its
  * price as land, or a bridge's price by how far into its crossing it is.
+ * The same prices `linePrice` in trackCost.js charges; town entry fees are
+ * added on top in the search (see `searchBoard`), as `priceSection` in
+ * trackBuilder.js adds them.
  * @param {Object} grid - The grid
  * @param {number} cell - The cell
  * @param {boolean} isWater - Whether it is water
  * @param {number} crossing - Its place in its row of water cells, from 1
- * @returns {number} The cost
+ * @param {number} priceScale - Dollars per point of terrain cost
+ * @returns {number} The cost, in dollars
  */
-function cellCost(grid, cell, isWater, crossing) {
+function cellCost(grid, cell, isWater, crossing, priceScale) {
   if (isWater) return bridgeCellCost(crossing)
   const cost = grid.cost[cell]
-  return Number.isFinite(cost) ? cost : 0
+  return Number.isFinite(cost) ? landCellPrice(cost, priceScale) : 0
 }
 
 /**
@@ -191,7 +220,8 @@ function cellCost(grid, cell, isWater, crossing) {
  *   of a search that stopped early, which cannot answer for it.
  */
 export function costField(board, sources, { shut = new Set(), targets } = {}) {
-  const { grid, isOpen, isWater, isTownCell, isBeside, townIn, minStep } = board
+  const { grid, priceScale, isOpen, isWater, isTownCell, isBeside, townIn, townFee, minStep } =
+    board
   const size = grid.present.length
   const { maxCells } = gameRules.bridges
 
@@ -231,7 +261,7 @@ export function costField(board, sources, { shut = new Set(), targets } = {}) {
     startIn.set(index, point)
     const water = isWater[index] && !isTownCell[index] ? 1 : 0
     const state = pack(index, water, isBeside[index])
-    cost[state] = cellCost(grid, index, isWater[index], 1)
+    cost[state] = cellCost(grid, index, isWater[index], 1, priceScale)
     frontier.push(cost[state] + estimate(index), state)
   })
 
@@ -264,10 +294,12 @@ export function costField(board, sources, { shut = new Set(), targets } = {}) {
       const nextBeside = isBeside[next] ? beside + 1 : 0
       if (nextBeside > MAX_BESIDE_CELLS) return
 
+      // The cell's price, the town's entry fee if it is a town not yet
+      // reached, and the search's own nudges
       const step =
-        cellCost(grid, next, isWater[next], water + 1) +
-        STEP_COST +
-        (isBeside[next] ? BESIDE_PENALTY : 0)
+        cellCost(grid, next, isWater[next], water + 1, priceScale) +
+        townFee[next] +
+        (STEP_COST + (isBeside[next] ? BESIDE_PENALTY : 0)) * priceScale
       const nextState = pack(next, nextWater, nextBeside)
       if (here + step < cost[nextState]) {
         cost[nextState] = here + step
@@ -405,15 +437,18 @@ export function planLine(board, sources, target, field = null) {
  * @param {Array<Object>} line - The whole line, buildable as a whole
  * @param {number} budget - What the player can spend
  * @param {Object} rules - See `searchBoard`
+ * @param {Function} price - What a section would cost the player to build,
+ *   town entry included: (points) => dollars (see `priceSection` in
+ *   trackBuilder.js)
  * @returns {Array<Object>|null} The section to build, or null if not even
  *   its first leg can be afforded
  */
-export function affordableSection(line, budget, rules) {
+export function affordableSection(line, budget, rules, price) {
   let affordable = 1
   let tooDear = line.length + 1
   while (tooDear - affordable > 1) {
     const middle = Math.floor((affordable + tooDear) / 2)
-    if (priceLine(line.slice(0, middle), rules.grid) <= budget) affordable = middle
+    if (price(line.slice(0, middle)) <= budget) affordable = middle
     else tooDear = middle
   }
   for (let count = affordable; count >= 2; count--) {

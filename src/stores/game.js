@@ -11,6 +11,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as turnOrder from '@/composables/turnOrder'
+import { boardScaleFor } from '@/composables/boardScale'
 
 export const useGameStore = defineStore('gameStore', () => {
   // STATE
@@ -37,6 +38,15 @@ export const useGameStore = defineStore('gameStore', () => {
 
   /** Whether someone has won, so the game is over */
   const isOver = computed(() => winnerId.value !== null)
+
+  /**
+   * The distances the game is played at, from the region's size: the board's
+   * size, the turns a Freight takes to cross it, and its speed unit — how far
+   * a train runs, and what track is priced and deliveries paid, per point of
+   * speed (see boardScale.js). Worked out from the region, never saved, so a
+   * change to the scale settings reaches saved games too.
+   */
+  const boardScale = computed(() => boardScaleFor(region.value))
 
   // ACTIONS
 
@@ -93,6 +103,7 @@ export const useGameStore = defineStore('gameStore', () => {
     // GETTERS
     isBuildingRound,
     isOver,
+    boardScale,
     // ACTIONS
     setRegion,
     advanceTurn,

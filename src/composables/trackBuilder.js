@@ -18,6 +18,10 @@
  * - cost no more than the player has left to spend this turn, in cash and
  *   in allowance (see the player store).
  *
+ * A section's price is its track — each grid cell it crosses, priced for this
+ * board (see trackCost.js) — plus the entry fee for each town it reaches that
+ * the player's track did not reach before (see townEntry.js).
+ *
  * @module composables/trackBuilder
  */
 
@@ -27,7 +31,8 @@ import { useGridStore } from '@/stores/grid'
 import { usePlayerStore } from '@/stores/players'
 import { useTownsStore } from '@/stores/towns'
 import { useTrackStore } from '@/stores/track'
-import { priceLine } from '@/composables/map/trackCost'
+import { linePrice, trackPriceScale } from '@/composables/map/trackCost'
+import { townsByKey, entryFees, entryFeesKept } from '@/composables/townEntry'
 import {
   lineBlock,
   blockMessage,
@@ -53,8 +58,10 @@ export function useTrackBuilder() {
 
   /**
    * What every line is checked against before it is built (see buildRules.js):
-   * the grid, the region being played, the cells the towns sit in, and the
-   * track built so far, indexed by where it is. Worked out once rather than
+   * the grid, what a point of its terrain cost comes to in dollars on this
+   * board (`priceScale`, see `trackPriceScale`), the region being played, the
+   * cells the towns sit in, and the track built so far, indexed by where it
+   * is. Worked out once rather than
    * on every move of the cursor; the board parts and the track are kept
    * apart, so building or tearing up track does not work the board out again.
    *
@@ -69,6 +76,8 @@ export function useTrackBuilder() {
     const grid = gridStore.grid
     return {
       grid,
+      // An empty grid has no cells to price, and no cell size to price them by
+      priceScale: isEmptyGrid(grid) ? 0 : trackPriceScale(grid, gameStore.boardScale.speedUnitKm),
       isInRegion: regionTest(gameStore.region),
       townCells: isEmptyGrid(grid) ? [] : townCells(townsStore.towns, grid)
     }
@@ -116,6 +125,20 @@ export function useTrackBuilder() {
     return { cities, own }
   })
 
+  /** Every town by the key of the point it sits on (see `townsByKey`) */
+  const townKeys = computed(() => townsByKey(townsStore.towns))
+
+  /**
+   * The points a player's track is drawn through, as network keys: what
+   * their track reaches, for town entry (see townEntry.js). Gathered already
+   * for the start rule.
+   * @param {number} playerId - The player
+   * @returns {Set<string>} Point keys
+   */
+  function reachedKeys(playerId) {
+    return startKeys.value.own.get(playerId) ?? new Set()
+  }
+
   /**
    * Whether a player may start a section at a point.
    * @param {number} playerId - The player
@@ -126,6 +149,34 @@ export function useTrackBuilder() {
     const key = pointKey(point)
     const { cities, own } = startKeys.value
     return cities.has(key) || Boolean(own.get(playerId)?.has(key))
+  }
+
+  /**
+   * What a section would cost a player to build: its track, and the entry fee
+   * for every town it reaches that their track does not reach already. This
+   * is the price building charges, and the one shown while a line is drawn.
+   * @param {number} playerId - The player who would build it
+   * @param {Array<{lat: number, lng: number}>} latlngs - The section's points
+   * @returns {{total: number, bridges: number, entry: number}} The whole
+   *   price, and how much of it is bridges and how much town entry
+   */
+  function priceSection(playerId, latlngs) {
+    const { grid, priceScale } = buildRules.value
+    const track = linePrice(latlngs, grid, priceScale)
+    const entry = entryFees(latlngs, townKeys.value, reachedKeys(playerId))
+    return { total: track.total + entry, bridges: track.bridges, entry }
+  }
+
+  /**
+   * What tearing up a section built this turn gives back: what it cost, less
+   * any entry fee it paid for a town the player's other track still reaches
+   * (see `entryFeesKept`). Asked before the section is taken out of the store.
+   * @param {Object} segment - The section, as the track store holds it
+   * @returns {number} Dollars to refund
+   */
+  function refundFor(segment) {
+    const own = trackStore.segmentsForOwner(segment.ownerId)
+    return segment.cost - entryFeesKept(segment, own, townKeys.value)
   }
 
   /**
@@ -182,7 +233,7 @@ export function useTrackBuilder() {
     const blocked = whyNotBuildable(latlngs, { isFinished: true })
     if (blocked) return { ok: false, error: blocked }
 
-    const cost = priceLine(latlngs, buildRules.value.grid)
+    const cost = priceSection(playerId, latlngs).total
     const affordable = playerStore.availableForTrack(playerId)
     // Whether building had started this turn, to put back if this one fails
     const hadSpent = playerStore.hasSpentThisTurn(playerId)
@@ -224,5 +275,15 @@ export function useTrackBuilder() {
     return { ok: true, segment, cost }
   }
 
-  return { buildRules, startPoints, canStartAt, whyNotBuildable, describeBlock, buildSection }
+  return {
+    buildRules,
+    startPoints,
+    canStartAt,
+    reachedKeys,
+    priceSection,
+    refundFor,
+    whyNotBuildable,
+    describeBlock,
+    buildSection
+  }
 }

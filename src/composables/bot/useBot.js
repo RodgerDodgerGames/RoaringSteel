@@ -45,7 +45,6 @@ import { useTurn } from '@/composables/useTurn'
 import { useVictory } from '@/composables/victory'
 import { townKey } from '@/composables/network'
 import { formatCurrency } from '@/composables/utils'
-import { priceLine } from '@/composables/map/trackCost'
 import { searchBoard, costField, planLine, affordableSection } from './botPathfinder'
 import {
   upgradeFor,
@@ -148,7 +147,13 @@ export function useBot() {
    */
   function survey(playerId) {
     const held = holdings(playerId)
-    const board = searchBoard(builder.buildRules.value, townsStore.towns)
+    // Searched with this player's entry fees: towns their track reaches
+    // already cost nothing more to build into
+    const board = searchBoard(
+      builder.buildRules.value,
+      townsStore.towns,
+      builder.reachedKeys(playerId)
+    )
 
     // Every question the plan asks of a search is what track to some town
     // would cost, or the line there, so each search stops once it has
@@ -511,9 +516,11 @@ export function useBot() {
         given.add(target.town.msa)
         continue
       }
-      step.linePrice = priceLine(line, picture.board.rules.grid)
+      // Priced as building will charge it, town entry included
+      const price = (points) => builder.priceSection(playerId, points).total
+      step.linePrice = price(line)
       step.lineCells = line.length
-      const section = affordableSection(line, budget, picture.board.rules)
+      const section = affordableSection(line, budget, picture.board.rules, price)
       if (!section) {
         return `the budget does not stretch to the first cell toward ${target.town.name}`
       }

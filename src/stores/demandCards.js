@@ -34,6 +34,7 @@ import { ref, computed, watch } from 'vue'
 import { useTownsStore } from './towns'
 import { usePlayerStore } from './players'
 import { useSettingsStore } from './settings'
+import { useGameStore } from './game'
 import { PIN_COLORS } from '@/config/demands'
 import { demandPayoff, mapSpanKm } from '@/composables/payoffs'
 import { debug } from '@/composables/debug'
@@ -240,6 +241,12 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
     // long-haul bonus is measured against. Worked out once here because it
     // compares every pair of towns (see payoffs.js)
     const spanKm = mapSpanKm(townsData)
+    // Payoffs are per speed unit, the board's yardstick (see boardScale.js)
+    const { sizeKm, turnsToCross, speedUnitKm } = useGameStore().boardScale
+    debug.log(
+      `Board scale: ${Math.round(sizeKm)} km across, crossed by a Freight in ` +
+        `${turnsToCross.toFixed(1)} turns; speed unit ${speedUnitKm.toFixed(2)} km`
+    )
 
     // Generate demand options
     const options = []
@@ -289,7 +296,13 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
 
         // Pays by how far the commodity has to come, with a bonus for long
         // hauls (see payoffs.js)
-        const payoff = demandPayoff(destination, selectedIndustry.name, townsData, spanKm)
+        const payoff = demandPayoff(
+          destination,
+          selectedIndustry.name,
+          townsData,
+          spanKm,
+          speedUnitKm
+        )
 
         // Create a demand option
         demandOptions.push({

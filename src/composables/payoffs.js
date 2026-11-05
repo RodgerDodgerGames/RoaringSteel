@@ -7,13 +7,14 @@
  * the printed payoffs track the distance from the nearest place that
  * produces it. The same is done here, by the numbers in `gameRules.payoffs`:
  * the straight-line distance from the nearest producing town to the
- * destination, at so much per km, rounded, and never less than a minimum.
+ * destination, at so much per speed unit (the board's yardstick, see
+ * boardScale.js), rounded, and never less than a minimum.
  *
  * Only the nearest producer counts, because that is where a sensible player
  * fetches it from — a commodity made all over the map is cheap to bring
  * anywhere, and one made in a single far corner pays well everywhere else.
  *
- * On top of the per-km rate, long hauls earn a bonus. Reaching a distant town
+ * On top of the distance rate, long hauls earn a bonus. Reaching a distant town
  * means building (and risking) a lot of track before the first delivery pays,
  * so the payoff is multiplied by a factor that grows exponentially with how
  * far the haul is, measured against the map's own span — the distance
@@ -108,18 +109,19 @@ export function longHaulMultiplier(km, spanKm) {
 }
 
 /**
- * What delivering a commodity to a town pays: the per-km rate times the
- * long-haul multiplier, rounded, and never under the minimum.
+ * What delivering a commodity to a town pays: the rate per speed unit of the
+ * haul, times the long-haul multiplier, rounded, and never under the minimum.
  * @param {Object} destination - The town it is wanted in, with lat and lon
  * @param {string} industry - The commodity's name
  * @param {Array<Object>} towns - Every town, each with lat, lon and industries
  * @param {number} spanKm - The map's span (see `mapSpanKm`)
+ * @param {number} speedUnitKm - The board's speed unit (see boardScale.js)
  * @returns {number} The payoff, in dollars; the minimum when no other town
  *   produces the commodity
  */
-export function demandPayoff(destination, industry, towns, spanKm) {
-  const { perKm, roundTo, minimum } = gameRules.payoffs
+export function demandPayoff(destination, industry, towns, spanKm, speedUnitKm) {
+  const { perSpeedUnit, roundTo, minimum } = gameRules.payoffs
   const km = haulKm(destination, industry, towns) ?? 0
-  const dollars = km * perKm * longHaulMultiplier(km, spanKm)
+  const dollars = (km / speedUnitKm) * perSpeedUnit * longHaulMultiplier(km, spanKm)
   return Math.max(minimum, Math.round(dollars / roundTo) * roundTo)
 }

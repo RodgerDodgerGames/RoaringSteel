@@ -11,7 +11,7 @@
 import { ref, computed, watch } from 'vue'
 import { usePlayerStore } from '@/stores/players'
 import { useTrainsStore } from '@/stores/trains'
-import { TRAIN_TYPES, trainRangeKm } from '@/config/trains'
+import { TRAIN_TYPES } from '@/config/trains'
 import { formatCurrency } from '@/composables/utils'
 
 const playerStore = usePlayerStore()
@@ -52,7 +52,7 @@ function change(option) {
         <span>
           <strong>{{ option.name }}</strong>
           <span class="upgrade-controls__note">
-            {{ trainRangeKm(option.to) }} km · {{ TRAIN_TYPES[option.to].capacity }} loads
+            Speed {{ TRAIN_TYPES[option.to].speed }} · {{ TRAIN_TYPES[option.to].capacity }} loads
           </span>
         </span>
         <button

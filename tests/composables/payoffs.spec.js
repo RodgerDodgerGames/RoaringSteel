@@ -2,7 +2,8 @@
  * Payoff Tests
  *
  * A demand pays by how far its commodity has to come: the straight-line
- * distance from the nearest town producing it, at gameRules.payoffs.perKm,
+ * distance from the nearest town producing it, at gameRules.payoffs.perSpeedUnit
+ * for each of the board's speed units,
  * times a long-haul bonus that grows exponentially with the haul's share of
  * the map's span, rounded, and never under the minimum.
  */
@@ -14,6 +15,9 @@ import { gameRules } from '@/config/game'
 // Along one meridian a degree of latitude is about 111.2 km, so towns placed
 // on it sit a known distance apart
 const KM_PER_DEGREE = 111.19
+
+// The board's speed unit, in km (see boardScale.js)
+const SPEED_UNIT_KM = 10
 
 const town = (name, lat, industries = []) => ({
   name,
@@ -148,23 +152,35 @@ describe('payoffs', () => {
 
     it('should pay the per-km rate times the full bonus for a haul across the whole map', () => {
       // With only Denver and Pueblo, the Steel haul is the map's whole span
-      const { perKm, roundTo } = gameRules.payoffs
+      const { perSpeedUnit, roundTo } = gameRules.payoffs
       const km = 2 * KM_PER_DEGREE
-      const expected = Math.round((km * perKm * 2) / roundTo) * roundTo
+      const expected = Math.round(((km / SPEED_UNIT_KM) * perSpeedUnit * 2) / roundTo) * roundTo
 
-      expect(demandPayoff(denver, 'Steel', [denver, far], mapSpanKm([denver, far]))).toBe(expected)
+      expect(
+        demandPayoff(denver, 'Steel', [denver, far], mapSpanKm([denver, far]), SPEED_UNIT_KM)
+      ).toBe(expected)
+    })
+
+    it('should pay by speed units, so a board with a shorter speed unit pays more per km', () => {
+      const onBigBoard = demandPayoff(denver, 'Steel', towns, spanKm, 2 * SPEED_UNIT_KM)
+
+      // Half the speed unit: the same haul is twice as many units
+      expect(demandPayoff(denver, 'Steel', towns, spanKm, SPEED_UNIT_KM)).toBeCloseTo(
+        2 * onBigBoard,
+        -3
+      )
     })
 
     it('should pay more for a commodity that has to come further', () => {
-      expect(demandPayoff(denver, 'Steel', towns, spanKm)).toBeGreaterThan(
-        demandPayoff(denver, 'Beef', towns, spanKm)
+      expect(demandPayoff(denver, 'Steel', towns, spanKm, SPEED_UNIT_KM)).toBeGreaterThan(
+        demandPayoff(denver, 'Beef', towns, spanKm, SPEED_UNIT_KM)
       )
     })
 
     it('should pay more per km for a longer haul', () => {
       // Steel comes twice as far as Beef, so it pays more than twice as much
-      expect(demandPayoff(denver, 'Steel', towns, spanKm)).toBeGreaterThan(
-        2 * demandPayoff(denver, 'Beef', towns, spanKm)
+      expect(demandPayoff(denver, 'Steel', towns, spanKm, SPEED_UNIT_KM)).toBeGreaterThan(
+        2 * demandPayoff(denver, 'Beef', towns, spanKm, SPEED_UNIT_KM)
       )
     })
 
@@ -173,11 +189,15 @@ describe('payoffs', () => {
 
       const map = [denver, nextDoor]
 
-      expect(demandPayoff(denver, 'Beef', map, mapSpanKm(map))).toBe(gameRules.payoffs.minimum)
+      expect(demandPayoff(denver, 'Beef', map, mapSpanKm(map), SPEED_UNIT_KM)).toBe(
+        gameRules.payoffs.minimum
+      )
     })
 
     it('should pay the minimum when nothing else produces the commodity', () => {
-      expect(demandPayoff(denver, 'Wine', [denver], 0)).toBe(gameRules.payoffs.minimum)
+      expect(demandPayoff(denver, 'Wine', [denver], 0, SPEED_UNIT_KM)).toBe(
+        gameRules.payoffs.minimum
+      )
     })
   })
 })

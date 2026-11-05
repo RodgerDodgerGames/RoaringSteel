@@ -22,6 +22,7 @@ import { pointKey } from '@/composables/network'
 import { findCell } from '@/composables/map/cellGrid'
 import { gameRules } from '@/config/game'
 import { makeGrid, makeRegion, makeTowns, seededRandom, centerAt } from '../../utils/botBoard'
+import { pinPlainScale } from '../../utils/boardScale'
 
 /**
  * Sets up a game on the test board.
@@ -80,10 +81,15 @@ function expectGameWhole() {
 }
 
 describe('useBot', () => {
+  // These tests are about how the computer players play, not the economy's
+  // rates: a 10 km speed unit, and track at its terrain cost
+  let restoreScale
   beforeEach(() => {
+    restoreScale = pinPlainScale()
     vi.spyOn(console, 'log').mockImplementation(() => {})
     localStorage.clear()
   })
+  afterEach(() => restoreScale())
 
   describe('a game of computer players only', () => {
     // A lower bar to win by keeps the game short enough for a test; the

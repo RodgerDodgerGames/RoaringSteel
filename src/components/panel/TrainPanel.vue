@@ -41,7 +41,7 @@ const bays = computed(() =>
         <span class="icon"><i class="fas fa-train" aria-hidden="true"></i></span>
         <span class="has-text-weight-bold">{{ trainType.name }}</span>
         <span class="train-panel__stats">
-          {{ trainType.rangeKm }} km a turn · {{ trainType.capacity }} loads
+          Speed {{ trainType.speed }} · {{ trainType.capacity }} loads
         </span>
       </div>
       <p class="train-panel__where">{{ whereabouts }}</p>

@@ -42,6 +42,7 @@ import { formatCurrency } from '@/composables/utils'
 import { gameRules } from '@/config/game'
 import { nlcdCostMap } from '@/config/nlcd'
 import { makeTestGrid, CELL } from '../utils/testGrid'
+import { pinPlainScale } from '../utils/boardScale'
 
 /**
  * A stand-in for the Leaflet map, with just enough surface for the
@@ -198,8 +199,11 @@ describe('useBuildTrack', () => {
   let map
   let playerStore
   let trackStore
+  let restorePrices
 
   beforeEach(() => {
+    // These tests are about which cells are charged; a cell costs its terrain
+    restorePrices = pinPlainScale()
     map = createFakeMap()
     playerStore = usePlayerStore()
     trackStore = useTrackStore()
@@ -207,6 +211,7 @@ describe('useBuildTrack', () => {
     playerStore.addPlayer({ name: 'Ann', color: 'red', cash: 20000 })
     playerStore.startGame()
   })
+  afterEach(() => restorePrices())
 
   describe('when the host is unmounted and mounted again', () => {
     it('should record a newly drawn section once', () => {

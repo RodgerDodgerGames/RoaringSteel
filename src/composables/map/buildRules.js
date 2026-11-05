@@ -27,10 +27,11 @@
  * waived, since every player builds into the same cities and their lines
  * bunch up there.
  *
- * A line is checked at the same points its price is worked out from (see
- * trackCost.js), a quarter of a cell apart, so a leg can slip across a narrow
- * neck of gray, or skirt the edge of another line's band, by up to that much
- * between two of them unnoticed.
+ * Where a line goes is checked at points a quarter of a cell apart (see
+ * `pointsAlongLine` in trackCost.js), so a leg can slip across a narrow neck
+ * of gray, or skirt the edge of another line's band, by up to that much
+ * between two of them unnoticed. Which cells it crosses, for the water rules,
+ * is found exactly, the same way its price is (see `cellPath`).
  *
  * Cells are named by their index in the grid (see cellGrid.js).
  *

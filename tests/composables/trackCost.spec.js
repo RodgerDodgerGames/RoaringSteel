@@ -17,6 +17,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import {
   cellsAlongLine,
+  cellPath,
   linePrice,
   trackPriceScale,
   terrainCost
@@ -24,6 +25,7 @@ import {
 import { gameRules } from '@/config/game'
 import { bridgeCellCost } from '@/composables/map/water'
 import { nlcdCostMap } from '@/config/nlcd'
+import { cellCenter } from '@/composables/map/cellGrid'
 import { makeTestGrid, CELL, CELL_METERS } from '../utils/testGrid'
 import { pinKnobs } from '../utils/boardScale'
 
@@ -76,6 +78,96 @@ describe('trackCost', () => {
       const cells = cellsAlongLine([centerOf(0), centerOf(2), centerOf(1)], grid)
 
       expect(cells).toEqual([0, 1, 2])
+    })
+  })
+
+  describe('cellPath', () => {
+    /**
+     * A point on a grid whose corner is at 0, 0, in units of cells: `at(1.5,
+     * 0.5)` is the middle of the second cell of the bottom row.
+     */
+    const at = (x, y) => ({ lat: y * CELL, lng: x * CELL })
+    // Cells in a grid four columns wide, by row (from the south) and column
+    const square = makeTestGrid({ rows: 4, cols: 4 })
+    const cell = (row, col) => row * 4 + col
+
+    // The bug: pricing looked at points a quarter of a cell apart, and the
+    // sliver of the cell west of (1, 1) this leg crosses lies between two
+    it('should include a cell the line clips only a sliver of', () => {
+      const path = cellPath([at(0.5, 0.5), at(1.5, 1.6)], square)
+
+      expect(path).toEqual([cell(0, 0), cell(1, 0), cell(1, 1)])
+    })
+
+    it('should charge for a cell the line clips only a sliver of', () => {
+      const grid = makeTestGrid({
+        rows: 2,
+        cols: 2,
+        cell: (row, col) => ({ landCover: 1 + row * 2 + col })
+      })
+
+      // 1 for (0, 0), 3 for the sliver of (1, 0), 4 for (1, 1)
+      expect(linePrice([at(0.5, 0.5), at(1.5, 1.6)], grid, 1).total).toBe(8)
+    })
+
+    it('should go straight from cell to cell through a corner it passes exactly through', () => {
+      expect(cellPath([at(0.5, 0.5), at(2.5, 2.5)], square)).toEqual([
+        cell(0, 0),
+        cell(1, 1),
+        cell(2, 2)
+      ])
+    })
+
+    // Computer players build from one cell's center to the next, and their
+    // diagonal steps go through corners: rounding must not tip them into the
+    // cells either side
+    it("should go through the corner between diagonal neighbors' centers on a real grid", () => {
+      const grid = makeTestGrid({
+        rows: 5,
+        cols: 5,
+        south: 39.123,
+        west: -105.471,
+        lngStep: CELL * 1.29
+      })
+      const centers = [0, 6, 12, 18, 24].map((index) => cellCenter(grid, index))
+
+      expect(cellPath(centers, grid)).toEqual([0, 6, 12, 18, 24])
+    })
+
+    it('should follow a leg running west and south', () => {
+      // Across the columns at x = 3, 2 and 1, and the row at y = 3 between
+      // the second and third
+      expect(cellPath([at(3.5, 3.5), at(0.5, 2.7)], square)).toEqual([
+        cell(3, 3),
+        cell(3, 2),
+        cell(3, 1),
+        cell(2, 1),
+        cell(2, 0)
+      ])
+    })
+
+    it('should list the cells of each leg in turn', () => {
+      expect(cellPath([at(0.5, 0.5), at(2.5, 0.5), at(2.5, 2.5)], square)).toEqual([
+        cell(0, 0),
+        cell(0, 1),
+        cell(0, 2),
+        cell(1, 2),
+        cell(2, 2)
+      ])
+    })
+
+    it('should list no cell for a hole the line crosses', () => {
+      const holed = makeTestGrid({ rows: 1, cols: 3, cell: (row, col) => (col === 1 ? null : {}) })
+
+      expect(cellPath([at(0.5, 0.5), at(2.5, 0.5)], holed)).toEqual([0, 2])
+    })
+
+    it('should end a line in the nearest cell when its last vertex is in a hole', () => {
+      const holed = makeTestGrid({ rows: 1, cols: 3, cell: (row, col) => (col === 1 ? null : {}) })
+
+      // The end is in the hole, nearer the cell east of it than the one the
+      // line starts in
+      expect(cellPath([at(0.5, 0.5), at(1.9, 0.5)], holed)).toEqual([0, 2])
     })
   })
 

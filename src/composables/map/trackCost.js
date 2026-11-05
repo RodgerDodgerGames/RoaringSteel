@@ -30,7 +30,7 @@
 
 import { gameRules } from '@/config/game'
 import { isWaterCell, bridgeCellCost } from '@/composables/map/water'
-import { findCell, cellKm } from '@/composables/map/cellGrid'
+import { findCell, cellAt, cellKm } from '@/composables/map/cellGrid'
 import {
   latitudeDegreesToMeters,
   longitudeDegreesToMeters
@@ -143,11 +143,12 @@ function pointsAlongLeg(from, to, spacingKm) {
 }
 
 /**
- * The points a line is checked at, a quarter of one of the grid's cells
- * apart along each leg, every vertex included. A quarter of a cell, so a leg
- * can only miss a cell it barely clips the corner of, while a long leg is
- * still only a few hundred lookups. Pricing and the build rules both look at
- * the line through these, so they always agree on where it goes.
+ * Points along a line, a quarter of one of the grid's cells apart along each
+ * leg, every vertex included. The build rules that look at where a line is
+ * rather than which cells it crosses (inside the region, alongside other
+ * track, see buildRules.js) check it at these points; a leg can only slip
+ * past them by less than a quarter of a cell. Pricing does not use them: it
+ * walks the cells exactly (see `cellPath`).
  * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
  * @param {Object} grid - The grid the line is checked against
  * @returns {Array<{lat: number, lng: number}>} The points, in order
@@ -161,9 +162,88 @@ export function pointsAlongLine(latlngs, grid) {
 }
 
 /**
+ * How near a leg must come to a cell's corner, in cells, to count as passing
+ * through the corner itself. Far finer than anything a player can draw; it
+ * only absorbs rounding, so a leg from one cell's center to its diagonal
+ * neighbor's, as the computer players build, goes corner to corner instead
+ * of clipping one of the two cells beside the corner by a rounding error.
+ */
+const CORNER_CELLS = 1e-6
+
+/**
+ * Every cell a straight leg passes through, in order, as row and column —
+ * exactly, by walking the grid from the cell the leg starts in to the cell it
+ * ends in, one boundary at a time.
+ *
+ * The grid's cells are equal rectangles in latitude and longitude, and a leg
+ * is straight in latitude and longitude, so in units of cells the leg is a
+ * straight line `x = x0 + t·dx`, `y = y0 + t·dy` for t from 0 to 1. The walk
+ * keeps, for each axis, the t at which the leg next crosses a cell boundary
+ * on that axis (`nextX`, `nextY`), steps into the next cell across whichever
+ * boundary comes first, and moves that axis' t on by one cell's worth
+ * (`deltaX`, `deltaY`). (This is the Amanatides–Woo grid traversal.) A leg
+ * that passes exactly through a corner steps diagonally: it touches the two
+ * cells beside the corner only at a point, and crosses neither.
+ *
+ * It takes one step per cell crossed, and nothing is missed however little
+ * of a cell the leg clips.
+ *
+ * Rows and columns may be off the grid; the caller drops those.
+ * @param {{lat: number, lng: number}} from - Where the leg starts
+ * @param {{lat: number, lng: number}} to - Where the leg ends
+ * @param {Object} grid - The grid
+ * @param {Function} visit - Called with (row, col) for each cell, in order
+ */
+function walkLeg(from, to, grid, visit) {
+  const x0 = (from.lng - grid.west) / grid.lngStep
+  const y0 = (from.lat - grid.south) / grid.latStep
+  const x1 = (to.lng - grid.west) / grid.lngStep
+  const y1 = (to.lat - grid.south) / grid.latStep
+  const dx = x1 - x0
+  const dy = y1 - y0
+
+  let col = Math.floor(x0)
+  let row = Math.floor(y0)
+  const stepX = Math.sign(dx)
+  const stepY = Math.sign(dy)
+  // Boundaries left to cross on each axis: the walk ends in the leg's end cell
+  let colsLeft = Math.abs(Math.floor(x1) - col)
+  let rowsLeft = Math.abs(Math.floor(y1) - row)
+
+  // The t at which the leg first crosses a boundary on each axis, and how
+  // much t one whole cell takes; never, on an axis the leg does not move along
+  const nextBoundary = (start, cell, delta) =>
+    delta > 0 ? (cell + 1 - start) / delta : delta < 0 ? (start - cell) / -delta : Infinity
+  let nextX = nextBoundary(x0, col, dx)
+  let nextY = nextBoundary(y0, row, dy)
+  const deltaX = dx !== 0 ? 1 / Math.abs(dx) : Infinity
+  const deltaY = dy !== 0 ? 1 / Math.abs(dy) : Infinity
+  // A gap in t, as a distance in cells along the leg's longer axis
+  const span = Math.max(Math.abs(dx), Math.abs(dy))
+
+  visit(row, col)
+  while (colsLeft > 0 || rowsLeft > 0) {
+    const atCorner = colsLeft > 0 && rowsLeft > 0 && Math.abs(nextX - nextY) * span < CORNER_CELLS
+    // Across the nearer boundary, or both at a corner
+    const acrossCol = atCorner || (colsLeft > 0 && (rowsLeft === 0 || nextX < nextY))
+    const acrossRow = atCorner || !acrossCol
+    if (acrossCol) {
+      col += stepX
+      nextX += deltaX
+      colsLeft--
+    }
+    if (acrossRow) {
+      row += stepY
+      nextY += deltaY
+      rowsLeft--
+    }
+    visit(row, col)
+  }
+}
+
+/**
  * Every grid cell a line passes through, each listed once, in the order the
- * line reaches them. The line is checked at points a quarter of a cell apart,
- * so a cell whose corner it clips by less than that may be left out.
+ * line reaches them (see `cellPath`).
  * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
  * @param {Object} grid - The grid
  * @returns {Array<number>} The cells crossed
@@ -173,19 +253,39 @@ export function cellsAlongLine(latlngs, grid) {
 }
 
 /**
- * The grid cells a line passes through, in the order it passes through them.
+ * The grid cells a line passes through, in the order it passes through them,
+ * found exactly, leg by leg (see `walkLeg`): every cell a leg enters is in,
+ * however little of it the leg clips, and a cell the leg only touches at a
+ * corner is not.
+ *
  * A cell the line comes back to later is listed again, so the path shows
  * where the line goes in and out of water; it is only listed once for as long
  * as the line stays in it.
+ *
+ * Holes (cells whose terrain failed to load) and ground off the grid are no
+ * cell, and a leg crossing them lists nothing there. A vertex in one is given
+ * the nearest cell instead (see `findCell`), as the town cells are, so a line
+ * to a town that sits in a hole still ends in that town's cell.
  * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
  * @param {Object} grid - The grid
  * @returns {Array<number>} The cells, in order along the line
  */
 export function cellPath(latlngs, grid) {
   const path = []
-  pointsAlongLine(latlngs, grid).forEach((point) => {
-    const cell = findCell(point, grid)
+  const add = (cell) => {
     if (cell !== -1 && cell !== path.at(-1)) path.push(cell)
+  }
+  if (latlngs.length === 0 || !grid) return path
+
+  // Each vertex's own cell is added beside its legs' walks. For a vertex on
+  // the board that is the cell the walk starts or ends in, and adds nothing;
+  // for one in a hole or off the grid, it is the nearest cell, which the walk
+  // cannot give. (A single vertex is a line that has only just started, and
+  // sits in its one cell.)
+  add(findCell(latlngs[0], grid))
+  latlngs.slice(1).forEach((to, i) => {
+    walkLeg(latlngs[i], to, grid, (row, col) => add(cellAt(grid, row, col)))
+    add(findCell(to, grid))
   })
   return path
 }

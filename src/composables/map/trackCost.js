@@ -5,12 +5,13 @@
  * line crosses is charged once, at that cell's cost — the cell the line starts
  * in included — however many of the line's legs pass through it.
  *
- * A land cell's cost on the grid is its terrain cost: how hard its ground is
- * to build on (land cover plus slope, see stores/grid.js). What that comes to
- * in dollars depends on the board, because track is priced per speed unit
- * (see boardScale.js and `gameRules.trackPrice`): `trackPriceScale` works out
- * the dollars per point of terrain cost for a grid on a board, and pricing
- * multiplies by it.
+ * A land cell's price comes from its terrain cost: how hard its ground is to
+ * build on, which has two parts — its land cover and its slope (see
+ * stores/grid.js) — each weighed by its own tuning knob (`terrainCost`).
+ * What that comes to in dollars depends on the board, because track is
+ * priced per speed unit (see boardScale.js and `gameRules.trackPrice`):
+ * `trackPriceScale` works out the dollars per point of terrain cost for a
+ * grid on a board, and pricing multiplies by it.
  *
  * Water is the exception: a water cell is bridged, and its price is the
  * bridge's, which climbs with each water cell in a row (see water.js).
@@ -39,12 +40,11 @@ import {
  * What one point of a land cell's terrain cost comes to in dollars, for this
  * grid on a board with this speed unit.
  *
- * A cell of open, level ground (terrain cost `openGroundCost`) is priced at
- * `perSpeedUnit` for every speed unit of its width; rougher ground costs more
- * in proportion to its terrain cost; and the tuning knob, `multiplier`,
- * scales the lot. So:
+ * A cell of ordinary ground (terrain cost `openGroundCost`) is priced at
+ * `perSpeedUnit` for every speed unit of its width, and rougher ground costs
+ * more in proportion to its terrain cost. So:
  *
- *   dollars per point = perSpeedUnit · multiplier / openGroundCost
+ *   dollars per point = perSpeedUnit / openGroundCost
  *                       · (cell width in km / speed unit in km)
  *
  * The cell's width is read off the grid itself, not the configured cell size,
@@ -55,30 +55,57 @@ import {
  * @returns {number} Dollars per point of terrain cost
  */
 export function trackPriceScale(grid, speedUnitKm) {
-  const { perSpeedUnit, openGroundCost, multiplier } = gameRules.trackPrice
-  return ((perSpeedUnit * multiplier) / openGroundCost) * (cellKm(grid) / speedUnitKm)
+  const { perSpeedUnit, openGroundCost } = gameRules.trackPrice
+  return (perSpeedUnit / openGroundCost) * (cellKm(grid) / speedUnitKm)
+}
+
+/**
+ * A land cell's terrain cost, in points: its land cover cost plus
+ * `slopeCost` times its slope, each part weighed by its tuning knob
+ * (`gameRules.trackPrice.knobs`).
+ *
+ * The ground is capped first, at `maxTerrainFactor` times ordinary ground's
+ * terrain cost, as Empire Builder's dearest ground (alpine, 5) is five times
+ * its clear ground (1). Without the cap the steepest cells cost many times a
+ * turn's allowance, a wall no one could ever build across. Ground past the
+ * cap is trimmed back with both its parts shrunk alike, so each knob still
+ * weighs its own part of what is left — and at equal knobs a capped cell
+ * costs the cap times the knob.
+ *
+ * @param {number} landCover - The cell's land cover cost (see config/nlcd.js)
+ * @param {number} slope - The cell's slope, as a grade (see slope.js)
+ * @returns {number} Points of terrain cost
+ */
+export function terrainCost(landCover, slope) {
+  const { openGroundCost, slopeCost, maxTerrainFactor, knobs } = gameRules.trackPrice
+  const slopePoints = slopeCost * slope
+  const ground = landCover + slopePoints
+  const cap = maxTerrainFactor * openGroundCost
+  const trim = ground > cap ? cap / ground : 1
+  return trim * (knobs.landCover * landCover + knobs.elevation * slopePoints)
 }
 
 /**
  * What track through one land cell costs, in whole dollars: its terrain cost
- * at the board's price scale.
+ * (see `terrainCost`) at the board's price scale.
  *
- * The terrain cost is capped at `maxTerrainFactor` times ordinary ground's,
- * as Empire Builder's dearest ground (alpine, 5) is five times its clear
- * ground (1). Without the cap the steepest cells cost many times a turn's
- * allowance, a wall no one could ever build across.
+ * A cell whose slope has not been worked out (its terrain data failed to
+ * load) costs nothing, rather than making every line through it
+ * unpriceable.
  *
  * Rounded per cell, so every price the game shows or charges is in whole
  * dollars, and the computer players' search (which adds up the same cells,
  * see botPathfinder.js) comes to the same sums.
- * @param {number} terrainCost - The cell's terrain cost
+ * @param {Object} grid - The grid
+ * @param {number} cell - The cell
  * @param {number} priceScale - Dollars per point of terrain cost (see
  *   `trackPriceScale`)
  * @returns {number} Dollars
  */
-export function landCellPrice(terrainCost, priceScale) {
-  const { openGroundCost, maxTerrainFactor } = gameRules.trackPrice
-  return Math.round(Math.min(terrainCost, maxTerrainFactor * openGroundCost) * priceScale)
+export function landCellPrice(grid, cell, priceScale) {
+  const slope = grid.slope[cell]
+  if (!Number.isFinite(slope)) return 0
+  return Math.round(terrainCost(grid.landCover[cell], slope) * priceScale)
 }
 
 /**
@@ -166,14 +193,11 @@ export function cellPath(latlngs, grid) {
 /**
  * What a line of track costs to build, and how much of that is bridges.
  *
- * Each land cell the line passes through adds its own cost, turned into
- * dollars by `priceScale` (see `trackPriceScale`). Each water cell
+ * Each land cell the line passes through adds its own price (see
+ * `landCellPrice`). Each water cell
  * adds a bridge instead, priced by how far into its crossing it is: the line
  * is followed cell by cell (see `cellPath`), and the water cells it passes
  * through between one land cell and the next are one crossing.
- *
- * A land cell whose cost is missing (its terrain data failed to load) adds
- * nothing rather than making the whole line unpriceable.
  *
  * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
  * @param {Object} grid - The grid
@@ -194,8 +218,7 @@ export function linePrice(latlngs, grid, priceScale) {
   cellPath(latlngs, grid).forEach((cell) => {
     if (!isWaterCell(grid, cell)) {
       crossing.clear()
-      const cost = grid.cost[cell]
-      if (!charged.has(cell) && Number.isFinite(cost)) total += landCellPrice(cost, priceScale)
+      if (!charged.has(cell)) total += landCellPrice(grid, cell, priceScale)
       charged.add(cell)
       return
     }

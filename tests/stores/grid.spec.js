@@ -69,7 +69,7 @@ const CELL_SIZE = 10000
 const CACHED_GRID = makeTestGrid({
   rows: 1,
   cols: 1,
-  cell: () => ({ elevation: 100, landCover: 5, cost: 10 })
+  cell: () => ({ elevation: 100, landCover: 5, slope: 0.1 })
 })
 
 /** The ids of the store's cells, "row-col", in order */
@@ -602,16 +602,17 @@ describe('Grid Store', () => {
       expect(elevationCellSize).toBe(10000)
     })
 
-    it('should keep land at sea level and price it', async () => {
+    it('should keep land at sea level and work out its slope', async () => {
       // Regression: a reading of 0 used to drop the cell, and the cost step
-      // skipped it too, so land at sea level vanished from the board.
+      // (now the slope step) skipped it too, so land at sea level vanished
+      // from the board.
       mockFetchElevations.mockResolvedValue(heights(0, 100))
       mockFetchLandCover.mockResolvedValue(landCover(5, 5))
 
       await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(idsOf(gridStore.grid)).toEqual(['0-0', '0-1'])
-      expect(cellsOf(gridStore.grid).every((cell) => Number.isFinite(cell.cost))).toBe(true)
+      expect(cellsOf(gridStore.grid).every((cell) => Number.isFinite(cell.slope))).toBe(true)
     })
 
     it('should keep land below sea level', async () => {
@@ -689,7 +690,7 @@ describe('Grid Store', () => {
       const stale = makeTestGrid({
         rows: 3,
         cols: 3,
-        cell: () => ({ elevation: 999, landCover: 999, cost: 999 })
+        cell: () => ({ elevation: 999, landCover: 999, slope: 0.999 })
       })
       gridStore.setGrid(stale, null)
 
@@ -703,16 +704,18 @@ describe('Grid Store', () => {
       expect(cellsOf(gridStore.grid).some((cell) => cell.elevation === 999)).toBe(false)
     })
 
-    it('should cost each cell of level ground its land cover', async () => {
+    it('should give each cell its land cover, and level ground no slope', async () => {
       mockFetchElevations.mockResolvedValue(heights(100, 100, 100, 100))
       mockFetchLandCover.mockResolvedValue(landCover(10, 20, 30, 40))
 
       await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000, YEAR)
 
-      expect(cellsOf(gridStore.grid).map((cell) => cell.cost)).toEqual([10, 20, 30, 40])
+      const cells = cellsOf(gridStore.grid)
+      expect(cells.map((cell) => cell.landCover)).toEqual([10, 20, 30, 40])
+      expect(cells.map((cell) => cell.slope)).toEqual([0, 0, 0, 0])
     })
 
-    it('should cost a cell more for the roughness inside it', async () => {
+    it('should give a cell the slope of the roughness inside it', async () => {
       // Level between cells, but the south-west cell is a 10% grade inside
       mockFetchElevations.mockResolvedValue({
         elevation: Float32Array.from([100, 100, 100, 100]),
@@ -722,9 +725,9 @@ describe('Grid Store', () => {
 
       await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000, YEAR)
 
-      const [rough, ...level] = cellsOf(gridStore.grid).map((cell) => cell.cost)
-      expect(rough).toBeGreaterThan(10)
-      expect(level).toEqual([10, 10, 10])
+      const [rough, ...level] = cellsOf(gridStore.grid).map((cell) => cell.slope)
+      expect(rough).toBeCloseTo(0.1, 6)
+      expect(level).toEqual([0, 0, 0])
     })
 
     it('should not count a hole beside a cell toward its slope', async () => {
@@ -734,7 +737,7 @@ describe('Grid Store', () => {
 
       await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000, YEAR)
 
-      expect(cellsOf(gridStore.grid).map((cell) => cell.cost)).toEqual([10, 10, 10])
+      expect(cellsOf(gridStore.grid).map((cell) => cell.slope)).toEqual([0, 0, 0])
     })
   })
 

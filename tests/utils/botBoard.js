@@ -66,8 +66,12 @@ export function makeGrid(keep = () => true) {
       keep(row, col)
         ? {
             elevation: 100,
-            landCover: isLake(row, col) || isRiver(row, col) ? WATER : 300,
-            cost: isRidge(row, col) ? 6000 : 400 + ((row * 7 + col * 13) % 9) * 120
+            landCover:
+              isLake(row, col) || isRiver(row, col)
+                ? WATER
+                : isRidge(row, col)
+                  ? 6000
+                  : 400 + ((row * 7 + col * 13) % 9) * 120
           }
         : null
   })

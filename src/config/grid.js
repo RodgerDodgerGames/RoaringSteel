@@ -1,5 +1,6 @@
 /**
- * How the board's grid is cut, and what its terrain costs.
+ * How the board's grid is cut. (What its terrain costs is set with the rest
+ * of the money, in `trackPrice` in game.js.)
  *
  * The grid's cells are the board's mileposts: track is priced, and towns are
  * placed, cell by cell. There are as many as `cellBudget` allows, so a small
@@ -26,17 +27,7 @@ export const gridConfig = {
    * pixels (see `pixelsPerCell`), and at much below this they would be the
    * same few squares read over and over.
    */
-  minCellSize: 250,
-
-  /**
-   * What a cell's slope adds to its terrain cost, per unit of grade (rise
-   * over run: a 10% grade is 0.1, adding a tenth of this). See
-   * composables/map/terrainCost.js. Set so that, against ordinary ground's
-   * terrain cost (`trackPrice.openGroundCost` in game.js), a 10% grade about
-   * doubles a cell's price, as Empire Builder's mountains double its clear
-   * ground, and a 40% one reaches the cap of five times, its alpine.
-   */
-  slopeCost: 4500
+  minCellSize: 250
 }
 
 /**

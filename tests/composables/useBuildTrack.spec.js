@@ -114,7 +114,7 @@ const pricedGrid = makeTestGrid({
   cols: 1,
   south: 40 - CELL / 2,
   west: -100 - CELL / 2,
-  cell: () => ({ cost: 1000 })
+  cell: () => ({ landCover: 1000 })
 })
 
 /**
@@ -661,7 +661,7 @@ describe('useBuildTrack', () => {
       rows: 1,
       cols: 5,
       south: -CELL / 2,
-      cell: (row, col) => ({ cost: (col + 1) * 100 })
+      cell: (row, col) => ({ landCover: (col + 1) * 100 })
     })
     /** The center of cell `i` of the row */
     const centerOf = (i) => L.latLng(0, (i + 0.5) * CELL)
@@ -755,7 +755,7 @@ describe('useBuildTrack', () => {
       rows: 1,
       cols: 5,
       south: -CELL / 2,
-      cell: () => ({ cost: 100 })
+      cell: () => ({ landCover: 100 })
     })
     const centerOf = (i) => L.latLng(0, (i + 0.5) * CELL)
     /** A region covering the first three cells of the row, and not the last two */
@@ -869,7 +869,7 @@ describe('useBuildTrack', () => {
       south: -CELL / 2,
       cell: (row, col) => {
         const isWater = col > 0 && col <= span
-        return { landCover: isWater ? nlcdCostMap[11] : 150, cost: isWater ? 10000 : 100 }
+        return { landCover: isWater ? nlcdCostMap[11] : 100 }
       }
     })
 
@@ -939,7 +939,7 @@ describe('useBuildTrack', () => {
 
   describe('beside track already built', () => {
     /** A three-by-five block of cells north of the equator, each costing 100 */
-    const grid = makeTestGrid({ rows: 3, cols: 5, cell: () => ({ cost: 100 }) })
+    const grid = makeTestGrid({ rows: 3, cols: 5, cell: () => ({ landCover: 100 }) })
     const centerOf = (row, col) => L.latLng((row + 0.5) * CELL, (col + 0.5) * CELL)
 
     /** Finishes a line along the given cell centers, as Geoman hands it over */

@@ -188,7 +188,9 @@ describe('useGamePersistence', () => {
       south: 39,
       west: -105,
       cell: (row, col) =>
-        row === 1 && col === 2 ? null : { elevation: col * 100, cost: row + col }
+        row === 1 && col === 2
+          ? null
+          : { elevation: col * 100, landCover: row + col, slope: col / 10 }
     })
     const SOURCE = {
       state: '08',
@@ -555,7 +557,7 @@ describe('useGamePersistence', () => {
     beforeEach(() => {
       gameStore.advanceTurn()
       useTownsStore().setTowns([{ name: 'Denver', industries: [] }])
-      useGridStore().setGrid(makeTestGrid({ rows: 1, cols: 1, cell: () => ({ cost: 100 }) }))
+      useGridStore().setGrid(makeTestGrid({ rows: 1, cols: 1, cell: () => ({ landCover: 100 }) }))
       trackStore.addSegment({
         ownerId: 1,
         coordinates: [

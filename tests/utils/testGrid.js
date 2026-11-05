@@ -32,8 +32,10 @@ export const CELL = metersToLatitudeDegrees(CELL_METERS)
  * @param {number} [shape.latStep] - Degrees of latitude per cell
  * @param {number} [shape.lngStep] - Degrees of longitude per cell
  * @param {Function} [shape.cell] - `(row, col)` → the cell's terrain,
- *   `{cost, landCover, elevation}` (any left out: no cost, plain land, sea
- *   level), or null to leave a hole
+ *   `{landCover, slope, elevation}`, or null to leave a hole. Any left out
+ *   are 0: ground that costs nothing, level, at sea level. A cell given only
+ *   a land cover is level ground priced at its land cover alone, which is
+ *   how most tests set what a cell costs.
  * @returns {Object} The grid
  */
 export function makeTestGrid({
@@ -52,8 +54,8 @@ export function makeTestGrid({
       if (!terrain) continue
       setCell(grid, row * cols + col, {
         elevation: terrain.elevation ?? 0,
-        landCover: terrain.landCover ?? 150,
-        cost: terrain.cost
+        landCover: terrain.landCover ?? 0,
+        slope: terrain.slope ?? 0
       })
     }
   }
@@ -64,13 +66,13 @@ export function makeTestGrid({
  * A grid's cells as plain objects, for checking what a grid holds: each
  * cell's "row-col" id and its terrain, in index order.
  * @param {Object} grid - The grid
- * @returns {Array<{id: string, elevation: number, landCover: number, cost: number}>}
+ * @returns {Array<{id: string, elevation: number, landCover: number, slope: number}>}
  */
 export function cellsOf(grid) {
   return cellIndexes(grid).map((index) => ({
     id: `${rowOf(grid, index)}-${colOf(grid, index)}`,
     elevation: grid.elevation[index],
     landCover: grid.landCover[index],
-    cost: grid.cost[index]
+    slope: grid.slope[index]
   }))
 }

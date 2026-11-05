@@ -55,7 +55,8 @@ function holeyGrid(seed = 1) {
     south: 38,
     west: -78,
     lngStep: CELL * 1.3,
-    cell: (row, col) => (random() < 0.25 ? null : { cost: row * 10 + col })
+    cell: (row, col) =>
+      random() < 0.25 ? null : { landCover: row * 10 + col, slope: (row * 10 + col) / 100 }
   })
 }
 
@@ -201,7 +202,7 @@ describe('cellGrid', () => {
     it('should not read a damaged grid', () => {
       const packed = packGrid(holeyGrid())
 
-      expect(unpackGrid({ ...packed, cost: 'not base64!' })).toBeNull()
+      expect(unpackGrid({ ...packed, slope: 'not base64!' })).toBeNull()
       expect(unpackGrid({ ...packed, rows: packed.rows + 1 })).toBeNull()
       expect(unpackGrid({ ...packed, present: undefined })).toBeNull()
       expect(unpackGrid({ ...packed, latStep: 0 })).toBeNull()

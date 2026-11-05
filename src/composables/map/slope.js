@@ -1,14 +1,11 @@
 /**
- * Terrain Cost (terrainCost.js)
+ * Slope (slope.js)
  *
- * How hard each grid cell's ground is to build track over: its terrain cost,
- * which pricing turns into dollars for the board (see trackCost.js).
+ * How steep each grid cell's ground is: one of the two parts of its terrain
+ * cost, alongside its land cover (pricing adds them up, each weighed by its
+ * tuning knob, see trackCost.js and `trackPrice` in config/game.js).
  *
- *   terrain cost = land cover cost + slopeCost · slope
- *
- * The land cover cost is the average over the cell's land (see
- * useLandCoverAPI.js): grassland $70, forest $350, a city $500–800. The slope
- * is how steep the cell is, as rise over run (0.1 is a 10% grade): the
+ * A cell's slope is a grade, rise over run (0.1 is a 10% grade): the
  * steeper of
  * - its roughness, the average steepness between neighboring pixels inside
  *   it (see useElevationTiles.js), which finds the hills and valleys within
@@ -17,17 +14,19 @@
  *   theirs over the distance between them, which finds a long, even slope
  *   that no single cell shows much of.
  *
- * Both are measured as grades, not meters of climb, so the same ground costs
- * the same whatever the size of the cells it is cut into: a cell half the
- * width over the same slope climbs half as far, over half the distance.
+ * Both are measured as grades, not meters of climb, so the same ground is as
+ * steep whatever the size of the cells it is cut into: a cell half the width
+ * over the same slope climbs half as far, over half the distance.
+ *
+ * The grid holds the slope rather than a price so that the elevation knob
+ * can be turned without building the grid again.
  *
  * Pure functions over the grid, so the model can be tested without
  * downloads.
  *
- * @module composables/map/terrainCost
+ * @module composables/map/slope
  */
 
-import { gridConfig } from '@/config/grid'
 import { cellAt } from '@/composables/map/cellGrid'
 import {
   latitudeDegreesToMeters,
@@ -35,16 +34,15 @@ import {
 } from '@/composables/setup/useMapSupport'
 
 /**
- * Works out every cell's terrain cost, writing it into the grid's `cost`.
+ * Works out every cell's slope, writing it into the grid's `slope`.
  *
  * @param {Object} grid - A grid being built (see cellGrid.js), each cell on
- *   the board with its average height (`elevation`) and land cover cost
- *   (`landCover`) filled in
+ *   the board with its average height (`elevation`) filled in
  * @param {Float32Array} roughness - Per cell, its roughness as a grade (see
  *   useElevationTiles.js); NaN or missing counts as level
  */
-export function fillTerrainCosts(grid, roughness) {
-  const { rows, cols, south, latStep, lngStep, elevation, landCover, cost, present } = grid
+export function fillSlopes(grid, roughness) {
+  const { rows, cols, south, latStep, lngStep, elevation, slope, present } = grid
   const northSouthMeters = latitudeDegreesToMeters(latStep)
 
   for (let row = 0; row < rows; row++) {
@@ -75,7 +73,7 @@ export function fillTerrainCosts(grid, roughness) {
       const grade = neighbors ? gradeSum / neighbors : 0
       const rough = Number.isFinite(roughness[index]) ? roughness[index] : 0
 
-      cost[index] = Math.round(landCover[index] + gridConfig.slopeCost * Math.max(grade, rough))
+      slope[index] = Math.max(grade, rough)
     }
   }
 }

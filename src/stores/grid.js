@@ -7,9 +7,9 @@
  *   and cells on a long climb, cost more
  * - Land Cover: the mix of ground in the cell, forest dearer than grassland
  *
- * The grid is used during gameplay to price track cell by cell. Each cell's
- * terrain cost is worked out once, as the grid is built (see
- * composables/map/terrainCost.js).
+ * The grid is used during gameplay to price track cell by cell, from each
+ * cell's land cover and slope (see composables/map/trackCost.js). The slope
+ * is worked out once, as the grid is built (see composables/map/slope.js).
  *
  * The grid is a `CellGrid` (see composables/map/cellGrid.js): rows and
  * columns of cells with their terrain in typed arrays. It is kept out of
@@ -31,7 +31,7 @@ import {
 } from '../composables/setup/useMapSupport'
 import { WATER_LAND_COVER } from '@/composables/map/water'
 import { createCellGrid, setCell, isEmptyGrid } from '@/composables/map/cellGrid'
-import { fillTerrainCosts } from '@/composables/map/terrainCost'
+import { fillSlopes } from '@/composables/map/slope'
 import { getGrid, getGridYears, putGrid } from '@/composables/database'
 import { gridApiConfig } from '@/config/grid'
 import { isRefusal, refusalMessage } from '@/composables/utils'
@@ -386,9 +386,10 @@ export const useGridStore = defineStore('gridStore', () => {
       console.warn(`Dropped ${dropped} of ${cellCount} grid cells with incomplete terrain data.`)
     }
 
-    // Each cell's terrain cost, from its land cover and how steep it is
+    // How steep each cell is, from its height, its neighbors' and its
+    // roughness
     currentPhase.value = 'calculating'
-    fillTerrainCosts(built, elevations.roughness)
+    fillSlopes(built, elevations.roughness)
     currentPhase.value = ''
     return built
   }

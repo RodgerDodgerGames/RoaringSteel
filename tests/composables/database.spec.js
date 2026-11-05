@@ -22,7 +22,7 @@ import { reactive } from 'vue'
 import { openDB } from 'idb'
 
 /** A stand-in for a grid: the database stores whatever it is given */
-const grid = (label) => ({ label, cost: new Float32Array([1, 2, 3]) })
+const grid = (label) => ({ label, slope: new Float32Array([1, 2, 3]) })
 
 describe('database', () => {
   describe('grids', () => {
@@ -66,10 +66,10 @@ describe('database', () => {
     it("should keep a grid's typed arrays as they are", async () => {
       await putGrid({ state: '27', cellSize: 10000, landCoverYear: 2023, grid: grid('a') })
 
-      const { cost } = (await getGrid('27', 10000, 2023)).grid
+      const { slope } = (await getGrid('27', 10000, 2023)).grid
 
-      expect(cost).toBeInstanceOf(Float32Array)
-      expect([...cost]).toEqual([1, 2, 3])
+      expect(slope).toBeInstanceOf(Float32Array)
+      expect([...slope]).toEqual([1, 2, 3])
     })
   })
 

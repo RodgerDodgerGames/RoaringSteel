@@ -37,46 +37,63 @@ export const gameRules = {
   buildingRounds: 2,
 
   /**
-   * What track costs: Empire Builder's $1 million a milepost of clear ground,
-   * here $1,000 per speed unit (see composables/boardScale.js), scaled up for
-   * rough or built-up ground, and then by the tuning knob below.
+   * What track over land costs: Empire Builder's $1 million a milepost of
+   * clear ground, here $1,000 per speed unit (see composables/boardScale.js),
+   * scaled up for built-up or steep ground. (Water is bridged instead, see
+   * `bridges`, and reaching a town adds its entry fee, see `townEntry`.)
    *
    * Priced per speed unit rather than per km or per grid cell, so a turn's
    * $20,000 allowance builds the same number of speed units of ordinary
    * ground on every board, whatever the board's size or its cells': 20 at
    * the board game's rate, a little over two turns of a Freight's running.
    *
-   * Each grid cell's terrain cost (land cover plus slope, see
-   * composables/map/terrainCost.js) is read against `openGroundCost`, the
-   * terrain cost of ordinary ground — Empire Builder's clear terrain, the
-   * most common ground on its map:
-   * a cell at that cost is priced at `perSpeedUnit` per speed unit of its
-   * width, one twice as costly at twice that. Measured on real boards cut to
-   * the cell budget (2026-11-04): Colorado's plains run about 175–245, and
-   * the middle of all the cells is 560 in Colorado, 610 in Maryland and 710
-   * in Massachusetts, so a typical cell costs 1.2–1.6 times ordinary ground.
-   * Computer players win at that (see `multiplier`).
+   * A cell's terrain cost has two parts, one from each source of terrain:
+   * - land cover: the average cost of the ground in the cell, from the
+   *   table in config/nlcd.js (grassland 70, forest 350, a city 500–800)
+   * - elevation: `slopeCost` times the cell's slope, as a grade (rise over
+   *   run: a 10% grade is 0.1, and adds 450). See composables/map/slope.js.
+   *
+   * Each part is multiplied by its own tuning knob (`knobs`) and the two are
+   * added. The total is read against `openGroundCost`, the terrain cost of
+   * ordinary ground — Empire Builder's clear terrain, the most common ground
+   * on its map: a cell at that cost is priced at `perSpeedUnit` per speed
+   * unit of its width, one twice as costly at twice that. Measured on real
+   * boards cut to the cell budget (2026-11-04), before the knobs: Colorado's
+   * plains run about 175–245, and the middle of all the cells is 560 in
+   * Colorado, 610 in Maryland and 710 in Massachusetts, so a typical cell
+   * costs 1.2–1.6 times ordinary ground.
+   *
+   * `slopeCost` is set so a 10% grade adds a whole ordinary ground's worth,
+   * about doubling a cell's price, as Empire Builder's mountains double its
+   * clear ground, and a 40% grade reaches the cap of five times, its alpine.
    *
    * `maxTerrainFactor` caps how much dearer than ordinary ground a cell can
    * be: Empire Builder's alpine mileposts, its dearest ground, cost 5 times
    * its clear ones. The steepest cells would otherwise cost more than a
-   * whole turn's allowance, and no one could build across them.
+   * whole turn's allowance, and no one could build across them. The cap is
+   * on the terrain itself, before the knobs: ground past it is trimmed back,
+   * both parts alike, and the knobs then weigh what is left.
    *
-   * `multiplier` is the tuning knob: every track price is multiplied by it.
-   * Raise it to make building dearer, lower it to make it cheaper; 1 is the
-   * board game's rate. Bridges and town entry are not affected.
+   * `knobs` are for tuning after playtests: raise one to make that part of
+   * the terrain dearer, lower it to make it cheaper. At 1 each, track costs
+   * the board game's rate. Bridges and town entry are not affected.
    *
-   * It starts at 0.5, half the board game's rate. Computer-player games on
-   * real Colorado, Maryland and Massachusetts boards cut to the cell budget
-   * (2026-11-04) were won in 39–70 rounds at 0.5; at 1 the computer players
-   * judged almost every demand a loss on its first delivery, threw in hand
-   * after hand, and never won.
+   * Both start at 0.5, half the board game's rate. With 1 each, on a
+   * Maryland board (bench run, 2026-11-05) the cheapest first delivery a
+   * player was dealt cost a little over the $40,000 a player starts with —
+   * nobody could afford one, and the computer players threw in their hands
+   * every turn and never built. At 0.5 each, computer players won on
+   * Colorado, Maryland and Massachusetts boards in 39–70 rounds.
    */
   trackPrice: {
     perSpeedUnit: 1000,
     openGroundCost: 450,
+    slopeCost: 4500,
     maxTerrainFactor: 5,
-    multiplier: 0.5
+    knobs: {
+      landCover: 0.5,
+      elevation: 0.5
+    }
   },
 
   /**
@@ -167,7 +184,7 @@ export const gameRules = {
    *
    * $1,000 per speed unit is the board game's rate — roughly a million per
    * milepost. Ordinary ground costs half that to build over at today's
-   * tuning (see `trackPrice.multiplier`), so a first delivery on a new,
+   * tuning (see `trackPrice.knobs`), so a first delivery on a new,
    * straight line over ordinary ground pays for the line about twice over.
    * Paid per speed unit, not per km, so payoffs keep pace with track prices
    * on every board.

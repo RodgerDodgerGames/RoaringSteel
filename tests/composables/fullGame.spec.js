@@ -25,7 +25,7 @@ import { pinSpeedUnit } from '../utils/boardScale'
 const centerOf = (i) => ({ lat: 0, lng: (i + 0.5) * CELL })
 
 /** Twelve cheap cells in a row along the equator */
-const grid = makeTestGrid({ rows: 1, cols: 12, south: -CELL / 2, cell: () => ({ cost: 100 }) })
+const grid = makeTestGrid({ rows: 1, cols: 12, south: -CELL / 2, cell: () => ({ landCover: 100 }) })
 
 /** Two major cities six cells (60 km) apart, and a small town further east */
 const town = (name, cell, size, industry) => ({

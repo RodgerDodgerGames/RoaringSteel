@@ -37,25 +37,43 @@ export function pinSpeedUnit(speedUnitKm) {
 }
 
 /**
+ * Sets the track price's tuning knobs (`gameRules.trackPrice.knobs`), until
+ * the returned function puts them back. Tests that check how track is priced
+ * or searched, rather than today's tuning, pin them.
+ *
+ * @param {number} landCover - The land cover knob
+ * @param {number} [elevation] - The elevation knob; the same as land cover's
+ *   if not given
+ * @returns {Function} Puts the knobs back
+ */
+export function pinKnobs(landCover, elevation = landCover) {
+  const { knobs } = gameRules.trackPrice
+  const saved = { ...knobs }
+  Object.assign(knobs, { landCover, elevation })
+  return () => Object.assign(knobs, saved)
+}
+
+/**
  * Plays the game at the scale it had before boards were scaled: a 10 km
  * speed unit — one cell of the test grids, so a Freight runs 90 km a turn —
- * and track on the test grids costing exactly its terrain cost in dollars.
- * For tests about which cells are charged, or how players play, rather than
- * at what rate. The tuning knob is set to whatever makes a cell's price its
- * terrain cost.
+ * and level track on the test grids costing exactly its land cover cost in
+ * dollars. For tests about which cells are charged, or how players play,
+ * rather than at what rate. Both tuning knobs are set to whatever makes a
+ * level cell's price its land cover cost.
  *
  * @returns {Function} Puts the settings back
  */
 export function pinPlainScale() {
   const speedUnitKm = 10
-  const { perSpeedUnit, openGroundCost, multiplier } = gameRules.trackPrice
+  const { perSpeedUnit, openGroundCost } = gameRules.trackPrice
   const restoreScale = pinSpeedUnit(speedUnitKm)
-  // Dollars per point of terrain = perSpeedUnit · multiplier / openGroundCost
-  // · cell km / speed unit km (see trackPriceScale); make that 1
+  // Dollars per point of terrain = perSpeedUnit / openGroundCost · cell km /
+  // speed unit km (see trackPriceScale), and the knob multiplies the points;
+  // make the two together 1
   const cellKm = CELL_METERS / 1000
-  gameRules.trackPrice.multiplier = (openGroundCost * speedUnitKm) / (perSpeedUnit * cellKm)
+  const restoreKnobs = pinKnobs((openGroundCost * speedUnitKm) / (perSpeedUnit * cellKm))
   return () => {
     restoreScale()
-    gameRules.trackPrice.multiplier = multiplier
+    restoreKnobs()
   }
 }

@@ -193,16 +193,18 @@ export function searchBoard(rules, towns, reached = new Set()) {
   })
 
   const widthKm = cellKm(grid)
+  // Each open land cell's price, worked out once here rather than each time
+  // the search steps onto it (see `landCellPrice`). Whole dollars, which a
+  // Float32 holds exactly far past any cell's price.
+  const landPrice = new Float32Array(size)
   // The least a step onto any open cell can add, for the A* estimate (see
   // `costField`): the step cost, plus the cheapest cell to step onto — a
   // bridge's first cell, for water
   let cheapestCell = Infinity
   for (let index = 0; index < size; index++) {
     if (!isOpen[index]) continue
-    cheapestCell = Math.min(
-      cheapestCell,
-      cellCost(grid, index, isWater[index], 1, priceScale, widthKm)
-    )
+    if (!isWater[index]) landPrice[index] = landCellPrice(grid, index, priceScale)
+    cheapestCell = Math.min(cheapestCell, cellCost(landPrice, index, isWater[index], 1, widthKm))
   }
   const minStep = STEP_COST * priceScale + (Number.isFinite(cheapestCell) ? cheapestCell : 0)
 
@@ -211,6 +213,7 @@ export function searchBoard(rules, towns, reached = new Set()) {
     rules,
     priceScale,
     widthKm,
+    landPrice,
     isOpen,
     isWater,
     isTownCell,
@@ -227,18 +230,15 @@ export function searchBoard(rules, towns, reached = new Set()) {
  * The same prices `linePrice` in trackCost.js charges; town entry fees are
  * added on top in the search (see `searchBoard`), as `priceSection` in
  * trackBuilder.js adds them.
- * @param {Object} grid - The grid
+ * @param {Float32Array} landPrice - Each land cell's price (see `searchBoard`)
  * @param {number} cell - The cell
  * @param {boolean} isWater - Whether it is water
  * @param {number} crossing - Its place in its row of water cells, from 1
- * @param {number} priceScale - Dollars per point of terrain cost
  * @param {number} widthKm - The grid's cell width (see `cellKm`)
  * @returns {number} The cost, in dollars
  */
-function cellCost(grid, cell, isWater, crossing, priceScale, widthKm) {
-  if (isWater) return bridgeCellCost(crossing, widthKm)
-  const cost = grid.cost[cell]
-  return Number.isFinite(cost) ? landCellPrice(cost, priceScale) : 0
+function cellCost(landPrice, cell, isWater, crossing, widthKm) {
+  return isWater ? bridgeCellCost(crossing, widthKm) : landPrice[cell]
 }
 
 /**
@@ -277,6 +277,7 @@ export function costField(board, sources, { shut = new Set(), targets } = {}) {
     grid,
     priceScale,
     widthKm,
+    landPrice,
     isOpen,
     isWater,
     isTownCell,
@@ -326,7 +327,7 @@ export function costField(board, sources, { shut = new Set(), targets } = {}) {
     startIn.set(index, point)
     const water = isWater[index] && !isTownCell[index] ? 1 : 0
     const state = pack(index, water, isBeside[index])
-    cost[state] = cellCost(grid, index, isWater[index], 1, priceScale, widthKm)
+    cost[state] = cellCost(landPrice, index, isWater[index], 1, widthKm)
     frontier.push(cost[state] + estimate(index), state)
   })
 
@@ -362,7 +363,7 @@ export function costField(board, sources, { shut = new Set(), targets } = {}) {
       // The cell's price, the town's entry fee if it is a town not yet
       // reached, and the search's own nudges
       const step =
-        cellCost(grid, next, isWater[next], water + 1, priceScale, widthKm) +
+        cellCost(landPrice, next, isWater[next], water + 1, widthKm) +
         townFee[next] +
         (STEP_COST + (isBeside[next] ? BESIDE_PENALTY : 0)) * priceScale
       const nextState = pack(next, nextWater, nextBeside)

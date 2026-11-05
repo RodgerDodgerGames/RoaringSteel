@@ -67,8 +67,8 @@ export const gameRules = {
    * board game's rate. Bridges and town entry are not affected.
    *
    * It starts at 0.5, half the board game's rate. Computer-player games on
-   * real Colorado, Maryland and Massachusetts boards (2026-11-04) were won
-   * in 40–100 rounds at 0.5, smaller boards sooner; at 1 the computer players
+   * real Colorado, Maryland and Massachusetts boards cut to the cell budget
+   * (2026-11-04) were won in 39–70 rounds at 0.5; at 1 the computer players
    * judged almost every demand a loss on its first delivery, threw in hand
    * after hand, and never won.
    */

@@ -9,7 +9,7 @@
  * game ends when a player has the cash and the cities.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { usePlayerStore } from '@/stores/players'
 import { useGameStore } from '@/stores/game'
 import { useGridStore } from '@/stores/grid'
@@ -20,6 +20,7 @@ import { useTrackBuilder } from '@/composables/trackBuilder'
 import { useTurn } from '@/composables/useTurn'
 import { gameRules } from '@/config/game'
 import { makeTestGrid, CELL } from '../utils/testGrid'
+import { pinSpeedUnit } from '../utils/boardScale'
 
 const centerOf = (i) => ({ lat: 0, lng: (i + 0.5) * CELL })
 
@@ -56,7 +57,11 @@ const card = (id) => ({
 })
 
 describe('a whole game', () => {
+  let restoreScale
   beforeEach(() => {
+    // A 10 km speed unit: a Freight runs 90 km a turn, past the 60 km between
+    // the two cities
+    restoreScale = pinSpeedUnit(10)
     vi.spyOn(console, 'log').mockImplementation(() => {})
     localStorage.clear()
     useGridStore().setGrid(grid)
@@ -68,6 +73,7 @@ describe('a whole game', () => {
     useDemandCardsStore().setDeck({ drawPile: Array.from({ length: 30 }, (_, i) => card(i + 1)) })
     useDemandCardsStore().dealHands([1, 2])
   })
+  afterEach(() => restoreScale())
 
   it('should be played from the first building round to a win', () => {
     const playerStore = usePlayerStore()

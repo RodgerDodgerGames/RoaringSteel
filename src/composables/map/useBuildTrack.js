@@ -11,7 +11,6 @@ import { usePlayerStore } from '@/stores/players'
 import { useTrackStore } from '@/stores/track'
 import { useGameStore } from '@/stores/game'
 import { useGridStore } from '@/stores/grid'
-import { linePrice } from '@/composables/map/trackCost'
 import { lineBlock } from '@/composables/map/buildRules'
 import { isEmptyGrid } from '@/composables/map/cellGrid'
 import { useTrackBuilder, START_RULE } from '@/composables/trackBuilder'
@@ -63,9 +62,9 @@ export default function useBuildTrack(formatCurrency) {
 
   /**
    * Cost of the line being drawn, out to the cursor: the vertices placed so
-   * far plus the leg the cursor is pulling out from the last one. Repriced
-   * from scratch each time (see `priceLine`), so it follows the cursor down as
-   * well as up.
+   * far plus the leg the cursor is pulling out from the last one, town entry
+   * included. Repriced from scratch each time (see `priceSection` in
+   * trackBuilder.js), so it follows the cursor down as well as up.
    */
   const pendingCost = ref(0)
 
@@ -87,7 +86,7 @@ export default function useBuildTrack(formatCurrency) {
   const trackStore = useTrackStore()
   const gameStore = useGameStore()
 
-  // The cost grid prices every section of track as it is drawn
+  // The cost grid: with none loaded, track cannot be priced or built
   const { grid } = storeToRefs(useGridStore())
 
   // Decides what may be built, and builds it (see the note above)
@@ -701,6 +700,9 @@ export default function useBuildTrack(formatCurrency) {
       return
     }
 
+    // Worked out while the section is still in the store: what it paid for
+    // depends on the track built before it
+    const refund = builder.refundFor(segment)
     if (!trackStore.removeSegment(layer.segmentId)) {
       console.error('Could not remove track segment:', trackStore.error)
       redrawLayer(layer, segment)
@@ -708,8 +710,9 @@ export default function useBuildTrack(formatCurrency) {
     }
 
     // Only track built this turn by the active player gets here, so the money
-    // and the allowance both go back to the player who put them in
-    if (!playerStore.refundTrackSpend(segment.ownerId, segment.cost)) {
+    // and the allowance both go back to the player who put them in — all but
+    // an entry fee for a town their other track still reaches
+    if (!playerStore.refundTrackSpend(segment.ownerId, refund)) {
       console.error('Could not refund track segment:', playerStore.error)
     }
 
@@ -794,17 +797,28 @@ export default function useBuildTrack(formatCurrency) {
    * change to the line reprices it through here, so the cost shown can never
    * be left describing an older shape of the line.
    *
+   * The price is the track builder's (see `priceSection`), so what is shown
+   * is what building will charge, town entry included.
+   *
    * @param {Object} [cursorLatLng] - Where the cursor is, if the leg to it counts
-   * @returns {{cost: number, bridges: number}} What the leg to the cursor adds,
-   *   and how much of that is bridges: the line's price with the leg minus
-   *   the price without, so a cell already paid for is not shown again
+   * @returns {{cost: number, bridges: number, entry: number}} What the leg to
+   *   the cursor adds, and how much of that is bridges and town entry: the
+   *   line's price with the leg minus the price without, so a cell or town
+   *   already paid for is not shown again
    */
   function repriceLine(cursorLatLng) {
+    const playerId = playerStore.activePlayer?.id
     const placed = workingLayer.value.getLatLngs()
-    const without = linePrice(placed, grid.value)
-    const withLeg = cursorLatLng ? linePrice([...placed, cursorLatLng], grid.value) : without
+    const without = builder.priceSection(playerId, placed)
+    const withLeg = cursorLatLng
+      ? builder.priceSection(playerId, [...placed, cursorLatLng])
+      : without
     pendingCost.value = withLeg.total
-    return { cost: withLeg.total - without.total, bridges: withLeg.bridges - without.bridges }
+    return {
+      cost: withLeg.total - without.total,
+      bridges: withLeg.bridges - without.bridges,
+      entry: withLeg.entry - without.entry
+    }
   }
 
   /**
@@ -850,13 +864,18 @@ export default function useBuildTrack(formatCurrency) {
 
   /**
    * The cursor's tooltip for a leg that can be built: its cost, and how much
-   * of that is bridges when it crosses water, so a costly leg says why.
-   * @param {{cost: number, bridges: number}} leg - From `repriceLine`
+   * of that is bridges or town entry, so a costly leg says why.
+   * @param {{cost: number, bridges: number, entry: number}} leg - From
+   *   `repriceLine`
    * @returns {string} The tooltip's text
    */
-  function legTooltip({ cost, bridges }) {
+  function legTooltip({ cost, bridges, entry }) {
+    const extras = [
+      bridges > 0 && `bridge ${formatCurrency(bridges)}`,
+      entry > 0 && `town entry ${formatCurrency(entry)}`
+    ].filter(Boolean)
     const price = `Cost: ${formatCurrency(cost)}`
-    return bridges > 0 ? `${price} (bridge ${formatCurrency(bridges)})` : price
+    return extras.length ? `${price} (${extras.join(', ')})` : price
   }
 
   // ================== UTILITY FUNCTIONS ==================

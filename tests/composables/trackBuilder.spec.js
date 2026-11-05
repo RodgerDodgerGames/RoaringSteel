@@ -6,7 +6,7 @@
  * within the build rules, and paid for out of cash and the turn's allowance.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { useTrackBuilder, START_RULE } from '@/composables/trackBuilder'
 import { usePlayerStore } from '@/stores/players'
 import { useGameStore } from '@/stores/game'
@@ -15,6 +15,7 @@ import { useTownsStore } from '@/stores/towns'
 import { useTrackStore } from '@/stores/track'
 import { gameRules } from '@/config/game'
 import { makeTestGrid, CELL } from '../utils/testGrid'
+import { pinPlainScale } from '../utils/boardScale'
 
 /** The center of cell `i` of a row of cells along the equator */
 const centerOf = (i) => ({ lat: 0, lng: (i + 0.5) * CELL })
@@ -28,8 +29,11 @@ describe('useTrackBuilder', () => {
   let builder
   let playerStore
   let trackStore
+  let restorePrices
 
   beforeEach(() => {
+    // These tests are about which cells are charged; a cell costs its terrain
+    restorePrices = pinPlainScale()
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     playerStore = usePlayerStore()
     trackStore = useTrackStore()
@@ -44,6 +48,7 @@ describe('useTrackBuilder', () => {
     ])
     builder = useTrackBuilder()
   })
+  afterEach(() => restorePrices())
 
   it('should build a section from a major city, charging for each cell', () => {
     const result = builder.buildSection(ANN, [centerOf(0), centerOf(2)])
@@ -52,6 +57,35 @@ describe('useTrackBuilder', () => {
     expect(trackStore.segmentsForOwner(ANN)).toHaveLength(1)
     expect(playerStore.players[0].cash).toBe(37000)
     expect(playerStore.trackSpendThisTurn(ANN)).toBe(3000)
+  })
+
+  it('should charge the entry fee for a town the section reaches', () => {
+    // Ending on the small town at the east end: six cells and its entry fee
+    const result = builder.buildSection(ANN, [centerOf(0), centerOf(5)])
+
+    expect(result).toMatchObject({ ok: true, cost: 6000 + gameRules.townEntry.small })
+  })
+
+  it('should price a section with its entry fees, as building will charge it', () => {
+    expect(builder.priceSection(ANN, [centerOf(0), centerOf(5)])).toEqual({
+      total: 6000 + gameRules.townEntry.small,
+      bridges: 0,
+      entry: gameRules.townEntry.small
+    })
+  })
+
+  it('should hold back an entry fee from a refund while other track still reaches the town', () => {
+    // The first section pays to enter Small; the second reaches it for free
+    const first = builder.buildSection(ANN, [centerOf(0), centerOf(5)]).segment
+    builder.buildSection(ANN, [centerOf(0), { lat: CELL, lng: 3 * CELL }, centerOf(5)])
+
+    expect(builder.refundFor(first)).toBe(first.cost - gameRules.townEntry.small)
+  })
+
+  it('should refund the whole price, entry fee too, when nothing else reaches the town', () => {
+    const only = builder.buildSection(ANN, [centerOf(0), centerOf(5)]).segment
+
+    expect(builder.refundFor(only)).toBe(only.cost)
   })
 
   it("should build on from the end of the player's own track", () => {

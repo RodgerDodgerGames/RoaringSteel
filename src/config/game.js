@@ -37,6 +37,63 @@ export const gameRules = {
   buildingRounds: 2,
 
   /**
+   * What track costs: Empire Builder's $1 million a milepost of clear ground,
+   * here $1,000 per speed unit (see composables/boardScale.js), scaled up for
+   * rough or built-up ground, and then by the tuning knob below.
+   *
+   * Priced per speed unit rather than per km or per grid cell, so a turn's
+   * $20,000 allowance builds the same number of speed units of ordinary
+   * ground on every board, whatever the board's size or its cells': 20 at
+   * the board game's rate, a little over two turns of a Freight's running.
+   *
+   * Each grid cell's terrain cost (land cover plus slope, see stores/grid.js)
+   * is read against `openGroundCost`, the terrain cost of an ordinary 10 km
+   * cell — Empire Builder's clear terrain, the most common ground on its map:
+   * a cell at that cost is priced at `perSpeedUnit` per speed unit of its
+   * width, one twice as costly at twice that. Measured on real 10 km grids
+   * (2026-11-04): Colorado's plains run about 370–500, the middle of
+   * Maryland's cells 530 and of Massachusetts' 790; 450 sits among them. It
+   * will need setting again when the terrain cost model changes.
+   *
+   * `maxTerrainFactor` caps how much dearer than ordinary ground a cell can
+   * be: Empire Builder's alpine mileposts, its dearest ground, cost 5 times
+   * its clear ones. The steepest cells would otherwise cost more than a
+   * whole turn's allowance, and no one could build across them.
+   *
+   * `multiplier` is the tuning knob: every track price is multiplied by it.
+   * Raise it to make building dearer, lower it to make it cheaper; 1 is the
+   * board game's rate. Bridges and town entry are not affected.
+   *
+   * It starts at 0.5, half the board game's rate. Computer-player games on
+   * real Colorado, Maryland and Massachusetts boards (2026-11-04) were won
+   * in 40–100 rounds at 0.5, smaller boards sooner; at 1 the computer players
+   * judged almost every demand a loss on its first delivery, threw in hand
+   * after hand, and never won.
+   */
+  trackPrice: {
+    perSpeedUnit: 1000,
+    openGroundCost: 450,
+    maxTerrainFactor: 5,
+    multiplier: 0.5
+  },
+
+  /**
+   * What it costs to build track into a town, on top of the track itself, by
+   * the town's size: Empire Builder's $3 million for small and medium cities
+   * and $5 million for major ones.
+   *
+   * A player pays once per town, when a section of their track first reaches
+   * it — has a point on the town, so trains can stop there. A line that only
+   * passes through the town's cell does not reach it and does not pay, and
+   * nor does the town a section starts from.
+   */
+  townEntry: {
+    small: 3000,
+    medium: 3000,
+    large: 5000
+  },
+
+  /**
    * Bridges: what it costs to carry track over water, and how far it may go.
    *
    * A grid cell is water when its land cover is open water (see water.js).
@@ -46,8 +103,9 @@ export const gameRules = {
    * is a far bigger job than a short one. A crossing of more than
    * `maxCells` water cells in a row cannot be built at all.
    *
-   * For scale: an ordinary land cell costs about $630 (the middle of a real
-   * Maryland grid), and a turn's building allowance is $20,000.
+   * For scale: an ordinary 10 km cell on a Colorado-sized board costs
+   * about $870 (see `trackPrice`), and a turn's building allowance is
+   * $20,000.
    */
   bridges: {
     costPerCell: 5000,
@@ -96,21 +154,24 @@ export const gameRules = {
   /**
    * What a demand pays (see payoffs.js). As in Empire Builder, a delivery
    * pays more the further the commodity has to travel: here, so much per
-   * kilometer as the crow flies from the nearest town that produces it to
-   * the destination, rounded to the nearest thousand.
+   * speed unit (see composables/boardScale.js) as the crow flies from the
+   * nearest town that produces it to the destination, rounded to the nearest
+   * thousand.
    *
-   * $100 per km is about the board game's rate — roughly a million per
-   * milepost — and pays a little more than building track the same distance
-   * costs (an ordinary 10 km cell is about $630), so a first delivery on a
-   * new line roughly pays for the line, and every later one on it is profit.
+   * $1,000 per speed unit is the board game's rate — roughly a million per
+   * milepost. Ordinary ground costs half that to build over at today's
+   * tuning (see `trackPrice.multiplier`), so a first delivery on a new,
+   * straight line over ordinary ground pays for the line about twice over.
+   * Paid per speed unit, not per km, so payoffs keep pace with track prices
+   * on every board.
    * `minimum` keeps a delivery between neighbors worth making.
    *
-   * `longHaul` rewards the risk of reaching for distant towns: the per-km
-   * payoff is multiplied by a bonus that grows exponentially with the haul's
+   * `longHaul` rewards the risk of reaching for distant towns: the
+   * distance payoff is multiplied by a bonus that grows exponentially with the haul's
    * share of the map's span (its two furthest-apart towns), up to
    * 1 + maxBonus for the longest possible haul. At a maxBonus of 1, that haul
    * pays double. Raise it to pull players across the map harder, or set it to
-   * 0 for plain per-km payoffs.
+   * 0 for plain distance payoffs.
    *
    * `steepness` sets how much of the bonus is held back for the very longest
    * hauls. At 2, a haul a quarter of the way across pays about 1.1× and one
@@ -118,7 +179,7 @@ export const gameRules = {
    * At 0 (or below), the bonus grows in a straight line with distance.
    */
   payoffs: {
-    perKm: 100,
+    perSpeedUnit: 1000,
     roundTo: 1000,
     minimum: 3000,
     longHaul: {

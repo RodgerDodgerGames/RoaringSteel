@@ -22,7 +22,8 @@ import { formatCurrency } from '@/composables/utils'
 const {
   train,
   town,
-  kmLeft,
+  distanceLeft,
+  distance,
   trainType,
   moveBlock,
   loadBlock,
@@ -56,7 +57,7 @@ watch(destinations, () => {
  * @returns {string} The option's text
  */
 function destinationLabel({ town: destination, km, reachable, payTo, fee }) {
-  const parts = [`${destination.name} — ${Math.round(km)} km`]
+  const parts = [`${destination.name} — distance ${distance(km)}`]
   if (!reachable) parts.push('(stops on the way)')
   if (fee) parts.push(`· ${formatCurrency(fee)} to ${payTo.map(nameOf).join(', ')}`)
   return parts.join(' ')
@@ -96,7 +97,7 @@ function destinationLabel({ town: destination, km, reachable, payTo, fee }) {
       <div class="move-controls__status">
         <span>{{ town ? `In ${town.name}` : 'Between towns' }}</span>
         <!-- Only while it can still go: once it is done, the note below says why -->
-        <span v-if="!moveBlock">{{ Math.round(kmLeft) }} of {{ trainType.rangeKm }} km left</span>
+        <span v-if="!moveBlock">Distance left: {{ distanceLeft }} of {{ trainType.speed }}</span>
       </div>
 
       <p v-if="moveBlock" class="move-controls__note">{{ moveBlock }}</p>

@@ -19,14 +19,17 @@
 import { ref, computed, watch, inject, onBeforeUnmount } from 'vue'
 import { onKeyStroke } from '@vueuse/core'
 import { usePlayerStore } from '@/stores/players'
+import { useGameStore } from '@/stores/game'
 import { useTrainsStore } from '@/stores/trains'
 import { useTownsStore } from '@/stores/towns'
 import { useMapStore } from '@/stores/map'
 import { buildTrackKey } from '@/composables/map/useBuildTrack'
 import { formatCurrency } from '@/composables/utils'
+import { formatDistance } from '@/composables/boardScale'
 
 export function useTrainControls() {
   const playerStore = usePlayerStore()
+  const gameStore = useGameStore()
   const trainsStore = useTrainsStore()
   const townsStore = useTownsStore()
   const mapStore = useMapStore()
@@ -41,7 +44,24 @@ export function useTrainControls() {
   const train = computed(() => trainsStore.trainOf(playerId.value))
   const trainType = computed(() => trainsStore.trainTypeOf(playerId.value))
   const town = computed(() => trainsStore.townOf(playerId.value))
-  const kmLeft = computed(() => trainsStore.kmLeft(playerId.value))
+
+  /**
+   * How much further the train can run this turn, as the player is shown it:
+   * in points of speed, like the train's speed itself (see `distance`).
+   */
+  const distanceLeft = computed(() => distance(trainsStore.kmLeft(playerId.value), 'down'))
+
+  /**
+   * A distance as the player is shown it, in points of speed (see
+   * `formatDistance`): rounded up, for a distance to cover, unless told
+   * otherwise.
+   * @param {number} km - The distance, in km
+   * @param {'up'|'down'} [rounding] - 'down' for a distance left to run
+   * @returns {string} The distance, e.g. "14" or "8.6"
+   */
+  function distance(km, rounding = 'up') {
+    return formatDistance(km, gameStore.boardScale.speedUnitKm, rounding)
+  }
 
   /** Why the train cannot run anywhere now, or null */
   const moveBlock = computed(() => trainsStore.whyCannotMove(playerId.value))
@@ -188,7 +208,8 @@ export function useTrainControls() {
     train,
     trainType,
     town,
-    kmLeft,
+    distanceLeft,
+    distance,
     moveBlock,
     loadBlock,
     destinations,

@@ -107,13 +107,12 @@ export const useTrainsStore = defineStore('trains', () => {
   }
 
   /**
-   * A kind of train's name, speed and capacity.
+   * A player's kind of train: its name, speed and capacity.
    * @param {number} playerId - The player
-   * @returns {{name: string, mileposts: number, capacity: number, rangeKm: number}}
+   * @returns {{name: string, speed: number, capacity: number}}
    */
   function trainTypeOf(playerId) {
-    const { type } = trainOf(playerId)
-    return { ...TRAIN_TYPES[type], rangeKm: trainRangeKm(type) }
+    return TRAIN_TYPES[trainOf(playerId).type]
   }
 
   /**
@@ -122,7 +121,16 @@ export const useTrainsStore = defineStore('trains', () => {
    * @returns {number} Kilometers left, never negative
    */
   function kmLeft(playerId) {
-    return Math.max(0, trainRangeKm(trainOf(playerId).type) - trainOf(playerId).kmThisTurn)
+    const range = trainRangeKm(trainOf(playerId).type, speedUnitKm())
+    return Math.max(0, range - trainOf(playerId).kmThisTurn)
+  }
+
+  /**
+   * The board's speed unit, in km (see boardScale.js).
+   * @returns {number} Kilometers per point of speed
+   */
+  function speedUnitKm() {
+    return gameStore.boardScale.speedUnitKm
   }
 
   /**

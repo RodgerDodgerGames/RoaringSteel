@@ -10,10 +10,11 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { lineBlock, townCells, builtLegs, trackIndex } from '@/composables/map/buildRules'
 import { regionTest } from '@/composables/map/region'
-import { priceLine, cellPath } from '@/composables/map/trackCost'
+import { linePrice, cellPath } from '@/composables/map/trackCost'
 import { findCell, rowOf, colOf } from '@/composables/map/cellGrid'
 import { isWaterCell } from '@/composables/map/water'
-import { pointKey } from '@/composables/network'
+import { pointKey, townKey } from '@/composables/network'
+import { townEntryFee } from '@/composables/townEntry'
 import {
   searchBoard,
   costField,
@@ -40,11 +41,16 @@ function rulesWith(segments = []) {
   const grid = makeGrid()
   return {
     grid,
+    // Land priced at its terrain cost: these tests are about the search
+    priceScale: 1,
     isInRegion: regionTest(makeRegion()),
     townCells: townCells(towns, grid),
     builtTrack: trackIndex(builtLegs(segments))
   }
 }
+
+/** What a line's track costs on the rules' board (town entry left out) */
+const priceOn = (rules) => (points) => linePrice(points, rules.grid, rules.priceScale).total
 
 /** The row and column of a cell */
 const placeOf = (cell, grid) => ({ row: rowOf(grid, cell), col: colOf(grid, cell) })
@@ -126,6 +132,7 @@ describe('botPathfinder', () => {
       const corridorTowns = [{ ...middle, industries: [] }]
       const corridor = {
         grid,
+        priceScale: 1,
         isInRegion: regionTest(makeRegion()),
         townCells: townCells(corridorTowns, grid)
       }
@@ -145,6 +152,17 @@ describe('botPathfinder', () => {
   })
 
   describe('costField', () => {
+    it("should add a town's entry fee unless the player's track reaches it", () => {
+      const from = [pointOf(townNamed('Alder'))]
+      const target = townNamed('Dogwood')
+      const reachedBoard = searchBoard(rules, towns, new Set([townKey(target)]))
+
+      const fresh = costField(board, from).costTo(pointOf(target))
+      const reached = costField(reachedBoard, from).costTo(pointOf(target))
+
+      expect(fresh - reached).toBeGreaterThanOrEqual(townEntryFee(target))
+    })
+
     it('should cost nothing it cannot reach as Infinity', () => {
       const field = costField(board, [pointOf(townNamed('Alder'))])
 
@@ -161,8 +179,8 @@ describe('botPathfinder', () => {
 
       targets.forEach((point) => {
         expect(targeted.costTo(point)).toBe(everywhere.costTo(point))
-        expect(priceLine(targeted.lineTo(point), rules.grid)).toBe(
-          priceLine(everywhere.lineTo(point), rules.grid)
+        expect(priceOn(rules)(targeted.lineTo(point))).toBe(
+          priceOn(rules)(everywhere.lineTo(point))
         )
       })
     })
@@ -200,25 +218,25 @@ describe('botPathfinder', () => {
     it('should build as far as the money goes, as a section the rules allow', () => {
       const line = planLine(board, [pointOf(townNamed('Alder'))], pointOf(townNamed('Dogwood')))
 
-      const section = affordableSection(line, 5000, rules)
+      const section = affordableSection(line, 5000, rules, priceOn(rules))
 
       expect(section.length).toBeLessThan(line.length)
       expect(section).toEqual(line.slice(0, section.length))
-      expect(priceLine(section, rules.grid)).toBeLessThanOrEqual(5000)
+      expect(priceOn(rules)(section)).toBeLessThanOrEqual(5000)
       expect(lineBlock(section, rules, { isFinished: true })).toBeNull()
     })
 
     it('should build the whole line when it can be paid for', () => {
       const line = planLine(board, [pointOf(townNamed('Alder'))], pointOf(townNamed('Juniper')))
 
-      expect(affordableSection(line, 1e9, rules)).toEqual(line)
+      expect(affordableSection(line, 1e9, rules, priceOn(rules))).toEqual(line)
     })
 
     it('should not stop part way over water', () => {
       const line = planLine(board, [pointOf(townNamed('Fir'))], pointOf(townNamed('Dogwood')))
       // Every budget that runs out somewhere along the line
-      for (let budget = 1000; budget < priceLine(line, rules.grid); budget += 500) {
-        const section = affordableSection(line, budget, rules)
+      for (let budget = 1000; budget < priceOn(rules)(line); budget += 500) {
+        const section = affordableSection(line, budget, rules, priceOn(rules))
         if (!section) continue
         expect(isWaterCell(rules.grid, findCell(section.at(-1), rules.grid))).toBe(false)
       }
@@ -227,7 +245,7 @@ describe('botPathfinder', () => {
     it('should build nothing when not even the first step can be paid for', () => {
       const line = planLine(board, [pointOf(townNamed('Alder'))], pointOf(townNamed('Birch')))
 
-      expect(affordableSection(line, 10, rules)).toBeNull()
+      expect(affordableSection(line, 10, rules, priceOn(rules))).toBeNull()
     })
   })
 })

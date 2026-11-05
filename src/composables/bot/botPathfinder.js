@@ -163,8 +163,9 @@ export function searchBoard(rules, towns, reached = new Set()) {
   })
 
   // Cells with a center within the spacing distance of built track. Track is
-  // walked at the points pricing checks it at, and the cells around each are
-  // measured; a quarter-cell gap between points is allowed for.
+  // walked at the points the build rules check it at (see `pointsAlongLine`),
+  // and the cells around each are measured; a quarter-cell gap between points
+  // is allowed for.
   const nearKm = gameRules.trackSpacing.nearCells * cellKm(grid)
   const isBeside = new Uint8Array(size)
   ;(rules.builtTrack?.legs ?? []).forEach((leg) => {

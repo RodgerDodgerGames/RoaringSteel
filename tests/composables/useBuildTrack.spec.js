@@ -40,8 +40,9 @@ import { useGridStore } from '@/stores/grid'
 import { useTownsStore } from '@/stores/towns'
 import { formatCurrency } from '@/composables/utils'
 import { gameRules } from '@/config/game'
+import { bridgeCellCost } from '@/composables/map/water'
 import { nlcdCostMap } from '@/config/nlcd'
-import { makeTestGrid, CELL } from '../utils/testGrid'
+import { makeTestGrid, CELL, CELL_METERS } from '../utils/testGrid'
 import { pinPlainScale } from '../utils/boardScale'
 
 /**
@@ -861,7 +862,7 @@ describe('useBuildTrack', () => {
   describe('bridging water', () => {
     const centerOf = (i) => L.latLng(0, (i + 0.5) * CELL)
     /** Land, then more water cells in a row than a bridge may cross, then land */
-    const span = gameRules.bridges.maxCells + 1
+    const span = Math.floor(gameRules.bridges.maxKm / (CELL_METERS / 1000)) + 1
     const grid = makeTestGrid({
       rows: 1,
       cols: span + 2,
@@ -896,7 +897,7 @@ describe('useBuildTrack', () => {
       hintMarker.setLatLng(centerOf(1))
       vi.advanceTimersByTime(200)
 
-      const bridge = formatCurrency(gameRules.bridges.costPerCell)
+      const bridge = formatCurrency(bridgeCellCost(1, CELL_METERS / 1000))
       expect(hintMarker.getTooltip().getContent()).toContain(`Cost: ${bridge} (bridge ${bridge})`)
     })
 

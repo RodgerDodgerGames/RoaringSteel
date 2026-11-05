@@ -3,12 +3,13 @@
  *
  * Generates and manages the square grid laid over the game map.
  * Each grid cell holds terrain data that affects railroad building costs:
- * - Elevation: Higher elevation differences = more expensive to build
- * - Land Cover: Different terrain types have different building costs
+ * - Elevation: the average height of the ground in the cell; steep cells,
+ *   and cells on a long climb, cost more
+ * - Land Cover: the mix of ground in the cell, forest dearer than grassland
  *
- * The grid is used during gameplay to calculate the cost of laying track
- * across different terrain types. Costs are calculated using a focal
- * operation that considers neighboring cell elevations.
+ * The grid is used during gameplay to price track cell by cell. Each cell's
+ * terrain cost is worked out once, as the grid is built (see
+ * composables/map/terrainCost.js).
  *
  * The grid is a `CellGrid` (see composables/map/cellGrid.js): rows and
  * columns of cells with their terrain in typed arrays. It is kept out of
@@ -29,14 +30,8 @@ import {
   metersToLongitudeDegrees
 } from '../composables/setup/useMapSupport'
 import { WATER_LAND_COVER } from '@/composables/map/water'
-import {
-  createCellGrid,
-  setCell,
-  cellAt,
-  rowOf,
-  colOf,
-  isEmptyGrid
-} from '@/composables/map/cellGrid'
+import { createCellGrid, setCell, isEmptyGrid } from '@/composables/map/cellGrid'
+import { fillTerrainCosts } from '@/composables/map/terrainCost'
 import { getGrid, getGridYears, putGrid } from '@/composables/database'
 import { gridApiConfig } from '@/config/grid'
 import { isRefusal, refusalMessage } from '@/composables/utils'
@@ -282,23 +277,22 @@ export const useGridStore = defineStore('gridStore', () => {
 
     const rows = Math.floor((bounds[3] - bounds[1]) / latCellSize)
     const cols = Math.floor((bounds[2] - bounds[0]) / lngCellSize)
+    const cellCount = rows * cols
 
-    // The center of every cell in the rectangle, row by row from the south,
-    // in the order the grid numbers its cells (see cellGrid.js): the terrain
-    // that comes back for location k is cell k's. The grid is built apart
-    // from `grid` and handed back, so nothing already in play — a grid
-    // restored from a save, say — can mix with the new one.
-    const locations = []
-    for (let i = 0; i < rows; i++) {
-      for (let j = 0; j < cols; j++) {
-        locations.push({
-          lat: bounds[1] + (i + 0.5) * latCellSize,
-          lng: bounds[0] + (j + 0.5) * lngCellSize
-        })
-      }
+    // Where the grid is and how it is divided. The terrain comes back per
+    // cell in the order the grid numbers its cells (see cellGrid.js). The
+    // grid is built apart from `grid` and handed back, so nothing already in
+    // play — a grid restored from a save, say — can mix with the new one.
+    const shape = {
+      rows,
+      cols,
+      south: bounds[1],
+      west: bounds[0],
+      latStep: latCellSize,
+      lngStep: lngCellSize
     }
 
-    if (locations.length === 0) {
+    if (cellCount <= 0) {
       return fail('That region is too small to build a grid from. Try selecting a larger area.')
     }
 
@@ -309,8 +303,8 @@ export const useGridStore = defineStore('gridStore', () => {
     let elevationPlan
     let landCoverPlan
     try {
-      elevationPlan = planElevations(locations, cellSize)
-      landCoverPlan = planLandCover(locations, cellSize, year)
+      elevationPlan = planElevations(shape, cellSize)
+      landCoverPlan = planLandCover(shape, year)
     } catch (e) {
       console.error('Error planning terrain downloads:', e)
       return fail('Could not plan the terrain downloads for this region.')
@@ -318,7 +312,7 @@ export const useGridStore = defineStore('gridStore', () => {
     elevationProgress.value = { completed: 0, total: elevationPlan.requestCount }
     landCoverProgress.value = { completed: 0, total: landCoverPlan.requestCount }
 
-    // Fetch elevation for all locations
+    // Fetch elevation for every cell
     let elevations
     isLoadingElevation.value = true
     currentPhase.value = 'elevation'
@@ -333,21 +327,22 @@ export const useGridStore = defineStore('gridStore', () => {
       isLoadingElevation.value = false
     }
 
-    // A tile that fails leaves its cells null rather than throwing, so a run
-    // that lost most of its tiles still looks like a success here and would
-    // be cached permanently. The tiles cover the whole world, sea included,
-    // so every null is a failed download. A zero is a real reading.
-    const failedElevations = elevations.filter((elevation) => elevation == null).length
-    if (failedElevations === elevations.length) {
+    // A tile that fails leaves its cells unknown (NaN) rather than throwing,
+    // so a run that lost most of its tiles still looks like a success here
+    // and would be cached permanently. The tiles cover the whole world, sea
+    // included, so every unknown cell is a failed download. A zero is a real
+    // reading.
+    const failedElevations = elevations.elevation.filter(Number.isNaN).length
+    if (failedElevations === cellCount) {
       return fail('No elevation data came back for this region. Check your connection and retry.')
     }
-    if (failedElevations / elevations.length > gridApiConfig.maxElevationFailureRate) {
+    if (failedElevations / cellCount > gridApiConfig.maxElevationFailureRate) {
       return fail(
-        `Elevation data was missing for ${failedElevations} of ${elevations.length} cells. Check your connection and retry.`
+        `Elevation data was missing for ${failedElevations} of ${cellCount} cells. Check your connection and retry.`
       )
     }
 
-    // Fetch land cover for all locations
+    // Fetch land cover for every cell
     let landCover
     isLoadingLandCover.value = true
     currentPhase.value = 'landcover'
@@ -367,42 +362,33 @@ export const useGridStore = defineStore('gridStore', () => {
     // Judged on the cells whose pictures failed, not on every cell without
     // land cover: a region reaching over the border or out to sea has cells
     // the NLCD rightly has nothing for.
-    if (landCover.failed / locations.length > gridApiConfig.maxLandCoverFailureRate) {
+    if (landCover.failed / cellCount > gridApiConfig.maxLandCoverFailureRate) {
       return fail(
-        `Land cover data was missing for ${landCover.failed} of ${locations.length} cells. Check your connection and retry.`
+        `Land cover data was missing for ${landCover.failed} of ${cellCount} cells. Check your connection and retry.`
       )
     }
 
     // Every cell with the terrain it needs goes on the board; the rest are
     // left as holes
-    const built = createCellGrid({
-      rows,
-      cols,
-      south: bounds[1],
-      west: bounds[0],
-      latStep: latCellSize,
-      lngStep: lngCellSize
-    })
-    locations.forEach((_, index) => {
-      const elevation = elevations[index]
+    const built = createCellGrid(shape)
+    for (let index = 0; index < cellCount; index++) {
+      const elevation = elevations.elevation[index]
       const cover = landCover.costs[index]
       if (isUsableCell(elevation, cover)) setCell(built, index, { elevation, landCover: cover })
-    })
+    }
 
     if (isEmptyGrid(built)) {
       return fail('No terrain data came back for this region. Check your connection and retry.')
     }
 
-    const dropped = locations.length - built.count
+    const dropped = cellCount - built.count
     if (dropped > 0) {
-      console.warn(
-        `Dropped ${dropped} of ${locations.length} grid cells with incomplete terrain data.`
-      )
+      console.warn(`Dropped ${dropped} of ${cellCount} grid cells with incomplete terrain data.`)
     }
 
-    // calculate total cost for grid
+    // Each cell's terrain cost, from its land cover and how steep it is
     currentPhase.value = 'calculating'
-    focalOpElevation(built)
+    fillTerrainCosts(built, elevations.roughness)
     currentPhase.value = ''
     return built
   }
@@ -526,40 +512,5 @@ export const useGridStore = defineStore('gridStore', () => {
     clearError,
     reset,
     setGrid
-  }
-
-  /**
-   * Works out what track through each cell costs: its land cover, plus how
-   * steep the ground around it is.
-   *
-   * Steepness comes from a focal operation over the 3x3 neighborhood: the
-   * height differences between the cell and each of its up to eight
-   * neighbors on the board, added up. A cell at the edge of the board, or
-   * beside a hole, has fewer neighbors and so less added.
-   *
-   * @param {Object} built - The grid being built, every cell's elevation and
-   *   land cover filled in; its costs are written in place
-   */
-  function focalOpElevation(built) {
-    const { elevation, landCover, cost, present } = built
-    for (let index = 0; index < present.length; index++) {
-      if (!present[index]) continue
-      const row = rowOf(built, index)
-      const col = colOf(built, index)
-      let elevationCost = 0
-
-      // dr/dc represent delta row/column (-1, 0, +1)
-      for (let dr = -1; dr <= 1; dr++) {
-        for (let dc = -1; dc <= 1; dc++) {
-          if (dr === 0 && dc === 0) continue // Skip the center cell (self)
-          const neighbor = cellAt(built, row + dr, col + dc)
-          // Steeper elevation changes = higher building cost
-          if (neighbor !== -1) elevationCost += Math.abs(elevation[index] - elevation[neighbor])
-        }
-      }
-
-      // Total cost = terrain difficulty (land cover) + slope difficulty (elevation changes)
-      cost[index] = elevationCost + landCover[index]
-    }
   }
 })

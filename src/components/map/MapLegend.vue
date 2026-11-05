@@ -30,7 +30,7 @@ import {
   TIES_STYLE
 } from '@/composables/map/trackStyles'
 import { PIN_COLORS } from '@/config/demands'
-import { MAX_BRIDGE_KM } from '@/composables/map/water'
+import { gameRules } from '@/config/game'
 
 const { towns } = storeToRefs(useTownsStore())
 const playerStore = usePlayerStore()
@@ -113,7 +113,7 @@ const commodities = computed(() => legendCommodities(towns.value))
           <span class="map-legend__symbol">
             <span class="map-legend__water"></span>
           </span>
-          Water: bridged at extra cost, up to {{ MAX_BRIDGE_KM }} km
+          Water: bridged at extra cost, up to {{ gameRules.bridges.maxKm }} km
         </li>
         <li class="map-legend__row">
           <!-- A short piece of track, drawn the way the map draws it: a dark

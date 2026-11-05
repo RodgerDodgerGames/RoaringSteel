@@ -41,14 +41,14 @@
 
 import { gameRules } from '@/config/game'
 import { pointsAlongLine, cellPath, kmBetween } from '@/composables/map/trackCost'
-import { findCell, cellContaining } from '@/composables/map/cellGrid'
+import { findCell, cellContaining, cellKm } from '@/composables/map/cellGrid'
 import {
   latitudeDegreesToMeters,
   longitudeDegreesToMeters,
   metersToLatitudeDegrees,
   metersToLongitudeDegrees
 } from '@/composables/setup/useMapSupport'
-import { isWaterCell, longestCrossing, MAX_BRIDGE_KM } from '@/composables/map/water'
+import { isWaterCell, longestCrossing, maxBridgeCells } from '@/composables/map/water'
 
 /**
  * The grid cells the towns sit in. Track may go into these even where they
@@ -175,8 +175,8 @@ function kmToTrack(point, legs, count = legs.length) {
  * Whether a line runs alongside track for longer than a crossing takes.
  *
  * The line is walked point by point, keeping a running total of the
- * distance it has been beside track — within `nearKm` of it — without a
- * break. A step counts only when the points at both ends of it are beside,
+ * distance it has been beside track — within `nearCells` of a cell of it —
+ * without a break. A step counts only when the points at both ends of it are beside,
  * so the total is how far the line was beside, not one step more.
  *
  * Each leg is held up against the built track and against the line's own
@@ -188,10 +188,13 @@ function kmToTrack(point, legs, count = legs.length) {
  * @param {Array<boolean>} inTown - Per sample point, in order, whether it is
  *   in a town's cell, where being beside track does not count
  * @param {Object} builtTrack - Built track (see `trackIndex`)
+ * @param {Object} grid - The grid, whose cells the spacing is counted in
  * @returns {boolean} True if the line runs alongside track
  */
-function runsAlongside(legPoints, inTown, builtTrack) {
-  const { nearKm, maxBesideKm } = gameRules.trackSpacing
+function runsAlongside(legPoints, inTown, builtTrack, grid) {
+  const { nearCells, maxBesideCells } = gameRules.trackSpacing
+  const nearKm = nearCells * cellKm(grid)
+  const maxBesideKm = maxBesideCells * cellKm(grid)
   const ownLegs = legPoints.map((points) => [points[0], points.at(-1)])
 
   /** Whether a point on leg number `leg` is within the spacing of track */
@@ -248,7 +251,7 @@ export function lineBlock(
   const legPoints =
     latlngs.length === 1
       ? [[latlngs[0]]]
-      : latlngs.slice(1).map((to, i) => pointsAlongLine([latlngs[i], to]))
+      : latlngs.slice(1).map((to, i) => pointsAlongLine([latlngs[i], to], grid))
   const points = legPoints.flat()
   const towns = new Set(townCells)
   const inTown = points.map((point) => towns.has(cellContaining(point, grid)))
@@ -257,11 +260,11 @@ export function lineBlock(
   if (outside !== -1) return { reason: 'outside', point: points[outside] }
 
   const path = cellPath(latlngs, grid)
-  if (longestCrossing(path, grid, townCells) > gameRules.bridges.maxCells) {
+  if (longestCrossing(path, grid, townCells) > maxBridgeCells(grid)) {
     return { reason: 'water' }
   }
 
-  if (runsAlongside(legPoints, inTown, builtTrack)) return { reason: 'alongside' }
+  if (runsAlongside(legPoints, inTown, builtTrack, grid)) return { reason: 'alongside' }
 
   const end = path.at(-1)
   if (isFinished && end !== undefined && isWaterCell(grid, end) && !towns.has(end)) {
@@ -281,13 +284,11 @@ export function blockMessage(block, regionName) {
     case 'outside':
       return `Track can't go outside ${regionName || 'the map'}.`
     case 'water':
-      return `Too much water to bridge: a bridge can span at most ${MAX_BRIDGE_KM} km.`
+      return `Too much water to bridge: a bridge can span at most ${gameRules.bridges.maxKm} km.`
     case 'endsOnWater':
       return "Track can't end on water: a bridge has to reach land."
-    case 'alongside': {
-      const { nearKm } = gameRules.trackSpacing
-      return `Track can't run alongside track already built: cross it more squarely, or keep ${nearKm} km away.`
-    }
+    case 'alongside':
+      return "Track can't run alongside track already built: cross it more squarely, or keep further away."
     default:
       return "Track can't go there."
   }

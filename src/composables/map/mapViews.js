@@ -9,9 +9,9 @@
  *   around it. This is the board laid out on the table: where players work
  *   out where to start building and which demands to chase. The game opens
  *   in this view.
- * - **Build**: close enough to lay track cell by cell. Zoom is held between
- *   `mapViewConfig.buildMinZoom` and `buildMaxZoom`, and panning stops a
- *   little past the edge of the region.
+ * - **Build**: close enough to lay track cell by cell. Zoom is held to a
+ *   range set by the size of the grid's cells (see `buildZoomRange`), and
+ *   panning stops a little past the edge of the region.
  *
  * The functions here work out where each view looks, and where a town's
  * popup goes in the Plan view. They are pure (plain numbers in, plain numbers
@@ -25,6 +25,7 @@
 
 import { bbox } from '@turf/turf'
 import { mapViewConfig } from '@/config/map'
+import { metersPerPixel } from '@/composables/setup/useElevationTiles'
 
 /** The view that shows the whole region, fixed in place */
 export const PLAN_VIEW = 'plan'
@@ -68,13 +69,41 @@ export function panLimits(bounds, margin = mapViewConfig.panMargin) {
   ]
 }
 
+/** The basemap's closest zoom */
+const MAX_MAP_ZOOM = 18
+
+/**
+ * The Build view's range of zoom levels, for a grid of cells this wide.
+ *
+ * The closest is whichever whole zoom shows a cell nearest
+ * `mapViewConfig.buildCellPixels` across, so a small board's small cells are
+ * seen as closely as a big board's big ones; the furthest is
+ * `buildZoomSteps` out from it.
+ *
+ * @param {number} cellWidthKm - How wide the grid's cells are
+ * @param {number} latitude - Where, in degrees; map pixels cover less
+ *   ground toward the poles
+ * @returns {{min: number, max: number}} The furthest and closest zoom
+ */
+export function buildZoomRange(cellWidthKm, latitude) {
+  const metersPerPixelAtZero = metersPerPixel(0, latitude)
+  // At zoom z a cell is cellMeters / (metersPerPixelAtZero / 2^z) pixels
+  // across; solved for the zoom that makes that buildCellPixels
+  const exact = Math.log2(
+    (mapViewConfig.buildCellPixels * metersPerPixelAtZero) / (cellWidthKm * 1000)
+  )
+  const max = Math.min(MAX_MAP_ZOOM, Math.round(exact))
+  return { min: max - mapViewConfig.buildZoomSteps, max }
+}
+
 /**
  * Holds a zoom to the Build view's range.
  * @param {number} zoom - Any zoom level
+ * @param {{min: number, max: number}} range - See `buildZoomRange`
  * @returns {number} The nearest zoom the Build view allows
  */
-function toBuildZoom(zoom) {
-  return Math.min(Math.max(zoom, mapViewConfig.buildMinZoom), mapViewConfig.buildMaxZoom)
+function toBuildZoom(zoom, { min, max }) {
+  return Math.min(Math.max(zoom, min), max)
 }
 
 /**
@@ -82,11 +111,11 @@ function toBuildZoom(zoom) {
  *
  * The first time, it opens over the middle of the region one whole zoom level
  * closer than the Plan view, so switching to it zooms in. (A region the size
- * of Colorado fits a desktop window at about 7.5, well inside the Build
- * view's range, so opening at its furthest zoom would show the region smaller
- * than the Plan view did.) The exceptions are the smallest states, which the
- * Plan view already shows closer than the Build view's closest zoom; their
- * Build view opens at that closest zoom.
+ * of Colorado fits a desktop window at about 7.5, so opening any further out
+ * would show the region smaller than the Plan view did.) The Build view's
+ * range holds the zoom in: on most boards its furthest zoom is already
+ * closer than one level in from the Plan view, and the Build view opens
+ * there.
  *
  * A last view the Build view could not have been left at, centered past its
  * pan limits or at a zoom outside its range, counts as no last view at all.
@@ -100,26 +129,26 @@ function toBuildZoom(zoom) {
  *   Where the Build view was last left (the map store's `mapZoom` and
  *   `mapCenter`)
  * @param {Array<Array<number>>} bounds - The region's box
- * @param {number} [planZoom] - The zoom the Plan view fits the region at.
- *   Without it, the first opening is at the Build view's furthest zoom.
+ * @param {number|undefined} planZoom - The zoom the Plan view fits the region
+ *   at. Without it, the first opening is at the Build view's furthest zoom.
+ * @param {{min: number, max: number}} range - The Build view's zoom range
+ *   (see `buildZoomRange`)
  * @returns {{zoom: number, center: Array<number>}} The zoom and [lat, lng]
  *   center to open at
  */
-export function buildViewStart(lastView, bounds, planZoom) {
+export function buildViewStart(lastView, bounds, planZoom, range) {
   const [[south, west], [north, east]] = bounds
   const [[minLat, minLng], [maxLat, maxLng]] = panLimits(bounds)
   const [lat, lng] = lastView?.center ?? []
   const isWithinReach = lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng
   const zoom = Math.round(lastView?.zoom)
-  const wasLeftHere = isWithinReach && zoom === toBuildZoom(zoom)
+  const wasLeftHere = isWithinReach && zoom === toBuildZoom(zoom, range)
 
   if (wasLeftHere) return { zoom, center: [lat, lng] }
 
-  const firstZoom = Number.isFinite(planZoom)
-    ? Math.floor(planZoom) + 1
-    : mapViewConfig.buildMinZoom
+  const firstZoom = Number.isFinite(planZoom) ? Math.floor(planZoom) + 1 : range.min
   return {
-    zoom: toBuildZoom(firstZoom),
+    zoom: toBuildZoom(firstZoom, range),
     center: [(south + north) / 2, (west + east) / 2]
   }
 }

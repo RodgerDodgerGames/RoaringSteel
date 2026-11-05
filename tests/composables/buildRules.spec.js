@@ -24,7 +24,10 @@ import {
 import { regionTest } from '@/composables/map/region'
 import { gameRules } from '@/config/game'
 import { nlcdCostMap } from '@/config/nlcd'
-import { makeTestGrid, CELL } from '../utils/testGrid'
+import { makeTestGrid, CELL, CELL_METERS } from '../utils/testGrid'
+
+/** The most water cells a bridge may cross on the test grids' 10 km cells */
+const MAX_BRIDGE_CELLS = Math.floor(gameRules.bridges.maxKm / (CELL_METERS / 1000))
 
 /** A square of the region, `size` cells across, starting `x` cells east */
 const square = (x, size) => [
@@ -122,13 +125,13 @@ describe('lineBlock over water', () => {
   })
 
   it('should let a line bridge as many water cells in a row as allowed', () => {
-    const water = Array.from({ length: gameRules.bridges.maxCells }, (_, i) => i + 1)
+    const water = Array.from({ length: MAX_BRIDGE_CELLS }, (_, i) => i + 1)
 
     expect(lineBlock([at(0), at(water.length + 1)], rulesWith(water))).toBeNull()
   })
 
   it('should refuse a crossing longer than the longest bridge', () => {
-    const water = Array.from({ length: gameRules.bridges.maxCells + 1 }, (_, i) => i + 1)
+    const water = Array.from({ length: MAX_BRIDGE_CELLS + 1 }, (_, i) => i + 1)
 
     expect(lineBlock([at(0), at(water.length + 1)], rulesWith(water))).toEqual({ reason: 'water' })
   })
@@ -138,7 +141,7 @@ describe('lineBlock over water', () => {
   })
 
   it('should refuse a crossing drawn over several legs, however short each', () => {
-    const water = Array.from({ length: gameRules.bridges.maxCells + 1 }, (_, i) => i + 1)
+    const water = Array.from({ length: MAX_BRIDGE_CELLS + 1 }, (_, i) => i + 1)
 
     const legs = [at(0), ...water.map((cell) => at(cell)), at(water.length + 1)]
 
@@ -146,7 +149,7 @@ describe('lineBlock over water', () => {
   })
 
   it("should not count a town on the shore toward a crossing's length", () => {
-    const water = Array.from({ length: gameRules.bridges.maxCells + 1 }, (_, i) => i + 1)
+    const water = Array.from({ length: MAX_BRIDGE_CELLS + 1 }, (_, i) => i + 1)
     const rules = rulesWith(water)
     // The last water cell is a town's: the land the bridge reaches
     const town = water.at(-1)

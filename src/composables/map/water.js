@@ -3,23 +3,24 @@
  *
  * Which grid cells are water, and what a bridge over them costs.
  *
- * A cell is water when the land cover at its center is open water — a lake,
- * a reservoir, a wide river or bay. (Permanent ice is counted the same way;
+ * A cell is water when most of its land cover is open water — a lake, a
+ * reservoir, a wide river or bay (see useLandCoverAPI.js). (Permanent ice is counted the same way;
  * the grid gives the two one cost and cannot tell them apart.) The big water
  * on a state's edge — the sea, the Great Lakes, Chesapeake Bay — is mostly
  * outside the state's outline, so it is under the region mask already; the
  * water here is the water inside the state.
  *
- * Track may cross water on a bridge. Each water cell in a row costs more
- * than the one before, and a crossing too long to bridge cannot be built
- * (see `gameRules.bridges`).
+ * Track may cross water on a bridge. Each km of a crossing costs more the
+ * further out it is, and a crossing too long to bridge cannot be built (see
+ * `gameRules.bridges`). Both are set in km, and turned into cells here for
+ * the size of the grid's cells.
  *
  * @module composables/map/water
  */
 
 import { nlcdCostMap } from '@/config/nlcd'
 import { gameRules } from '@/config/game'
-import { gridConfig } from '@/config/grid'
+import { cellKm } from '@/composables/map/cellGrid'
 
 /**
  * The land cover cost the grid gives open water (NLCD class 11). The grid
@@ -39,17 +40,32 @@ export function isWaterCell(grid, cell) {
 
 /**
  * What the bridge over one water cell costs, by how far into the crossing
- * the cell is: the first water cell in a row costs `costPerCell`, the second
- * twice that, and so on.
+ * the cell is: `costPerKm` for each km of it, times which `stepKm` of the
+ * crossing the cell reaches into. With 10 km cells and steps, the first
+ * water cell in a row costs $5,000 and the second $10,000; with 1 km cells,
+ * each of the first ten costs $500 and each of the next ten $1,000 — the
+ * same $15,000 for 20 km of water.
  * @param {number} position - The cell's place in its row of water cells, from 1
- * @returns {number} The cost
+ * @param {number} cellWidthKm - The grid's cell width (see `cellKm`)
+ * @returns {number} The cost, in dollars
  */
-export function bridgeCellCost(position) {
-  return gameRules.bridges.costPerCell * position
+export function bridgeCellCost(position, cellWidthKm) {
+  const { costPerKm, stepKm } = gameRules.bridges
+  // The step the cell's far edge is in; a hair's leeway keeps a cell that
+  // ends exactly on a step's end in that step
+  const step = Math.ceil((position * cellWidthKm) / stepKm - 1e-9)
+  return Math.round(costPerKm * cellWidthKm * step)
 }
 
-/** The longest bridge track may cross water on, in km */
-export const MAX_BRIDGE_KM = (gameRules.bridges.maxCells * gridConfig.cellSize) / 1000
+/**
+ * How many water cells in a row a bridge may cross on this grid: as many as
+ * fit in `gameRules.bridges.maxKm`.
+ * @param {Object} grid - The grid
+ * @returns {number} Cells
+ */
+export function maxBridgeCells(grid) {
+  return Math.floor(gameRules.bridges.maxKm / cellKm(grid) + 1e-9)
+}
 
 /**
  * The longest crossing of water along a line: the most water cells it

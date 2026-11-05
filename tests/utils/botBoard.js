@@ -13,21 +13,20 @@
  *   an eleventh out in the notch that no track can reach.
  */
 
-import { gridConfig } from '@/config/grid'
 import { nlcdCostMap } from '@/config/nlcd'
 import {
   metersToLatitudeDegrees,
   metersToLongitudeDegrees
 } from '@/composables/setup/useMapSupport'
-import { makeTestGrid } from './testGrid'
+import { makeTestGrid, CELL_METERS } from './testGrid'
 
 export const ROWS = 20
 export const COLS = 26
 
 const SOUTH = 40
 const WEST = -100
-const LAT_STEP = metersToLatitudeDegrees(gridConfig.cellSize)
-const LNG_STEP = metersToLongitudeDegrees(gridConfig.cellSize, SOUTH + (ROWS * LAT_STEP) / 2)
+const LAT_STEP = metersToLatitudeDegrees(CELL_METERS)
+const LNG_STEP = metersToLongitudeDegrees(CELL_METERS, SOUTH + (ROWS * LAT_STEP) / 2)
 const NORTH = SOUTH + ROWS * LAT_STEP
 const EAST = WEST + COLS * LNG_STEP
 

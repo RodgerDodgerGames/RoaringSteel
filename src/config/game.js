@@ -46,14 +46,16 @@ export const gameRules = {
    * ground on every board, whatever the board's size or its cells': 20 at
    * the board game's rate, a little over two turns of a Freight's running.
    *
-   * Each grid cell's terrain cost (land cover plus slope, see stores/grid.js)
-   * is read against `openGroundCost`, the terrain cost of an ordinary 10 km
-   * cell — Empire Builder's clear terrain, the most common ground on its map:
+   * Each grid cell's terrain cost (land cover plus slope, see
+   * composables/map/terrainCost.js) is read against `openGroundCost`, the
+   * terrain cost of ordinary ground — Empire Builder's clear terrain, the
+   * most common ground on its map:
    * a cell at that cost is priced at `perSpeedUnit` per speed unit of its
-   * width, one twice as costly at twice that. Measured on real 10 km grids
-   * (2026-11-04): Colorado's plains run about 370–500, the middle of
-   * Maryland's cells 530 and of Massachusetts' 790; 450 sits among them. It
-   * will need setting again when the terrain cost model changes.
+   * width, one twice as costly at twice that. Measured on real boards cut to
+   * the cell budget (2026-11-04): Colorado's plains run about 175–245, and
+   * the middle of all the cells is 560 in Colorado, 610 in Maryland and 710
+   * in Massachusetts, so a typical cell costs 1.2–1.6 times ordinary ground.
+   * Computer players win at that (see `multiplier`).
    *
    * `maxTerrainFactor` caps how much dearer than ordinary ground a cell can
    * be: Empire Builder's alpine mileposts, its dearest ground, cost 5 times
@@ -96,20 +98,23 @@ export const gameRules = {
   /**
    * Bridges: what it costs to carry track over water, and how far it may go.
    *
-   * A grid cell is water when its land cover is open water (see water.js).
-   * Track crossing water pays for a bridge instead of the cell's own cost,
-   * and each water cell in a row costs more than the one before — the first
-   * `costPerCell`, the second twice that, and so on — because a long bridge
-   * is a far bigger job than a short one. A crossing of more than
-   * `maxCells` water cells in a row cannot be built at all.
+   * A grid cell is water when most of its land cover is open water (see
+   * water.js). Track crossing water pays for a bridge instead of the cell's
+   * own cost, and each km of bridge costs more the further out it is —
+   * `costPerKm` for the first `stepKm`, twice that for the next, and so on —
+   * because a long bridge is a far bigger job than a short one. A crossing
+   * longer than `maxKm` cannot be built at all.
    *
-   * For scale: an ordinary 10 km cell on a Colorado-sized board costs
-   * about $870 (see `trackPrice`), and a turn's building allowance is
-   * $20,000.
+   * Set in km so bridges cost the same whatever the size of the grid's
+   * cells: a 10 km crossing is $5,000 and a 20 km one $15,000, as when cells
+   * were always 10 km and each water cell cost $5,000 more than the last.
+   * (Water is due a rework of its own: bridges priced by the crossing, from
+   * a map of rivers and lakes.)
    */
   bridges: {
-    costPerCell: 5000,
-    maxCells: 2
+    costPerKm: 500,
+    stepKm: 10,
+    maxKm: 20
   },
 
   /**
@@ -117,16 +122,18 @@ export const gameRules = {
    * may cross at a milepost but never share the way between two, new track
    * may cross built track but not run alongside it.
    *
-   * New track is "beside" built track wherever it is within `nearKm` of it —
-   * half a grid cell, the width of the band a line runs down the middle
-   * of. It may be beside built track for at most `maxBesideKm` at a stretch. Crossing
-   * square on takes about 10 km of that (5 km each side); the stretch grows
-   * as the angle flattens, so 20 km lets a line cross at anything steeper
-   * than about 30°, and stops it running along, or weaving along, a line.
+   * Counted in grid cells, the board's mileposts, so the rule is the same on
+   * every board. New track is "beside" built track wherever it is within
+   * `nearCells` of a cell of it — half a cell, the width of the band a line
+   * runs down the middle of. It may be beside built track for at most
+   * `maxBesideCells` at a stretch. Crossing square on takes about one cell of
+   * that (half a cell each side); the stretch grows as the angle flattens, so
+   * two cells lets a line cross at anything steeper than about 30°, and stops
+   * it running along, or weaving along, a line.
    */
   trackSpacing: {
-    nearKm: 5,
-    maxBesideKm: 20
+    nearCells: 0.5,
+    maxBesideCells: 2
   },
 
   /**

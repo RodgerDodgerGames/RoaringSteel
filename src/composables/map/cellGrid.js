@@ -27,6 +27,8 @@
  * @module composables/map/cellGrid
  */
 
+import { latitudeDegreesToMeters } from '@/composables/setup/useMapSupport'
+
 /**
  * @typedef {Object} CellGrid
  * @property {number} rows - Rows of cells, south to north
@@ -105,6 +107,17 @@ export function setCell(grid, index, { elevation, landCover, cost = NaN }) {
  */
 export function isEmptyGrid(grid) {
   return !grid || grid.count === 0
+}
+
+/**
+ * How wide a grid's cells are, in km, north to south. Cells are cut square
+ * in meters at the middle of the region (see stores/grid.js), so this is
+ * their size; east to west they narrow a little toward the poles.
+ * @param {CellGrid} grid - The grid
+ * @returns {number} Kilometers
+ */
+export function cellKm(grid) {
+  return latitudeDegreesToMeters(grid.latStep) / 1000
 }
 
 /**

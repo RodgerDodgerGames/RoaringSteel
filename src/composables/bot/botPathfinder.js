@@ -43,8 +43,9 @@ import { gameRules } from '@/config/game'
 import { pointsAlongLine, kmBetween, landCellPrice } from '@/composables/map/trackCost'
 import { townEntryFee } from '@/composables/townEntry'
 import { lineBlock } from '@/composables/map/buildRules'
-import { isWaterCell, bridgeCellCost } from '@/composables/map/water'
+import { isWaterCell, bridgeCellCost, maxBridgeCells } from '@/composables/map/water'
 import {
+  cellKm,
   findCell,
   cellCenter,
   cellIndexes,
@@ -54,12 +55,27 @@ import {
 import { MinHeap, townKey } from '@/composables/network'
 
 /**
- * How many cells right beside built track a line may pass through in a row.
- * Two lets a line cross track at any angle (a line drawn between two cell
- * centers has cells beside it on both sides); three in a row is running
- * alongside it.
+ * How many cells right beside built track a line may pass through in a row:
+ * the build rules' `maxBesideCells` (see `gameRules.trackSpacing`). Two lets
+ * a line cross track at any angle (a line drawn between two cell centers has
+ * cells beside it on both sides); three in a row is running alongside it.
  */
-const MAX_BESIDE_CELLS = 2
+const MAX_BESIDE_CELLS = gameRules.trackSpacing.maxBesideCells
+
+/**
+ * The most water cells in a row the search will plan a bridge over, whatever
+ * the rules allow.
+ *
+ * The search keeps count of the water cells a line has just crossed, so the
+ * memory it needs grows with the longest bridge it may plan: on a grid of
+ * small cells, the 20 km the rules allow can be eighty cells, and a search
+ * over a quarter of a million cells with that many counts each would need
+ * gigabytes. Six keeps it to a few tens of megabytes. Computer players go
+ * round water wider than that — 6 km on a grid of 1 km cells — where a
+ * person may bridge it. (Water is due a rework, with bridges priced by the
+ * crossing, that may lift this.)
+ */
+const MAX_SEARCH_BRIDGE_CELLS = 6
 
 /**
  * What passing through a cell beside built track adds to a line's cost in
@@ -77,6 +93,36 @@ const BESIDE_PENALTY = 400
  * with no price (missing terrain data) as free to wander.
  */
 const STEP_COST = 50
+
+/**
+ * Which cells of a grid are inside the region, kept per grid: worked out
+ * once and reused by every search on that grid. Testing a cell's center
+ * against the state's outline is slow — thousands of the outline's points
+ * per cell — and a grid of a quarter of a million cells took seconds to test
+ * on every search. Held weakly, so a grid no longer in play is let go.
+ * Each entry remembers the region test it was made with, and is made again
+ * if the test is a different one (another region on the same grid).
+ * @type {WeakMap<Object, {isInRegion: Function, inside: Uint8Array}>}
+ */
+const regionMasks = new WeakMap()
+
+/**
+ * Per cell of a grid, 1 if its center is inside the region (see
+ * `regionMasks`).
+ * @param {Object} grid - The grid
+ * @param {Function} isInRegion - The region test (see region.js)
+ * @returns {Uint8Array} The mask
+ */
+function regionMask(grid, isInRegion) {
+  const kept = regionMasks.get(grid)
+  if (kept?.isInRegion === isInRegion) return kept.inside
+  const inside = new Uint8Array(grid.present.length)
+  cellIndexes(grid).forEach((index) => {
+    inside[index] = isInRegion(cellCenter(grid, index)) ? 1 : 0
+  })
+  regionMasks.set(grid, { isInRegion, inside })
+  return inside
+}
 
 /** How many times a line that breaks a build rule is searched for again */
 const MAX_ATTEMPTS = 6
@@ -105,23 +151,24 @@ export function searchBoard(rules, towns, reached = new Set()) {
   const size = grid.present.length
   const townCellSet = new Set(rules.townCells)
 
+  const inside = regionMask(grid, rules.isInRegion)
   const isTownCell = new Uint8Array(size)
   const isOpen = new Uint8Array(size)
   const isWater = new Uint8Array(size)
   cellIndexes(grid).forEach((index) => {
     isTownCell[index] = townCellSet.has(index) ? 1 : 0
     // Town cells may be built in even where they reach outside the region
-    isOpen[index] = isTownCell[index] || rules.isInRegion(cellCenter(grid, index)) ? 1 : 0
+    isOpen[index] = isTownCell[index] || inside[index] ? 1 : 0
     isWater[index] = isWaterCell(grid, index) ? 1 : 0
   })
 
   // Cells with a center within the spacing distance of built track. Track is
   // walked at the points pricing checks it at, and the cells around each are
   // measured; a quarter-cell gap between points is allowed for.
-  const { nearKm } = gameRules.trackSpacing
+  const nearKm = gameRules.trackSpacing.nearCells * cellKm(grid)
   const isBeside = new Uint8Array(size)
   ;(rules.builtTrack?.legs ?? []).forEach((leg) => {
-    pointsAlongLine(leg).forEach((point) => {
+    pointsAlongLine(leg, grid).forEach((point) => {
       const middle = findCell(point, grid)
       if (middle === -1) return
       ;[middle, ...cellNeighbors(grid, middle).map(({ index }) => index)].forEach((index) => {
@@ -145,13 +192,17 @@ export function searchBoard(rules, towns, reached = new Set()) {
     if (!reached.has(townKey(town))) townFee[index] = townEntryFee(town)
   })
 
+  const widthKm = cellKm(grid)
   // The least a step onto any open cell can add, for the A* estimate (see
   // `costField`): the step cost, plus the cheapest cell to step onto — a
   // bridge's first cell, for water
   let cheapestCell = Infinity
   for (let index = 0; index < size; index++) {
     if (!isOpen[index]) continue
-    cheapestCell = Math.min(cheapestCell, cellCost(grid, index, isWater[index], 1, priceScale))
+    cheapestCell = Math.min(
+      cheapestCell,
+      cellCost(grid, index, isWater[index], 1, priceScale, widthKm)
+    )
   }
   const minStep = STEP_COST * priceScale + (Number.isFinite(cheapestCell) ? cheapestCell : 0)
 
@@ -159,6 +210,7 @@ export function searchBoard(rules, towns, reached = new Set()) {
     grid,
     rules,
     priceScale,
+    widthKm,
     isOpen,
     isWater,
     isTownCell,
@@ -180,10 +232,11 @@ export function searchBoard(rules, towns, reached = new Set()) {
  * @param {boolean} isWater - Whether it is water
  * @param {number} crossing - Its place in its row of water cells, from 1
  * @param {number} priceScale - Dollars per point of terrain cost
+ * @param {number} widthKm - The grid's cell width (see `cellKm`)
  * @returns {number} The cost, in dollars
  */
-function cellCost(grid, cell, isWater, crossing, priceScale) {
-  if (isWater) return bridgeCellCost(crossing)
+function cellCost(grid, cell, isWater, crossing, priceScale, widthKm) {
+  if (isWater) return bridgeCellCost(crossing, widthKm)
   const cost = grid.cost[cell]
   return Number.isFinite(cost) ? landCellPrice(cost, priceScale) : 0
 }
@@ -220,10 +273,20 @@ function cellCost(grid, cell, isWater, crossing, priceScale) {
  *   of a search that stopped early, which cannot answer for it.
  */
 export function costField(board, sources, { shut = new Set(), targets } = {}) {
-  const { grid, priceScale, isOpen, isWater, isTownCell, isBeside, townIn, townFee, minStep } =
-    board
+  const {
+    grid,
+    priceScale,
+    widthKm,
+    isOpen,
+    isWater,
+    isTownCell,
+    isBeside,
+    townIn,
+    townFee,
+    minStep
+  } = board
   const size = grid.present.length
-  const { maxCells } = gameRules.bridges
+  const maxCells = Math.min(maxBridgeCells(grid), MAX_SEARCH_BRIDGE_CELLS)
 
   // A search state is a cell plus the two running counts, packed into one
   // number: cell * STATES + water * (MAX_BESIDE_CELLS + 1) + beside
@@ -231,7 +294,9 @@ export function costField(board, sources, { shut = new Set(), targets } = {}) {
   const STATES = (maxCells + 1) * besideStates
   const pack = (cell, water, beside) => cell * STATES + water * besideStates + beside
 
-  const cost = new Float64Array(size * STATES).fill(Infinity)
+  // Single precision is plenty for comparing what lines cost, and halves
+  // what a search over a big grid holds
+  const cost = new Float32Array(size * STATES).fill(Infinity)
   const previous = new Int32Array(size * STATES).fill(-1)
   // Where each starting cell's line begins: the source point in it
   const startIn = new Map()
@@ -261,7 +326,7 @@ export function costField(board, sources, { shut = new Set(), targets } = {}) {
     startIn.set(index, point)
     const water = isWater[index] && !isTownCell[index] ? 1 : 0
     const state = pack(index, water, isBeside[index])
-    cost[state] = cellCost(grid, index, isWater[index], 1, priceScale)
+    cost[state] = cellCost(grid, index, isWater[index], 1, priceScale, widthKm)
     frontier.push(cost[state] + estimate(index), state)
   })
 
@@ -297,7 +362,7 @@ export function costField(board, sources, { shut = new Set(), targets } = {}) {
       // The cell's price, the town's entry fee if it is a town not yet
       // reached, and the search's own nudges
       const step =
-        cellCost(grid, next, isWater[next], water + 1, priceScale) +
+        cellCost(grid, next, isWater[next], water + 1, priceScale, widthKm) +
         townFee[next] +
         (STEP_COST + (isBeside[next] ? BESIDE_PENALTY : 0)) * priceScale
       const nextState = pack(next, nextWater, nextBeside)

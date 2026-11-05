@@ -27,6 +27,7 @@ vi.mock('@/composables/utils', async (importOriginal) => {
 })
 
 import {
+  cellOfPixel,
   landCoverClass,
   landCoverImages,
   landCoverYears,
@@ -112,70 +113,66 @@ describe('landCoverClass', () => {
   })
 })
 
+/** A grid of 2 by 2 cells, 0.1 degrees a side, unless told otherwise */
+const shapeOf = ({ rows = 2, cols = 2 } = {}) => ({
+  rows,
+  cols,
+  south: 44.9,
+  west: -93.3,
+  latStep: 0.1,
+  lngStep: 0.1
+})
+
 describe('landCoverImages', () => {
-  const lngPerPixel = 0.01
-  const latPerPixel = 0.01
+  const perCell = gridApiConfig.pixelsPerCell
+  const size = gridApiConfig.landCoverImageSize
 
-  it('should cover a small set of cells with one picture', () => {
-    const images = landCoverImages(
-      [
-        { lat: 44, lng: -95 },
-        { lat: 44.5, lng: -94 }
-      ],
-      lngPerPixel,
-      latPerPixel
-    )
+  it('should cover a small grid with one picture, its pixels a whole number to a cell', () => {
+    const shape = shapeOf()
+    const [image, ...more] = landCoverImages(shape)
 
-    expect(images).toHaveLength(1)
+    expect(more).toHaveLength(0)
+    expect(image.width).toBe(2 * perCell)
+    expect(image.height).toBe(2 * perCell)
+    expect(image.west).toBeCloseTo(shape.west)
+    expect(image.east).toBeCloseTo(shape.west + 2 * shape.lngStep)
+    expect(image.north).toBeCloseTo(shape.south + 2 * shape.latStep)
   })
 
-  it('should split cells too wide for one picture across more', () => {
-    const size = gridApiConfig.landCoverImageSize
-    const images = landCoverImages(
-      [
-        { lat: 44, lng: -95 },
-        { lat: 44, lng: -95 + (size + 10) * lngPerPixel }
-      ],
-      lngPerPixel,
-      latPerPixel
-    )
+  it('should split a grid too wide for one picture across more', () => {
+    const cols = Math.ceil(size / perCell) + 1
+    const images = landCoverImages(shapeOf({ cols }))
 
     expect(images).toHaveLength(2)
-    // The second is cut short to what its cells need
-    expect(images[1].width).toBeLessThan(size)
+    // The second is cut short at the grid's edge
+    expect(images[1].width).toBe(cols * perCell - size)
+    expect(images[1].left).toBe(size)
   })
 
-  it("should put each cell's pixel over the cell's center", () => {
-    // Whatever the layout, the pixel a cell reads must be the one its center
-    // falls in: the picture's west or north edge plus the pixel's place, to
-    // within half a pixel. 40 cells spread wide enough to need several
-    // pictures.
-    const locations = []
-    for (let i = 0; i < 40; i++) {
-      locations.push({ lat: 40 + i * 0.37, lng: -100 + i * 0.53 })
-    }
-    const images = landCoverImages(locations, lngPerPixel, latPerPixel)
+  it('should put every pixel in the cell under it', () => {
+    const shape = shapeOf({ rows: 3, cols: Math.ceil(size / perCell) + 1 })
+    const images = landCoverImages(shape)
+    const lngPerPixel = shape.lngStep / perCell
+    const latPerPixel = shape.latStep / perCell
 
-    expect(images.length).toBeGreaterThan(1)
     images.forEach((image) => {
-      expect(image.east - image.west).toBeCloseTo(image.width * lngPerPixel)
-      expect(image.north - image.south).toBeCloseTo(image.height * latPerPixel)
-      image.cells.forEach(({ index, px, py }) => {
-        expect(px).toBeLessThan(image.width)
-        expect(py).toBeLessThan(image.height)
-        const pixelLng = image.west + (px + 0.5) * lngPerPixel
-        const pixelLat = image.north - (py + 0.5) * latPerPixel
-        expect(Math.abs(pixelLng - locations[index].lng)).toBeLessThanOrEqual(lngPerPixel / 2)
-        expect(Math.abs(pixelLat - locations[index].lat)).toBeLessThanOrEqual(latPerPixel / 2)
+      ;[
+        [0, 0],
+        [image.width - 1, image.height - 1],
+        [Math.floor(image.width / 2), 3]
+      ].forEach(([px, py]) => {
+        const lng = image.west + (px + 0.5) * lngPerPixel
+        const lat = image.north - (py + 0.5) * latPerPixel
+        const cell = cellOfPixel(image, px, py, shape)
+        const row = Math.floor((lat - shape.south) / shape.latStep)
+        const col = Math.floor((lng - shape.west) / shape.lngStep)
+        expect(cell).toBe(row * shape.cols + col)
       })
     })
-    // Every cell is in exactly one picture
-    const covered = images.flatMap((image) => image.cells.map(({ index }) => index))
-    expect(covered.sort((a, b) => a - b)).toEqual(locations.map((_, index) => index))
   })
 
-  it('should lay out nothing for no cells', () => {
-    expect(landCoverImages([], lngPerPixel, latPerPixel)).toEqual([])
+  it('should lay out nothing for a grid with no cells', () => {
+    expect(landCoverImages(shapeOf({ rows: 0 }))).toEqual([])
   })
 })
 
@@ -184,18 +181,66 @@ describe('useLandCoverAPI', () => {
     vi.clearAllMocks()
   })
 
-  const locations = [
-    { lat: 44.98, lng: -93.27 },
-    { lat: 44.9, lng: -93.1 }
-  ]
+  const FOREST = hex('68aa63')
+  const GRASS = hex('dfdfc2')
+  const WATER = hex('466b9f')
 
-  it('should turn the class under each cell into its cost', async () => {
-    mockFetchImagePixels.mockImplementation(answerWith(hex('68aa63')))
+  /**
+   * A stand-in server that colors each picture's pixels by where they are in
+   * the whole grid, so a test can paint parts of cells
+   */
+  function paint(colorAt) {
+    return async (url) => {
+      const params = new URL(url).searchParams
+      const width = Number(params.get('WIDTH'))
+      const height = Number(params.get('HEIGHT'))
+      const data = new Uint8ClampedArray(width * height * 4)
+      for (let py = 0; py < height; py++) {
+        for (let px = 0; px < width; px++)
+          data.set([...colorAt(px, py), 255], (py * width + px) * 4)
+      }
+      return { width, height, data }
+    }
+  }
+
+  it('should cost a cell of one class at that class', async () => {
+    mockFetchImagePixels.mockImplementation(answerWith(FOREST))
     const { planLandCover } = useLandCoverAPI()
 
-    const result = await planLandCover(locations, 10000, 2023).fetch()
+    const result = await planLandCover(shapeOf(), 2023).fetch()
 
-    expect(result).toEqual({ costs: [nlcdCostMap[41], nlcdCostMap[41]], failed: 0 })
+    expect(result).toEqual({ costs: Array(4).fill(nlcdCostMap[41]), failed: 0 })
+  })
+
+  it('should cost a cell of mixed ground at the average of its pixels', async () => {
+    // The west half of every cell forest, the east half grassland
+    const half = gridApiConfig.pixelsPerCell / 2
+    mockFetchImagePixels.mockImplementation(
+      paint((px) => (px % gridApiConfig.pixelsPerCell < half ? FOREST : GRASS))
+    )
+    const { planLandCover } = useLandCoverAPI()
+
+    const { costs } = await planLandCover(shapeOf(), 2023).fetch()
+
+    expect(costs).toEqual(Array(4).fill(Math.round((nlcdCostMap[41] + nlcdCostMap[71]) / 2)))
+  })
+
+  it('should make a cell that is mostly water a water cell, and leave water out of the rest', async () => {
+    // The west column of cells three-quarters water, the east a quarter
+    const perCell = gridApiConfig.pixelsPerCell
+    mockFetchImagePixels.mockImplementation(
+      paint((px) => {
+        const along = px % perCell
+        const isWestCell = px < perCell
+        return along < (isWestCell ? 0.75 : 0.25) * perCell ? WATER : GRASS
+      })
+    )
+    const { planLandCover } = useLandCoverAPI()
+
+    const { costs } = await planLandCover(shapeOf({ rows: 1 }), 2023).fetch()
+
+    // The east cell's water is not averaged in: it costs as its land does
+    expect(costs).toEqual([nlcdCostMap[11], nlcdCostMap[71]])
   })
 
   it('should leave a cell with no data null without counting it as a failure', async () => {
@@ -203,44 +248,44 @@ describe('useLandCoverAPI', () => {
     mockFetchImagePixels.mockImplementation(answerWith([255, 255, 255]))
     const { planLandCover } = useLandCoverAPI()
 
-    const result = await planLandCover(locations, 10000, 2023).fetch()
+    const result = await planLandCover(shapeOf(), 2023).fetch()
 
-    expect(result).toEqual({ costs: [null, null], failed: 0 })
+    expect(result).toEqual({ costs: [null, null, null, null], failed: 0 })
   })
 
   it('should count the cells of a failed picture and still finish the rest', async () => {
-    // Far enough apart, at 10 km cells, to need two pictures
-    const apart = [
-      { lat: 44, lng: -100 },
-      { lat: 44, lng: -60 }
-    ]
+    // Wide enough to need two pictures
+    const cols = Math.ceil(gridApiConfig.landCoverImageSize / gridApiConfig.pixelsPerCell) + 1
     mockFetchImagePixels
       .mockRejectedValueOnce(new Error('Request timed out after 30000ms'))
       .mockImplementationOnce(answerWith(hex('dbd83d')))
     const { planLandCover } = useLandCoverAPI()
-    const plan = planLandCover(apart, 10000, 2023)
+    const plan = planLandCover(shapeOf({ rows: 1, cols }), 2023)
 
-    const result = await plan.fetch()
+    const { costs, failed } = await plan.fetch()
 
     expect(plan.requestCount).toBe(2)
-    expect(result).toEqual({ costs: [null, nlcdCostMap[81]], failed: 1 })
+    expect(failed).toBe(cols - 1)
+    expect(costs.at(-1)).toBe(nlcdCostMap[81])
+    expect(costs.slice(0, -1).every((cost) => cost === null)).toBe(true)
   })
 
   it('should count a picture that comes back at the wrong size as failed', async () => {
-    // An error drawn as an image, say: every cell would read the wrong pixel
-    mockFetchImagePixels.mockResolvedValue(imageOf(256, 256, hex('68aa63')))
+    // An error drawn as an image, say: every cell would read the wrong pixels
+    mockFetchImagePixels.mockResolvedValue(imageOf(256, 256, FOREST))
     const { planLandCover } = useLandCoverAPI()
 
-    const result = await planLandCover(locations, 10000, 2023).fetch()
+    const result = await planLandCover(shapeOf(), 2023).fetch()
 
-    expect(result).toEqual({ costs: [null, null], failed: 2 })
+    expect(result).toEqual({ costs: [null, null, null, null], failed: 4 })
   })
 
   it("should ask the Annual NLCD server for a picture of the area in the game's year", async () => {
-    mockFetchImagePixels.mockImplementation(answerWith(hex('68aa63')))
+    mockFetchImagePixels.mockImplementation(answerWith(FOREST))
+    const shape = shapeOf()
     const { planLandCover } = useLandCoverAPI()
 
-    await planLandCover(locations, 10000, 2023).fetch()
+    await planLandCover(shape, 2023).fetch()
 
     const url = new URL(mockFetchImagePixels.mock.calls[0][0])
     expect(url.origin).toBe('https://dmsdata.cr.usgs.gov')
@@ -250,20 +295,18 @@ describe('useLandCoverAPI', () => {
     expect(url.searchParams.get('CRS')).toBe('CRS:84')
     expect(url.searchParams.get('FORMAT')).toBe('image/png')
     const [west, south, east, north] = url.searchParams.get('BBOX').split(',').map(Number)
-    locations.forEach(({ lat, lng }) => {
-      expect(lng).toBeGreaterThan(west)
-      expect(lng).toBeLessThan(east)
-      expect(lat).toBeGreaterThan(south)
-      expect(lat).toBeLessThan(north)
-    })
+    expect(west).toBeCloseTo(shape.west)
+    expect(south).toBeCloseTo(shape.south)
+    expect(east).toBeCloseTo(shape.west + 2 * shape.lngStep)
+    expect(north).toBeCloseTo(shape.south + 2 * shape.latStep)
   })
 
   it('should report progress once per picture', async () => {
-    mockFetchImagePixels.mockImplementation(answerWith(hex('68aa63')))
+    mockFetchImagePixels.mockImplementation(answerWith(FOREST))
     const onProgress = vi.fn()
     const { planLandCover } = useLandCoverAPI()
 
-    await planLandCover(locations, 10000, 2023).fetch(onProgress)
+    await planLandCover(shapeOf(), 2023).fetch(onProgress)
 
     expect(onProgress.mock.calls).toEqual([[1, 1]])
   })

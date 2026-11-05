@@ -27,21 +27,13 @@
  * @module composables/map/trackCost
  */
 
-import { gridConfig } from '@/config/grid'
 import { gameRules } from '@/config/game'
 import { isWaterCell, bridgeCellCost } from '@/composables/map/water'
-import { findCell } from '@/composables/map/cellGrid'
+import { findCell, cellKm } from '@/composables/map/cellGrid'
 import {
   latitudeDegreesToMeters,
   longitudeDegreesToMeters
 } from '@/composables/setup/useMapSupport'
-
-/**
- * How far apart, in meters, the points a leg is checked at are spaced. A
- * quarter of a cell's width, so a leg can only miss a cell it barely clips the
- * corner of, while a long leg is still only a few hundred lookups.
- */
-const SAMPLE_SPACING_METERS = gridConfig.cellSize / 4
 
 /**
  * What one point of a land cell's terrain cost comes to in dollars, for this
@@ -64,8 +56,7 @@ const SAMPLE_SPACING_METERS = gridConfig.cellSize / 4
  */
 export function trackPriceScale(grid, speedUnitKm) {
   const { perSpeedUnit, openGroundCost, multiplier } = gameRules.trackPrice
-  const cellKm = latitudeDegreesToMeters(grid.latStep) / 1000
-  return ((perSpeedUnit * multiplier) / openGroundCost) * (cellKm / speedUnitKm)
+  return ((perSpeedUnit * multiplier) / openGroundCost) * (cellKm(grid) / speedUnitKm)
 }
 
 /**
@@ -108,13 +99,14 @@ export function kmBetween(a, b) {
  * Points spaced along one straight leg, both ends included.
  * @param {{lat: number, lng: number}} from - Where the leg starts
  * @param {{lat: number, lng: number}} to - Where the leg ends
+ * @param {number} spacingKm - The most the points may be apart
  * @returns {Array<{lat: number, lng: number}>} The points, in order
  */
-function pointsAlongLeg(from, to) {
+function pointsAlongLeg(from, to, spacingKm) {
   const dLat = to.lat - from.lat
   const dLng = to.lng - from.lng
   // Rough length, only used to decide how many points to take
-  const steps = Math.max(1, Math.ceil((kmBetween(from, to) * 1000) / SAMPLE_SPACING_METERS))
+  const steps = Math.max(1, Math.ceil(kmBetween(from, to) / spacingKm))
 
   const points = []
   for (let i = 0; i <= steps; i++) {
@@ -124,17 +116,21 @@ function pointsAlongLeg(from, to) {
 }
 
 /**
- * The points a line is checked at, a quarter of a cell apart along each leg,
- * every vertex included. Pricing and the build rules both look at the line
- * through these, so they always agree on where it goes.
+ * The points a line is checked at, a quarter of one of the grid's cells
+ * apart along each leg, every vertex included. A quarter of a cell, so a leg
+ * can only miss a cell it barely clips the corner of, while a long leg is
+ * still only a few hundred lookups. Pricing and the build rules both look at
+ * the line through these, so they always agree on where it goes.
  * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
+ * @param {Object} grid - The grid the line is checked against
  * @returns {Array<{lat: number, lng: number}>} The points, in order
  */
-export function pointsAlongLine(latlngs) {
+export function pointsAlongLine(latlngs, grid) {
+  const spacingKm = cellKm(grid) / 4
   // A single vertex is a line that has only just started: it sits in one cell
   return latlngs.length === 1
     ? [latlngs[0]]
-    : latlngs.slice(1).flatMap((to, i) => pointsAlongLeg(latlngs[i], to))
+    : latlngs.slice(1).flatMap((to, i) => pointsAlongLeg(latlngs[i], to, spacingKm))
 }
 
 /**
@@ -160,7 +156,7 @@ export function cellsAlongLine(latlngs, grid) {
  */
 export function cellPath(latlngs, grid) {
   const path = []
-  pointsAlongLine(latlngs).forEach((point) => {
+  pointsAlongLine(latlngs, grid).forEach((point) => {
     const cell = findCell(point, grid)
     if (cell !== -1 && cell !== path.at(-1)) path.push(cell)
   })
@@ -187,6 +183,7 @@ export function cellPath(latlngs, grid) {
  *   that is bridges
  */
 export function linePrice(latlngs, grid, priceScale) {
+  const widthKm = cellKm(grid)
   let total = 0
   let bridges = 0
   // Cells already paid for: each is charged once, however often it is crossed
@@ -206,7 +203,7 @@ export function linePrice(latlngs, grid, priceScale) {
     if (charged.has(cell)) return
     charged.add(cell)
     // Priced by how far into its crossing the cell is
-    const bridge = bridgeCellCost(crossing.size)
+    const bridge = bridgeCellCost(crossing.size, widthKm)
     bridges += bridge
     total += bridge
   })

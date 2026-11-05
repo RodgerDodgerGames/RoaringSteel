@@ -10,7 +10,7 @@
 
 import { boardConfig } from '@/config/board'
 import { gameRules } from '@/config/game'
-import { gridConfig } from '@/config/grid'
+import { CELL_METERS } from './testGrid'
 
 /**
  * Makes every board — with or without a region — play at this speed unit,
@@ -52,7 +52,7 @@ export function pinPlainScale() {
   const restoreScale = pinSpeedUnit(speedUnitKm)
   // Dollars per point of terrain = perSpeedUnit · multiplier / openGroundCost
   // · cell km / speed unit km (see trackPriceScale); make that 1
-  const cellKm = gridConfig.cellSize / 1000
+  const cellKm = CELL_METERS / 1000
   gameRules.trackPrice.multiplier = (openGroundCost * speedUnitKm) / (perSpeedUnit * cellKm)
   return () => {
     restoreScale()

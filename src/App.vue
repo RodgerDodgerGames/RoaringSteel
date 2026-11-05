@@ -17,13 +17,11 @@ import { useGridStore } from '@/stores/grid'
 import { useDemandCardsStore } from '@/stores/demandCards'
 import { usePlayerStore } from '@/stores/players'
 
-// import config
-import { gridConfig } from '@/config/grid'
-
 // import composables
 import { useGamePersistence } from '@/composables/useGamePersistence'
 import { keepStorage } from '@/composables/database'
 import { debug } from '@/composables/debug'
+import { cellSizeFor } from '@/composables/boardScale'
 
 // setup stores
 const townsStore = useTownsStore()
@@ -112,7 +110,8 @@ async function handlePlayGameClick() {
     const generated = await gridStore.generateGrid(
       region.value.properties.STATE,
       bounds,
-      gridConfig.cellSize,
+      // As small as the cell budget allows for this region (see boardScale.js)
+      cellSizeFor(bounds),
       townsStore.dataWindow.middle
     )
 

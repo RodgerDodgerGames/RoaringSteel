@@ -16,8 +16,9 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { cellsAlongLine, linePrice, trackPriceScale } from '@/composables/map/trackCost'
 import { gameRules } from '@/config/game'
+import { bridgeCellCost } from '@/composables/map/water'
 import { nlcdCostMap } from '@/config/nlcd'
-import { makeTestGrid, CELL } from '../utils/testGrid'
+import { makeTestGrid, CELL, CELL_METERS } from '../utils/testGrid'
 
 /**
  * A single row of square cells running east along latitude 0, where a degree
@@ -105,7 +106,9 @@ describe('trackCost', () => {
   })
 
   describe('bridges', () => {
-    const BRIDGE = gameRules.bridges.costPerCell
+    // The first water cell of a crossing, and the second, on 10 km cells
+    const BRIDGE = bridgeCellCost(1, CELL_METERS / 1000)
+    const SECOND = bridgeCellCost(2, CELL_METERS / 1000)
 
     /**
      * A row of cells where 'W' is a water cell (with the high cost the grid
@@ -127,9 +130,7 @@ describe('trackCost', () => {
     it('should charge more for each water cell further into a crossing', () => {
       const grid = rowWithWater([100, 'W', 'W', 300])
 
-      expect(linePrice([centerOf(0), centerOf(3)], grid, 1).total).toBe(
-        100 + BRIDGE + 2 * BRIDGE + 300
-      )
+      expect(linePrice([centerOf(0), centerOf(3)], grid, 1).total).toBe(100 + BRIDGE + SECOND + 300)
     })
 
     it('should start each separate crossing at the first price again', () => {
@@ -154,8 +155,8 @@ describe('trackCost', () => {
       const grid = rowWithWater([100, 'W', 'W', 300])
 
       expect(linePrice([centerOf(0), centerOf(3)], grid, 1)).toEqual({
-        total: 400 + 3 * BRIDGE,
-        bridges: 3 * BRIDGE
+        total: 400 + BRIDGE + SECOND,
+        bridges: BRIDGE + SECOND
       })
     })
   })
@@ -167,15 +168,15 @@ describe('trackCost', () => {
       gameRules.trackPrice.multiplier = tunedMultiplier
     })
 
-    // The test grid's cells are `gridConfig.cellSize` tall
+    // The test grid's cells are 10 km tall (see testGrid.js)
     const cellKm = 10
 
     it('should multiply land cells by the price scale but leave bridges alone', () => {
       const grid = rowOfCells([100, 10000, 300], [150, nlcdCostMap[11], 150])
 
       expect(linePrice([centerOf(0), centerOf(2)], grid, 3)).toEqual({
-        total: 3 * 100 + gameRules.bridges.costPerCell + 3 * 300,
-        bridges: gameRules.bridges.costPerCell
+        total: 3 * 100 + bridgeCellCost(1, CELL_METERS / 1000) + 3 * 300,
+        bridges: bridgeCellCost(1, CELL_METERS / 1000)
       })
     })
 

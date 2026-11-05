@@ -23,14 +23,18 @@ import { computed, watch, onBeforeUnmount } from 'vue'
 import L from 'leaflet'
 import { useMapStore } from '@/stores/map'
 import { useGameStore } from '@/stores/game'
+import { useGridStore } from '@/stores/grid'
 import { mapViewConfig } from '@/config/map'
 import {
   BUILD_VIEW,
   PLAN_VIEW,
   buildViewStart,
+  buildZoomRange,
   panLimits,
   regionBounds
 } from '@/composables/map/mapViews'
+import { cellKm, isEmptyGrid } from '@/composables/map/cellGrid'
+import { cellSizeFor } from '@/composables/boardScale'
 
 /**
  * Leaflet's handlers for moving the map by mouse, touch and keyboard. All of
@@ -52,6 +56,7 @@ const MOVE_HANDLERS = [
 export function useMapView() {
   const mapStore = useMapStore()
   const gameStore = useGameStore()
+  const gridStore = useGridStore()
 
   /** The Leaflet map, once attached */
   let map = null
@@ -102,7 +107,7 @@ export function useMapView() {
 
   /** Reopens the Build view where it was left, within its limits */
   function showBuild() {
-    const { buildMinZoom, buildMaxZoom } = mapViewConfig
+    const range = buildRange()
     // Measured while zoom may still fall between whole levels, so it is the
     // Plan view's exact zoom (the first opening is one level closer than it)
     const planZoom = map.getBoundsZoom(bounds.value, false, planPaddingTotal())
@@ -110,15 +115,31 @@ export function useMapView() {
     const { zoom, center } = buildViewStart(
       { zoom: mapStore.mapZoom, center: mapStore.mapCenter },
       bounds.value,
-      planZoom
+      planZoom,
+      range
     )
     // Moved into place before the limits go on, so the limits never push
     // the map somewhere on the way
     map.setView(center, zoom, { animate: false })
-    map.setMinZoom(buildMinZoom)
-    map.setMaxZoom(buildMaxZoom)
+    map.setMinZoom(range.min)
+    map.setMaxZoom(range.max)
     map.setMaxBounds(panLimits(bounds.value))
     setMovable(true)
+  }
+
+  /**
+   * The Build view's zoom range, for the cells of the grid in play (see
+   * `buildZoomRange`). Before the grid is in, the cells the region's grid
+   * will be cut into stand in for them.
+   * @returns {{min: number, max: number}} The range
+   */
+  function buildRange() {
+    const [[south, west], [north, east]] = bounds.value
+    const grid = gridStore.grid
+    const widthKm = isEmptyGrid(grid)
+      ? cellSizeFor([west, south, east, north]) / 1000
+      : cellKm(grid)
+    return buildZoomRange(widthKm, (south + north) / 2)
   }
 
   /** Fits the region to the map, with a little clear space around it */

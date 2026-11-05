@@ -7,11 +7,16 @@
  */
 
 import { createCellGrid, setCell, cellIndexes, rowOf, colOf } from '@/composables/map/cellGrid'
-import { gridConfig } from '@/config/grid'
 import { metersToLatitudeDegrees } from '@/composables/setup/useMapSupport'
 
+/**
+ * How wide the test grids' cells are, in meters: 10 km, the size every
+ * board's cells were before cell size followed the board
+ */
+export const CELL_METERS = 10000
+
 /** Degrees of latitude one grid cell spans */
-export const CELL = metersToLatitudeDegrees(gridConfig.cellSize)
+export const CELL = metersToLatitudeDegrees(CELL_METERS)
 
 /**
  * A grid with the terrain each cell is given.

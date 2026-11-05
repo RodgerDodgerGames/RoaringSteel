@@ -11,6 +11,7 @@ import {
   regionBounds,
   panLimits,
   buildViewStart,
+  buildZoomRange,
   planPopupOffset
 } from '@/composables/map/mapViews'
 
@@ -58,30 +59,56 @@ describe('mapViews', () => {
     })
   })
 
+  describe('buildZoomRange', () => {
+    it('should put a cell nearest 32 pixels across at the closest zoom', () => {
+      // A 1 km cell at the equator is 32 px across at zoom 12.03
+      expect(buildZoomRange(1, 0)).toEqual({ min: 9, max: 12 })
+    })
+
+    it('should go one zoom closer for cells half the size', () => {
+      expect(buildZoomRange(0.5, 40).max).toBe(buildZoomRange(1, 40).max + 1)
+    })
+
+    it('should stop a zoom further out toward the poles, where a cell looks bigger', () => {
+      // At 60° a map pixel covers half the ground it does at the equator, so
+      // a cell is twice as many pixels across at the same zoom
+      expect(buildZoomRange(1, 60).max).toBe(buildZoomRange(1, 0).max - 1)
+    })
+
+    it('should never go closer than the basemap draws', () => {
+      expect(buildZoomRange(0.001, 0).max).toBe(18)
+    })
+  })
+
+  /** The Build view's range when its cells are 10 km: zoom 6 to 9 */
+  const RANGE = { min: 6, max: 9 }
+
   describe('buildViewStart', () => {
     it('should open one level closer than the Plan view, over the middle of the region, the first time', () => {
       // The Plan view fits Colorado at 7.47 in a desktop window
-      expect(buildViewStart({ zoom: null, center: null }, bounds, 7.47)).toEqual({
+      expect(buildViewStart({ zoom: null, center: null }, bounds, 7.47, RANGE)).toEqual({
         zoom: 8,
         center: [39, -105.5]
       })
     })
 
     it('should open closer than the Plan view even when that fits at a whole level', () => {
-      expect(buildViewStart({ zoom: null, center: null }, bounds, 7).zoom).toBe(8)
+      expect(buildViewStart({ zoom: null, center: null }, bounds, 7, RANGE).zoom).toBe(8)
     })
 
     it('should open the first time within the Build view range', () => {
       // Texas fits further out than the Build view goes; a small state closer in
-      expect(buildViewStart(null, bounds, 4.2).zoom).toBe(6)
-      expect(buildViewStart(null, bounds, 9.6).zoom).toBe(9)
+      expect(buildViewStart(null, bounds, 4.2, RANGE).zoom).toBe(6)
+      expect(buildViewStart(null, bounds, 9.6, RANGE).zoom).toBe(9)
     })
 
     it('should reopen where the player left it', () => {
-      expect(buildViewStart({ zoom: 8, center: [38.3, -104.6] }, bounds)).toEqual({
-        zoom: 8,
-        center: [38.3, -104.6]
-      })
+      expect(buildViewStart({ zoom: 8, center: [38.3, -104.6] }, bounds, undefined, RANGE)).toEqual(
+        {
+          zoom: 8,
+          center: [38.3, -104.6]
+        }
+      )
     })
 
     it('should open as it does the first time if left at a zoom the Build view does not go to', () => {
@@ -91,37 +118,42 @@ describe('mapViews', () => {
         [37, -102],
         [40, -94.5]
       ]
-      expect(buildViewStart({ zoom: 3, center: [40, -100] }, kansas, 6.6)).toEqual({
+      expect(buildViewStart({ zoom: 3, center: [40, -100] }, kansas, 6.6, RANGE)).toEqual({
         zoom: 7,
         center: [38.5, -98.25]
       })
-      expect(buildViewStart({ zoom: 12, center: [39, -105] }, bounds, 7.47).zoom).toBe(8)
+      expect(buildViewStart({ zoom: 12, center: [39, -105] }, bounds, 7.47, RANGE).zoom).toBe(8)
     })
 
     it('should reopen where the player left it just past the edge of the region', () => {
       // The Build view pans a little past the region's box, so a border town
       // can be brought away from the edge of the screen
-      expect(buildViewStart({ zoom: 9, center: [41.2, -104.6] }, bounds, 7.47)).toEqual({
+      expect(buildViewStart({ zoom: 9, center: [41.2, -104.6] }, bounds, 7.47, RANGE)).toEqual({
         zoom: 9,
         center: [41.2, -104.6]
       })
     })
 
     it('should open at a whole zoom level', () => {
-      expect(buildViewStart({ zoom: 7.4, center: [39, -105] }, bounds).zoom).toBe(7)
+      expect(buildViewStart({ zoom: 7.4, center: [39, -105] }, bounds, undefined, RANGE).zoom).toBe(
+        7
+      )
     })
 
     it('should open as it does the first time if left outside the region', () => {
       // The view every save recorded before there were two views: zoom 3,
       // over Kansas
-      expect(buildViewStart({ zoom: 3, center: [40, -100] }, bounds, 7.47)).toEqual({
+      expect(buildViewStart({ zoom: 3, center: [40, -100] }, bounds, 7.47, RANGE)).toEqual({
         zoom: 8,
         center: [39, -105.5]
       })
     })
 
     it('should open zoomed all the way out over the middle of the region with nothing to go on', () => {
-      expect(buildViewStart(undefined, bounds)).toEqual({ zoom: 6, center: [39, -105.5] })
+      expect(buildViewStart(undefined, bounds, undefined, RANGE)).toEqual({
+        zoom: 6,
+        center: [39, -105.5]
+      })
     })
   })
 

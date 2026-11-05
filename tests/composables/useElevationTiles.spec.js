@@ -1,9 +1,10 @@
 /**
  * useElevationTiles Composable Tests
  *
- * The tile math, the terrarium decoding, and how a set of cells is turned
- * into tile downloads and back into one height per cell. The image download
- * itself needs a browser, so it is stood in for with pixels made here.
+ * The tile math, the terrarium decoding, and how a grid is turned into tile
+ * downloads and back into each cell's average height and roughness, read
+ * from every pixel inside it. The image download itself needs a browser, so
+ * it is stood in for with pixels made here.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -91,77 +92,131 @@ describe('tile math', () => {
   })
 })
 
+/**
+ * A grid of 10 km cells, 2 by 2, inside one zoom-8 tile over Minnesota
+ * (tile 61, 92), unless told otherwise
+ */
+const shapeOf = ({ rows = 2, cols = 2, west = -93.5 } = {}) => ({
+  rows,
+  cols,
+  south: 44.5,
+  west,
+  latStep: 0.09,
+  lngStep: 0.127
+})
+
+/** The center of a cell of a shape */
+const centerOf = (shape, row, col) => ({
+  lat: shape.south + (row + 0.5) * shape.latStep,
+  lng: shape.west + (col + 0.5) * shape.lngStep
+})
+
 describe('useElevationTiles', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('should fetch each tile once, however many cells read from it', () => {
+  it('should plan every tile that covers the grid, each once', () => {
     const { planElevations } = useElevationTiles()
-    // Two cells a few km apart share a tile; one across the country does not
-    const plan = planElevations(
-      [
-        { lat: 44.98, lng: -93.27 },
-        { lat: 44.99, lng: -93.2 },
-        { lat: 29.76, lng: -95.37 }
-      ],
-      10000
-    )
 
-    expect(plan.requestCount).toBe(2)
+    expect(planElevations(shapeOf(), 10000).requestCount).toBe(1)
+    // Twelve cells east, 1.5 degrees: across into the next tile
+    expect(planElevations(shapeOf({ cols: 12 }), 10000).requestCount).toBe(2)
   })
 
-  it('should read each cell the height of the pixel under its center', async () => {
-    // Kept under the 32,767 m a tile can store
-    mockFetchImagePixels.mockResolvedValue(tileOf((px, py) => px * 100 + py))
-    const locations = [
-      { lat: 44.98, lng: -93.27 },
-      { lat: 44.9, lng: -93.1 }
-    ]
+  it('should give each cell the average height of the pixels inside it', async () => {
+    const shape = shapeOf()
     const { planElevations } = useElevationTiles()
-    const plan = planElevations(locations, 10000)
+    const plan = planElevations(shape, 10000)
+    // Ground stepping up from 100 m to 300 m part way across the west column
+    // of cells, and staying at 300 m across the east column
+    const step = tilePixel(centerOf(shape, 0, 0), plan.zoom).px
+    mockFetchImagePixels.mockResolvedValue(tileOf((px) => (px < step ? 100 : 300)))
 
-    const elevations = await plan.fetch()
+    const { elevation } = await plan.fetch()
 
-    const expected = locations.map((location) => {
-      const { px, py } = tilePixel(location, plan.zoom)
-      return px * 100 + py
-    })
-    expect(elevations).toEqual(expected)
+    expect(elevation[0]).toBeGreaterThan(100)
+    expect(elevation[0]).toBeLessThan(300)
+    expect(elevation[1]).toBe(300)
+  })
+
+  it('should measure a cell as level when its pixels are all one height', async () => {
+    mockFetchImagePixels.mockResolvedValue(tileOf(() => 250))
+    const { planElevations } = useElevationTiles()
+
+    const { roughness } = await planElevations(shapeOf(), 10000).fetch()
+
+    expect([...roughness]).toEqual([0, 0, 0, 0])
+  })
+
+  it('should measure roughness as the grade between neighboring pixels', async () => {
+    const shape = shapeOf()
+    const { planElevations } = useElevationTiles()
+    const plan = planElevations(shape, 10000)
+    // Rising 10 m with each pixel to the east
+    mockFetchImagePixels.mockResolvedValue(tileOf((px) => px * 10))
+
+    const { roughness } = await plan.fetch()
+
+    const grade = 10 / metersPerPixel(plan.zoom, centerOf(shape, 0, 0).lat)
+    roughness.forEach((value) => expect(value).toBeCloseTo(grade, 3))
+  })
+
+  it('should leave the sea floor out of a coastal cell that is mostly land', async () => {
+    const shape = shapeOf()
+    const { planElevations } = useElevationTiles()
+    const plan = planElevations(shape, 10000)
+    // Sea 40 m deep along the west edge of the west column of cells, land at
+    // 5 m everywhere else: the west cells are mostly land
+    const shore = tilePixel({ lat: 44.6, lng: shape.west }, plan.zoom).px + 3
+    mockFetchImagePixels.mockResolvedValue(tileOf((px) => (px < shore ? -40 : 5)))
+
+    const { elevation, roughness } = await plan.fetch()
+
+    expect([...elevation]).toEqual([5, 5, 5, 5])
+    expect([...roughness]).toEqual([0, 0, 0, 0])
+  })
+
+  it('should read a cell that is mostly below sea level from all of it', async () => {
+    // The sea, or land below sea level: its height stays below zero
+    mockFetchImagePixels.mockResolvedValue(tileOf((px) => (px % 4 === 0 ? 5 : -40)))
+    const { planElevations } = useElevationTiles()
+
+    const { elevation } = await planElevations(shapeOf(), 10000).fetch()
+
+    elevation.forEach((height) => expect(height).toBeLessThan(0))
   })
 
   it('should ask for the tile at the right address', async () => {
     mockFetchImagePixels.mockResolvedValue(tileOf(() => 0))
-    const location = { lat: 44.98, lng: -93.27 }
+    const shape = shapeOf()
     const { planElevations } = useElevationTiles()
-    const plan = planElevations([location], 10000)
+    const plan = planElevations(shape, 10000)
 
     await plan.fetch()
 
-    const { tileX, tileY } = tilePixel(location, plan.zoom)
+    const { tileX, tileY } = tilePixel(centerOf(shape, 0, 0), plan.zoom)
     expect(mockFetchImagePixels.mock.calls[0][0]).toBe(
       `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${plan.zoom}/${tileX}/${tileY}.png`
     )
   })
 
   it('should leave the cells of a failed tile unknown and still finish the rest', async () => {
-    // null reads as "unknown", never as a sea-level 0, so the grid store can
+    // NaN reads as "unknown", never as a sea-level 0, so the grid store can
     // tell lost data from real low ground
-    mockFetchImagePixels
-      .mockRejectedValueOnce(new Error('Request timed out after 20000ms'))
-      .mockResolvedValueOnce(tileOf(() => 250))
+    const shape = shapeOf({ rows: 1, cols: 2, west: -92.96 })
     const { planElevations } = useElevationTiles()
-    const plan = planElevations(
-      [
-        { lat: 44.98, lng: -93.27 },
-        { lat: 29.76, lng: -95.37 }
-      ],
-      10000
-    )
+    const plan = planElevations(shape, 10000)
+    // The grid straddles tiles 61 and 62: the west tile fails
+    mockFetchImagePixels.mockImplementation(async (url) => {
+      if (url.includes('/61/')) throw new Error('Request timed out after 20000ms')
+      return tileOf(() => 250)
+    })
 
-    const elevations = await plan.fetch()
+    const { elevation } = await plan.fetch()
 
-    expect(elevations).toEqual([null, 250])
+    expect(Number.isNaN(elevation[0])).toBe(true)
+    expect(elevation[1]).toBe(250)
   })
 
   it('should round heights to the meter', async () => {
@@ -169,9 +224,9 @@ describe('useElevationTiles', () => {
     mockFetchImagePixels.mockResolvedValue(tileOf(() => 123.6))
     const { planElevations } = useElevationTiles()
 
-    const elevations = await planElevations([{ lat: 44.98, lng: -93.27 }], 10000).fetch()
+    const { elevation } = await planElevations(shapeOf(), 10000).fetch()
 
-    expect(elevations).toEqual([124])
+    expect([...elevation]).toEqual([124, 124, 124, 124])
   })
 
   it('should treat a tile of the wrong size as failed', async () => {
@@ -183,9 +238,9 @@ describe('useElevationTiles', () => {
     })
     const { planElevations } = useElevationTiles()
 
-    const elevations = await planElevations([{ lat: 44.98, lng: -93.27 }], 10000).fetch()
+    const { elevation } = await planElevations(shapeOf(), 10000).fetch()
 
-    expect(elevations).toEqual([null])
+    expect([...elevation].every(Number.isNaN)).toBe(true)
   })
 
   it('should read a see-through pixel as unknown, not 32 km below sea level', async () => {
@@ -194,22 +249,16 @@ describe('useElevationTiles', () => {
     mockFetchImagePixels.mockResolvedValue(tile)
     const { planElevations } = useElevationTiles()
 
-    const elevations = await planElevations([{ lat: 44.98, lng: -93.27 }], 10000).fetch()
+    const { elevation } = await planElevations(shapeOf(), 10000).fetch()
 
-    expect(elevations).toEqual([null])
+    expect([...elevation].every(Number.isNaN)).toBe(true)
   })
 
   it('should report progress once per tile', async () => {
     mockFetchImagePixels.mockResolvedValue(tileOf(() => 100))
     const onProgress = vi.fn()
     const { planElevations } = useElevationTiles()
-    const plan = planElevations(
-      [
-        { lat: 44.98, lng: -93.27 },
-        { lat: 29.76, lng: -95.37 }
-      ],
-      10000
-    )
+    const plan = planElevations(shapeOf({ cols: 12 }), 10000)
 
     await plan.fetch(onProgress)
 
@@ -219,11 +268,12 @@ describe('useElevationTiles', () => {
     ])
   })
 
-  it('should plan nothing for no cells', async () => {
+  it('should plan nothing for a grid with no cells', async () => {
     const { planElevations } = useElevationTiles()
-    const plan = planElevations([], 10000)
+    const plan = planElevations(shapeOf({ rows: 0 }), 10000)
 
     expect(plan.requestCount).toBe(0)
-    await expect(plan.fetch()).resolves.toEqual([])
+    const { elevation } = await plan.fetch()
+    expect(elevation).toHaveLength(0)
   })
 })

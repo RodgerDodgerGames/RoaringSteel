@@ -37,44 +37,63 @@ export const gameRules = {
   buildingRounds: 2,
 
   /**
-   * What track costs: Empire Builder's $1 million a milepost of clear ground,
-   * here $1,000 per speed unit (see composables/boardScale.js), scaled up for
-   * rough or built-up ground, and then by the tuning knob below.
+   * What track over land costs: Empire Builder's $1 million a milepost of
+   * clear ground, here $1,000 per speed unit (see composables/boardScale.js),
+   * scaled up for built-up or steep ground. (Water is bridged instead, see
+   * `bridges`, and reaching a town adds its entry fee, see `townEntry`.)
    *
    * Priced per speed unit rather than per km or per grid cell, so a turn's
    * $20,000 allowance builds the same number of speed units of ordinary
    * ground on every board, whatever the board's size or its cells': 20 at
    * the board game's rate, a little over two turns of a Freight's running.
    *
-   * Each grid cell's terrain cost (land cover plus slope, see stores/grid.js)
-   * is read against `openGroundCost`, the terrain cost of an ordinary 10 km
-   * cell — Empire Builder's clear terrain, the most common ground on its map:
-   * a cell at that cost is priced at `perSpeedUnit` per speed unit of its
-   * width, one twice as costly at twice that. Measured on real 10 km grids
-   * (2026-11-04): Colorado's plains run about 370–500, the middle of
-   * Maryland's cells 530 and of Massachusetts' 790; 450 sits among them. It
-   * will need setting again when the terrain cost model changes.
+   * A cell's terrain cost has two parts, one from each source of terrain:
+   * - land cover: the average cost of the ground in the cell, from the
+   *   table in config/nlcd.js (grassland 70, forest 350, a city 500–800)
+   * - elevation: `slopeCost` times the cell's slope, as a grade (rise over
+   *   run: a 10% grade is 0.1, and adds 450). See composables/map/slope.js.
+   *
+   * Each part is multiplied by its own tuning knob (`knobs`) and the two are
+   * added. The total is read against `openGroundCost`, the terrain cost of
+   * ordinary ground — Empire Builder's clear terrain, the most common ground
+   * on its map: a cell at that cost is priced at `perSpeedUnit` per speed
+   * unit of its width, one twice as costly at twice that. Measured on real
+   * boards cut to the cell budget (2026-11-04), before the knobs: Colorado's
+   * plains run about 175–245, and the middle of all the cells is 560 in
+   * Colorado, 610 in Maryland and 710 in Massachusetts, so a typical cell
+   * costs 1.2–1.6 times ordinary ground.
+   *
+   * `slopeCost` is set so a 10% grade adds a whole ordinary ground's worth,
+   * about doubling a cell's price, as Empire Builder's mountains double its
+   * clear ground, and a 40% grade reaches the cap of five times, its alpine.
    *
    * `maxTerrainFactor` caps how much dearer than ordinary ground a cell can
    * be: Empire Builder's alpine mileposts, its dearest ground, cost 5 times
    * its clear ones. The steepest cells would otherwise cost more than a
-   * whole turn's allowance, and no one could build across them.
+   * whole turn's allowance, and no one could build across them. The cap is
+   * on the terrain itself, before the knobs: ground past it is trimmed back,
+   * both parts alike, and the knobs then weigh what is left.
    *
-   * `multiplier` is the tuning knob: every track price is multiplied by it.
-   * Raise it to make building dearer, lower it to make it cheaper; 1 is the
-   * board game's rate. Bridges and town entry are not affected.
+   * `knobs` are for tuning after playtests: raise one to make that part of
+   * the terrain dearer, lower it to make it cheaper. At 1 each, track costs
+   * the board game's rate. Bridges and town entry are not affected.
    *
-   * It starts at 0.5, half the board game's rate. Computer-player games on
-   * real Colorado, Maryland and Massachusetts boards (2026-11-04) were won
-   * in 40–100 rounds at 0.5, smaller boards sooner; at 1 the computer players
-   * judged almost every demand a loss on its first delivery, threw in hand
-   * after hand, and never won.
+   * Both start at 0.5, half the board game's rate. With 1 each, on a
+   * Maryland board (bench run, 2026-11-05) the cheapest first delivery a
+   * player was dealt cost a little over the $40,000 a player starts with —
+   * nobody could afford one, and the computer players threw in their hands
+   * every turn and never built. At 0.5 each, computer players won on
+   * Colorado, Maryland and Massachusetts boards in 39–70 rounds.
    */
   trackPrice: {
     perSpeedUnit: 1000,
     openGroundCost: 450,
+    slopeCost: 4500,
     maxTerrainFactor: 5,
-    multiplier: 0.5
+    knobs: {
+      landCover: 0.5,
+      elevation: 0.5
+    }
   },
 
   /**
@@ -96,20 +115,23 @@ export const gameRules = {
   /**
    * Bridges: what it costs to carry track over water, and how far it may go.
    *
-   * A grid cell is water when its land cover is open water (see water.js).
-   * Track crossing water pays for a bridge instead of the cell's own cost,
-   * and each water cell in a row costs more than the one before — the first
-   * `costPerCell`, the second twice that, and so on — because a long bridge
-   * is a far bigger job than a short one. A crossing of more than
-   * `maxCells` water cells in a row cannot be built at all.
+   * A grid cell is water when most of its land cover is open water (see
+   * water.js). Track crossing water pays for a bridge instead of the cell's
+   * own cost, and each km of bridge costs more the further out it is —
+   * `costPerKm` for the first `stepKm`, twice that for the next, and so on —
+   * because a long bridge is a far bigger job than a short one. A crossing
+   * longer than `maxKm` cannot be built at all.
    *
-   * For scale: an ordinary 10 km cell on a Colorado-sized board costs
-   * about $870 (see `trackPrice`), and a turn's building allowance is
-   * $20,000.
+   * Set in km so bridges cost the same whatever the size of the grid's
+   * cells: a 10 km crossing is $5,000 and a 20 km one $15,000, as when cells
+   * were always 10 km and each water cell cost $5,000 more than the last.
+   * (Water is due a rework of its own: bridges priced by the crossing, from
+   * a map of rivers and lakes.)
    */
   bridges: {
-    costPerCell: 5000,
-    maxCells: 2
+    costPerKm: 500,
+    stepKm: 10,
+    maxKm: 20
   },
 
   /**
@@ -117,16 +139,18 @@ export const gameRules = {
    * may cross at a milepost but never share the way between two, new track
    * may cross built track but not run alongside it.
    *
-   * New track is "beside" built track wherever it is within `nearKm` of it —
-   * half a grid cell, the width of the band a line runs down the middle
-   * of. It may be beside built track for at most `maxBesideKm` at a stretch. Crossing
-   * square on takes about 10 km of that (5 km each side); the stretch grows
-   * as the angle flattens, so 20 km lets a line cross at anything steeper
-   * than about 30°, and stops it running along, or weaving along, a line.
+   * Counted in grid cells, the board's mileposts, so the rule is the same on
+   * every board. New track is "beside" built track wherever it is within
+   * `nearCells` of a cell of it — half a cell, the width of the band a line
+   * runs down the middle of. It may be beside built track for at most
+   * `maxBesideCells` at a stretch. Crossing square on takes about one cell of
+   * that (half a cell each side); the stretch grows as the angle flattens, so
+   * two cells lets a line cross at anything steeper than about 30°, and stops
+   * it running along, or weaving along, a line.
    */
   trackSpacing: {
-    nearKm: 5,
-    maxBesideKm: 20
+    nearCells: 0.5,
+    maxBesideCells: 2
   },
 
   /**
@@ -160,7 +184,7 @@ export const gameRules = {
    *
    * $1,000 per speed unit is the board game's rate — roughly a million per
    * milepost. Ordinary ground costs half that to build over at today's
-   * tuning (see `trackPrice.multiplier`), so a first delivery on a new,
+   * tuning (see `trackPrice.knobs`), so a first delivery on a new,
    * straight line over ordinary ground pays for the line about twice over.
    * Paid per speed unit, not per km, so payoffs keep pace with track prices
    * on every board.

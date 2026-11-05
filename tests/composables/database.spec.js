@@ -19,9 +19,10 @@ import {
 } from '@/composables/database'
 import { SETTINGS_STORAGE_KEY } from '@/stores/settings'
 import { reactive } from 'vue'
+import { openDB } from 'idb'
 
 /** A stand-in for a grid: the database stores whatever it is given */
-const grid = (label) => ({ label, cost: new Float32Array([1, 2, 3]) })
+const grid = (label) => ({ label, slope: new Float32Array([1, 2, 3]) })
 
 describe('database', () => {
   describe('grids', () => {
@@ -44,13 +45,31 @@ describe('database', () => {
       expect(await getGridYears('27', 10000)).toEqual([2019, 2023])
     })
 
+    it('should throw away grids kept by the first version, which built them the old way', async () => {
+      // A browser that last ran version 1 of the database, with a grid in it
+      const old = await openDB('roaring-steel', 1, {
+        upgrade(db) {
+          db.createObjectStore('autosaves', { keyPath: 'id', autoIncrement: true })
+          db.createObjectStore('grids', { keyPath: ['state', 'cellSize', 'landCoverYear'] })
+          db.createObjectStore('caches')
+        }
+      })
+      await old.put('grids', { state: '27', cellSize: 10000, landCoverYear: 2023, grid: grid('a') })
+      await old.put('caches', 'kept', 'towns_27')
+      old.close()
+
+      expect(await getGrid('27', 10000, 2023)).toBeUndefined()
+      // Only the grids: everything else is kept
+      expect(await readCache('towns_27')).toBe('kept')
+    })
+
     it("should keep a grid's typed arrays as they are", async () => {
       await putGrid({ state: '27', cellSize: 10000, landCoverYear: 2023, grid: grid('a') })
 
-      const { cost } = (await getGrid('27', 10000, 2023)).grid
+      const { slope } = (await getGrid('27', 10000, 2023)).grid
 
-      expect(cost).toBeInstanceOf(Float32Array)
-      expect([...cost]).toEqual([1, 2, 3])
+      expect(slope).toBeInstanceOf(Float32Array)
+      expect([...slope]).toEqual([1, 2, 3])
     })
   })
 

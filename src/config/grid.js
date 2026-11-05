@@ -1,5 +1,33 @@
+/**
+ * How the board's grid is cut. (What its terrain costs is set with the rest
+ * of the money, in `trackPrice` in game.js.)
+ *
+ * The grid's cells are the board's mileposts: track is priced, and towns are
+ * placed, cell by cell. There are as many as `cellBudget` allows, so a small
+ * board has small cells and a big one bigger cells (see `cellSizeFor` in
+ * composables/boardScale.js). What a cell's size changes is how finely the
+ * terrain is read; how far trains run and what track costs per km are set by
+ * the board's size, not the cells' (see boardScale.js).
+ */
 export const gridConfig = {
-  cellSize: 10000 // in meters
+  /**
+   * How many cells the grid's rectangle (the region's bounding box) is cut
+   * into, about. Everything that grows with the cell count is held in check
+   * by it: the terrain downloads at setup (about 60 land cover pictures and
+   * 1,000 elevation tiles at 250,000, roughly 25 seconds), the grid's size in
+   * the browser's storage and in a saved game (about 2.5 MB), and how long a
+   * computer player's route search takes (about half a second each on a
+   * desktop, three to five times that on a phone).
+   */
+  cellBudget: 250000,
+
+  /**
+   * The smallest a cell may be, in meters, however small the region. The
+   * land cover is mapped in 30 m squares; a cell is read from a few hundred
+   * pixels (see `pixelsPerCell`), and at much below this they would be the
+   * same few squares read over and over.
+   */
+  minCellSize: 250
 }
 
 /**
@@ -23,11 +51,13 @@ export const gridApiConfig = {
   elevationMaxZoom: 15,
 
   /**
-   * How many image pixels should span one cell, for both elevation and land
-   * cover. The images are fetched at the coarsest detail that still gives each
-   * cell about this many pixels across. Each cell reads only the pixel at its
-   * center for now, so this mainly sets how finely that pixel was averaged
-   * from the source data: 16 across a 10 km cell is about 600 m per pixel.
+   * How many image pixels span one cell, each way, for both elevation and
+   * land cover. A cell is read from every pixel inside it — about 256 at 16
+   * — so its land cover is a mix and its height an average, with its
+   * roughness measured between them (see useElevationTiles.js and
+   * useLandCoverAPI.js). Land cover pictures are drawn at exactly this many
+   * pixels to a cell; elevation tiles come at the coarsest zoom with at
+   * least this many.
    */
   pixelsPerCell: 16,
 

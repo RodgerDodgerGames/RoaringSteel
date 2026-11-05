@@ -24,7 +24,12 @@
 
 import { area } from '@turf/turf'
 import { boardConfig } from '@/config/board'
+import { gridConfig } from '@/config/grid'
 import { regionPolygons } from '@/composables/map/region'
+import {
+  latitudeDegreesToMeters,
+  longitudeDegreesToMeters
+} from '@/composables/setup/useMapSupport'
 
 /**
  * How big a region is, as one length: the square root of its area, in km.
@@ -89,6 +94,26 @@ export function boardScaleFor(region) {
     // the board in `turns` turns
     speedUnitKm: sizeKm / (turns * boardConfig.referenceSpeed)
   }
+}
+
+/**
+ * How wide a board's grid cells are: as small as `gridConfig.cellBudget`
+ * allows, so the grid over the region's bounding box comes to about that
+ * many cells, but no smaller than `gridConfig.minCellSize`.
+ *
+ * Rounded to the meter, since a grid is kept in the browser's database under
+ * its cell size (see database.js), and the same region must come out at the
+ * same size every time to find it again.
+ *
+ * @param {Array<number>} bounds - The region's bounding box, [west, south,
+ *   east, north] in degrees
+ * @returns {number} Cell width, in meters
+ */
+export function cellSizeFor([west, south, east, north]) {
+  const width = longitudeDegreesToMeters(east - west, (south + north) / 2)
+  const height = latitudeDegreesToMeters(north - south)
+  const fitted = Math.sqrt((width * height) / gridConfig.cellBudget)
+  return Math.round(Math.max(gridConfig.minCellSize, fitted))
 }
 
 /**

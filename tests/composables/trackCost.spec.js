@@ -8,33 +8,50 @@
  * Water cells are bridged instead: each water cell in a row costs more than
  * the one before, whatever the cell's own cost.
  *
- * A land cell's cost is terrain cost, turned into dollars by the board's
- * price scale: open ground costs `trackPrice.perSpeedUnit` per speed unit of
- * the cell's width, times the tuning knob.
+ * A land cell's price is its terrain cost — land cover plus slope, each
+ * weighed by its tuning knob — turned into dollars by the board's price
+ * scale: ordinary ground costs `trackPrice.perSpeedUnit` per speed unit of
+ * the cell's width at knobs of 1.
  */
 
-import { describe, it, expect, afterEach } from 'vitest'
-import { cellsAlongLine, linePrice, trackPriceScale } from '@/composables/map/trackCost'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import {
+  cellsAlongLine,
+  linePrice,
+  trackPriceScale,
+  terrainCost
+} from '@/composables/map/trackCost'
 import { gameRules } from '@/config/game'
+import { bridgeCellCost } from '@/composables/map/water'
 import { nlcdCostMap } from '@/config/nlcd'
-import { makeTestGrid, CELL } from '../utils/testGrid'
+import { makeTestGrid, CELL, CELL_METERS } from '../utils/testGrid'
+import { pinKnobs } from '../utils/boardScale'
 
 /**
  * A single row of square cells running east along latitude 0, where a degree
- * of longitude is as long as a degree of latitude. Cell `i` costs `costs[i]`
- * and has the land cover `covers[i]`, if given.
- * @param {Array<number|null>} costs - One cost per cell, west to east
- * @param {Array<number>} [covers] - One land cover per cell
+ * of longitude is as long as a degree of latitude. Cell `i` has the land
+ * cover `covers[i]` and the slope `slopes[i]`, level if not given.
+ * @param {Array<number>} covers - One land cover cost per cell, west to east
+ * @param {Array<number>} [slopes] - One slope per cell, as a grade
  * @returns {Object} The grid
  */
-function rowOfCells(costs, covers = []) {
+function rowOfCells(covers, slopes = []) {
   return makeTestGrid({
     rows: 1,
-    cols: costs.length,
+    cols: covers.length,
     south: -CELL / 2,
-    cell: (row, col) => ({ cost: costs[col], landCover: covers[col] })
+    cell: (row, col) => ({ landCover: covers[col], slope: slopes[col] })
   })
 }
+
+// The knobs are meant to be edited after playtests. Every test here starts
+// them at 1, so a level cell at a price scale of 1 costs its land cover, and
+// the tests check the rules rather than today's tuning.
+let restoreKnobs
+beforeEach(() => {
+  restoreKnobs = pinKnobs(1)
+})
+afterEach(() => restoreKnobs())
 
 /**
  * The center of a cell in `rowOfCells`.
@@ -93,8 +110,8 @@ describe('trackCost', () => {
       expect(broughtBack).toBe(300)
     })
 
-    it('should charge nothing for a cell whose cost failed to load', () => {
-      const grid = rowOfCells([100, null, 300])
+    it('should charge nothing for a cell whose terrain failed to load', () => {
+      const grid = rowOfCells([100, 200, 300], [0, NaN, 0])
 
       expect(linePrice([centerOf(0), centerOf(2)], grid, 1).total).toBe(400)
     })
@@ -105,17 +122,16 @@ describe('trackCost', () => {
   })
 
   describe('bridges', () => {
-    const BRIDGE = gameRules.bridges.costPerCell
+    // The first water cell of a crossing, and the second, on 10 km cells
+    const BRIDGE = bridgeCellCost(1, CELL_METERS / 1000)
+    const SECOND = bridgeCellCost(2, CELL_METERS / 1000)
 
     /**
-     * A row of cells where 'W' is a water cell (with the high cost the grid
-     * gives water) and a number is a land cell costing that much.
+     * A row of cells where 'W' is a water cell and a number is a land cell
+     * costing that much.
      */
     function rowWithWater(cells) {
-      return rowOfCells(
-        cells.map((cell) => (cell === 'W' ? 10000 : cell)),
-        cells.map((cell) => (cell === 'W' ? nlcdCostMap[11] : 150))
-      )
+      return rowOfCells(cells.map((cell) => (cell === 'W' ? nlcdCostMap[11] : cell)))
     }
 
     it("should charge a bridge for a water cell instead of the cell's own cost", () => {
@@ -127,9 +143,7 @@ describe('trackCost', () => {
     it('should charge more for each water cell further into a crossing', () => {
       const grid = rowWithWater([100, 'W', 'W', 300])
 
-      expect(linePrice([centerOf(0), centerOf(3)], grid, 1).total).toBe(
-        100 + BRIDGE + 2 * BRIDGE + 300
-      )
+      expect(linePrice([centerOf(0), centerOf(3)], grid, 1).total).toBe(100 + BRIDGE + SECOND + 300)
     })
 
     it('should start each separate crossing at the first price again', () => {
@@ -154,34 +168,27 @@ describe('trackCost', () => {
       const grid = rowWithWater([100, 'W', 'W', 300])
 
       expect(linePrice([centerOf(0), centerOf(3)], grid, 1)).toEqual({
-        total: 400 + 3 * BRIDGE,
-        bridges: 3 * BRIDGE
+        total: 400 + BRIDGE + SECOND,
+        bridges: BRIDGE + SECOND
       })
     })
   })
 
   describe('price scale', () => {
-    // The tuning knob is meant to be edited; pin it so these check the rule
-    const tunedMultiplier = gameRules.trackPrice.multiplier
-    afterEach(() => {
-      gameRules.trackPrice.multiplier = tunedMultiplier
-    })
-
-    // The test grid's cells are `gridConfig.cellSize` tall
+    // The test grid's cells are 10 km tall (see testGrid.js)
     const cellKm = 10
 
     it('should multiply land cells by the price scale but leave bridges alone', () => {
-      const grid = rowOfCells([100, 10000, 300], [150, nlcdCostMap[11], 150])
+      const grid = rowOfCells([100, nlcdCostMap[11], 300])
 
       expect(linePrice([centerOf(0), centerOf(2)], grid, 3)).toEqual({
-        total: 3 * 100 + gameRules.bridges.costPerCell + 3 * 300,
-        bridges: gameRules.bridges.costPerCell
+        total: 3 * 100 + bridgeCellCost(1, CELL_METERS / 1000) + 3 * 300,
+        bridges: bridgeCellCost(1, CELL_METERS / 1000)
       })
     })
 
     it('should price a cell of open ground one speed unit wide at the rate per speed unit', () => {
       const grid = rowOfCells([gameRules.trackPrice.openGroundCost])
-      gameRules.trackPrice.multiplier = 1
 
       const scale = trackPriceScale(grid, cellKm)
 
@@ -212,19 +219,69 @@ describe('trackCost', () => {
     it('should cap a cell at the dearest ground, however steep', () => {
       const { openGroundCost, maxTerrainFactor } = gameRules.trackPrice
       const cap = maxTerrainFactor * openGroundCost
-      const grid = rowOfCells([cap, 10 * cap])
+      const grid = rowOfCells([cap, 10 * cap, 0], [0, 0, 1])
 
-      expect(linePrice([centerOf(1)], grid, 1).total).toBe(cap)
       expect(linePrice([centerOf(0)], grid, 1).total).toBe(cap)
+      expect(linePrice([centerOf(1)], grid, 1).total).toBe(cap)
+      expect(linePrice([centerOf(2)], grid, 1).total).toBe(cap)
+    })
+  })
+
+  describe('terrainCost', () => {
+    const { slopeCost } = gameRules.trackPrice
+
+    it('should add the land cover to the slope cost of the grade', () => {
+      expect(terrainCost(100, 0.05)).toBeCloseTo(100 + slopeCost * 0.05, 9)
     })
 
-    it('should scale every track price by the tuning knob', () => {
-      const grid = rowOfCells([gameRules.trackPrice.openGroundCost])
-      gameRules.trackPrice.multiplier = 1
-      const normal = trackPriceScale(grid, cellKm)
-      gameRules.trackPrice.multiplier = 1.5
+    it('should weigh the land cover by the land cover knob alone', () => {
+      gameRules.trackPrice.knobs.landCover = 2
+      gameRules.trackPrice.knobs.elevation = 3
 
-      expect(trackPriceScale(grid, cellKm)).toBeCloseTo(1.5 * normal, 9)
+      expect(terrainCost(300, 0)).toBeCloseTo(600, 9)
+    })
+
+    it('should weigh the slope by the elevation knob alone', () => {
+      gameRules.trackPrice.knobs.landCover = 3
+      gameRules.trackPrice.knobs.elevation = 2
+
+      expect(terrainCost(0, 0.1)).toBeCloseTo(2 * slopeCost * 0.1, 9)
+    })
+
+    it('should weigh each part of a cell by its own knob', () => {
+      gameRules.trackPrice.knobs.landCover = 0.5
+      gameRules.trackPrice.knobs.elevation = 2
+
+      expect(terrainCost(100, 0.1)).toBeCloseTo(0.5 * 100 + 2 * slopeCost * 0.1, 9)
+    })
+
+    it('should cost nothing at knobs of 0', () => {
+      gameRules.trackPrice.knobs.landCover = 0
+      gameRules.trackPrice.knobs.elevation = 0
+
+      expect(terrainCost(800, 0.3)).toBe(0)
+    })
+
+    it('should trim ground past the cap before the knobs weigh it', () => {
+      const { openGroundCost, maxTerrainFactor } = gameRules.trackPrice
+      const cap = maxTerrainFactor * openGroundCost
+      // Ground twice the cap, half of it land cover and half slope
+      const landCover = cap
+      const slope = cap / slopeCost
+      gameRules.trackPrice.knobs.landCover = 1
+      gameRules.trackPrice.knobs.elevation = 0
+
+      // Trimmed to the cap, both parts alike: the land cover's half is left
+      expect(terrainCost(landCover, slope)).toBeCloseTo(cap / 2, 9)
+    })
+
+    it('should price capped ground at the cap times the knob when the knobs match', () => {
+      const { openGroundCost, maxTerrainFactor } = gameRules.trackPrice
+      const cap = maxTerrainFactor * openGroundCost
+      gameRules.trackPrice.knobs.landCover = 0.5
+      gameRules.trackPrice.knobs.elevation = 0.5
+
+      expect(terrainCost(800, 1)).toBeCloseTo(0.5 * cap, 9)
     })
   })
 })

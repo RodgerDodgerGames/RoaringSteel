@@ -188,7 +188,9 @@ describe('useGamePersistence', () => {
       south: 39,
       west: -105,
       cell: (row, col) =>
-        row === 1 && col === 2 ? null : { elevation: col * 100, cost: row + col }
+        row === 1 && col === 2
+          ? null
+          : { elevation: col * 100, landCover: row + col, slope: col / 10 }
     })
     const SOURCE = {
       state: '08',
@@ -304,7 +306,7 @@ describe('useGamePersistence', () => {
       trackStore.addSegment({ ownerId: 1, coordinates: A_LINE, cost: 500, turn: 0 })
 
       expect(persistence.validateSaveData(save).errors).toContain(
-        'Saved by another version of the game (2.0.0); only 3.0.0 saves load'
+        'Saved by another version of the game (2.0.0); only 4.0.0 saves load'
       )
       expect(await persistence.deserializeGameState(save)).toBe(false)
       // Nothing of the game being played was cleared
@@ -555,7 +557,7 @@ describe('useGamePersistence', () => {
     beforeEach(() => {
       gameStore.advanceTurn()
       useTownsStore().setTowns([{ name: 'Denver', industries: [] }])
-      useGridStore().setGrid(makeTestGrid({ rows: 1, cols: 1, cell: () => ({ cost: 100 }) }))
+      useGridStore().setGrid(makeTestGrid({ rows: 1, cols: 1, cell: () => ({ landCover: 100 }) }))
       trackStore.addSegment({
         ownerId: 1,
         coordinates: [

@@ -20,7 +20,7 @@ import { pinPlainScale } from '../utils/boardScale'
 /** The center of cell `i` of a row of cells along the equator */
 const centerOf = (i) => ({ lat: 0, lng: (i + 0.5) * CELL })
 /** A row of six cells along the equator, each costing 1000 */
-const grid = makeTestGrid({ rows: 1, cols: 6, south: -CELL / 2, cell: () => ({ cost: 1000 }) })
+const grid = makeTestGrid({ rows: 1, cols: 6, south: -CELL / 2, cell: () => ({ landCover: 1000 }) })
 
 const ANN = 1
 const BO = 2
@@ -166,7 +166,7 @@ describe('useTrackBuilder', () => {
       cols: 60,
       south: -CELL / 2,
       west: -CELL / 2,
-      cell: () => ({ cost: 10 })
+      cell: () => ({ landCover: 10 })
     })
     useGridStore().setGrid(bigGrid)
     useTownsStore().setTowns([

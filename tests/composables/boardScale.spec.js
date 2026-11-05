@@ -8,7 +8,14 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { boardSizeKm, turnsToCross, boardScaleFor, formatDistance } from '@/composables/boardScale'
+import {
+  boardSizeKm,
+  turnsToCross,
+  boardScaleFor,
+  formatDistance,
+  cellSizeFor
+} from '@/composables/boardScale'
+import { gridConfig } from '@/config/grid'
 import { boardConfig } from '@/config/board'
 
 /** A square region `degrees` on a side, sitting on the equator */
@@ -153,6 +160,32 @@ describe('boardScale', () => {
 
       expect(formatDistance(km, 5.77, 'up')).toBe('0.3')
       expect(formatDistance(km, 5.77, 'down')).toBe('0.3')
+    })
+  })
+
+  describe('cellSizeFor', () => {
+    it('should cut the bounding box into about the cell budget', () => {
+      // Colorado's box, about 600 by 450 km
+      const bounds = [-109, 37, -102, 41]
+      const meters = cellSizeFor(bounds)
+      const cells =
+        Math.floor((4 * 111195) / meters) *
+        Math.floor((7 * 111195 * Math.cos((39 * Math.PI) / 180)) / meters)
+
+      expect(cells).toBeLessThanOrEqual(gridConfig.cellBudget)
+      expect(cells).toBeGreaterThan(gridConfig.cellBudget * 0.99)
+    })
+
+    it('should give a bigger region bigger cells', () => {
+      expect(cellSizeFor([-106, 26, -94, 36])).toBeGreaterThan(cellSizeFor([-73, 41, -70, 43]))
+    })
+
+    it('should not cut a tiny region finer than the smallest cell', () => {
+      expect(cellSizeFor([-71.5, 41.5, -71.4, 41.6])).toBe(gridConfig.minCellSize)
+    })
+
+    it('should come out the same, to the meter, every time', () => {
+      expect(Number.isInteger(cellSizeFor([-109, 37, -102, 41]))).toBe(true)
     })
   })
 })

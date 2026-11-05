@@ -38,7 +38,7 @@ const DB_NAME = 'roaring-steel'
  * state, cell size and year alone, so a grid built the old way would
  * otherwise go on being used.
  */
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 /** How many autosaves are kept; the oldest goes when another is added */
 export const MAX_AUTOSAVES = 3
@@ -65,7 +65,7 @@ function openDatabase() {
   return openDB(DB_NAME, DB_VERSION, {
     // Runs each step the browser's copy has not had yet, from the version it
     // has (0 the first time) up to DB_VERSION
-    upgrade(db, oldVersion) {
+    upgrade(db, oldVersion, newVersion, transaction) {
       if (oldVersion < 1) {
         // Autosaves are numbered as they are added, so the highest number is
         // the newest
@@ -77,6 +77,12 @@ function openDatabase() {
         db.createObjectStore('grids', { keyPath: ['state', 'cellSize', 'landCoverYear'] })
         // Towns and industry data, each under a name such as "towns_27"
         db.createObjectStore('caches')
+      }
+      if (oldVersion === 1) {
+        // Version 2 (2026-11-04) reads each cell from every pixel in it and
+        // prices slope as a grade: a grid built before, at the same state,
+        // cell size and year, would still be found and used
+        transaction.objectStore('grids').clear()
       }
     }
   })

@@ -5,13 +5,18 @@
  * Cover Database (Annual NLCD), and turns it into a building cost.
  *
  * The NLCD server draws its map as pictures (a WMS "GetMap"), and those
- * pictures are what this reads: each class has its own color, so the pixel
- * under a cell's center says what the cell is. One 1024-pixel picture covers
+ * pictures are what this reads: each class has its own color, so a pixel's
+ * color says what the ground is there. One 1024-pixel picture covers
  * thousands of cells, so a state takes a handful of requests where asking
  * about one point at a time took one request per cell.
  *
- * The pictures are drawn at the same detail as the elevation tiles, about
- * `pixelsPerCell` pixels across a cell.
+ * The pictures are drawn at exactly `pixelsPerCell` pixels across a cell,
+ * and a cell is read from every pixel inside it: its cost is the average of
+ * its land pixels' costs, so a cell that is half forest and half grassland
+ * costs halfway between. The server does not average when it draws a
+ * coarse picture — each pixel is the class at one spot — so a cell's couple
+ * of hundred pixels are a sample of its ground, not one point standing in
+ * for all of it.
  *
  * Annual NLCD has a map for every year since 1985. A game takes its land
  * cover from the middle year of its data window (see dataWindow.js), or the
@@ -27,10 +32,7 @@ import { nlcdCostMap, nlcdLegendColors } from '@/config/nlcd'
 import { gridApiConfig } from '@/config/grid'
 import { fetchWithRetries, mapWithConcurrency, RequestError } from '@/composables/utils'
 import { fetchImagePixels } from '@/composables/setup/imagePixels'
-import {
-  metersToLatitudeDegrees,
-  metersToLongitudeDegrees
-} from '@/composables/setup/useMapSupport'
+import { WATER_LAND_COVER } from '@/composables/map/water'
 
 const landCoverApiUrl =
   'https://dmsdata.cr.usgs.gov/geoserver/mrlc_Land-Cover-Native_conus_year_data/wms'
@@ -73,68 +75,66 @@ export function landCoverClass(red, green, blue, alpha) {
 }
 
 /**
- * Lays out the pictures that cover a set of cells: a grid of square images,
- * `landCoverImageSize` pixels a side at the given detail, starting at the
- * cells' north-west corner. The last image in each row and column is cut
- * short to what the cells need.
+ * Lays out the pictures that cover a grid: a grid of square images,
+ * `landCoverImageSize` pixels a side, over the grid's rectangle from its
+ * north-west corner, at exactly `pixelsPerCell` pixels to a cell each way.
+ * The last image in each row and column is cut short at the grid's edge.
  *
- * Each image's edges are worked out from its pixel count, so every pixel is
- * exactly `lngPerPixel` wide and `latPerPixel` tall and a cell's pixel is
- * found by arithmetic.
+ * With a whole number of pixels to a cell, the cell a pixel falls in is found
+ * by arithmetic: see `cellOfPixel`.
  *
- * @param {Array<{lat: number, lng: number}>} locations - Cell centers
- * @param {number} lngPerPixel - Degrees of longitude per pixel
- * @param {number} latPerPixel - Degrees of latitude per pixel
+ * @param {Object} shape - The grid's rows, cols, south, west, latStep and
+ *   lngStep (see cellGrid.js)
  * @returns {Array<{west: number, north: number, east: number, south: number,
- *   width: number, height: number, cells: Array}>} The images, each with the
- *   cells it covers as {index, px, py}
+ *   width: number, height: number, left: number, top: number}>} The images,
+ *   each with its edges and size, and `left` and `top`: where its first
+ *   pixel sits among the pixels of the whole grid
  */
-export function landCoverImages(locations, lngPerPixel, latPerPixel) {
-  if (locations.length === 0) return []
+export function landCoverImages({ rows, cols, south, west, latStep, lngStep }) {
   const size = gridApiConfig.landCoverImageSize
-  // The cells' extent. Looped rather than `Math.min(...lngs)`: spreading
-  // hundreds of thousands of cells into one call overflows the stack.
-  let minLng = Infinity
-  let maxLng = -Infinity
-  let minLat = Infinity
-  let maxLat = -Infinity
-  locations.forEach(({ lat, lng }) => {
-    minLng = Math.min(minLng, lng)
-    maxLng = Math.max(maxLng, lng)
-    minLat = Math.min(minLat, lat)
-    maxLat = Math.max(maxLat, lat)
-  })
-  // Half a pixel's margin, so no cell center sits on an image's outer edge
-  const west = minLng - lngPerPixel / 2
-  const north = maxLat + latPerPixel / 2
-  const columnsNeeded = Math.floor((maxLng - west) / lngPerPixel) + 1
-  const rowsNeeded = Math.floor((north - minLat) / latPerPixel) + 1
+  const perCell = gridApiConfig.pixelsPerCell
+  const lngPerPixel = lngStep / perCell
+  const latPerPixel = latStep / perCell
+  const north = south + rows * latStep
+  const totalWidth = cols * perCell
+  const totalHeight = rows * perCell
 
-  const images = new Map()
-  locations.forEach((location, index) => {
-    const column = Math.floor((location.lng - west) / lngPerPixel)
-    const row = Math.floor((north - location.lat) / latPerPixel)
-    const imageColumn = Math.floor(column / size)
-    const imageRow = Math.floor(row / size)
-    const key = `${imageColumn},${imageRow}`
-    if (!images.has(key)) {
-      const width = Math.min(size, columnsNeeded - imageColumn * size)
-      const height = Math.min(size, rowsNeeded - imageRow * size)
-      const imageWest = west + imageColumn * size * lngPerPixel
-      const imageNorth = north - imageRow * size * latPerPixel
-      images.set(key, {
+  const images = []
+  for (let top = 0; top < totalHeight; top += size) {
+    for (let left = 0; left < totalWidth; left += size) {
+      const width = Math.min(size, totalWidth - left)
+      const height = Math.min(size, totalHeight - top)
+      const imageWest = west + left * lngPerPixel
+      const imageNorth = north - top * latPerPixel
+      images.push({
         west: imageWest,
         north: imageNorth,
         east: imageWest + width * lngPerPixel,
         south: imageNorth - height * latPerPixel,
         width,
         height,
-        cells: []
+        left,
+        top
       })
     }
-    images.get(key).cells.push({ index, px: column % size, py: row % size })
-  })
-  return [...images.values()]
+  }
+  return images
+}
+
+/**
+ * The cell a pixel of a land cover image falls in.
+ * @param {Object} image - From `landCoverImages`
+ * @param {number} px - The pixel's column in the image
+ * @param {number} py - The pixel's row in the image, from the top
+ * @param {Object} shape - The grid's rows and cols
+ * @returns {number} The cell's index (see cellGrid.js)
+ */
+export function cellOfPixel(image, px, py, { rows, cols }) {
+  const perCell = gridApiConfig.pixelsPerCell
+  const col = Math.floor((image.left + px) / perCell)
+  // Pictures run from the north; the grid's rows from the south
+  const row = rows - 1 - Math.floor((image.top + py) / perCell)
+  return row * cols + col
 }
 
 /**
@@ -240,67 +240,110 @@ export function useLandCoverAPI() {
   }
 
   /**
-   * Works out which pictures a set of cells needs, before anything is
-   * fetched, so the progress bar can know the size of the job up front.
+   * Works out which pictures a grid needs, before anything is fetched, so the
+   * progress bar can know the size of the job up front.
    *
-   * @param {Array<{lat: number, lng: number}>} locations - Cell centers
-   * @param {number} cellMeters - Width of a cell, in meters
+   * @param {Object} shape - The grid's rows, cols, south, west, latStep and
+   *   lngStep (see cellGrid.js)
    * @param {number} year - The year of land cover, one the server has (see
    *   `landCoverYearFor`)
    * @returns {{requestCount: number, fetch: Function}} The plan: how many
    *   pictures it takes, and `fetch(onProgress)` to get them
    */
-  function planLandCover(locations, cellMeters, year) {
-    const meanLat = locations.reduce((sum, { lat }) => sum + lat, 0) / (locations.length || 1)
-    const lngPerPixel = metersToLongitudeDegrees(cellMeters, meanLat) / gridApiConfig.pixelsPerCell
-    const latPerPixel = metersToLatitudeDegrees(cellMeters) / gridApiConfig.pixelsPerCell
-    const images = landCoverImages(locations, lngPerPixel, latPerPixel)
+  function planLandCover(shape, year) {
+    const images = landCoverImages(shape)
 
     /**
-     * Fetches the pictures and reads each cell's land cover cost.
+     * Fetches the pictures and works out each cell's land cover cost from
+     * every pixel in it.
      *
-     * Two kinds of missing are kept apart. A cell the NLCD has no data for
-     * (outside the US) is simply null. A cell whose picture failed to load
-     * is null too, but is also counted in `failed`: the grid store fails
-     * setup when too many pictures failed, and must not mistake a region that
-     * reaches over the border for one whose downloads broke.
+     * Water (open water, and permanent ice, which is crossed the same way) is
+     * counted apart from land: a cell that is at least half water is a water
+     * cell, costed as water (see water.js); any other cell costs the average
+     * of its land pixels, its water left out. Pixels with no data — beyond the
+     * US border, or out at sea — are not counted at all.
+     *
+     * Two kinds of missing are kept apart. A cell no pixel has data for is
+     * simply null. A cell whose picture failed to load is null too, but is
+     * also counted in `failed`: the grid store fails setup when too many
+     * pictures failed, and must not mistake a region that reaches over the
+     * border for one whose downloads broke.
      *
      * @param {Function} [onProgress] - Called with (pictures done, in all)
      * @returns {Promise<{costs: Array<number|null>, failed: number}>} One
-     *   cost per location, in order, and how many cells' pictures failed
+     *   cost per cell, in the grid's order, and how many cells' pictures
+     *   failed and left them with nothing
      */
     async function fetchLandCover(onProgress = null) {
-      const costs = new Array(locations.length).fill(null)
-      let failed = 0
+      const size = shape.rows * shape.cols
+      const landSum = new Float64Array(size)
+      const landCount = new Uint32Array(size)
+      const waterCount = new Uint32Array(size)
+      const lost = new Uint8Array(size)
+      // The class of each color seen, so each distinct color (the pictures
+      // have about sixteen) is matched against the legend once
+      const classOfColor = new Map()
+
       await mapWithConcurrency(
         images,
         async (image) => {
+          let pixels
           try {
-            const { width, height, data } = await fetchImagePixels(getMapUrl(image, year), {
+            pixels = await fetchImagePixels(getMapUrl(image, year), {
               timeoutMs: gridApiConfig.landCoverTimeoutMs
             })
             // A picture at another size than asked for (an error page drawn as
-            // an image, say) would put every cell on the wrong pixel
-            if (width !== image.width || height !== image.height) {
-              throw new Error(`Land cover image came back ${width}x${height}`)
+            // an image, say) would put every cell on the wrong pixels
+            if (pixels.width !== image.width || pixels.height !== image.height) {
+              throw new Error(`Land cover image came back ${pixels.width}x${pixels.height}`)
             }
-            image.cells.forEach(({ index, px, py }) => {
-              const offset = (py * width + px) * 4
-              const code = landCoverClass(
-                data[offset],
-                data[offset + 1],
-                data[offset + 2],
-                data[offset + 3]
-              )
-              costs[index] = nlcdCostMap[code] ?? null
-            })
           } catch (error) {
             console.error('Error fetching land cover image:', error)
-            failed += image.cells.length
+            for (let py = 0; py < image.height; py++) {
+              for (let px = 0; px < image.width; px++) lost[cellOfPixel(image, px, py, shape)] = 1
+            }
+            return
+          }
+
+          const { data, width } = pixels
+          for (let py = 0; py < image.height; py++) {
+            for (let px = 0; px < width; px++) {
+              const o = (py * width + px) * 4
+              const color =
+                ((data[o] << 24) | (data[o + 1] << 16) | (data[o + 2] << 8) | data[o + 3]) >>> 0
+              let code = classOfColor.get(color)
+              if (code === undefined) {
+                code = landCoverClass(data[o], data[o + 1], data[o + 2], data[o + 3])
+                classOfColor.set(color, code)
+              }
+              const cost = nlcdCostMap[code]
+              if (cost === undefined) continue
+              const cell = cellOfPixel(image, px, py, shape)
+              if (cost === WATER_LAND_COVER) {
+                waterCount[cell]++
+              } else {
+                landSum[cell] += cost
+                landCount[cell]++
+              }
+            }
           }
         },
         { concurrency: gridApiConfig.landCoverConcurrency, onProgress }
       )
+
+      const costs = new Array(size).fill(null)
+      let failed = 0
+      for (let cell = 0; cell < size; cell++) {
+        const counted = landCount[cell] + waterCount[cell]
+        if (counted === 0) {
+          if (lost[cell]) failed++
+          continue
+        }
+        costs[cell] =
+          waterCount[cell] * 2 >= counted
+            ? WATER_LAND_COVER
+            : Math.round(landSum[cell] / landCount[cell])
+      }
       return { costs, failed }
     }
 

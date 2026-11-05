@@ -7,7 +7,7 @@
  * the build rules allow — the same check a person's line gets.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { lineBlock, townCells, builtLegs, trackIndex } from '@/composables/map/buildRules'
 import { regionTest } from '@/composables/map/region'
 import { linePrice, cellPath } from '@/composables/map/trackCost'
@@ -31,6 +31,7 @@ import {
   isRiver,
   isRidge
 } from '../../utils/botBoard'
+import { pinKnobs } from '../../utils/boardScale'
 
 const towns = makeTowns()
 const townNamed = (name) => towns.find((town) => town.name === name)
@@ -41,7 +42,8 @@ function rulesWith(segments = []) {
   const grid = makeGrid()
   return {
     grid,
-    // Land priced at its terrain cost: these tests are about the search
+    // Land priced at its terrain cost (with the knobs at 1, see below):
+    // these tests are about the search
     priceScale: 1,
     isInRegion: regionTest(makeRegion()),
     townCells: townCells(towns, grid),
@@ -58,11 +60,15 @@ const placeOf = (cell, grid) => ({ row: rowOf(grid, cell), col: colOf(grid, cell
 describe('botPathfinder', () => {
   let rules
   let board
+  let restoreKnobs
 
   beforeEach(() => {
+    // The knobs at 1, so a cell costs its terrain cost at a price scale of 1
+    restoreKnobs = pinKnobs(1)
     rules = rulesWith()
     board = searchBoard(rules, towns)
   })
+  afterEach(() => restoreKnobs())
 
   describe('planLine', () => {
     it('should find a line the build rules allow, ending on the town', () => {

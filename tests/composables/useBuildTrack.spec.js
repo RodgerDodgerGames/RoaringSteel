@@ -40,8 +40,9 @@ import { useGridStore } from '@/stores/grid'
 import { useTownsStore } from '@/stores/towns'
 import { formatCurrency } from '@/composables/utils'
 import { gameRules } from '@/config/game'
+import { bridgeCellCost } from '@/composables/map/water'
 import { nlcdCostMap } from '@/config/nlcd'
-import { makeTestGrid, CELL } from '../utils/testGrid'
+import { makeTestGrid, CELL, CELL_METERS } from '../utils/testGrid'
 import { pinPlainScale } from '../utils/boardScale'
 
 /**
@@ -113,7 +114,7 @@ const pricedGrid = makeTestGrid({
   cols: 1,
   south: 40 - CELL / 2,
   west: -100 - CELL / 2,
-  cell: () => ({ cost: 1000 })
+  cell: () => ({ landCover: 1000 })
 })
 
 /**
@@ -660,7 +661,7 @@ describe('useBuildTrack', () => {
       rows: 1,
       cols: 5,
       south: -CELL / 2,
-      cell: (row, col) => ({ cost: (col + 1) * 100 })
+      cell: (row, col) => ({ landCover: (col + 1) * 100 })
     })
     /** The center of cell `i` of the row */
     const centerOf = (i) => L.latLng(0, (i + 0.5) * CELL)
@@ -754,7 +755,7 @@ describe('useBuildTrack', () => {
       rows: 1,
       cols: 5,
       south: -CELL / 2,
-      cell: () => ({ cost: 100 })
+      cell: () => ({ landCover: 100 })
     })
     const centerOf = (i) => L.latLng(0, (i + 0.5) * CELL)
     /** A region covering the first three cells of the row, and not the last two */
@@ -861,14 +862,14 @@ describe('useBuildTrack', () => {
   describe('bridging water', () => {
     const centerOf = (i) => L.latLng(0, (i + 0.5) * CELL)
     /** Land, then more water cells in a row than a bridge may cross, then land */
-    const span = gameRules.bridges.maxCells + 1
+    const span = Math.floor(gameRules.bridges.maxKm / (CELL_METERS / 1000)) + 1
     const grid = makeTestGrid({
       rows: 1,
       cols: span + 2,
       south: -CELL / 2,
       cell: (row, col) => {
         const isWater = col > 0 && col <= span
-        return { landCover: isWater ? nlcdCostMap[11] : 150, cost: isWater ? 10000 : 100 }
+        return { landCover: isWater ? nlcdCostMap[11] : 100 }
       }
     })
 
@@ -896,7 +897,7 @@ describe('useBuildTrack', () => {
       hintMarker.setLatLng(centerOf(1))
       vi.advanceTimersByTime(200)
 
-      const bridge = formatCurrency(gameRules.bridges.costPerCell)
+      const bridge = formatCurrency(bridgeCellCost(1, CELL_METERS / 1000))
       expect(hintMarker.getTooltip().getContent()).toContain(`Cost: ${bridge} (bridge ${bridge})`)
     })
 
@@ -938,7 +939,7 @@ describe('useBuildTrack', () => {
 
   describe('beside track already built', () => {
     /** A three-by-five block of cells north of the equator, each costing 100 */
-    const grid = makeTestGrid({ rows: 3, cols: 5, cell: () => ({ cost: 100 }) })
+    const grid = makeTestGrid({ rows: 3, cols: 5, cell: () => ({ landCover: 100 }) })
     const centerOf = (row, col) => L.latLng((row + 0.5) * CELL, (col + 0.5) * CELL)
 
     /** Finishes a line along the given cell centers, as Geoman hands it over */

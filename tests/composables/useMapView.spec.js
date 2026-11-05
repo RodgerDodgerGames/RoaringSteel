@@ -16,7 +16,10 @@ import L from 'leaflet'
 import { useMapView } from '@/composables/map/useMapView'
 import { useMapStore } from '@/stores/map'
 import { useGameStore } from '@/stores/game'
-import { BUILD_VIEW, PLAN_VIEW, panLimits } from '@/composables/map/mapViews'
+import { useGridStore } from '@/stores/grid'
+import { BUILD_VIEW, PLAN_VIEW, panLimits, buildZoomRange } from '@/composables/map/mapViews'
+import { cellSizeFor } from '@/composables/boardScale'
+import { makeTestGrid, CELL_METERS } from '../utils/testGrid'
 
 /** A Colorado-shaped rectangle: 37–41°N, 109–102°W */
 const colorado = {
@@ -42,6 +45,12 @@ const coloradoBox = [
   [41, -102]
 ]
 const coloradoBounds = L.latLngBounds(coloradoBox)
+
+/**
+ * The Build view's zoom range for the cells Colorado's grid will be cut into
+ * (about 1 km): 9 to 12
+ */
+const coloradoRange = buildZoomRange(cellSizeFor([-109, 37, -102, 41]) / 1000, 39)
 
 describe('useMapView', () => {
   let container
@@ -134,8 +143,10 @@ describe('useMapView', () => {
       mapStore.setViewMode(BUILD_VIEW)
     })
 
-    it('should open one level closer than the Plan view, over the middle of the region', () => {
-      expect(map.getZoom()).toBe(Math.floor(planZoom) + 1)
+    it('should open closer than the Plan view, over the middle of the region', () => {
+      // One level closer, unless that is further out than the Build view goes
+      expect(map.getZoom()).toBe(Math.max(Math.floor(planZoom) + 1, coloradoRange.min))
+      expect(map.getZoom()).toBeGreaterThan(planZoom)
       expect(map.getCenter().lat).toBeCloseTo(39, 5)
       expect(map.getCenter().lng).toBeCloseTo(-105.5, 5)
     })
@@ -146,13 +157,23 @@ describe('useMapView', () => {
       expect(map.zoomControl._map).toBe(map)
     })
 
-    it('should hold zoom between levels 6 and 9', () => {
-      expect(map.getMinZoom()).toBe(6)
-      expect(map.getMaxZoom()).toBe(9)
+    it("should hold zoom to the range for the region's cells", () => {
+      expect(map.getMinZoom()).toBe(coloradoRange.min)
+      expect(map.getMaxZoom()).toBe(coloradoRange.max)
 
-      map.setZoom(12, { animate: false })
+      map.setZoom(18, { animate: false })
 
-      expect(map.getZoom()).toBe(9)
+      expect(map.getZoom()).toBe(coloradoRange.max)
+    })
+
+    it('should take the zoom range from the cells of the grid in play', () => {
+      // A grid of 10 km cells, as a game saved before cells followed the
+      // board has
+      useGridStore().setGrid(makeTestGrid({ rows: 2, cols: 2, south: 37, west: -109 }))
+      mapStore.setViewMode(PLAN_VIEW)
+      mapStore.setViewMode(BUILD_VIEW)
+
+      expect(map.getMaxZoom()).toBe(buildZoomRange(CELL_METERS / 1000, 39).max)
     })
 
     it('should stop panning a little past the edge of the region', () => {
@@ -160,20 +181,20 @@ describe('useMapView', () => {
     })
 
     it('should reopen where the player left it', () => {
-      moveTo([38.3, -104.6], 8)
+      moveTo([38.3, -104.6], 10)
 
       mapStore.setViewMode(PLAN_VIEW)
       mapStore.setViewMode(BUILD_VIEW)
 
-      expect(map.getZoom()).toBe(8)
+      expect(map.getZoom()).toBe(10)
       expect(map.getCenter().lat).toBeCloseTo(38.3, 2)
       expect(map.getCenter().lng).toBeCloseTo(-104.6, 2)
     })
 
     it('should record where it is for the save', () => {
-      moveTo([38.3, -104.6], 8)
+      moveTo([38.3, -104.6], 10)
 
-      expect(mapStore.mapZoom).toBe(8)
+      expect(mapStore.mapZoom).toBe(10)
       expect(mapStore.mapCenter[0]).toBeCloseTo(38.3, 2)
     })
 

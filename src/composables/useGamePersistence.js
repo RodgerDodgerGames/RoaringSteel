@@ -39,8 +39,11 @@ import { addAutoSave, getAutoSave, getAutoSaves as readAutoSaves, plain } from '
 import { debug } from '@/composables/debug'
 
 // 3.0.0: autosaves record where the grid came from instead of holding it.
+// 4.0.0: grids are read from every pixel in a cell and price slope as a
+// grade; an older save's track was laid on the old grid, and would sit
+// wrongly on one rebuilt the new way.
 // Only saves of this version are loaded.
-const SAVE_VERSION = '3.0.0'
+const SAVE_VERSION = '4.0.0'
 
 export function useGamePersistence() {
   const gameStore = useGameStore()

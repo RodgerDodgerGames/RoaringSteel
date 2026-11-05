@@ -27,6 +27,8 @@
  * @module composables/map/cellGrid
  */
 
+import { latitudeDegreesToMeters } from '@/composables/setup/useMapSupport'
+
 /**
  * @typedef {Object} CellGrid
  * @property {number} rows - Rows of cells, south to north
@@ -40,18 +42,17 @@
  * @property {Float32Array} elevation - Per cell, height in meters (NaN for a hole)
  * @property {Uint16Array} landCover - Per cell, the land cover's cost
  *   (see config/nlcd.js); 0 for a hole
- * @property {Float32Array} cost - Per cell, what track through it costs;
- *   NaN where the cost could not be worked out
+ * @property {Float32Array} slope - Per cell, how steep its ground is, as a
+ *   grade (see composables/map/slope.js); NaN until it is worked out
  */
 
 /**
  * A new grid with every cell a hole, ready to have its cells filled in.
  *
- * The values a cell holds all fit their arrays exactly: heights are whole
- * meters, land cover costs whole dollars no more than 9,990, and a cell's
- * cost — land cover plus the height differences to its neighbors — is a
- * whole number far below the 16 million a Float32 counts to without
- * rounding.
+ * The values a cell holds fit their arrays: heights are whole meters, land
+ * cover costs whole numbers no more than 9,990, and a slope is a grade that
+ * a Float32 holds to about seven significant figures, far finer than any
+ * price needs.
  *
  * @param {Object} shape - Where the grid is and how it is divided
  * @param {number} shape.rows - Rows of cells
@@ -75,7 +76,7 @@ export function createCellGrid({ rows, cols, south, west, latStep, lngStep }) {
     present: new Uint8Array(size),
     elevation: new Float32Array(size).fill(NaN),
     landCover: new Uint16Array(size),
-    cost: new Float32Array(size).fill(NaN)
+    slope: new Float32Array(size).fill(NaN)
   }
 }
 
@@ -86,16 +87,16 @@ export function createCellGrid({ rows, cols, south, west, latStep, lngStep }) {
  * @param {Object} terrain - What the cell holds
  * @param {number} terrain.elevation - Height in meters
  * @param {number} terrain.landCover - The land cover's cost
- * @param {number} [terrain.cost] - What track through it costs, if known yet
+ * @param {number} [terrain.slope] - How steep it is, as a grade, if known yet
  */
-export function setCell(grid, index, { elevation, landCover, cost = NaN }) {
+export function setCell(grid, index, { elevation, landCover, slope = NaN }) {
   if (!grid.present[index]) grid.count++
   grid.present[index] = 1
   grid.elevation[index] = elevation
   grid.landCover[index] = landCover
-  // A missing cost (null) is held as NaN, which is what `Number.isFinite`
-  // checks for when the cost is read
-  grid.cost[index] = cost ?? NaN
+  // A missing slope (null) is held as NaN, which is what `Number.isFinite`
+  // checks for when the slope is read
+  grid.slope[index] = slope ?? NaN
 }
 
 /**
@@ -105,6 +106,17 @@ export function setCell(grid, index, { elevation, landCover, cost = NaN }) {
  */
 export function isEmptyGrid(grid) {
   return !grid || grid.count === 0
+}
+
+/**
+ * How wide a grid's cells are, in km, north to south. Cells are cut square
+ * in meters at the middle of the region (see stores/grid.js), so this is
+ * their size; east to west they narrow a little toward the poles.
+ * @param {CellGrid} grid - The grid
+ * @returns {number} Kilometers
+ */
+export function cellKm(grid) {
+  return latitudeDegreesToMeters(grid.latStep) / 1000
 }
 
 /**
@@ -337,7 +349,7 @@ const ARRAYS = {
   present: Uint8Array,
   elevation: Float32Array,
   landCover: Uint16Array,
-  cost: Float32Array
+  slope: Float32Array
 }
 
 /**

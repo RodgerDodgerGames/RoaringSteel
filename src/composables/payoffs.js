@@ -15,8 +15,8 @@
  *
  * On top of the per-km rate, long hauls earn a bonus. Reaching a distant town
  * means building (and risking) a lot of track before the first delivery pays,
- * so the payoff is multiplied by a factor that grows with the logarithm of
- * how far the haul is, measured against the map's own span — the distance
+ * so the payoff is multiplied by a factor that grows exponentially with how
+ * far the haul is, measured against the map's own span — the distance
  * between its two furthest-apart towns. Measuring against the span keeps the
  * bonus the same shape on a small region as on a large one: a haul halfway
  * across the map gets the same multiplier either way.
@@ -72,14 +72,20 @@ export function mapSpanKm(towns) {
  * The long-haul bonus: what the per-km payoff is multiplied by for a haul of
  * this length on a map of this span.
  *
- *   multiplier = 1 + maxBonus · ln(1 + km / span) / ln 2
+ *   share      = km / span                       (0 to 1)
+ *   multiplier = 1 + maxBonus · (e^(steepness · share) − 1) / (e^steepness − 1)
  *
- * At zero km the logarithm is 0, so a short haul pays (nearly) the plain
- * per-km rate. At the full span it is ln 2, which the division cancels, so the
- * map's longest possible haul pays exactly (1 + maxBonus) times the rate. In
- * between, the logarithm rises fastest early on, so even a moderate haul gets
- * a noticeable share of the bonus — but since the payoff is km × multiplier,
- * every extra km still pays more than the last.
+ * The fraction is an exponential curve squeezed to run from 0 at no distance
+ * to 1 at the full span: e^0 − 1 is 0 on top, and at the full span the top and
+ * bottom are equal. So a haul of no length pays the plain per-km rate and the
+ * map's longest possible haul pays exactly (1 + maxBonus) times it.
+ *
+ * In between, the curve is exponential: it stays low for short and middling
+ * hauls and climbs fastest at the far end, so the bonus is saved for the
+ * hauls that really cross the map. `steepness` sets how hard it bends. At 2,
+ * a haul a quarter of the way across gets about a tenth of the bonus and one
+ * halfway across about a quarter of it; higher holds more back for the very
+ * longest hauls, and values near 0 straighten it into a plain line.
  * @param {number} km - The haul's length
  * @param {number} spanKm - The map's span (see `mapSpanKm`)
  * @returns {number} The multiplier, from 1 up to 1 + maxBonus
@@ -88,8 +94,17 @@ export function longHaulMultiplier(km, spanKm) {
   // A map with one town, or all towns in one spot, has no long hauls; this
   // also keeps the division below from going by zero
   if (spanKm <= 0) return 1
-  const { maxBonus } = gameRules.payoffs.longHaul
-  return 1 + (maxBonus * Math.log(1 + km / spanKm)) / Math.LN2
+  const { maxBonus, steepness } = gameRules.payoffs.longHaul
+  // A haul runs between two of the map's towns, so it should never be longer
+  // than the span. Capped anyway: past the span the exponential runs away
+  // fast (twice the span would pay over 9 times the rate), so a span worked
+  // out from a different set of towns must not turn into a runaway payoff.
+  const share = Math.min(1, km / spanKm)
+  // At a steepness of 0 the curve is 0 / 0, and it tends to a straight line
+  // as steepness shrinks, so use the line. A negative or missing steepness
+  // gets the line too, rather than a curve bent the wrong way or NaN.
+  const curve = steepness > 0 ? Math.expm1(steepness * share) / Math.expm1(steepness) : share
+  return 1 + maxBonus * curve
 }
 
 /**

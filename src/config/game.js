@@ -105,19 +105,25 @@ export const gameRules = {
    * new line roughly pays for the line, and every later one on it is profit.
    * `minimum` keeps a delivery between neighbors worth making.
    *
-   * `longHaul.maxBonus` rewards the risk of reaching for distant towns: the
-   * per-km payoff is multiplied by a bonus that grows logarithmically with
-   * the haul's share of the map's span (its two furthest-apart towns), up to
-   * 1 + maxBonus for the longest possible haul. At 1, that haul pays double;
-   * one a quarter of the way across pays about 1.3×. Raise it to pull players
-   * across the map harder, or set it to 0 for plain per-km payoffs.
+   * `longHaul` rewards the risk of reaching for distant towns: the per-km
+   * payoff is multiplied by a bonus that grows exponentially with the haul's
+   * share of the map's span (its two furthest-apart towns), up to
+   * 1 + maxBonus for the longest possible haul. At a maxBonus of 1, that haul
+   * pays double. Raise it to pull players across the map harder, or set it to
+   * 0 for plain per-km payoffs.
+   *
+   * `steepness` sets how much of the bonus is held back for the very longest
+   * hauls. At 2, a haul a quarter of the way across pays about 1.1× and one
+   * halfway across about 1.27×; at 4, those drop to about 1.03× and 1.12×.
+   * At 0 (or below), the bonus grows in a straight line with distance.
    */
   payoffs: {
     perKm: 100,
     roundTo: 1000,
     minimum: 3000,
     longHaul: {
-      maxBonus: 1
+      maxBonus: 1,
+      steepness: 2
     }
   }
 }

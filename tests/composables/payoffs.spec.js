@@ -3,7 +3,7 @@
  *
  * A demand pays by how far its commodity has to come: the straight-line
  * distance from the nearest town producing it, at gameRules.payoffs.perKm,
- * times a long-haul bonus that grows logarithmically with the haul's share of
+ * times a long-haul bonus that grows exponentially with the haul's share of
  * the map's span, rounded, and never under the minimum.
  */
 
@@ -23,14 +23,14 @@ const town = (name, lat, industries = []) => ({
 })
 
 describe('payoffs', () => {
-  // The bonus is a tuning knob (0 turns it off), so pin it for these tests:
-  // they check the rule's shape, not whatever the knob is set to today
-  const tunedBonus = gameRules.payoffs.longHaul.maxBonus
+  // The bonus and its steepness are tuning knobs, so pin them for these
+  // tests: they check the rule's shape, not whatever the knobs are set to today
+  const tuned = { ...gameRules.payoffs.longHaul }
   beforeEach(() => {
-    gameRules.payoffs.longHaul.maxBonus = 1
+    Object.assign(gameRules.payoffs.longHaul, { maxBonus: 1, steepness: 2 })
   })
   afterEach(() => {
-    gameRules.payoffs.longHaul.maxBonus = tunedBonus
+    Object.assign(gameRules.payoffs.longHaul, tuned)
   })
 
   const denver = town('Denver', 39.7)
@@ -80,11 +80,49 @@ describe('payoffs', () => {
       expect(longHaulMultiplier(span, span)).toBeCloseTo(2, 10)
     })
 
-    it('should rise fastest early on, giving a half-map haul over half the bonus', () => {
-      // The logarithmic shape: front-loaded, so moderate hauls already earn
-      // a good share of the bonus, but not all of it
-      expect(longHaulMultiplier(span / 2, span)).toBeGreaterThan(1.5)
-      expect(longHaulMultiplier(span / 2, span)).toBeLessThan(2)
+    it('should hold most of the bonus back for the longest hauls', () => {
+      // The exponential shape: a half-map haul earns well under half the bonus
+      expect(longHaulMultiplier(span / 2, span)).toBeGreaterThan(1)
+      expect(longHaulMultiplier(span / 2, span)).toBeLessThan(1.5)
+    })
+
+    it('should climb faster the longer the haul', () => {
+      // Each further quarter of the map adds more bonus than the one before
+      const quarters = [0, 1, 2, 3, 4].map((q) => longHaulMultiplier((q * span) / 4, span))
+      const steps = quarters.slice(1).map((value, i) => value - quarters[i])
+
+      steps.slice(1).forEach((step, i) => expect(step).toBeGreaterThan(steps[i]))
+    })
+
+    it('should hold more back for the longest hauls when steeper', () => {
+      const gentle = longHaulMultiplier(span / 2, span)
+      gameRules.payoffs.longHaul.steepness = 4
+
+      expect(longHaulMultiplier(span / 2, span)).toBeLessThan(gentle)
+      expect(longHaulMultiplier(span, span)).toBeCloseTo(2, 10)
+    })
+
+    it('should grow in a straight line at a steepness of 0', () => {
+      gameRules.payoffs.longHaul.steepness = 0
+
+      expect(longHaulMultiplier(span / 4, span)).toBeCloseTo(1.25, 10)
+      expect(longHaulMultiplier(span, span)).toBe(2)
+    })
+
+    it('should meet the straight line smoothly as steepness shrinks toward 0', () => {
+      gameRules.payoffs.longHaul.steepness = 1e-6
+
+      expect(longHaulMultiplier(span / 4, span)).toBeCloseTo(1.25, 5)
+    })
+
+    it('should use the straight line for a negative steepness', () => {
+      gameRules.payoffs.longHaul.steepness = -2
+
+      expect(longHaulMultiplier(span / 4, span)).toBeCloseTo(1.25, 10)
+    })
+
+    it('should not pay past the full bonus for a haul longer than the span', () => {
+      expect(longHaulMultiplier(2 * span, span)).toBeCloseTo(2, 10)
     })
 
     it('should scale with the configured bonus', () => {

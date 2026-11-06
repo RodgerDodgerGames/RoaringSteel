@@ -19,7 +19,7 @@ export const gridConfig = {
    * computer player's route search takes (about half a second each on a
    * desktop, three to five times that on a phone).
    */
-  cellBudget: 250000,
+  cellBudget: 150000,
 
   /**
    * The smallest a cell may be, in meters, however small the region. The
@@ -27,7 +27,7 @@ export const gridConfig = {
    * pixels (see `pixelsPerCell`), and at much below this they would be the
    * same few squares read over and over.
    */
-  minCellSize: 250
+  minCellSize: 300
 }
 
 /**

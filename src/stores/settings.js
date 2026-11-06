@@ -5,6 +5,12 @@
  * game itself. They are set from the Settings dialog, which opens from the
  * Settings button on the New Game steps and from the Game menu during play.
  *
+ * Changes are made in the Settings dialog on a draft (see
+ * useSettingsDraft.js) and only reach the settings when the player presses
+ * Save; Cancel throws the draft away. The one exception is the theme, which
+ * is shown on the page while it is being chosen, as a preview (see
+ * `themePreview`), and goes back if the player cancels.
+ *
  * Settings are remembered in this browser (localStorage), so they carry from
  * game to game on the same computer. They are also written into every saved
  * game, and loading a save applies its settings, so a game picks up looking
@@ -14,6 +20,7 @@
  * @module stores/settings
  */
 
+import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { useStorage } from '@vueuse/core'
 import { PIN_COLORS } from '@/config/demands'
@@ -32,7 +39,27 @@ export const DEFAULT_SETTINGS = Object.freeze({
    * How many demand lines a player may pin to the map at once. Pinning one
    * more drops the oldest pin.
    */
-  pinLimit: 3
+  pinLimit: 3,
+  /**
+   * Light or dark colors: "system" follows the computer's own light/dark
+   * setting, "light" and "dark" keep to one whatever it is (see useTheme.js)
+   */
+  theme: 'system'
+})
+
+/**
+ * Settings that belong to this browser alone: kept here, but never taken
+ * from a loaded save. Light or dark colors suit the person at the screen,
+ * not whoever saved the game.
+ */
+export const BROWSER_ONLY_SETTINGS = Object.freeze(['theme'])
+
+/**
+ * The values a choice setting may take, in the order the Settings dialog
+ * offers them. A setting with a fixed list of values must be listed here.
+ */
+export const SETTING_CHOICES = Object.freeze({
+  theme: Object.freeze(['system', 'light', 'dark'])
 })
 
 /**
@@ -46,13 +73,16 @@ export const SETTING_RANGES = Object.freeze({
 
 /**
  * Whether a value read back can be used for a setting: the same kind as the
- * default, and, for a number setting, a whole number within its range.
+ * default; for a choice setting, one of its choices; and, for a number
+ * setting, a whole number within its range.
  * @param {string} name - The setting's name
  * @param {*} value - The value read back
  * @returns {boolean} True if the setting may take the value
  */
 function isUsable(name, value) {
   if (typeof value !== typeof DEFAULT_SETTINGS[name]) return false
+  const choices = SETTING_CHOICES[name]
+  if (choices && !choices.includes(value)) return false
   const range = SETTING_RANGES[name]
   return !range || (Number.isInteger(value) && value >= range.min && value <= range.max)
 }
@@ -100,14 +130,46 @@ export const useSettingsStore = defineStore('settings', () => {
   /**
    * Takes on the settings carried by a loaded save, which then become this
    * browser's settings too. Unusable settings in the save are ignored (see
-   * usableSettings), and settings the save does not mention keep their
-   * current value.
+   * usableSettings), as are the browser-only ones (BROWSER_ONLY_SETTINGS),
+   * and settings the save does not mention keep their current value.
    *
    * @param {Object} saved - The `settings` object from a save
    */
   function applySettings(saved) {
-    Object.assign(settings.value, usableSettings(saved))
+    const usable = usableSettings(saved)
+    BROWSER_ONLY_SETTINGS.forEach((name) => delete usable[name])
+    Object.assign(settings.value, usable)
   }
 
-  return { settings, applySettings }
+  /**
+   * The theme being tried in the Settings dialog, shown on the page until
+   * the player saves or cancels; null while no theme is being tried.
+   */
+  const themePreview = ref(null)
+
+  /** The theme the page shows: the one being tried, or else the setting */
+  const shownTheme = computed(() => themePreview.value ?? settings.value.theme)
+
+  /**
+   * Shows a theme on the page without saving it, while the player tries it
+   * in the Settings dialog. A value that is not a theme is ignored.
+   * @param {string|null} theme - The theme to show, or null to stop previewing
+   */
+  function previewTheme(theme) {
+    themePreview.value = theme === null || isUsable('theme', theme) ? theme : null
+  }
+
+  /**
+   * Saves the settings from the Settings dialog's draft, and ends any theme
+   * preview: the theme saved is now the one shown. Unusable values in the
+   * draft are ignored, as they are from a save (see usableSettings).
+   *
+   * @param {Object} draft - The settings as the player left them in the dialog
+   */
+  function saveSettings(draft) {
+    Object.assign(settings.value, usableSettings(draft))
+    previewTheme(null)
+  }
+
+  return { settings, applySettings, themePreview, shownTheme, previewTheme, saveSettings }
 })

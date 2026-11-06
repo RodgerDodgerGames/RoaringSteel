@@ -4,7 +4,7 @@
   The primary game map component built on Leaflet. Displays:
   - Stamen terrain background tiles
   - Everything outside the region being played grayed out (regionMask.js)
-  - The grid cells counted as water shaded blue (waterMask.js)
+  - The rivers, lakes and sea track has to bridge, with their names (waterLayer.js)
   - Town markers with size-based icons
   - Each town's commodity icons, in the Plan view
   - Interactive popups for town information
@@ -37,7 +37,7 @@ import { useMapView } from '@/composables/map/useMapView'
 import { useTownsStore } from '@/stores/towns'
 import { useMapStore } from '@/stores/map'
 import { useRegionMask } from '@/composables/map/regionMask'
-import { useWaterMask } from '@/composables/map/waterMask'
+import { useWaterLayer } from '@/composables/map/waterLayer'
 import { useTrainMarkers } from '@/composables/map/trainMarkers'
 import MapCreditsLink from '@/components/map/MapCreditsLink.vue'
 
@@ -51,7 +51,7 @@ const mapContainer = ref(null)
 const { addTownsToMap, townsLayer } = useTowns()
 const mapView = useMapView()
 const regionMask = useRegionMask()
-const waterMask = useWaterMask()
+const waterLayer = useWaterLayer()
 const trainMarkers = useTrainMarkers()
 
 onMounted(() => {
@@ -75,8 +75,9 @@ onMounted(() => {
   if (map.value) {
     // The edge of the board: track may not be built in the gray
     regionMask.attach(map.value)
-    // Water inside it, which track crosses only on a bridge
-    waterMask.attach(map.value)
+    // The water, which track crosses only on a bridge: drawn over the gray,
+    // since water beyond the border may be bridged too
+    waterLayer.attach(map.value)
     // add towns to map
     addTownsToMap(map, towns)
     // add townsLayer to store

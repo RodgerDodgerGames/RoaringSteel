@@ -161,3 +161,32 @@
 .is-demand-hovering .town-tooltip:not(.is-demand-marked) {
   opacity: 0.25 !important;
 }
+
+/* The names of rivers, lakes and bays (see waterLayer.js). The marker is an
+   empty point; the name is centered on it and turned to its angle. */
+.water-label-anchor {
+  background: none;
+  border: none;
+}
+
+/* Italic, as water is named on maps, in the water's Denim, with the same
+   paper glow as town names so a name reads over forest or track. */
+.water-label {
+  position: absolute;
+  white-space: nowrap;
+  font-family: var(--bulma-family-primary);
+  font-style: italic;
+  font-size: 0.75rem;
+  color: #2f5d73;
+  -webkit-text-stroke: 2px var(--timetable-paper);
+  paint-order: stroke fill;
+  text-shadow: 0 0 3px var(--timetable-paper);
+  pointer-events: none;
+}
+
+/* Lakes and bays a little larger than rivers, and spaced out across the
+   water they name */
+.water-label--area {
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+}

@@ -64,6 +64,13 @@ export const CREDIT_GROUPS = [
         name: 'Annual National Land Cover Database (Annual NLCD)',
         url: 'https://www.mrlc.gov/data/project/annual-nlcd',
         note: 'Land cover, from the U.S. Geological Survey and the MRLC Consortium'
+      },
+      {
+        name: 'Natural Earth',
+        url: 'https://www.naturalearthdata.com/',
+        note:
+          'Rivers, lakes, sea and bays. Made with Natural Earth. Free vector and raster map ' +
+          'data @ naturalearthdata.com.'
       }
     ]
   },

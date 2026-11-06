@@ -42,7 +42,7 @@ import {
  *   useElevationTiles.js); NaN or missing counts as level
  */
 export function fillSlopes(grid, roughness) {
-  const { rows, cols, south, latStep, lngStep, elevation, slope, present } = grid
+  const { rows, cols, south, latStep, lngStep, elevation, slope, present, water } = grid
   const northSouthMeters = latitudeDegreesToMeters(latStep)
 
   for (let row = 0; row < rows; row++) {
@@ -57,14 +57,16 @@ export function fillSlopes(grid, roughness) {
       if (!present[index]) continue
 
       // The average grade to the neighbors on the board; a cell at the edge,
-      // or beside a hole, is measured against the neighbors it has
+      // or beside a hole, is measured against the neighbors it has. Water
+      // neighbors are left out too: the sea's height is its floor, often far
+      // below the shore, and would make every coast look like a cliff
       let gradeSum = 0
       let neighbors = 0
       for (let dr = -1; dr <= 1; dr++) {
         for (let dc = -1; dc <= 1; dc++) {
           if (dr === 0 && dc === 0) continue
           const neighbor = cellAt(grid, row + dr, col + dc)
-          if (neighbor === -1) continue
+          if (neighbor === -1 || water[neighbor]) continue
           const meters = dr === 0 ? eastWestMeters : dc === 0 ? northSouthMeters : diagonalMeters
           gradeSum += Math.abs(elevation[index] - elevation[neighbor]) / meters
           neighbors++

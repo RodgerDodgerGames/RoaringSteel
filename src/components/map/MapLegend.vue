@@ -31,6 +31,7 @@ import {
 } from '@/composables/map/trackStyles'
 import { PIN_COLORS } from '@/config/demands'
 import { gameRules } from '@/config/game'
+import { formatCurrency } from '@/composables/utils'
 
 const { towns } = storeToRefs(useTownsStore())
 const playerStore = usePlayerStore()
@@ -77,6 +78,14 @@ const haloSample = {
 }
 
 const commodities = computed(() => legendCommodities(towns.value))
+
+/**
+ * What bridges cost, as the water rows say it. Distances are in the units a
+ * train's speed is counted in, as everywhere the player sees one.
+ */
+const { perSpeedUnit, maxSpeedUnits, riverCrossing } = gameRules.bridges
+const lakeText = `Lakes and bays: bridged at ${formatCurrency(perSpeedUnit)} per 1 of distance, up to ${maxSpeedUnits}`
+const riverText = `Rivers: bridged at ${formatCurrency(riverCrossing)} a crossing`
 </script>
 
 <template>
@@ -113,7 +122,13 @@ const commodities = computed(() => legendCommodities(towns.value))
           <span class="map-legend__symbol">
             <span class="map-legend__water"></span>
           </span>
-          Water: bridged at extra cost, up to {{ gameRules.bridges.maxKm }} km
+          {{ lakeText }}
+        </li>
+        <li class="map-legend__row">
+          <span class="map-legend__symbol">
+            <span class="map-legend__river"></span>
+          </span>
+          {{ riverText }}
         </li>
         <li class="map-legend__row">
           <!-- A short piece of track, drawn the way the map draws it: a dark
@@ -257,12 +272,20 @@ const commodities = computed(() => legendCommodities(towns.value))
   border-radius: 50%;
 }
 
-/* A water square, shaded as the map shades one (see waterMask.js) */
+/* A patch of lake, and a stretch of river, drawn as the map draws them (see
+   waterLayer.js) */
 .map-legend__water {
   width: 16px;
   height: 16px;
-  border: 1px solid rgba(31, 111, 178, 0.6);
-  background: rgba(31, 111, 178, 0.3);
+  border: 1px solid rgba(47, 93, 115, 0.8);
+  background: rgba(47, 93, 115, 0.45);
+}
+
+.map-legend__river {
+  width: 20px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(47, 93, 115, 0.9);
 }
 
 /* Drawn as the map draws them: white on a dark rounded square */

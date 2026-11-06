@@ -13,8 +13,9 @@
  * `trackPriceScale` works out the dollars per point of terrain cost for a
  * grid on a board, and pricing multiplies by it.
  *
- * Water is the exception: a water cell is bridged, and its price is the
- * bridge's, which climbs with each water cell in a row (see water.js).
+ * Water is the exception (see water.js): a lake or sea cell is bridged, at
+ * the bridge's price instead of its own, and each place the line crosses a
+ * river adds a river bridge.
  *
  * The price depends only on where the line's vertices are, never on the path
  * the cursor took to get there. Pricing used to add a cell each time the
@@ -29,8 +30,8 @@
  */
 
 import { gameRules } from '@/config/game'
-import { isWaterCell, bridgeCellCost } from '@/composables/map/water'
-import { findCell, cellAt, cellKm } from '@/composables/map/cellGrid'
+import { isWaterCell, bridgeCellPrice, riverCrossings } from '@/composables/map/water'
+import { findCell, cellAt, cellKm, walkCells } from '@/composables/map/cellGrid'
 import {
   latitudeDegreesToMeters,
   longitudeDegreesToMeters
@@ -162,86 +163,6 @@ export function pointsAlongLine(latlngs, grid) {
 }
 
 /**
- * How near a leg must come to a cell's corner, in cells, to count as passing
- * through the corner itself. Far finer than anything a player can draw; it
- * only absorbs rounding, so a leg from one cell's center to its diagonal
- * neighbor's, as the computer players build, goes corner to corner instead
- * of clipping one of the two cells beside the corner by a rounding error.
- */
-const CORNER_CELLS = 1e-6
-
-/**
- * Every cell a straight leg passes through, in order, as row and column —
- * exactly, by walking the grid from the cell the leg starts in to the cell it
- * ends in, one boundary at a time.
- *
- * The grid's cells are equal rectangles in latitude and longitude, and a leg
- * is straight in latitude and longitude, so in units of cells the leg is a
- * straight line `x = x0 + t·dx`, `y = y0 + t·dy` for t from 0 to 1. The walk
- * keeps, for each axis, the t at which the leg next crosses a cell boundary
- * on that axis (`nextX`, `nextY`), steps into the next cell across whichever
- * boundary comes first, and moves that axis' t on by one cell's worth
- * (`deltaX`, `deltaY`). (This is the Amanatides–Woo grid traversal.) A leg
- * that passes exactly through a corner steps diagonally: it touches the two
- * cells beside the corner only at a point, and crosses neither.
- *
- * It takes one step per cell crossed, and nothing is missed however little
- * of a cell the leg clips.
- *
- * Rows and columns may be off the grid; the caller drops those.
- * @param {{lat: number, lng: number}} from - Where the leg starts
- * @param {{lat: number, lng: number}} to - Where the leg ends
- * @param {Object} grid - The grid
- * @param {Function} visit - Called with (row, col) for each cell, in order
- */
-function walkLeg(from, to, grid, visit) {
-  const x0 = (from.lng - grid.west) / grid.lngStep
-  const y0 = (from.lat - grid.south) / grid.latStep
-  const x1 = (to.lng - grid.west) / grid.lngStep
-  const y1 = (to.lat - grid.south) / grid.latStep
-  const dx = x1 - x0
-  const dy = y1 - y0
-
-  let col = Math.floor(x0)
-  let row = Math.floor(y0)
-  const stepX = Math.sign(dx)
-  const stepY = Math.sign(dy)
-  // Boundaries left to cross on each axis: the walk ends in the leg's end cell
-  let colsLeft = Math.abs(Math.floor(x1) - col)
-  let rowsLeft = Math.abs(Math.floor(y1) - row)
-
-  // The t at which the leg first crosses a boundary on each axis, and how
-  // much t one whole cell takes; never, on an axis the leg does not move along
-  const nextBoundary = (start, cell, delta) =>
-    delta > 0 ? (cell + 1 - start) / delta : delta < 0 ? (start - cell) / -delta : Infinity
-  let nextX = nextBoundary(x0, col, dx)
-  let nextY = nextBoundary(y0, row, dy)
-  const deltaX = dx !== 0 ? 1 / Math.abs(dx) : Infinity
-  const deltaY = dy !== 0 ? 1 / Math.abs(dy) : Infinity
-  // A gap in t, as a distance in cells along the leg's longer axis
-  const span = Math.max(Math.abs(dx), Math.abs(dy))
-
-  visit(row, col)
-  while (colsLeft > 0 || rowsLeft > 0) {
-    const atCorner = colsLeft > 0 && rowsLeft > 0 && Math.abs(nextX - nextY) * span < CORNER_CELLS
-    // Across the nearer boundary, or both at a corner
-    const acrossCol = atCorner || (colsLeft > 0 && (rowsLeft === 0 || nextX < nextY))
-    const acrossRow = atCorner || !acrossCol
-    if (acrossCol) {
-      col += stepX
-      nextX += deltaX
-      colsLeft--
-    }
-    if (acrossRow) {
-      row += stepY
-      nextY += deltaY
-      rowsLeft--
-    }
-    visit(row, col)
-  }
-}
-
-/**
  * Every grid cell a line passes through, each listed once, in the order the
  * line reaches them (see `cellPath`).
  * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
@@ -254,7 +175,7 @@ export function cellsAlongLine(latlngs, grid) {
 
 /**
  * The grid cells a line passes through, in the order it passes through them,
- * found exactly, leg by leg (see `walkLeg`): every cell a leg enters is in,
+ * found exactly, leg by leg (see `walkCells` in cellGrid.js): every cell a leg enters is in,
  * however little of it the leg clips, and a cell the leg only touches at a
  * corner is not.
  *
@@ -284,7 +205,7 @@ export function cellPath(latlngs, grid) {
   // sits in its one cell.)
   add(findCell(latlngs[0], grid))
   latlngs.slice(1).forEach((to, i) => {
-    walkLeg(latlngs[i], to, grid, (row, col) => add(cellAt(grid, row, col)))
+    walkCells(latlngs[i], to, grid, (row, col) => add(cellAt(grid, row, col)))
     add(findCell(to, grid))
   })
   return path
@@ -294,41 +215,43 @@ export function cellPath(latlngs, grid) {
  * What a line of track costs to build, and how much of that is bridges.
  *
  * Each land cell the line passes through adds its own price (see
- * `landCellPrice`). Each water cell
- * adds a bridge instead, priced by how far into its crossing it is: the line
- * is followed cell by cell (see `cellPath`), and the water cells it passes
- * through between one land cell and the next are one crossing.
+ * `landCellPrice`), once however often the line passes through it. Each lake
+ * or sea cell adds a bridge instead, at the same price for every cell of a
+ * crossing (see `bridgeCellPrice`). And each place the line crosses a river
+ * adds a river bridge (see `riverCrossings`).
  *
  * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
- * @param {Object} grid - The grid
- * @param {number} priceScale - Dollars per point of terrain cost (see
+ * @param {Object} board - What the line is priced against, as the track
+ *   builder holds it (`buildRules` in trackBuilder.js)
+ * @param {Object} board.grid - The grid
+ * @param {number} board.priceScale - Dollars per point of terrain cost (see
  *   `trackPriceScale`)
+ * @param {number} board.speedUnitKm - The board's speed unit (see
+ *   boardScale.js), which bridges are priced by
+ * @param {Object|null} [board.rivers] - The rivers on the board (see
+ *   `riverIndex` in water.js); none if left out
  * @returns {{total: number, bridges: number}} The price, and the part of it
  *   that is bridges
  */
-export function linePrice(latlngs, grid, priceScale) {
-  const widthKm = cellKm(grid)
+export function linePrice(latlngs, { grid, priceScale, speedUnitKm, rivers = null }) {
+  const waterCell = bridgeCellPrice(grid, speedUnitKm)
   let total = 0
   let bridges = 0
   // Cells already paid for: each is charged once, however often it is crossed
   const charged = new Set()
-  // The water cells of the crossing the line is on, if it is on one
-  const crossing = new Set()
 
   cellPath(latlngs, grid).forEach((cell) => {
-    if (!isWaterCell(grid, cell)) {
-      crossing.clear()
-      if (!charged.has(cell)) total += landCellPrice(grid, cell, priceScale)
-      charged.add(cell)
-      return
-    }
-    crossing.add(cell)
     if (charged.has(cell)) return
     charged.add(cell)
-    // Priced by how far into its crossing the cell is
-    const bridge = bridgeCellCost(crossing.size, widthKm)
-    bridges += bridge
-    total += bridge
+    if (isWaterCell(grid, cell)) {
+      bridges += waterCell
+      total += waterCell
+    } else {
+      total += landCellPrice(grid, cell, priceScale)
+    }
   })
-  return { total, bridges }
+
+  const riverBridges =
+    riverCrossings(latlngs, grid, rivers).length * gameRules.bridges.riverCrossing
+  return { total: total + riverBridges, bridges: bridges + riverBridges }
 }

@@ -42,8 +42,10 @@ import { debug } from '@/composables/debug'
 // 4.0.0: grids are read from every pixel in a cell and price slope as a
 // grade; an older save's track was laid on the old grid, and would sit
 // wrongly on one rebuilt the new way.
+// 5.0.0: grids mark lakes and the sea from the game's water data, and keep
+// the sea on the board; an older grid has neither.
 // Only saves of this version are loaded.
-const SAVE_VERSION = '4.0.0'
+const SAVE_VERSION = '5.0.0'
 
 export function useGamePersistence() {
   const gameStore = useGameStore()
@@ -135,6 +137,9 @@ export function useGamePersistence() {
         cellGrid = await gridStore.gridForSave(data.terrain)
         if (!cellGrid) return false
       }
+      // A file's grid needs the water data too, for its rivers (see the grid
+      // store); a grid found for an autosave has it loaded already
+      if (cellGrid && !(await gridStore.ensureWater())) return false
 
       // Clear the game being replaced
       resetGame()

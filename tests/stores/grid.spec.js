@@ -48,6 +48,8 @@ import { nlcdCostMap } from '@/config/nlcd'
 import { RequestError } from '@/composables/utils'
 import { getGrid, getGridYears, putGrid } from '@/composables/database'
 import { makeTestGrid, cellsOf } from '../utils/testGrid'
+import { useWaterStore } from '@/stores/water'
+import { waterData, lake } from '../utils/testWater'
 
 /**
  * Bounds are named by the cell count they produce with the mocked 0.1-degree
@@ -83,8 +85,27 @@ const idsOf = (grid) => cellsOf(grid).map((cell) => cell.id)
 const keep = (landCoverYear, grid = CACHED_GRID) =>
   putGrid({ state: '27', cellSize: CELL_SIZE, landCoverYear, grid })
 
-/** The land cover cost of open water, which is how a water cell is known */
-const WATER = nlcdCostMap[11]
+/** The land cover cost of the NLCD's open water, which is priced as ground */
+const NLCD_WATER = nlcdCostMap[11]
+
+/**
+ * Gives the game water over the west cell of `BOUNDS_2_CELLS` (and the
+ * south-west cell of `BOUNDS_4_CELLS`): a box whose edge runs between the
+ * centers of the first and second columns, and of the first and second rows.
+ */
+const waterOverFirstCell = () =>
+  useWaterStore().setData(
+    waterData({
+      sea: [
+        lake([
+          { lat: 43.5, lng: -95.5 },
+          { lat: 43.5, lng: -94.9 },
+          { lat: 44.1, lng: -94.9 },
+          { lat: 44.1, lng: -95.5 }
+        ])
+      ]
+    })
+  )
 
 /** A land cover result with every picture loaded */
 const landCover = (...costs) => ({ costs, failed: 0 })
@@ -624,26 +645,64 @@ describe('Grid Store', () => {
       expect(cellsOf(gridStore.grid).map((cell) => cell.elevation)).toEqual([-20, 100])
     })
 
-    it('should leave the sea off the board', async () => {
-      // Water at or below sea level is the sea: the tiles read it below zero
+    it('should keep the sea on the board as water, though the land cover has nothing there', async () => {
+      // Out at sea: the tiles read the sea floor, and the NLCD has no data
+      waterOverFirstCell()
       mockFetchElevations.mockResolvedValue(heights(-30, 100))
-      mockFetchLandCover.mockResolvedValue(landCover(WATER, 5))
+      mockFetchLandCover.mockResolvedValue(landCover(null, 5))
+
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
+
+      expect(cellsOf(gridStore.grid).map((cell) => [cell.id, cell.water])).toEqual([
+        ['0-0', 1],
+        ['0-1', 0]
+      ])
+    })
+
+    it('should mark a lake as water from the water data', async () => {
+      waterOverFirstCell()
+      mockFetchElevations.mockResolvedValue(heights(300, 310))
+      mockFetchLandCover.mockResolvedValue(landCover(5, 5))
+
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
+
+      expect(cellsOf(gridStore.grid).map((cell) => cell.water)).toEqual([1, 0])
+    })
+
+    it("should treat the land cover's open water as ground, not water", async () => {
+      // No water data here: the NLCD's ponds are just wet ground
+      mockFetchElevations.mockResolvedValue(heights(300, 310))
+      mockFetchLandCover.mockResolvedValue(landCover(NLCD_WATER, 5))
+
+      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
+
+      expect(cellsOf(gridStore.grid).map((cell) => [cell.landCover, cell.water])).toEqual([
+        [NLCD_WATER, 0],
+        [5, 0]
+      ])
+    })
+
+    it("should leave off land beyond the land cover's reach", async () => {
+      // Over the border: a height, but no land cover, and no water
+      mockFetchElevations.mockResolvedValue(heights(300, 310))
+      mockFetchLandCover.mockResolvedValue(landCover(null, 5))
 
       await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
       expect(idsOf(gridStore.grid)).toEqual(['0-1'])
     })
 
-    it('should keep a lake, which sits above sea level', async () => {
+    it('should fail setup when the water data cannot be loaded', async () => {
+      const waterStore = useWaterStore()
+      waterStore.data = null
+      vi.spyOn(waterStore, 'load').mockResolvedValue(false)
       mockFetchElevations.mockResolvedValue(heights(300, 310))
-      mockFetchLandCover.mockResolvedValue(landCover(WATER, 5))
+      mockFetchLandCover.mockResolvedValue(landCover(5, 5))
 
-      await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
+      const result = await gridStore.generateGrid('27', BOUNDS_2_CELLS, 10000, YEAR)
 
-      expect(cellsOf(gridStore.grid).map((cell) => [cell.id, cell.landCover])).toEqual([
-        ['0-0', WATER],
-        ['0-1', 5]
-      ])
+      expect(result).toBe(false)
+      expect(gridStore.error).toMatch(/rivers and lakes/)
     })
 
     it('should drop cells whose elevation could not be had', async () => {
@@ -731,13 +790,26 @@ describe('Grid Store', () => {
     })
 
     it('should not count a hole beside a cell toward its slope', async () => {
-      // The sea in the south-west corner, far below the level land beside it
+      // Over the border in the south-west corner: no land cover, so a hole,
+      // far below the level land beside it
       mockFetchElevations.mockResolvedValue(heights(-30, 150, 150, 150))
-      mockFetchLandCover.mockResolvedValue(landCover(WATER, 10, 10, 10))
+      mockFetchLandCover.mockResolvedValue(landCover(null, 10, 10, 10))
 
       await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000, YEAR)
 
       expect(cellsOf(gridStore.grid).map((cell) => cell.slope)).toEqual([0, 0, 0])
+    })
+
+    it('should not count the sea beside a cell toward its slope', async () => {
+      // The sea's floor in the south-west corner, far below the shore
+      waterOverFirstCell()
+      mockFetchElevations.mockResolvedValue(heights(-30, 150, 150, 150))
+      mockFetchLandCover.mockResolvedValue(landCover(null, 10, 10, 10))
+
+      await gridStore.generateGrid('27', BOUNDS_4_CELLS, 10000, YEAR)
+
+      const land = cellsOf(gridStore.grid).filter((cell) => !cell.water)
+      expect(land.map((cell) => cell.slope)).toEqual([0, 0, 0])
     })
   })
 

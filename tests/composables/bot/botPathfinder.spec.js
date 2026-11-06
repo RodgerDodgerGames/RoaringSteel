@@ -12,7 +12,8 @@ import { lineBlock, townCells, builtLegs, trackIndex } from '@/composables/map/b
 import { regionTest } from '@/composables/map/region'
 import { linePrice, cellPath } from '@/composables/map/trackCost'
 import { findCell, rowOf, colOf } from '@/composables/map/cellGrid'
-import { isWaterCell } from '@/composables/map/water'
+import { isWaterCell, riverIndex, riverCrossings } from '@/composables/map/water'
+import { gameRules } from '@/config/game'
 import { pointKey, townKey } from '@/composables/network'
 import { townEntryFee } from '@/composables/townEntry'
 import {
@@ -25,26 +26,36 @@ import {
   makeGrid,
   makeRegion,
   makeTowns,
+  makeRivers,
   centerAt,
   ROWS,
   isLake,
-  isRiver,
+  isChannel,
   isRidge
 } from '../../utils/botBoard'
 import { pinKnobs } from '../../utils/boardScale'
+import { makeTestGrid, CELL, CELL_METERS } from '../../utils/testGrid'
+
+/** The speed unit these boards are played at: one cell */
+const SPEED_UNIT_KM = CELL_METERS / 1000
 
 const towns = makeTowns()
 const townNamed = (name) => towns.find((town) => town.name === name)
 const pointOf = (town) => ({ lat: town.lat, lng: town.lon })
 
-/** The build rules for the test board, with some track already built */
-function rulesWith(segments = []) {
+/**
+ * The build rules for the test board, with some track already built, and
+ * its river unless told otherwise
+ */
+function rulesWith(segments = [], { withRiver = true } = {}) {
   const grid = makeGrid()
   return {
     grid,
     // Land priced at its terrain cost (with the knobs at 1, see below):
     // these tests are about the search
     priceScale: 1,
+    speedUnitKm: SPEED_UNIT_KM,
+    rivers: withRiver ? riverIndex(grid, makeRivers()) : null,
     isInRegion: regionTest(makeRegion()),
     townCells: townCells(towns, grid),
     builtTrack: trackIndex(builtLegs(segments))
@@ -52,7 +63,7 @@ function rulesWith(segments = []) {
 }
 
 /** What a line's track costs on the rules' board (town entry left out) */
-const priceOn = (rules) => (points) => linePrice(points, rules.grid, rules.priceScale).total
+const priceOn = (rules) => (points) => linePrice(points, rules).total
 
 /** The row and column of a cell */
 const placeOf = (cell, grid) => ({ row: rowOf(grid, cell), col: colOf(grid, cell) })
@@ -90,14 +101,51 @@ describe('botPathfinder', () => {
     })
 
     it('should bridge water narrow enough to bridge', () => {
-      // The river runs the whole height of the board: there is no way round
+      // The channel runs the whole height of the board: there is no way round
       const line = planLine(board, [pointOf(townNamed('Fir'))], pointOf(townNamed('Dogwood')))
 
       expect(lineBlock(line, rules, { isFinished: true })).toBeNull()
       const crossed = cellPath(line, rules.grid)
       expect(crossed.some((cell) => isWaterCell(rules.grid, cell))).toBe(true)
       const places = crossed.map((cell) => placeOf(cell, rules.grid))
-      expect(places.some(({ row, col }) => isRiver(row, col))).toBe(true)
+      expect(places.some(({ row, col }) => isChannel(row, col))).toBe(true)
+    })
+
+    it('should bridge water beyond the region when that is the only way across', () => {
+      // Two pieces of region, columns 0–2 and 4–6, with water between them
+      // in column 3, outside both
+      const grid = makeTestGrid({
+        rows: 3,
+        cols: 7,
+        cell: (row, col) => (col === 3 ? { water: true } : { landCover: 100 })
+      })
+      const piece = (west) => [
+        [
+          [west * CELL, 0],
+          [(west + 3) * CELL, 0],
+          [(west + 3) * CELL, 3 * CELL],
+          [west * CELL, 3 * CELL],
+          [west * CELL, 0]
+        ]
+      ]
+      const twoPieces = {
+        type: 'Feature',
+        geometry: { type: 'MultiPolygon', coordinates: [piece(0), piece(4)] }
+      }
+      const splitRules = {
+        grid,
+        priceScale: 1,
+        speedUnitKm: SPEED_UNIT_KM,
+        rivers: null,
+        isInRegion: regionTest(twoPieces),
+        townCells: []
+      }
+      const at = (row, col) => ({ lat: (row + 0.5) * CELL, lng: (col + 0.5) * CELL })
+
+      const line = planLine(searchBoard(splitRules, []), [at(1, 1)], at(1, 5))
+
+      expect(line).not.toBeNull()
+      expect(lineBlock(line, splitRules, { isFinished: true })).toBeNull()
     })
 
     it('should go through the pass rather than over the ridge', () => {
@@ -139,6 +187,7 @@ describe('botPathfinder', () => {
       const corridor = {
         grid,
         priceScale: 1,
+        speedUnitKm: SPEED_UNIT_KM,
         isInRegion: regionTest(makeRegion()),
         townCells: townCells(corridorTowns, grid)
       }
@@ -158,6 +207,21 @@ describe('botPathfinder', () => {
   })
 
   describe('costField', () => {
+    it('should add a river bridge for the river a line has to cross', () => {
+      // Elm is west of the river and Fir east of it: every way between them
+      // crosses it, and the cheapest crosses it once
+      const from = [pointOf(townNamed('Elm'))]
+      const to = pointOf(townNamed('Fir'))
+      const dryBoard = searchBoard(rulesWith([], { withRiver: false }), towns)
+
+      const wet = costField(board, from).costTo(to)
+      const dry = costField(dryBoard, from).costTo(to)
+
+      expect(wet - dry).toBeCloseTo(gameRules.bridges.riverCrossing, 6)
+      const line = planLine(board, from, to)
+      expect(riverCrossings(line, rules.grid, rules.rivers)).toHaveLength(1)
+    })
+
     it("should add a town's entry fee unless the player's track reaches it", () => {
       const from = [pointOf(townNamed('Alder'))]
       const target = townNamed('Dogwood')

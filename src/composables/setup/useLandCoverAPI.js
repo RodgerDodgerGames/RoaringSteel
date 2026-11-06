@@ -32,7 +32,6 @@ import { nlcdCostMap, nlcdLegendColors } from '@/config/nlcd'
 import { gridApiConfig } from '@/config/grid'
 import { fetchWithRetries, mapWithConcurrency, RequestError } from '@/composables/utils'
 import { fetchImagePixels } from '@/composables/setup/imagePixels'
-import { WATER_LAND_COVER } from '@/composables/map/water'
 
 const landCoverApiUrl =
   'https://dmsdata.cr.usgs.gov/geoserver/mrlc_Land-Cover-Native_conus_year_data/wms'
@@ -257,11 +256,11 @@ export function useLandCoverAPI() {
      * Fetches the pictures and works out each cell's land cover cost from
      * every pixel in it.
      *
-     * Water (open water, and permanent ice, which is crossed the same way) is
-     * counted apart from land: a cell that is at least half water is a water
-     * cell, costed as water (see water.js); any other cell costs the average
-     * of its land pixels, its water left out. Pixels with no data — beyond the
-     * US border, or out at sea — are not counted at all.
+     * A cell costs the average of its pixels' costs. Open water counts as
+     * ground like any other class, at its cost in config/nlcd.js: the water
+     * track has to bridge comes from the game's own water data instead (see
+     * water.js). Pixels with no data — beyond the US border, or out at sea —
+     * are not counted at all.
      *
      * Two kinds of missing are kept apart. A cell no pixel has data for is
      * simply null. A cell whose picture failed to load is null too, but is
@@ -278,7 +277,6 @@ export function useLandCoverAPI() {
       const size = shape.rows * shape.cols
       const landSum = new Float64Array(size)
       const landCount = new Uint32Array(size)
-      const waterCount = new Uint32Array(size)
       const lost = new Uint8Array(size)
       // The class of each color seen, so each distinct color (the pictures
       // have about sixteen) is matched against the legend once
@@ -319,12 +317,8 @@ export function useLandCoverAPI() {
               const cost = nlcdCostMap[code]
               if (cost === undefined) continue
               const cell = cellOfPixel(image, px, py, shape)
-              if (cost === WATER_LAND_COVER) {
-                waterCount[cell]++
-              } else {
-                landSum[cell] += cost
-                landCount[cell]++
-              }
+              landSum[cell] += cost
+              landCount[cell]++
             }
           }
         },
@@ -334,15 +328,11 @@ export function useLandCoverAPI() {
       const costs = new Array(size).fill(null)
       let failed = 0
       for (let cell = 0; cell < size; cell++) {
-        const counted = landCount[cell] + waterCount[cell]
-        if (counted === 0) {
+        if (landCount[cell] === 0) {
           if (lost[cell]) failed++
           continue
         }
-        costs[cell] =
-          waterCount[cell] * 2 >= counted
-            ? WATER_LAND_COVER
-            : Math.round(landSum[cell] / landCount[cell])
+        costs[cell] = Math.round(landSum[cell] / landCount[cell])
       }
       return { costs, failed }
     }

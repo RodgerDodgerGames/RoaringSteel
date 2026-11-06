@@ -114,24 +114,28 @@ export const gameRules = {
 
   /**
    * Bridges: what it costs to carry track over water, and how far it may go.
+   * The water is Natural Earth's rivers, lakes and sea (see
+   * composables/map/water.js and scripts/build-water-data.mjs).
    *
-   * A grid cell is water when most of its land cover is open water (see
-   * water.js). Track crossing water pays for a bridge instead of the cell's
-   * own cost, and each km of bridge costs more the further out it is —
-   * `costPerKm` for the first `stepKm`, twice that for the next, and so on —
-   * because a long bridge is a far bigger job than a short one. A crossing
-   * longer than `maxKm` cannot be built at all.
+   * Lakes and the sea are grid cells of water. A crossing of them pays
+   * `perSpeedUnit` for every speed unit of water it spans (see
+   * composables/boardScale.js), as track pays per speed unit of land, so a
+   * bridge costs the same share of a turn's allowance on every board. A
+   * crossing longer than `maxSpeedUnits` cannot be built at all: then the
+   * line has to go around. A crossing may reach out over water beyond the
+   * region's border, as long as it comes back to the region's land.
    *
-   * Set in km so bridges cost the same whatever the size of the grid's
-   * cells: a 10 km crossing is $5,000 and a 20 km one $15,000, as when cells
-   * were always 10 km and each water cell cost $5,000 more than the last.
-   * (Water is due a rework of its own: bridges priced by the crossing, from
-   * a map of rivers and lakes.)
+   * Rivers are lines with no width, so a river is not water cells: track may
+   * run alongside one freely, and pays `riverCrossing` each time it crosses
+   * one, however wide the river. No river is too wide to bridge.
+   *
+   * Both prices are $2,000, decided 2026-11-05. The limit of 3 speed units
+   * is about 17 km on a board Colorado's size and about 14 km on a small one.
    */
   bridges: {
-    costPerKm: 500,
-    stepKm: 10,
-    maxKm: 20
+    perSpeedUnit: 2000,
+    maxSpeedUnits: 3,
+    riverCrossing: 2000
   },
 
   /**

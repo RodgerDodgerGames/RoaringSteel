@@ -2,11 +2,13 @@
  * Build Rules Tests
  *
  * Track stays inside the region being played, except into the grid cell a
- * town sits in, which may reach over the region's edge. A line breaking the
- * rule anywhere along it is refused, not just at its corners.
+ * town sits in, which may reach over the region's edge, and over water,
+ * which may be bridged beyond the region's edge as long as the bridge lands
+ * on the region's own land. A line breaking the rule anywhere along it is
+ * refused, not just at its corners.
  *
- * Water may be bridged, but only so far: a crossing longer than the longest
- * bridge allowed is refused.
+ * Lakes and sea may be bridged, but only so far: a crossing longer than the
+ * longest bridge allowed is refused.
  *
  * Track may cross track already built, but not run alongside it: a line may
  * come close to built track only for the short stretch a crossing takes,
@@ -23,11 +25,16 @@ import {
 } from '@/composables/map/buildRules'
 import { regionTest } from '@/composables/map/region'
 import { gameRules } from '@/config/game'
-import { nlcdCostMap } from '@/config/nlcd'
 import { makeTestGrid, CELL, CELL_METERS } from '../utils/testGrid'
 
-/** The most water cells a bridge may cross on the test grids' 10 km cells */
-const MAX_BRIDGE_CELLS = Math.floor(gameRules.bridges.maxKm / (CELL_METERS / 1000))
+/**
+ * The speed unit the rules here are played at: one test grid cell, so the
+ * longest bridge is as many cells as it is speed units
+ */
+const SPEED_UNIT_KM = CELL_METERS / 1000
+
+/** The most water cells a bridge may cross on the test grids */
+const MAX_BRIDGE_CELLS = gameRules.bridges.maxSpeedUnits
 
 /** A square of the region, `size` cells across, starting `x` cells east */
 const square = (x, size) => [
@@ -56,7 +63,12 @@ const at = (i, along = 0.5) => ({ lat: CELL / 2, lng: (i + along) * CELL })
 /** A point `x` cells east and `y` cells north of where the row starts */
 const pt = (x, y) => ({ lat: y * CELL, lng: x * CELL })
 
-const rules = { grid, isInRegion: regionTest(islands), townCells: [] }
+const rules = {
+  grid,
+  speedUnitKm: SPEED_UNIT_KM,
+  isInRegion: regionTest(islands),
+  townCells: []
+}
 
 describe('townCells', () => {
   it('should give the cell each town sits in', () => {
@@ -115,12 +127,13 @@ describe('lineBlock over water', () => {
     makeTestGrid({
       rows: 1,
       cols: 8,
-      cell: (row, col) => ({ landCover: waterCells.includes(col) ? nlcdCostMap[11] : 150 })
+      cell: (row, col) => (waterCells.includes(col) ? { water: true } : { landCover: 150 })
     })
 
-  const rulesWith = (waterCells) => ({
+  const rulesWith = (waterCells, region = longRegion) => ({
     grid: gridWithWater(waterCells),
-    isInRegion: regionTest(longRegion),
+    speedUnitKm: SPEED_UNIT_KM,
+    isInRegion: regionTest(region),
     townCells: []
   })
 
@@ -166,6 +179,18 @@ describe('lineBlock over water', () => {
     })
   })
 
+  it('should let a bridge cross water outside the region and land back inside it', () => {
+    // The gap between the islands, cells 2 and 3, is water
+    expect(lineBlock([at(1), at(4)], rulesWith([2, 3], islands))).toBeNull()
+  })
+
+  it('should refuse a bridge that lands on land outside the region', () => {
+    // The region is cells 0–3; cell 4 is water outside it, cell 5 land
+    const region = { type: 'Feature', geometry: { type: 'Polygon', coordinates: square(0, 4) } }
+
+    expect(lineBlock([at(2), at(5)], rulesWith([4], region))).toMatchObject({ reason: 'outside' })
+  })
+
   it('should let a finished line end at a town whose cell is water', () => {
     const rules = rulesWith([1])
 
@@ -182,6 +207,7 @@ describe('lineBlock beside track already built', () => {
 
   const rules = (towns = []) => ({
     grid,
+    speedUnitKm: SPEED_UNIT_KM,
     isInRegion: everywhere,
     townCells: towns,
     builtTrack: trackIndex(builtLegs(bosTrack))
@@ -303,6 +329,8 @@ describe('blockMessage', () => {
   })
 
   it('should name the region a line was kept inside', () => {
-    expect(blockMessage({ reason: 'outside' }, 'Maryland')).toBe("Track can't go outside Maryland.")
+    expect(blockMessage({ reason: 'outside' }, 'Maryland')).toBe(
+      "Track can't go onto land outside Maryland."
+    )
   })
 })

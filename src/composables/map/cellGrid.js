@@ -44,6 +44,8 @@ import { latitudeDegreesToMeters } from '@/composables/setup/useMapSupport'
  *   (see config/nlcd.js); 0 for a hole
  * @property {Float32Array} slope - Per cell, how steep its ground is, as a
  *   grade (see composables/map/slope.js); NaN until it is worked out
+ * @property {Uint8Array} water - Per cell, 1 if it is water track has to
+ *   bridge: a lake or the sea (see composables/map/water.js)
  */
 
 /**
@@ -76,7 +78,8 @@ export function createCellGrid({ rows, cols, south, west, latStep, lngStep }) {
     present: new Uint8Array(size),
     elevation: new Float32Array(size).fill(NaN),
     landCover: new Uint16Array(size),
-    slope: new Float32Array(size).fill(NaN)
+    slope: new Float32Array(size).fill(NaN),
+    water: new Uint8Array(size)
   }
 }
 
@@ -88,8 +91,9 @@ export function createCellGrid({ rows, cols, south, west, latStep, lngStep }) {
  * @param {number} terrain.elevation - Height in meters
  * @param {number} terrain.landCover - The land cover's cost
  * @param {number} [terrain.slope] - How steep it is, as a grade, if known yet
+ * @param {boolean} [terrain.water] - Whether it is water track has to bridge
  */
-export function setCell(grid, index, { elevation, landCover, slope = NaN }) {
+export function setCell(grid, index, { elevation, landCover, slope = NaN, water = false }) {
   if (!grid.present[index]) grid.count++
   grid.present[index] = 1
   grid.elevation[index] = elevation
@@ -97,6 +101,7 @@ export function setCell(grid, index, { elevation, landCover, slope = NaN }) {
   // A missing slope (null) is held as NaN, which is what `Number.isFinite`
   // checks for when the slope is read
   grid.slope[index] = slope ?? NaN
+  grid.water[index] = water ? 1 : 0
 }
 
 /**
@@ -308,25 +313,48 @@ function nearestCell(point, row, col, grid) {
  * it share, so each diagonal neighbor comes with those two `sides`: a line
  * may only cut the corner if it could go through both (see botPathfinder.js).
  *
+ * Each step has a number, 0 to 7 (`NEIGHBOR_STEPS` of them), so something
+ * can be kept per cell and step out of it (see `riverStepCrossings` in
+ * botPathfinder.js): the steps are counted row by row through the 3 × 3
+ * block around the cell, south-west first, skipping the cell itself. The
+ * step back the other way is then always `7 - step` (see `reverseStep`).
+ *
  * @param {CellGrid} grid - The grid
  * @param {number} index - The cell
- * @returns {Array<{index: number, sides: Array<number>}>} Each neighbor, and
- *   for a diagonal one the two cells beside the step (either may be -1)
+ * @returns {Array<{index: number, sides: Array<number>, step: number}>} Each
+ *   neighbor, its step's number, and for a diagonal one the two cells beside
+ *   the step (either may be -1)
  */
 export function cellNeighbors(grid, index) {
   const row = rowOf(grid, index)
   const col = colOf(grid, index)
   const list = []
+  let step = 0
   for (let dr = -1; dr <= 1; dr++) {
     for (let dc = -1; dc <= 1; dc++) {
       if (dr === 0 && dc === 0) continue
       const next = cellAt(grid, row + dr, col + dc)
-      if (next === -1) continue
-      const sides = dr && dc ? [cellAt(grid, row + dr, col), cellAt(grid, row, col + dc)] : []
-      list.push({ index: next, sides })
+      if (next !== -1) {
+        const sides = dr && dc ? [cellAt(grid, row + dr, col), cellAt(grid, row, col + dc)] : []
+        list.push({ index: next, sides, step })
+      }
+      step++
     }
   }
   return list
+}
+
+/** How many steps there are out of a cell (see `cellNeighbors`) */
+export const NEIGHBOR_STEPS = 8
+
+/**
+ * The number of the step back the way a step came (see `cellNeighbors`):
+ * north-east's is south-west's, east's is west's.
+ * @param {number} step - 0 to 7
+ * @returns {number} 0 to 7
+ */
+export function reverseStep(step) {
+  return NEIGHBOR_STEPS - 1 - step
 }
 
 /**
@@ -344,12 +372,96 @@ export function stepsBetween(grid, a, b) {
   )
 }
 
+/**
+ * How near a leg must come to a cell's corner, in cells, to count as passing
+ * through the corner itself. Far finer than anything a player can draw; it
+ * only absorbs rounding, so a leg from one cell's center to its diagonal
+ * neighbor's, as the computer players build, goes corner to corner instead
+ * of clipping one of the two cells beside the corner by a rounding error.
+ */
+const CORNER_CELLS = 1e-6
+
+/**
+ * Every cell a straight leg passes through, in order, as row and column —
+ * exactly, by walking the grid from the cell the leg starts in to the cell it
+ * ends in, one boundary at a time.
+ *
+ * The grid's cells are equal rectangles in latitude and longitude, and a leg
+ * is straight in latitude and longitude, so in units of cells the leg is a
+ * straight line `x = x0 + t·dx`, `y = y0 + t·dy` for t from 0 to 1. The walk
+ * keeps, for each axis, the t at which the leg next crosses a cell boundary
+ * on that axis (`nextX`, `nextY`), steps into the next cell across whichever
+ * boundary comes first, and moves that axis' t on by one cell's worth
+ * (`deltaX`, `deltaY`). (This is the Amanatides–Woo grid traversal.) A leg
+ * that passes exactly through a corner steps diagonally: it touches the two
+ * cells beside the corner only at a point, and crosses neither.
+ *
+ * It takes one step per cell crossed, and nothing is missed however little
+ * of a cell the leg clips.
+ *
+ * Rows and columns may be off the grid; the caller drops those.
+ *
+ * Used to price track (see `cellPath` in trackCost.js) and to file river
+ * lines under the cells they run through (see `riverIndex` in water.js).
+ * @param {{lat: number, lng: number}} from - Where the leg starts
+ * @param {{lat: number, lng: number}} to - Where the leg ends
+ * @param {Object} grid - The grid
+ * @param {Function} visit - Called with (row, col) for each cell, in order
+ */
+export function walkCells(from, to, grid, visit) {
+  const x0 = (from.lng - grid.west) / grid.lngStep
+  const y0 = (from.lat - grid.south) / grid.latStep
+  const x1 = (to.lng - grid.west) / grid.lngStep
+  const y1 = (to.lat - grid.south) / grid.latStep
+  const dx = x1 - x0
+  const dy = y1 - y0
+
+  let col = Math.floor(x0)
+  let row = Math.floor(y0)
+  const stepX = Math.sign(dx)
+  const stepY = Math.sign(dy)
+  // Boundaries left to cross on each axis: the walk ends in the leg's end cell
+  let colsLeft = Math.abs(Math.floor(x1) - col)
+  let rowsLeft = Math.abs(Math.floor(y1) - row)
+
+  // The t at which the leg first crosses a boundary on each axis, and how
+  // much t one whole cell takes; never, on an axis the leg does not move along
+  const nextBoundary = (start, cell, delta) =>
+    delta > 0 ? (cell + 1 - start) / delta : delta < 0 ? (start - cell) / -delta : Infinity
+  let nextX = nextBoundary(x0, col, dx)
+  let nextY = nextBoundary(y0, row, dy)
+  const deltaX = dx !== 0 ? 1 / Math.abs(dx) : Infinity
+  const deltaY = dy !== 0 ? 1 / Math.abs(dy) : Infinity
+  // A gap in t, as a distance in cells along the leg's longer axis
+  const span = Math.max(Math.abs(dx), Math.abs(dy))
+
+  visit(row, col)
+  while (colsLeft > 0 || rowsLeft > 0) {
+    const atCorner = colsLeft > 0 && rowsLeft > 0 && Math.abs(nextX - nextY) * span < CORNER_CELLS
+    // Across the nearer boundary, or both at a corner
+    const acrossCol = atCorner || (colsLeft > 0 && (rowsLeft === 0 || nextX < nextY))
+    const acrossRow = atCorner || !acrossCol
+    if (acrossCol) {
+      col += stepX
+      nextX += deltaX
+      colsLeft--
+    }
+    if (acrossRow) {
+      row += stepY
+      nextY += deltaY
+      rowsLeft--
+    }
+    visit(row, col)
+  }
+}
+
 /** The typed arrays a grid holds, by name, and the kind each is */
 const ARRAYS = {
   present: Uint8Array,
   elevation: Float32Array,
   landCover: Uint16Array,
-  slope: Float32Array
+  slope: Float32Array,
+  water: Uint8Array
 }
 
 /**
@@ -389,7 +501,7 @@ function fromBase64(text, Kind) {
 
 /**
  * A grid as plain JSON-safe data, for saving: its shape as numbers and its
- * arrays as base64 text. About 15 bytes of text per cell, against well over
+ * arrays as base64 text. About 16 bytes of text per cell, against well over
  * a hundred for the cell objects saves held before.
  * @param {CellGrid} grid - The grid
  * @returns {Object} The packed grid

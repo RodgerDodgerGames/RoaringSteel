@@ -225,7 +225,7 @@ describe('useLandCoverAPI', () => {
     expect(costs).toEqual(Array(4).fill(Math.round((nlcdCostMap[41] + nlcdCostMap[71]) / 2)))
   })
 
-  it('should make a cell that is mostly water a water cell, and leave water out of the rest', async () => {
+  it('should average open water into a cell like any other ground', async () => {
     // The west column of cells three-quarters water, the east a quarter
     const perCell = gridApiConfig.pixelsPerCell
     mockFetchImagePixels.mockImplementation(
@@ -239,8 +239,10 @@ describe('useLandCoverAPI', () => {
 
     const { costs } = await planLandCover(shapeOf({ rows: 1 }), 2023).fetch()
 
-    // The east cell's water is not averaged in: it costs as its land does
-    expect(costs).toEqual([nlcdCostMap[11], nlcdCostMap[71]])
+    // The water track bridges comes from the game's water data, not the
+    // land cover: here open water is just wet ground, part of the average
+    const mix = (water) => Math.round(water * nlcdCostMap[11] + (1 - water) * nlcdCostMap[71])
+    expect(costs).toEqual([mix(0.75), mix(0.25)])
   })
 
   it('should leave a cell with no data null without counting it as a failure', async () => {

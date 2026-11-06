@@ -26,7 +26,7 @@ export default defineConfig([
 
   // Config files and anything else at the repo root run in Node.
   {
-    files: ['*.js', 'vite.config.js', 'vitest.config.js'],
+    files: ['*.js', 'vite.config.js', 'vitest.config.js', 'scripts/**/*.mjs'],
     languageOptions: {
       globals: globals.node
     }

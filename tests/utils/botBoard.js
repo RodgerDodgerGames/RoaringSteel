@@ -7,13 +7,14 @@
  * way around:
  * - a notch cut out of the region's top right corner, where track may not go;
  * - a lake four cells across, too wide to bridge;
- * - a river one cell wide, which can be bridged;
+ * - a channel of water one cell wide, which can be bridged;
+ * - a river (a line, see `makeRivers`) down the whole board, which every
+ *   line from the west of the board to the east has to cross;
  * - a ridge of dear cells down the middle, with a cheap pass through it;
  * - ten towns, four of them major cities, producing a spread of goods, and
  *   an eleventh out in the notch that no track can reach.
  */
 
-import { nlcdCostMap } from '@/config/nlcd'
 import {
   metersToLatitudeDegrees,
   metersToLongitudeDegrees
@@ -36,14 +37,18 @@ export const centerAt = (row, col) => ({
   lng: WEST + (col + 0.5) * LNG_STEP
 })
 
-/** The land cover the grid gives open water */
-const WATER = nlcdCostMap[11]
-
 /** Whether a cell is in the lake (rows 8–11, columns 4–7) */
 export const isLake = (row, col) => row >= 8 && row <= 11 && col >= 4 && col <= 7
 
-/** Whether a cell is the river (column 18) */
-export const isRiver = (row, col) => col === 18
+/** Whether a cell is the channel (column 18) */
+export const isChannel = (row, col) => col === 18
+
+/**
+ * How far east the river runs, in columns from the board's west edge: down
+ * column 14, a little west of its middle, so a line from cell center to cell
+ * center crosses it cleanly rather than running along it.
+ */
+export const RIVER_COLUMN = 14.3
 
 /** Whether a cell is on the ridge (column 12), apart from the pass at row 3 */
 export const isRidge = (row, col) => col === 12 && row !== 3
@@ -66,15 +71,27 @@ export function makeGrid(keep = () => true) {
       keep(row, col)
         ? {
             elevation: 100,
-            landCover:
-              isLake(row, col) || isRiver(row, col)
-                ? WATER
-                : isRidge(row, col)
-                  ? 6000
-                  : 400 + ((row * 7 + col * 13) % 9) * 120
+            water: isLake(row, col) || isChannel(row, col),
+            landCover: isRidge(row, col) ? 6000 : 400 + ((row * 7 + col * 13) % 9) * 120
           }
         : null
   })
+}
+
+/**
+ * The board's river: a straight line from the south edge to the north, down
+ * `RIVER_COLUMN`, as the river lines of the water data are (GeoJSON
+ * [lng, lat] points, see `riverIndex` in water.js).
+ * @returns {Array<Array<Array<number>>>} The river lines
+ */
+export function makeRivers() {
+  const lng = WEST + RIVER_COLUMN * LNG_STEP
+  return [
+    [
+      [lng, SOUTH],
+      [lng, NORTH]
+    ]
+  ]
 }
 
 /**

@@ -35,7 +35,7 @@ export const CREDIT_GROUPS = [
   {
     title: 'Maps',
     credits: [
-      { name: 'Stadia Maps', url: 'https://www.stadiamaps.com/', note: 'Game map tiles' },
+      { name: 'Stadia Maps', url: 'https://www.stadiamaps.com/', note: 'Map tiles' },
       {
         name: 'Stamen Design',
         url: 'https://www.stamen.com/',
@@ -45,7 +45,7 @@ export const CREDIT_GROUPS = [
       {
         name: 'OpenStreetMap contributors',
         url: 'https://www.openstreetmap.org/copyright',
-        note: 'Map data, and the map the region is chosen on'
+        note: 'Map data'
       }
     ]
   },

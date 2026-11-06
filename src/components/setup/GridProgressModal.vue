@@ -67,8 +67,9 @@ const townsStepLabel = computed(() => {
   const message = townsMessage.value
   if (!message) return 'Preparing game…'
   const { done, total } = industryProgress.value
+  // "Fetching jobs by industry in Maine…" becomes "… in Maine (3 of 13)…"
   if (townsStep.value === SETUP_STEPS.industry && total > 0) {
-    return `Fetching jobs by industry (${done} of ${total})…`
+    return message.replace(/…$/, ` (${done} of ${total})…`)
   }
   return message
 })

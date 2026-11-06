@@ -427,4 +427,22 @@ describe('Industry Store', () => {
       expect(agricultureData.proportion).toBe(0.2)
     })
   })
+
+  describe('combineStates', () => {
+    it("should add an area's employment from each state, and work out each industry's share again", () => {
+      industryStore.combineStates([
+        [
+          { industry: 111, level: 3, meanEmp: { A: 100, B: 50 } },
+          { industry: 211, level: 3, meanEmp: { A: 50 } }
+        ],
+        [{ industry: 111, level: 3, meanEmp: { A: 20, C: 30 } }]
+      ])
+
+      const farming = industryStore.employmentData.find((e) => e.industry === 111)
+      expect(farming.meanEmp).toEqual({ A: 120, B: 50, C: 30 })
+      // 200 of 250 is 0.8, held to the 0.2 cap; 50 of 250 is 0.2
+      expect(farming.proportion).toBe(0.2)
+      expect(industryStore.employmentData.find((e) => e.industry === 211).proportion).toBe(0.2)
+    })
+  })
 })

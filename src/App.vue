@@ -24,6 +24,7 @@ import { keepStorage } from '@/composables/database'
 import { debug } from '@/composables/debug'
 import { cellSizeFor } from '@/composables/boardScale'
 import { useTheme } from '@/composables/useTheme'
+import { boardKey, boardStates } from '@/composables/setup/boards'
 
 // setup stores
 const townsStore = useTownsStore()
@@ -104,8 +105,9 @@ async function handlePlayGameClick() {
 
   try {
     // run setup towns after the region is selected
-    // Towns whose main city is off the board are left out
-    await townsStore.setupTowns(region.value.properties.STATE, region.value)
+    // The towns of every state on the board; those whose main city is off
+    // the board are left out
+    await townsStore.setupTowns(boardStates(region.value), region.value)
     // Leave the modal up on failure, as for the grid below: it shows the
     // error and offers a retry
     if (townsStore.error) return
@@ -117,7 +119,8 @@ async function handlePlayGameClick() {
     // generate grid using the selected region bounds
     const bounds = turf.bbox(region.value)
     const generated = await gridStore.generateGrid(
-      region.value.properties.STATE,
+      // A state's grid is kept under its FIPS code, a region's under its own key
+      boardKey(region.value),
       bounds,
       // As small as the cell budget allows for this region (see boardScale.js)
       cellSizeFor(bounds),

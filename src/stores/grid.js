@@ -197,7 +197,8 @@ export const useGridStore = defineStore('gridStore', () => {
    * kept grid whose year is closest to the one asked for is used, as the
    * towns are when the Census Bureau is down.
    *
-   * @param {string} stateFipsCode - State FIPS code the grid is kept under
+   * @param {string} stateFipsCode - The key the grid is kept under: a
+   *   state's FIPS code, or a region's own key (see `boardKey` in boards.js)
    * @param {Array<number>} bounds - Bounding box [minLng, minLat, maxLng, maxLat]
    * @param {number} cellSize - Grid cell size in meters
    * @param {number} landCoverYear - The year to take land cover from: the

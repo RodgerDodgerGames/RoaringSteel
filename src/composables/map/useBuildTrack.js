@@ -19,8 +19,11 @@ import {
   UNOWNED_TRACK_COLOR,
   RAIL_STYLE,
   CASING_STYLE,
-  TIES_STYLE
+  TIES_STYLE,
+  BRIDGE_DECK_STYLE,
+  BRIDGE_POST_STYLE
 } from '@/composables/map/trackStyles'
+import { bridgeSpans } from '@/composables/map/bridges'
 
 /**
  * Injection key for the one build-track instance a game view runs.
@@ -273,6 +276,19 @@ export default function useBuildTrack(formatCurrency) {
    */
   watch(() => [...trackStore.segments], syncTrackLayers)
 
+  // A section's bridges are found from the grid and the rivers as it is
+  // drawn. The rivers come from a file fetched in the background, and can
+  // arrive after a loaded game's track is already on the map; every section
+  // is styled again when either changes, so its bridges appear.
+  watch([() => builder.boardRules.value.grid, () => builder.boardRules.value.rivers], () => {
+    if (!mapStore.map) return
+    allTrackLayers().forEach((layer) => {
+      if (!mapStore.map.hasLayer(layer)) return
+      removeStyling(layer)
+      styleTracks(layer, layer.segment?.ownerId)
+    })
+  })
+
   /**
    * Escape backs out of whichever map mode the player is in, the way it does in
    * most drawing tools. Registered through VueUse so the key listener is taken
@@ -522,9 +538,9 @@ export default function useBuildTrack(formatCurrency) {
   }
 
   /**
-   * Takes one section's layer (its rail) off the map, along with the casing
-   * and ties drawn under it. The three are one piece of track to the player,
-   * so none may be left behind without the others.
+   * Takes one section's layer (its rail) off the map, along with the casing,
+   * ties and any bridges drawn with it. They are one piece of track to the
+   * player, so none may be left behind without the others.
    *
    * Only the map changes here; whether the section also leaves the track store
    * is up to the caller.
@@ -652,10 +668,10 @@ export default function useBuildTrack(formatCurrency) {
   /**
    * Finds the track layer an event belongs to.
    *
-   * Track is drawn as three lines: the layer itself, which is the rail, and the
-   * casing and ties `styleTracks` lays under it. A click in removal mode can
-   * land on any of the three, depending on where on the track it falls, and
-   * all three have to lead back to the same segment.
+   * Track is drawn as several pieces: the layer itself, which is the rail,
+   * and the casing, ties and bridges `styleTracks` lays under it. A click in
+   * removal mode can land on any of them, depending on where on the track it
+   * falls, and all of them have to lead back to the same segment.
    *
    * @param {Object} layer - The layer the Geoman event fired on
    * @returns {Object|null} The track layer carrying a segment id, if any
@@ -981,9 +997,10 @@ export default function useBuildTrack(formatCurrency) {
    * The Leaflet panes finished track is drawn in, one per piece, lowest first.
    *
    * Track is three lines stacked on the same route: a dark casing, the ties,
-   * and the rail in the owner's color. Giving each piece its own pane puts
-   * every casing below every set of ties, and every set of ties below every
-   * rail, across all sections. With one shared pane, the newest section would
+   * and the rail in the owner's color; where it crosses water, a bridge's
+   * deck and posts go between the ties and the rail. Giving each piece its
+   * own pane puts every casing below every set of ties, and every set of
+   * ties below every bridge and every rail, across all sections. With one shared pane, the newest section would
    * be drawn entirely over the older ones, and its casing would cut a dark
    * notch across the rail wherever two sections meet.
    *
@@ -994,9 +1011,10 @@ export default function useBuildTrack(formatCurrency) {
   const TRACK_PANES = [
     { name: 'trackCasing', zIndex: 410 },
     { name: 'trackTies', zIndex: 420 },
+    { name: 'trackBridges', zIndex: 425 },
     { name: 'trackRails', zIndex: 430 }
   ]
-  const [CASING_PANE, TIES_PANE, RAILS_PANE] = TRACK_PANES.map((pane) => pane.name)
+  const [CASING_PANE, TIES_PANE, BRIDGES_PANE, RAILS_PANE] = TRACK_PANES.map((pane) => pane.name)
 
   /**
    * Creates the panes finished track is drawn in, if this map does not have
@@ -1054,7 +1072,9 @@ export default function useBuildTrack(formatCurrency) {
    *
    * The layer itself becomes the rail. The casing and ties are two more lines
    * on the same route, kept on the layer as its `decorations` and each linked
-   * back to it, so a click on any of the three finds the same section.
+   * back to it, so a click on any of them finds the same section. So are the
+   * section's bridges, where it crosses lakes, the sea or rivers (see
+   * bridges.js): a solid deck over the ties, with a post at each end.
    *
    * @param {Object} layer - A track layer, created in the rail pane
    * @param {number} ownerId - Id of the player who built the track
@@ -1063,9 +1083,18 @@ export default function useBuildTrack(formatCurrency) {
     const latlngs = layer.getLatLngs()
     layer.setStyle({ color: playerStore.colorOf(ownerId) ?? UNOWNED_TRACK_COLOR, ...RAIL_STYLE })
 
+    // The board parts only: the track built so far plays no part in where
+    // this section's bridges are
+    const { grid, rivers } = builder.boardRules.value
+    const bridges = isEmptyGrid(grid) ? [] : bridgeSpans(latlngs, grid, rivers)
     layer.decorations = [
       L.polyline(latlngs, { ...CASING_STYLE, pane: CASING_PANE }),
-      L.polyline(latlngs, { ...TIES_STYLE, pane: TIES_PANE })
+      L.polyline(latlngs, { ...TIES_STYLE, pane: TIES_PANE }),
+      ...bridges.flatMap((span) => [
+        L.polyline(span, { ...BRIDGE_DECK_STYLE, pane: BRIDGES_PANE }),
+        L.circleMarker(span[0], { ...BRIDGE_POST_STYLE, pane: BRIDGES_PANE }),
+        L.circleMarker(span.at(-1), { ...BRIDGE_POST_STYLE, pane: BRIDGES_PANE })
+      ])
     ]
     layer.decorations.forEach((decoration) => {
       decoration.trackLayer = layer
@@ -1074,8 +1103,9 @@ export default function useBuildTrack(formatCurrency) {
   }
 
   /**
-   * Takes a track layer's casing and ties off the map, leaving the rail (the
-   * layer itself) alone. Used before redrawing, and when a section is removed.
+   * Takes a track layer's casing, ties and bridges off the map, leaving the
+   * rail (the layer itself) alone. Used before redrawing, and when a section
+   * is removed.
    *
    * @param {Object} layer - The track layer whose styling should be cleared
    */

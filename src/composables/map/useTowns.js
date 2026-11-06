@@ -7,12 +7,15 @@
  *
  * Each size of town has its own shape and size of icon, with a building
  * standing on it in the Build view (see townIcons.js); whatever its shape,
- * the comments here call a town's icon its dot.
+ * the comments here call a town's icon its dot. The dots are drawn bigger in
+ * the Build view than in the Plan view, so every dot, its name and its
+ * commodity icons are drawn again on each change of view.
  *
  * In the map's Plan view each town also shows what it produces: its
  * commodity icons fan out over the top of its dot (see commodityIcons.js),
  * as on the printed board. They are hidden in the Build view, so it stays
- * clear for laying track. The town popup lists the same icons in either view.
+ * clear for laying track. Clicking a town in the Plan view goes to the Build
+ * view over it and opens its popup there, which lists the same icons.
  *
  * The demand lines the player points at or pins on their cards are marked
  * here too (see demandMarks.js): a halo round each destination's dot, and
@@ -35,7 +38,7 @@ import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 import { storeToRefs } from 'pinia'
 import { useMapStore } from '@/stores/map'
 import { useDemandCardsStore } from '@/stores/demandCards'
-import { PLAN_VIEW, planPopupOffset } from '@/composables/map/mapViews'
+import { PLAN_VIEW } from '@/composables/map/mapViews'
 import { demandMarks } from '@/composables/map/demandMarks'
 import {
   COMMODITY_ICON_SIZE,
@@ -43,7 +46,7 @@ import {
   iconRingOffsets,
   iconRingRadius
 } from '@/composables/map/commodityIcons'
-import { townIcon, townIconHtml, townNameOffset } from '@/composables/map/townIcons'
+import { shapeSize, townIconHtml, townNameOffset } from '@/composables/map/townIcons'
 
 /**
  * The map pane the commodity icons are drawn in: above track (panes 410–430)
@@ -170,7 +173,51 @@ export function useTowns() {
     townsMap.getContainer().classList.toggle(PLAN_VIEW_CLASS, isPlanView)
   }
 
-  watch([() => demandCardsStore.markedLines, () => mapStore.viewMode], showMarks)
+  watch(() => demandCardsStore.markedLines, showMarks)
+  watch(
+    () => mapStore.viewMode,
+    () => {
+      drawForView()
+      showMarks()
+    }
+  )
+
+  /**
+   * Draws every town's dot, name and commodity icons at the current view's
+   * sizes (see `shapeSize`). A new icon is a new element, so the marks are
+   * gone from it: `showMarks` has to follow.
+   */
+  function drawForView() {
+    if (!townsMap) return
+    const view = mapStore.viewMode
+    townsLayer.value.eachLayer((marker) => {
+      const size = marker.feature.properties.size
+      marker.setIcon(townDivIcon(size, view))
+      const tooltip = marker.getTooltip()
+      if (tooltip) {
+        tooltip.options.offset = L.point(townNameOffset(size, view))
+        tooltip.update()
+      }
+    })
+    commodityMarkers.forEach(({ town, marker }) => marker.setIcon(commodityDivIcon(town, view)))
+  }
+
+  /**
+   * A town's dot, sized for a view. The marker is the size of the town's
+   * shape, so the shape is what sits on the town's spot; its building
+   * overflows above it.
+   * @param {string} size - The town's size
+   * @param {string} view - The map's view
+   * @returns {Object} Leaflet DivIcon
+   */
+  function townDivIcon(size, view) {
+    const width = shapeSize(size, view)
+    return L.divIcon({
+      html: townIconHtml(size, view),
+      iconSize: [width, width],
+      className: 'marker'
+    })
+  }
 
   /**
    * Adds town markers, and their commodity icons, to the map.
@@ -208,16 +255,7 @@ export function useTowns() {
       // pointToLayer is called for each Point feature to create its marker
       pointToLayer: (feature, latlng) => {
         const size = feature.properties.size
-        // The marker is the size of the town's shape, so the shape is what
-        // sits on the town's spot; its building overflows above it
-        const iconSize = townIcon(size).size
-        const icon = L.divIcon({
-          html: townIconHtml(size),
-          iconSize: [iconSize, iconSize],
-          className: 'marker'
-        })
-
-        const marker = L.marker(latlng, { icon: icon })
+        const marker = L.marker(latlng, { icon: townDivIcon(size, mapStore.viewMode) })
 
         // Towns are part of the board, so no map tool may delete them. Geoman's
         // removal mode — switched on to tear up track — otherwise takes any
@@ -231,7 +269,7 @@ export function useTowns() {
           permanent: true, // Make the tooltip always visible
           direction: 'center',
           className: 'town-tooltip',
-          offset: townNameOffset(size)
+          offset: townNameOffset(size, mapStore.viewMode)
         })
 
         // Add a click event handler to display town information
@@ -246,13 +284,12 @@ export function useTowns() {
             return
           }
 
-          // popup options. The Plan view is fixed in place, so a popup there
-          // must not pan the map to fit itself in (see `keepPopupInView`).
-          const isPlanView = mapStore.viewMode === PLAN_VIEW
-          const options = {
-            className: 'town-popup',
-            autoPan: !isPlanView
-          }
+          // In the Plan view a click is a request to build there: the map
+          // goes to the Build view over the town, and the popup opens there.
+          // (The switch happens at once, so the popup opens on the Build view.)
+          if (mapStore.viewMode === PLAN_VIEW) mapStore.showInBuildView([latlng.lat, latlng.lng])
+
+          const options = { className: 'town-popup' }
           // industry content, each with the icon the Plan view shows for it
           const indContent =
             feature.properties.industries.length > 0
@@ -268,8 +305,7 @@ export function useTowns() {
       <span class="has-text-grey-dark">Size: ${feature.properties.size}</span></div>
       <ul>Industries:${indContent}</ul>
       `
-          const popup = L.popup(options).setLatLng(latlng).setContent(townInfo).openOn(map.value)
-          if (isPlanView) keepPopupInView(popup)
+          L.popup(options).setLatLng(latlng).setContent(townInfo).openOn(map.value)
         })
 
         return marker
@@ -287,25 +323,6 @@ export function useTowns() {
   }
 
   /**
-   * Keeps a popup opened in the Plan view inside the map. The Plan view is
-   * fixed in place, so the popup cannot pan the map to fit itself in the way
-   * it does in the Build view; it is moved instead (see `planPopupOffset`).
-   *
-   * @param {Object} popup - The town's popup, just opened
-   */
-  const keepPopupInView = (popup) => {
-    const element = popup.getElement()
-    const { offset, showTip } = planPopupOffset(
-      { width: element.offsetWidth, height: element.offsetHeight },
-      townsMap.latLngToContainerPoint(popup.getLatLng()),
-      townsMap.getSize()
-    )
-    popup.options.offset = L.point(offset)
-    element.classList.toggle('town-popup--no-tip', !showTip)
-    popup.update()
-  }
-
-  /**
    * Makes the marker that holds one town's commodity icons, fanned over the
    * top of the town's dot. Each icon names its commodity on hover.
    *
@@ -317,9 +334,24 @@ export function useTowns() {
    * @param {Object} town - Town with lat, lon, size and industries
    * @returns {Object} Leaflet marker
    */
-  const createCommodityMarker = (town) => {
+  const createCommodityMarker = (town) =>
+    L.marker([town.lat, town.lon], {
+      icon: commodityDivIcon(town, mapStore.viewMode),
+      pane: COMMODITY_PANE,
+      interactive: false,
+      keyboard: false,
+      pmIgnore: true
+    })
+
+  /**
+   * A town's commodity icons, fanned round its dot as a view draws the dot.
+   * @param {Object} town - Town with size and industries
+   * @param {string} view - The map's view
+   * @returns {Object} Leaflet DivIcon
+   */
+  function commodityDivIcon(town, view) {
     const count = town.industries.length
-    const offsets = iconRingOffsets(count, iconRingRadius(townIcon(town.size).size, count))
+    const offsets = iconRingOffsets(count, iconRingRadius(shapeSize(town.size, view), count))
     const half = COMMODITY_ICON_SIZE / 2
     const html = town.industries
       .map(({ name, industry }, i) => {
@@ -329,14 +361,7 @@ export function useTowns() {
         return `<img class="commodity-icon" src="${commodityIconUrl(industry)}" alt="${name}" title="${name}" style="${style}" draggable="false">`
       })
       .join('')
-
-    return L.marker([town.lat, town.lon], {
-      icon: L.divIcon({ html, className: 'commodity-ring', iconSize: [0, 0] }),
-      pane: COMMODITY_PANE,
-      interactive: false,
-      keyboard: false,
-      pmIgnore: true
-    })
+    return L.divIcon({ html, className: 'commodity-ring', iconSize: [0, 0] })
   }
 
   onUnmounted(() => {

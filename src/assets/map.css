@@ -129,12 +129,6 @@
   pointer-events: auto;
 }
 
-/* A Plan view popup moved to stay inside the map (see planPopupOffset): its
-   tip would no longer point at its town, so it is hidden */
-.town-popup--no-tip .leaflet-popup-tip-container {
-  display: none;
-}
-
 /* A commodity icon the Build view leaves out (see useTowns) */
 .commodity-icon[hidden] {
   display: none;

@@ -14,6 +14,9 @@
  * a halo round the destination's dot, and round the commodity's icon at each
  * town producing it, which the Build view then shows on its own.
  *
+ * Towns are drawn bigger in the Build view than in the Plan view. A town
+ * clicked in the Plan view takes the player to the Build view over it.
+ *
  * These tests run against a real Leaflet map with Geoman attached, because
  * the behavior under test is Geoman's own removal mode.
  */
@@ -101,6 +104,49 @@ describe('useTowns', () => {
       drawTowns()
 
       expect(iconsHidden()).toEqual([true, true])
+    })
+  })
+
+  describe('town sizes', () => {
+    /** How wide each town's dot is drawn, in px */
+    const dotWidths = () =>
+      [...container.querySelectorAll('.town-shape')].map((svg) => Number(svg.getAttribute('width')))
+
+    it('should draw the dots bigger in the Build view, and back to size in the Plan view', async () => {
+      const mapStore = useMapStore()
+      drawTowns()
+      const planWidths = dotWidths()
+
+      mapStore.setViewMode(BUILD_VIEW)
+      await nextTick()
+      dotWidths().forEach((width, i) => expect(width).toBeGreaterThan(planWidths[i]))
+
+      mapStore.setViewMode(PLAN_VIEW)
+      await nextTick()
+      expect(dotWidths()).toEqual(planWidths)
+    })
+  })
+
+  describe('clicking a town', () => {
+    it('should go to the Build view over the town from the Plan view', () => {
+      const mapStore = useMapStore()
+      const [denver] = drawTowns()
+
+      denver.fire('click')
+
+      expect(mapStore.viewMode).toBe(BUILD_VIEW)
+      expect(mapStore.buildFocus).toEqual([39.74, -104.99])
+    })
+
+    it('should stay in the Build view, where it is, when clicked there', () => {
+      const mapStore = useMapStore()
+      mapStore.setViewMode(BUILD_VIEW)
+      const [denver] = drawTowns()
+
+      denver.fire('click')
+
+      expect(mapStore.viewMode).toBe(BUILD_VIEW)
+      expect(mapStore.buildFocus).toBeNull()
     })
   })
 

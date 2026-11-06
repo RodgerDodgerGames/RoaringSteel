@@ -5,6 +5,11 @@
  * the Empire Builder board — a circle for a small town, a square for a medium
  * one, a hexagon for a large one — and the bigger towns are drawn bigger too.
  *
+ * Each view draws the shapes at its own size. The Plan view shows the whole
+ * board at once, so its shapes are smaller, leaving room for the commodity
+ * icons round them. The Build view is zoomed in, and its shapes are bigger,
+ * so a town stands out from the terrain and is easy to aim track at.
+ *
  * In the Build view a building stands on each shape, its base a little below
  * the shape's middle and the rest rising above it: one house on a small town,
  * a cluster of houses on a medium one, a city skyline on a large one. In the
@@ -22,6 +27,7 @@
 import houseUrl from '@/assets/icons/towns/house.svg'
 import housesUrl from '@/assets/icons/towns/houses.png'
 import cityUrl from '@/assets/icons/towns/city.png'
+import { PLAN_VIEW } from '@/composables/map/mapViews'
 
 /**
  * The color every town shape is filled with: plum, the game's original
@@ -45,16 +51,18 @@ const SHAPE_MARKUP = {
 }
 
 /**
- * Each town size's icon: its shape, the shape's width and height on the map
- * in px, and the building that stands on it in the Build view, with that
- * image's width and height in px. The shapes are small enough to leave the
- * terrain readable round a town and large enough to click and draw track to;
- * the buildings are a little larger, so their detail can be made out.
+ * Each town size's icon: its shape; the shape's width and height on the map
+ * in px in the Build view (`size`) and in the Plan view (`planSize`); and
+ * the building that stands on it in the Build view, with that image's width
+ * and height in px. The shapes are small enough to leave the terrain
+ * readable round a town and large enough to click and draw track to; the
+ * buildings are about as large, so their detail can be made out. A Build
+ * view shape is a quarter bigger than its Plan view one.
  */
 export const TOWN_ICONS = {
-  small: { shape: 'circle', size: 16, buildingUrl: houseUrl, buildingSize: 17 },
-  medium: { shape: 'square', size: 20, buildingUrl: housesUrl, buildingSize: 20 },
-  large: { shape: 'hexagon', size: 24, buildingUrl: cityUrl, buildingSize: 23 }
+  small: { shape: 'circle', size: 20, planSize: 16, buildingUrl: houseUrl, buildingSize: 21 },
+  medium: { shape: 'square', size: 25, planSize: 20, buildingUrl: housesUrl, buildingSize: 25 },
+  large: { shape: 'hexagon', size: 30, planSize: 24, buildingUrl: cityUrl, buildingSize: 29 }
 }
 
 /**
@@ -87,8 +95,21 @@ export function townIcon(size) {
 }
 
 /**
+ * How wide and tall a town's shape is drawn in a view.
+ * @param {string} size - The town's size: "small", "medium" or "large"
+ * @param {string} view - The map's view, PLAN_VIEW or BUILD_VIEW (see
+ *   mapViews.js); any view but the Plan view draws the Build view's size
+ * @returns {number} The shape's width and height, in px
+ */
+export function shapeSize(size, view) {
+  const icon = townIcon(size)
+  return view === PLAN_VIEW ? icon.planSize : icon.size
+}
+
+/**
  * Where a town's building goes: its top-left corner, in px from the top-left
- * corner of the town's shape. Centered across the shape, with its base a
+ * corner of the town's shape as the Build view draws it (the only view that
+ * shows buildings). Centered across the shape, with its base a
  * little below the shape's middle. The building is taller than the half of
  * the shape it stands in, so `top` comes out negative: it rises above.
  * @param {string} size - The town's size
@@ -103,15 +124,17 @@ export function buildingPosition(size) {
 /**
  * The markup for a town's icon on the map: its shape, filled with
  * TOWN_COLOR, with its building standing on it. The building is always
- * there; the Plan view hides it with CSS, so switching views needs no
- * redrawing.
+ * there; the Plan view hides it with CSS.
  * @param {string} size - The town's size
+ * @param {string} [view] - The view the shape is sized for (see `shapeSize`);
+ *   the Build view if left out
  * @returns {string} HTML for the inside of the town's marker
  */
-export function townIconHtml(size) {
+export function townIconHtml(size, view) {
   const icon = townIcon(size)
+  const width = shapeSize(size, view)
   const { left, top } = buildingPosition(size)
-  const shape = `<svg class="town-shape" viewBox="0 0 24 24" width="${icon.size}" height="${icon.size}" aria-hidden="true"><g class="town-shape__fill" fill="${TOWN_COLOR}">${SHAPE_MARKUP[icon.shape]}</g></svg>`
+  const shape = `<svg class="town-shape" viewBox="0 0 24 24" width="${width}" height="${width}" aria-hidden="true"><g class="town-shape__fill" fill="${TOWN_COLOR}">${SHAPE_MARKUP[icon.shape]}</g></svg>`
   const buildingStyle = `left:${left}px;top:${top}px;width:${icon.buildingSize}px;height:${icon.buildingSize}px`
   const building = `<img class="town-building" src="${icon.buildingUrl}" alt="" style="${buildingStyle}" draggable="false">`
   return shape + building
@@ -119,10 +142,11 @@ export function townIconHtml(size) {
 
 /**
  * Where a town's name goes, as a pixel offset from the town's center: just
- * below its shape, which is taller for bigger towns.
+ * below its shape, which is taller for bigger towns and in the Build view.
  * @param {string} size - The town's size
+ * @param {string} view - The view the shape is sized for (see `shapeSize`)
  * @returns {Array<number>} [x, y] offset in px, y downward
  */
-export function townNameOffset(size) {
-  return [0, townIcon(size).size / 2 + NAME_GAP + NAME_HALF_HEIGHT]
+export function townNameOffset(size, view) {
+  return [0, shapeSize(size, view) / 2 + NAME_GAP + NAME_HALF_HEIGHT]
 }

@@ -401,12 +401,15 @@ const CORNER_CELLS = 1e-6
  *
  * Rows and columns may be off the grid; the caller drops those.
  *
- * Used to price track (see `cellPath` in trackCost.js) and to file river
- * lines under the cells they run through (see `riverIndex` in water.js).
+ * Used to price track (see `cellPath` in trackCost.js), to file river
+ * lines under the cells they run through (see `riverIndex` in water.js), and
+ * to find where track runs over water (see `bridgeSpans` in bridges.js).
  * @param {{lat: number, lng: number}} from - Where the leg starts
  * @param {{lat: number, lng: number}} to - Where the leg ends
  * @param {Object} grid - The grid
- * @param {Function} visit - Called with (row, col) for each cell, in order
+ * @param {Function} visit - Called with (row, col, t) for each cell, in
+ *   order, where t is how far along the leg it enters the cell, from 0 at
+ *   its start to 1 at its end (0 for the cell it starts in)
  */
 export function walkCells(from, to, grid, visit) {
   const x0 = (from.lng - grid.west) / grid.lngStep
@@ -435,12 +438,14 @@ export function walkCells(from, to, grid, visit) {
   // A gap in t, as a distance in cells along the leg's longer axis
   const span = Math.max(Math.abs(dx), Math.abs(dy))
 
-  visit(row, col)
+  visit(row, col, 0)
   while (colsLeft > 0 || rowsLeft > 0) {
     const atCorner = colsLeft > 0 && rowsLeft > 0 && Math.abs(nextX - nextY) * span < CORNER_CELLS
     // Across the nearer boundary, or both at a corner
     const acrossCol = atCorner || (colsLeft > 0 && (rowsLeft === 0 || nextX < nextY))
     const acrossRow = atCorner || !acrossCol
+    // Where along the leg this boundary is crossed, before the walk moves on
+    const t = Math.min(acrossCol ? nextX : Infinity, acrossRow ? nextY : Infinity)
     if (acrossCol) {
       col += stepX
       nextX += deltaX
@@ -451,7 +456,7 @@ export function walkCells(from, to, grid, visit) {
       nextY += deltaY
       rowsLeft--
     }
-    visit(row, col)
+    visit(row, col, t)
   }
 }
 

@@ -27,7 +27,9 @@ import {
   UNOWNED_TRACK_COLOR,
   RAIL_STYLE,
   CASING_STYLE,
-  TIES_STYLE
+  TIES_STYLE,
+  BRIDGE_DECK_STYLE,
+  BRIDGE_POST_STYLE
 } from '@/composables/map/trackStyles'
 import { PIN_COLORS } from '@/config/demands'
 import { gameRules } from '@/config/game'
@@ -68,6 +70,17 @@ const sampleEnds = {
   x2: SAMPLE_LENGTH - CASING_STYLE.weight / 2,
   y1: TIES_STYLE.weight / 2,
   y2: TIES_STYLE.weight / 2
+}
+
+/**
+ * Where the bridge sample's deck runs: between its two posts, each a post's
+ * radius in from the sample's ends so the whole post shows
+ */
+const bridgeEnds = {
+  x1: BRIDGE_POST_STYLE.radius,
+  x2: SAMPLE_LENGTH - BRIDGE_POST_STYLE.radius,
+  y1: BRIDGE_POST_STYLE.radius,
+  y2: BRIDGE_POST_STYLE.radius
 }
 
 /** The halo sample: a small town ringed in the first color a pinned line gets */
@@ -159,6 +172,37 @@ const riverText = `Rivers: bridged at ${formatCurrency(riverCrossing)} a crossin
             />
           </svg>
           Track, in its builder's color
+        </li>
+        <li class="map-legend__row">
+          <!-- A short bridge, drawn the way the map draws one: a solid deck
+               between two posts, under the rail -->
+          <svg
+            class="map-legend__symbol"
+            :width="SAMPLE_LENGTH"
+            :height="BRIDGE_POST_STYLE.radius * 2"
+            aria-hidden="true"
+          >
+            <line
+              v-bind="bridgeEnds"
+              :stroke="BRIDGE_DECK_STYLE.color"
+              :stroke-width="BRIDGE_DECK_STYLE.weight"
+            />
+            <circle
+              v-for="x in [bridgeEnds.x1, bridgeEnds.x2]"
+              :key="x"
+              :cx="x"
+              :cy="bridgeEnds.y1"
+              :r="BRIDGE_POST_STYLE.radius"
+              :fill="BRIDGE_POST_STYLE.fillColor"
+            />
+            <line
+              v-bind="bridgeEnds"
+              :stroke="trackColor"
+              :stroke-width="RAIL_STYLE.weight"
+              stroke-linecap="round"
+            />
+          </svg>
+          Bridge, where track crosses water
         </li>
         <li class="map-legend__row">
           <span class="map-legend__symbol">

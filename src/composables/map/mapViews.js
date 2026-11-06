@@ -13,10 +13,9 @@
  *   range set by the size of the grid's cells (see `buildZoomRange`), and
  *   panning stops a little past the edge of the region.
  *
- * The functions here work out where each view looks, and where a town's
- * popup goes in the Plan view. They are pure (plain numbers in, plain numbers
- * out), so they are tested without a map; useMapView and useTowns apply them
- * to the Leaflet map.
+ * The functions here work out where each view looks. They are pure (plain
+ * numbers in, plain numbers out), so they are tested without a map;
+ * useMapView applies them to the Leaflet map.
  *
  * Bounds are written the way Leaflet takes them: [[south, west], [north, east]].
  *
@@ -75,7 +74,7 @@ const MAX_MAP_ZOOM = 18
 /**
  * The Build view's range of zoom levels, for a grid of cells this wide.
  *
- * The closest is whichever whole zoom shows a cell nearest
+ * The closest is the closest whole zoom at which a cell is no more than
  * `mapViewConfig.buildCellPixels` across, so a small board's small cells are
  * seen as closely as a big board's big ones; the furthest is
  * `buildZoomSteps` out from it.
@@ -88,11 +87,14 @@ const MAX_MAP_ZOOM = 18
 export function buildZoomRange(cellWidthKm, latitude) {
   const metersPerPixelAtZero = metersPerPixel(0, latitude)
   // At zoom z a cell is cellMeters / (metersPerPixelAtZero / 2^z) pixels
-  // across; solved for the zoom that makes that buildCellPixels
+  // across; solved for the zoom that makes that buildCellPixels. Rounded
+  // down, so a cell is never drawn bigger than buildCellPixels. The tiny
+  // allowance keeps a zoom that is whole but for floating-point noise from
+  // being dropped a level.
   const exact = Math.log2(
     (mapViewConfig.buildCellPixels * metersPerPixelAtZero) / (cellWidthKm * 1000)
   )
-  const max = Math.min(MAX_MAP_ZOOM, Math.round(exact))
+  const max = Math.min(MAX_MAP_ZOOM, Math.floor(exact + 1e-9))
   return { min: max - mapViewConfig.buildZoomSteps, max }
 }
 
@@ -153,60 +155,22 @@ export function buildViewStart(lastView, bounds, planZoom, range) {
   }
 }
 
-// Leaflet's popup geometry, as `planPopupOffset` works with it. A popup's
-// `offset` option moves it from where Leaflet puts it by default: centered
-// over its town, its bottom edge POPUP_TIP_SPACE - DEFAULT_OFFSET_Y px above
-// the town, with the tip filling the gap down to the town.
-
-/** Leaflet's default vertical popup offset, which sits a popup above its town */
-const DEFAULT_OFFSET_Y = 7
-
-/** Space Leaflet keeps under every popup for its tip, in px */
-const POPUP_TIP_SPACE = 20
-
 /**
- * How far below a town's center a popup dropped under it starts, in px: past
- * the town's dot (16px at the largest) and the name hung beneath it.
+ * Where the Build view opens when it is sent to a point, such as a town
+ * clicked in the Plan view: centered on the point, at the zoom the player
+ * last left the Build view at, or at its closest zoom if they have not yet
+ * left it at one it still allows. (The pan limits keep the map itself from
+ * going past the region's edge; a point near it ends up off-center.)
+ * @param {Array<number>} center - [lat, lng] to open over
+ * @param {number|null} lastZoom - The zoom the Build view was last left at
+ *   (the map store's `mapZoom`), or null
+ * @param {{min: number, max: number}} range - The Build view's zoom range
+ *   (see `buildZoomRange`)
+ * @returns {{zoom: number, center: Array<number>}} The zoom and [lat, lng]
+ *   center to open at
  */
-const BELOW_CLEARANCE = 34
-
-/** Space kept between a popup and the edge of the map, in px */
-const EDGE_MARGIN = 8
-
-/**
- * Where to put a town's popup in the Plan view so that it stays inside the
- * map.
- *
- * In the Build view a popup that would run off the map pans the map to fit
- * itself in. The Plan view is fixed, so the popup is moved instead: dropped
- * below its town when there is no room above (or onto whichever side has
- * more room, on a map too short for either), and slid sideways off the left
- * or right edge. A popup moved either way loses its tip, which would no
- * longer point at its town.
- *
- * @param {{width: number, height: number}} size - The popup's size, in px
- * @param {{x: number, y: number}} anchor - Where its town is on the map, in
- *   px from the map's top left corner
- * @param {{x: number, y: number}} mapSize - The map's width and height, in px
- * @returns {{offset: Array<number>, showTip: boolean}} The [x, y] offset to
- *   give the popup, and whether its tip still points at its town
- */
-export function planPopupOffset(size, anchor, mapSize) {
-  const topAbove = anchor.y + DEFAULT_OFFSET_Y - POPUP_TIP_SPACE - size.height
-  const bottomBelow = anchor.y + BELOW_CLEARANCE + size.height
-  const roomAbove = topAbove - EDGE_MARGIN
-  const roomBelow = mapSize.y - EDGE_MARGIN - bottomBelow
-  const isBelow = roomAbove < 0 && roomBelow > roomAbove
-
-  // Below: the bottom edge moves down a popup's height, the tip space and the
-  // clearance, which puts the top edge BELOW_CLEARANCE under the town
-  const y = isBelow ? BELOW_CLEARANCE + size.height + POPUP_TIP_SPACE : DEFAULT_OFFSET_Y
-
-  const left = anchor.x - size.width / 2
-  const right = left + size.width
-  let x = 0
-  if (left < EDGE_MARGIN) x = EDGE_MARGIN - left
-  else if (right > mapSize.x - EDGE_MARGIN) x = mapSize.x - EDGE_MARGIN - right
-
-  return { offset: [x, y], showTip: !isBelow && x === 0 }
+export function buildViewAt(center, lastZoom, range) {
+  const zoom = Math.round(lastZoom)
+  const isAllowed = Number.isFinite(zoom) && zoom === toBuildZoom(zoom, range)
+  return { zoom: isAllowed ? zoom : range.max, center }
 }

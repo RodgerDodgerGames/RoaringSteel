@@ -19,7 +19,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, shallowRef } from 'vue'
-import { MAP_VIEWS, PLAN_VIEW } from '@/composables/map/mapViews'
+import { BUILD_VIEW, MAP_VIEWS, PLAN_VIEW } from '@/composables/map/mapViews'
 
 export const useMapStore = defineStore('map', () => {
   // STATE
@@ -53,6 +53,13 @@ export const useMapStore = defineStore('map', () => {
    * first opens the Build view. Saved with the game.
    */
   const mapCenter = ref(null)
+
+  /**
+   * A point [lat, lng] the Build view is to open over next time it opens,
+   * instead of where it was last left: set when a town is clicked in the
+   * Plan view, and used up as the Build view opens. Not saved.
+   */
+  const buildFocus = ref(null)
 
   /** Leaflet LayerGroup containing town markers */
   const townsLayer = shallowRef(null)
@@ -88,7 +95,25 @@ export const useMapStore = defineStore('map', () => {
       return false
     }
     viewMode.value = mode
+    // A point the Build view was to open over is for the switch that set it;
+    // going back to the Plan view drops it, so it cannot surface later
+    if (mode === PLAN_VIEW) buildFocus.value = null
     return true
+  }
+
+  /**
+   * Switches to the Build view over a point, such as a town clicked in the
+   * Plan view (see `buildFocus`).
+   * @param {Array<number>} center - [lat, lng] to open over
+   */
+  const showInBuildView = (center) => {
+    buildFocus.value = center
+    setViewMode(BUILD_VIEW)
+  }
+
+  /** Forgets the point the Build view was to open over, once it has */
+  const clearBuildFocus = () => {
+    buildFocus.value = null
   }
 
   /** @param {boolean} status - Whether drawing mode is active */
@@ -119,6 +144,7 @@ export const useMapStore = defineStore('map', () => {
     viewMode.value = PLAN_VIEW
     mapZoom.value = null
     mapCenter.value = null
+    buildFocus.value = null
     isDrawingActive.value = false
     townPicker.value = null
     // Note: map and townsLayer are Leaflet instances and should not be reset here
@@ -140,12 +166,15 @@ export const useMapStore = defineStore('map', () => {
     viewMode,
     mapZoom,
     mapCenter,
+    buildFocus,
     townsLayer,
     isDrawingActive,
     townPicker,
     // actions
     setMap,
     setViewMode,
+    showInBuildView,
+    clearBuildFocus,
     setIsDrawingActive,
     setTownPicker,
     setTownsLayer,

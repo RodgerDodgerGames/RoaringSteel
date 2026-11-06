@@ -47,6 +47,16 @@ describe('useQWI Composable', () => {
   })
 
   describe('fetchQWI Success', () => {
+    it('should ask for several industries in one request', async () => {
+      mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => [['Emp']] })
+
+      const { fetchQWI } = useQWI('27', [111, 3311, 2121], WINDOW)
+      await fetchQWI()
+
+      const url = new URL(mockFetch.mock.calls[0][0])
+      expect(url.searchParams.getAll('industry')).toEqual(['111', '3311', '2121'])
+    })
+
     it('should transform array-of-arrays response to array-of-objects', async () => {
       const mockResponse = [
         ['Emp', 'metropolitan statistical area/micropolitan statistical area', 'state', 'time'],

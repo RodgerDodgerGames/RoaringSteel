@@ -6,9 +6,10 @@
  * each town in the map's Plan view and beside each industry in a town's popup.
  *
  * A town's commodities are its industries, each identified by a NAICS
- * industry code (see the industry store). Every code in the curated industry
- * list has an icon, so switching between the test list and the full list
- * needs no change here. A code without one gets a plain cargo crate.
+ * industry code (see the industry store). Every code in the full curated
+ * industry list has an icon, the game's own list (game_industries.csv)
+ * among them, so the game's list can take any of them without a change
+ * here. A code without one gets a plain cargo crate.
  *
  * The icons are from game-icons.net (CC BY 3.0); the authors are listed in
  * src/assets/icons/commodities/CREDITS.md, and the map credits the site.

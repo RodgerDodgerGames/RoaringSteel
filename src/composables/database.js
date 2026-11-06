@@ -38,7 +38,7 @@ const DB_NAME = 'roaring-steel'
  * state, cell size and year alone, so a grid built the old way would
  * otherwise go on being used.
  */
-const DB_VERSION = 4
+const DB_VERSION = 5
 
 /** How many autosaves are kept; the oldest goes when another is added */
 export const MAX_AUTOSAVES = 3
@@ -88,18 +88,24 @@ function openDatabase() {
         // cover's open water as ground.
         transaction.objectStore('grids').clear()
       }
-      if (oldVersion >= 1 && oldVersion < 4) {
+      if (oldVersion >= 1 && oldVersion < 5) {
+        // Kept data nothing reads now goes, by the prefix of its name.
         // Version 4 (2026-11-06) keeps each state's town sites
-        // ("townSites_27") rather than its finished towns ("towns_27"),
-        // which nothing reads now, so those go
+        // ("townSites_27") rather than its finished towns ("towns_27").
+        // Version 5 (2026-11-06) keeps each state's jobs data for the game's
+        // own list of industries ("industryJobs_27") rather than for the
+        // short test list ("industry_27").
+        const oldPrefixes = oldVersion < 4 ? ['towns_', 'industry_'] : ['industry_']
         const caches = transaction.objectStore('caches')
         caches
           .getAllKeys()
           .then((keys) =>
             keys
-              .filter((key) => String(key).startsWith('towns_'))
+              .filter((key) => oldPrefixes.some((prefix) => String(key).startsWith(prefix)))
               .forEach((key) => caches.delete(key))
           )
+          // Left behind, the old data only takes up room, so the game goes on
+          .catch((e) => console.error('Could not clear the old caches:', e))
       }
     }
   })

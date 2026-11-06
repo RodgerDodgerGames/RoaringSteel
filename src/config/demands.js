@@ -15,3 +15,13 @@ export const PIN_COLORS = Object.freeze([
   '#64DD17', // lime
   '#FF3D00' // vermilion
 ])
+
+/**
+ * How big the demand deck is (see demandDeck.js). Every card's three demands
+ * are different pairs of town and commodity, and no pair is on two cards, so
+ * the deck is also never bigger than a third of the pairs the board has.
+ */
+export const demandDeckConfig = {
+  /** Cards per town on the board, at most */
+  cardsPerTown: 6
+}

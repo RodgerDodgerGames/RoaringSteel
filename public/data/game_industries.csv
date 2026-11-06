@@ -1,0 +1,51 @@
+naics_code,label,category
+1111,Grain,Farm
+1112,Vegetables,Farm
+1113,Fruit,Farm
+1121,Cattle,Farm
+1122,Hogs,Farm
+1123,Poultry,Farm
+113,Logs,Farm
+114,Fish,Farm
+211,Oil & Gas,Mining
+2121,Coal,Mining
+2122,Metal Ore,Mining
+2123,Stone & Gravel,Mining
+3112,Flour,Food
+3113,Sugar & Candy,Food
+3114,Canned Goods,Food
+3115,Dairy,Food
+3116,Meat,Food
+3117,Seafood,Food
+3121,Beverages,Food
+3122,Tobacco,Food
+321,Lumber,Materials
+322,Paper,Materials
+324,Fuel,Materials
+3251,Chemicals,Materials
+3253,Fertilizer,Materials
+3261,Plastics,Materials
+3262,Rubber,Materials
+3271,Bricks,Materials
+3272,Glass,Materials
+3273,Cement,Materials
+3311,Steel,Metals
+3313,Aluminum,Metals
+3314,Copper,Metals
+313,Textiles,Goods
+315,Clothing,Goods
+3254,Medicine,Goods
+337,Furniture,Goods
+3352,Appliances,Goods
+3391,Medical Supplies,Goods
+3331,Farm Machinery,Machinery
+3332,Machinery,Machinery
+3336,Engines,Machinery
+3341,Computers,Machinery
+3344,Microchips,Machinery
+3361,Cars,Vehicles
+3362,Trailers,Vehicles
+3363,Auto Parts,Vehicles
+3364,Aircraft Parts,Vehicles
+3365,Railcars,Vehicles
+3366,Boats,Vehicles

@@ -460,8 +460,8 @@ describe('Towns Store', () => {
       // Setup industry store with test data
       industryStore.employmentData.push({
         industry: 111,
-        meanEmp: { 12345: 1000, 12346: 500, 12347: 100 },
-        proportion: 0.15
+        category: 'Farm',
+        meanEmp: { 12345: 1000, 12346: 500, 12347: 100 }
       })
       industryStore.industries.push({ naics_code: 111, label: 'Agriculture' })
 
@@ -700,10 +700,11 @@ describe('Towns Store', () => {
       })
       // Each state's jobs: Boston's area has some in both
       industryStore.useIndustryData = vi.fn(async (state) => {
+        industryStore.industries = [{ naics_code: 111, label: 'Grain', category: 'Farm' }]
         industryStore.employmentData = [
           {
             industry: 111,
-            level: 3,
+            category: 'Farm',
             meanEmp: state === '25' ? { 14460: 900, 49340: 300 } : { 14460: 100, 31700: 400 }
           }
         ]
@@ -725,6 +726,14 @@ describe('Towns Store', () => {
         49340: 300,
         31700: 400
       })
+    })
+
+    it("should give the board's towns industries from both states' jobs", async () => {
+      await townsStore.setupTowns(['25', '33'])
+
+      expect(industryStore.employmentData[0].category).toBe('Farm')
+      const makers = townsStore.towns.filter((t) => t.industries.some((i) => i.name === 'Grain'))
+      expect(makers.length).toBeGreaterThan(0)
     })
 
     it('should play each state from its own latest years, and the board from the earliest', async () => {

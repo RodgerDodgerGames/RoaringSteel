@@ -6,18 +6,20 @@
  * which industries should be assigned to which towns based on employment patterns.
  *
  * Data Flow:
- * 1. Load industry definitions from CSV (NAICS codes and labels)
- * 2. For each industry, fetch QWI employment data for the state, over the
- *    game's data window (see dataWindow.js)
+ * 1. Load the game's industries from CSV (NAICS codes, short labels, and a
+ *    category for each: Farm, Mining, Food, ...)
+ * 2. Fetch QWI employment data for the state, over the game's data window
+ *    (see dataWindow.js), several industries to a request
  * 3. Calculate average employment per MSA
- * 4. Calculate each industry's proportion of total employment
+ *
+ * Which of these industries a board plays with, and which towns make them,
+ * is worked out from this data in townIndustries.js.
  *
  * Employment Data Structure:
  * {
  *   industry: number,      // NAICS code
- *   level: number,         // Industry level (2-4 digit NAICS)
- *   meanEmp: Object,       // {msa_code: average_employment}
- *   proportion: number     // This industry's share of total employment (capped at 0.2)
+ *   category: string,      // The industry's kind, such as "Farm" or "Metals"
+ *   meanEmp: Object        // {msa_code: average_employment}
  * }
  *
  * @module stores/industry
@@ -30,8 +32,21 @@ import Papa from 'papaparse'
 import { readCache, writeCache } from '../composables/database'
 import { debug } from '@/composables/debug'
 
-/** Path to curated industry definitions CSV */
-const csvFile = '/data/label_industry_curated_test.csv'
+/**
+ * The game's industries: about fifty, from every kind of work there is
+ * freight for, each with a label short enough for a demand card (see the
+ * file itself, public/data/game_industries.csv). A board plays with some of
+ * them (see townIndustries.js).
+ */
+const csvFile = '/data/game_industries.csv'
+
+/**
+ * How many industries one QWI request asks for. One request can ask for all
+ * of them, but a big state's answer for fifty took 11 seconds, close to the
+ * time a request is given before it is tried again; ten at a time keeps
+ * each well inside it.
+ */
+const INDUSTRIES_PER_REQUEST = 10
 
 export const useIndustryStore = defineStore('qwiStore', () => {
   // STATE
@@ -39,7 +54,7 @@ export const useIndustryStore = defineStore('qwiStore', () => {
   /** Employment data by industry with MSA-level averages */
   const employmentData = ref([])
 
-  /** Industry definitions loaded from CSV (naics_code, label, ind_level) */
+  /** The game's industries, loaded from CSV (naics_code, label, category) */
   const industries = ref([])
 
   /**
@@ -94,7 +109,7 @@ export const useIndustryStore = defineStore('qwiStore', () => {
 
     // Each state's industry data is kept under its own name, along with the
     // data window it was built for
-    const cacheName = `industry_${stateFipsCode}`
+    const cacheName = `industryJobs_${stateFipsCode}`
     const cached = await readCache(cacheName)
 
     failedIndustries.value = []
@@ -128,54 +143,16 @@ export const useIndustryStore = defineStore('qwiStore', () => {
     }
     isLoadingCSV.value = false
 
-    // iterate over each industry and fetch the QWI data
+    // Fetch the QWI data, several industries to a request
     isLoadingQWI.value = true
     progress.value = { done: 0, total: industries.value.length }
-    for (const industry of industries.value) {
-      progress.value = { ...progress.value, done: progress.value.done + 1 }
-      debug.log('Fetching QWI data for industry:', industry)
-
-      // fetch the QWI data for the industry
-      try {
-        const { data, error, refused, fetchQWI } = useQWI(
-          stateFipsCode,
-          industry.naics_code,
-          dataWindow
-        )
-        await fetchQWI()
-        if (error.value) {
-          console.error('useQWI error:', error.value)
-          // A refusal will come again in the next game too, so it is left
-          // out like an industry with no data, rather than keep the state
-          // from ever being cached
-          if (!refused.value) failedIndustries.value.push(industry.naics_code)
-        } else {
-          // check if all of the data is either null or zero
-          // if so, skip this industry
-          const allZero = data.value.every((row) => row.Emp === null || row.Emp === 0)
-          if (allZero) {
-            debug.log('All zero data for industry:', industry)
-            continue
-          }
-
-          // calculate the average employment for the industry
-          employmentData.value.push({
-            industry: industry.naics_code,
-            level: industry.ind_level,
-            // format => {msa_code: average employment}
-            // Push the calculated average employment directly to the array
-            meanEmp: calculateAverageEmployment(data.value, industry)
-          })
-        }
-      } catch (error) {
-        console.error('Error calling useQWI:', error)
-        failedIndustries.value.push(industry.naics_code)
-      }
+    for (let first = 0; first < industries.value.length; first += INDUSTRIES_PER_REQUEST) {
+      const batch = industries.value.slice(first, first + INDUSTRIES_PER_REQUEST)
+      await fetchIndustries(stateFipsCode, batch, dataWindow)
+      // Counted once the answer is in, so the setup screen never runs ahead
+      progress.value = { ...progress.value, done: first + batch.length }
     }
     isLoadingQWI.value = false
-
-    // Calculate and assign proportions
-    calculateAndAssignProportions()
 
     if (failedIndustries.value.length > 0) {
       console.warn(
@@ -193,10 +170,63 @@ export const useIndustryStore = defineStore('qwiStore', () => {
   }
 
   /**
+   * Fetches some industries' jobs in one request, adding each one with jobs
+   * to `employmentData`.
+   *
+   * An industry with no jobs in the state, or none counted, is left out. If
+   * the request fails, all its industries are counted in `failedIndustries`.
+   * If the API turns it down, it is asked again an industry at a time: the
+   * one it will not take is left out (it would be turned down again next
+   * game, so it is not counted as failed), and the others are kept.
+   *
+   * @param {string} stateFipsCode - The state's FIPS code
+   * @param {Array<Object>} batch - The industries, from the CSV
+   * @param {{start: number, end: number}} dataWindow - The years to average over
+   * @returns {Promise<void>}
+   */
+  async function fetchIndustries(stateFipsCode, batch, dataWindow) {
+    const codes = batch.map((industry) => industry.naics_code)
+    debug.log('Fetching QWI data for industries:', codes)
+    try {
+      const { data, error, refused, fetchQWI } = useQWI(stateFipsCode, codes, dataWindow)
+      await fetchQWI()
+      if (error.value) {
+        console.error('useQWI error:', error.value)
+        if (!refused.value) {
+          failedIndustries.value.push(...codes)
+        } else if (batch.length > 1) {
+          for (const industry of batch) await fetchIndustries(stateFipsCode, [industry], dataWindow)
+        }
+        return
+      }
+
+      batch.forEach((industry) => {
+        // The rows for this industry; codes come back as text
+        const rows = data.value.filter(
+          (row) => String(row.industry) === String(industry.naics_code)
+        )
+        const hasJobs = rows.some((row) => Number(row.Emp) > 0)
+        if (!hasJobs) {
+          debug.log('No jobs for industry:', industry)
+          return
+        }
+        employmentData.value.push({
+          industry: industry.naics_code,
+          category: industry.category,
+          // format => {msa_code: average employment}
+          meanEmp: calculateAverageEmployment(rows)
+        })
+      })
+    } catch (error) {
+      console.error('Error calling useQWI:', error)
+      failedIndustries.value.push(...codes)
+    }
+  }
+
+  /**
    * Puts several states' industry data together, for a board of more than
-   * one state: each industry's employment in every area, from every state,
-   * with each industry's share of all the board's employment worked out
-   * again. An area that crosses a state line (Boston's reaches into New
+   * one state: each industry's employment in every area, from every state.
+   * An area that crosses a state line (Boston's reaches into New
    * Hampshire) has its parts' employment added together.
    *
    * @param {Array<Array<Object>>} perState - Each state's `employmentData`,
@@ -204,15 +234,14 @@ export const useIndustryStore = defineStore('qwiStore', () => {
    */
   function combineStates(perState) {
     const byIndustry = new Map()
-    perState.flat().forEach(({ industry, level, meanEmp }) => {
-      const merged = byIndustry.get(industry) ?? { industry, level, meanEmp: {} }
+    perState.flat().forEach(({ industry, category, meanEmp }) => {
+      const merged = byIndustry.get(industry) ?? { industry, category, meanEmp: {} }
       Object.entries(meanEmp).forEach(([msaCode, emp]) => {
         merged.meanEmp[msaCode] = (merged.meanEmp[msaCode] ?? 0) + emp
       })
       byIndustry.set(industry, merged)
     })
     employmentData.value = [...byIndustry.values()]
-    calculateAndAssignProportions()
   }
 
   return {
@@ -246,8 +275,11 @@ export const useIndustryStore = defineStore('qwiStore', () => {
         quoteChar: '"', // specify the quote character
         header: true,
         dynamicTyping: true,
+        // The file ends with a newline, which would otherwise be read as one
+        // more industry, with no code, asked for in a request of its own
+        skipEmptyLines: true,
         complete: (results) => {
-          resolve(results.data)
+          resolve(results.data.filter((row) => row.naics_code != null))
         },
         error: (error) => {
           reject(error)
@@ -287,34 +319,5 @@ export const useIndustryStore = defineStore('qwiStore', () => {
       acc[msaCode] = employment[msaCode].total / employment[msaCode].count
       return acc
     }, {})
-  }
-
-  /**
-   * Calculates each industry's proportion of total employment.
-   * Proportions are capped at 0.2 (20%) to ensure industry diversity.
-   * Updates employmentData in place with proportion field.
-   */
-  function calculateAndAssignProportions() {
-    // Calculate the total employment for each industry
-    const industryTotals = employmentData.value.map((industry) => {
-      const totalEmployment = Object.values(industry.meanEmp).reduce((sum, emp) => sum + emp, 0)
-      return {
-        industry: industry.industry,
-        totalEmployment
-      }
-    })
-
-    // Calculate the total employment across all industries
-    const totalEmployment = industryTotals.reduce(
-      (sum, industry) => sum + industry.totalEmployment,
-      0
-    )
-
-    // Assign the proportion for each industry
-    employmentData.value.forEach((industry) => {
-      const industryTotal = industryTotals.find((i) => i.industry === industry.industry)
-      // cap proportion at 0.2
-      industry.proportion = Math.min(industryTotal.totalEmployment / totalEmployment, 0.2)
-    })
   }
 })

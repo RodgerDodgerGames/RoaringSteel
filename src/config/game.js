@@ -13,7 +13,7 @@
 
 export const gameRules = {
   /** What each player is handed when the game starts: $40 million in Empire Builder. */
-  startingCash: 40000,
+  startingCash: 50000,
 
   /**
    * The most a player may spend on track in one turn.

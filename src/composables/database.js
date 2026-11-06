@@ -38,7 +38,7 @@ const DB_NAME = 'roaring-steel'
  * state, cell size and year alone, so a grid built the old way would
  * otherwise go on being used.
  */
-const DB_VERSION = 2
+const DB_VERSION = 3
 
 /** How many autosaves are kept; the oldest goes when another is added */
 export const MAX_AUTOSAVES = 3
@@ -78,10 +78,13 @@ function openDatabase() {
         // Towns and industry data, each under a name such as "towns_27"
         db.createObjectStore('caches')
       }
-      if (oldVersion === 1) {
-        // Version 2 (2026-11-04) reads each cell from every pixel in it and
-        // prices slope as a grade: a grid built before, at the same state,
-        // cell size and year, would still be found and used
+      if (oldVersion >= 1 && oldVersion < 3) {
+        // Grids built the old way, at the same state, cell size and year,
+        // would still be found and used, so they go. Version 2 (2026-11-04)
+        // reads each cell from every pixel in it and prices slope as a
+        // grade; version 3 (2026-11-05) marks the lakes and sea from the
+        // game's water data, keeps the sea on the board, and prices the land
+        // cover's open water as ground.
         transaction.objectStore('grids').clear()
       }
     }

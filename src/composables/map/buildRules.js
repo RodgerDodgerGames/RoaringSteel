@@ -6,19 +6,25 @@
  * it is finished, so a section that breaks a rule is never built.
  *
  * The rule here: track stays inside the region being played — the state the
- * game is set in. The map grays out everything outside it (see
- * regionMask.js), and no track may go into the gray. The one exception is the
- * grid cell a town sits in: a town is placed at the middle of its metro area,
- * and a metro area that spans a state line can have its middle just over it.
- * Such a town can still be built to, up to the edge of its cell.
+ * game is set in. The map grays out the land outside it (see regionMask.js),
+ * and no track may go onto that land. There are two exceptions:
+ * - the grid cell a town sits in: a town is placed at the middle of its
+ *   metro area, and a metro area that spans a state line can have its middle
+ *   just over it. Such a town can still be built to, up to the edge of its
+ *   cell.
+ * - water: the region's outline follows its shore, so a bay or an inlet is
+ *   outside it, and track may bridge across one there. A bridge still has
+ *   to land on the region's own land (or a town), since land outside stays
+ *   off limits.
  *
- * And track may bridge water, but only so far: a crossing of more water
- * cells in a row than the longest bridge allowed cannot be built (see
+ * And track may bridge water, but only so far: a crossing of more lake or
+ * sea cells in a row than the longest bridge allowed cannot be built (see
  * water.js and `gameRules.bridges`). A bridge has to reach land, so a
  * finished line may not end on water — or a long crossing could be built
  * as two short ones, the second starting where the first stopped midstream.
  * A line ending at a town is the exception: a town on the shore can have
- * its cell counted as water.
+ * its cell counted as water. (Rivers are lines, not water cells, and are
+ * never too wide to bridge.)
  *
  * Last, track may cross track already built — anyone's, the builder's own
  * included, and earlier legs of the same line — but not run alongside it
@@ -41,6 +47,7 @@
  */
 
 import { gameRules } from '@/config/game'
+import { boardConfig } from '@/config/board'
 import { pointsAlongLine, cellPath, kmBetween } from '@/composables/map/trackCost'
 import { findCell, cellContaining, cellKm } from '@/composables/map/cellGrid'
 import {
@@ -229,6 +236,8 @@ function runsAlongside(legPoints, inTown, builtTrack, grid) {
  * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
  * @param {Object} rules - What the line is checked against
  * @param {Object} rules.grid - The grid
+ * @param {number} rules.speedUnitKm - The board's speed unit (see
+ *   boardScale.js), which the longest bridge is measured in
  * @param {Function} rules.isInRegion - Whether a point is inside the region
  *   being played (see `regionTest` in region.js)
  * @param {Array<number>} rules.townCells - The cells towns sit in (see `townCells`)
@@ -244,7 +253,7 @@ function runsAlongside(legPoints, inTown, builtTrack, grid) {
  */
 export function lineBlock(
   latlngs,
-  { grid, isInRegion, townCells, builtTrack = NO_TRACK },
+  { grid, speedUnitKm, isInRegion, townCells, builtTrack = NO_TRACK },
   { isFinished = false } = {}
 ) {
   // Each leg's sample points, and whether each point is in a town's cell,
@@ -257,11 +266,16 @@ export function lineBlock(
   const towns = new Set(townCells)
   const inTown = points.map((point) => towns.has(cellContaining(point, grid)))
 
-  const outside = points.findIndex((point, i) => !inTown[i] && !isInRegion(point))
+  // Outside the region only on water, which may be bridged wherever it is
+  const outside = points.findIndex((point, i) => {
+    if (inTown[i] || isInRegion(point)) return false
+    const cell = cellContaining(point, grid)
+    return cell === -1 || !isWaterCell(grid, cell)
+  })
   if (outside !== -1) return { reason: 'outside', point: points[outside] }
 
   const path = cellPath(latlngs, grid)
-  if (longestCrossing(path, grid, townCells) > maxBridgeCells(grid)) {
+  if (longestCrossing(path, grid, townCells) > maxBridgeCells(grid, speedUnitKm)) {
     return { reason: 'water' }
   }
 
@@ -283,9 +297,15 @@ export function lineBlock(
 export function blockMessage(block, regionName) {
   switch (block.reason) {
     case 'outside':
-      return `Track can't go outside ${regionName || 'the map'}.`
-    case 'water':
-      return `Too much water to bridge: a bridge can span at most ${gameRules.bridges.maxKm} km.`
+      return `Track can't go onto land outside ${regionName || 'the map'}.`
+    case 'water': {
+      // In the units a train's speed is in: the player never sees km
+      const { referenceSpeed } = boardConfig
+      return (
+        `Too much water to bridge: a bridge can span at most ${gameRules.bridges.maxSpeedUnits}` +
+        ` (a speed ${referenceSpeed} train runs ${referenceSpeed} a turn).`
+      )
+    }
     case 'endsOnWater':
       return "Track can't end on water: a bridge has to reach land."
     case 'alongside':

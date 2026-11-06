@@ -11,6 +11,12 @@
  * cell's land cover and slope (see composables/map/trackCost.js). The slope
  * is worked out once, as the grid is built (see composables/map/slope.js).
  *
+ * Each cell also says whether it is water track has to bridge — a lake or
+ * the sea — from the game's water data (see composables/map/water.js and
+ * the water store), marked as the grid is built. The water data is loaded
+ * before any grid is put in play, built or kept, because the build rules
+ * read its rivers too.
+ *
  * The grid is a `CellGrid` (see composables/map/cellGrid.js): rows and
  * columns of cells with their terrain in typed arrays. It is kept out of
  * Vue's reactivity on purpose — a shallow ref, holding an object marked raw
@@ -29,7 +35,9 @@ import {
   metersToLatitudeDegrees,
   metersToLongitudeDegrees
 } from '../composables/setup/useMapSupport'
-import { WATER_LAND_COVER } from '@/composables/map/water'
+import { waterCells } from '@/composables/map/water'
+import { waterPolygons } from '@/composables/map/waterData'
+import { useWaterStore } from '@/stores/water'
 import { createCellGrid, setCell, isEmptyGrid } from '@/composables/map/cellGrid'
 import { fillSlopes } from '@/composables/map/slope'
 import { getGrid, getGridYears, putGrid } from '@/composables/database'
@@ -39,23 +47,19 @@ import { isRefusal, refusalMessage } from '@/composables/utils'
 /**
  * Whether a cell, with its terrain filled in, belongs on the board.
  *
- * It needs both a height and a land cover. The NLCD has no land cover beyond
- * the US border or out at sea, so those cells drop out here.
- *
- * Water at or below sea level is the sea, and drops out too, as it always
- * has: the sea is not part of the board. A lake stays — it is water above sea
- * level — and is bridged like any other water. (The rare lake below sea
- * level, such as the Salton Sea, cannot be told from the sea this way and
- * drops out with it.) Land stays at any height, including at sea level or
- * below it (coastal Louisiana, Death Valley).
+ * It needs a height, and either a land cover or to be water. The NLCD has no
+ * land cover beyond the US border or out at sea, so land beyond the border
+ * drops out here. The sea stays: track may bridge a bay or an inlet, even
+ * beyond the region's border, as long as it comes back to land (see
+ * buildRules.js), so the sea's cells have to be on the board to be bridged.
  *
  * @param {number|null} elevation - The cell's height, in meters
  * @param {number|null} landCover - The cell's land cover cost
+ * @param {boolean} isWater - Whether the cell is lake or sea
  * @returns {boolean} True if the cell is kept
  */
-function isUsableCell(elevation, landCover) {
-  if (!Number.isFinite(elevation) || landCover == null) return false
-  return !(landCover === WATER_LAND_COVER && elevation <= 0)
+function isUsableCell(elevation, landCover, isWater) {
+  return Number.isFinite(elevation) && (landCover != null || isWater)
 }
 
 /**
@@ -154,6 +158,17 @@ export const useGridStore = defineStore('gridStore', () => {
 
   const { planElevations } = useElevationTiles()
   const { landCoverYearFor, planLandCover } = useLandCoverAPI()
+  const waterStore = useWaterStore()
+
+  /**
+   * Loads the game's water data, if it is not loaded yet (see the water
+   * store), failing as setup fails if it cannot be.
+   * @returns {Promise<boolean>} True once the water data is there
+   */
+  async function ensureWater() {
+    if (await waterStore.load()) return true
+    return fail('Could not load the map of rivers and lakes. Check your connection and retry.')
+  }
 
   /**
    * Starts the progress shown while a grid is found or built: nothing
@@ -193,8 +208,9 @@ export const useGridStore = defineStore('gridStore', () => {
     startProgress()
     isGridGenerated.value = false
 
-    /** Plays with a kept grid */
-    const playKept = (record) =>
+    /** Plays with a kept grid, once the water data is loaded for its rivers */
+    const playKept = async (record) =>
+      (await ensureWater()) &&
       setGrid(record.grid, {
         state: stateFipsCode,
         bounds,
@@ -249,7 +265,7 @@ export const useGridStore = defineStore('gridStore', () => {
     // Looked for before any progress is shown, so a quick load from the
     // kept grid does not flash the progress modal
     const kept = await keptGrid(state, cellSize, landCoverYear)
-    if (kept) return kept.grid
+    if (kept) return (await ensureWater()) && kept.grid
 
     startProgress()
     const built = await buildGrid(bounds, cellSize, landCoverYear)
@@ -259,8 +275,9 @@ export const useGridStore = defineStore('gridStore', () => {
 
   /**
    * Builds a grid of cells covering the specified bounds: fetches elevation
-   * and land cover for each cell, then works out what track through each
-   * costs. Reports its progress as it goes, and on failure sets `error`.
+   * and land cover for each cell, marks which are lake or sea, then works out
+   * how steep each is. Reports its progress as it goes, and on failure sets
+   * `error`.
    *
    * @param {Array<number>} bounds - Bounding box [minLng, minLat, maxLng, maxLat]
    * @param {number} cellSize - Grid cell size in meters
@@ -295,6 +312,12 @@ export const useGridStore = defineStore('gridStore', () => {
     if (cellCount <= 0) {
       return fail('That region is too small to build a grid from. Try selecting a larger area.')
     }
+
+    // Which cells are lake or sea, from the game's own water data: loaded
+    // first, since it is quick and a failure here should not waste the
+    // downloads below
+    if (!(await ensureWater())) return false
+    const water = waterCells(shape, waterPolygons(waterStore.data, bounds))
 
     // Work out both downloads before starting either, so the progress bar
     // knows the size of the whole job from the first moment. Planning is only
@@ -369,12 +392,16 @@ export const useGridStore = defineStore('gridStore', () => {
     }
 
     // Every cell with the terrain it needs goes on the board; the rest are
-    // left as holes
+    // left as holes. A cell of sea beyond the land cover's reach has no land
+    // cover, and is given none: it is bridged, never priced as ground.
     const built = createCellGrid(shape)
     for (let index = 0; index < cellCount; index++) {
       const elevation = elevations.elevation[index]
       const cover = landCover.costs[index]
-      if (isUsableCell(elevation, cover)) setCell(built, index, { elevation, landCover: cover })
+      const isWater = water[index] === 1
+      if (isUsableCell(elevation, cover, isWater)) {
+        setCell(built, index, { elevation, landCover: cover ?? 0, water: isWater })
+      }
     }
 
     if (isEmptyGrid(built)) {
@@ -511,6 +538,7 @@ export const useGridStore = defineStore('gridStore', () => {
     gridForSave,
     keepGrid,
     clearError,
+    ensureWater,
     reset,
     setGrid
   }

@@ -5,8 +5,9 @@
  * charged once. The price depends only on the line's vertices, so it can go
  * down as well as up while a leg is being placed.
  *
- * Water cells are bridged instead: each water cell in a row costs more than
- * the one before, whatever the cell's own cost.
+ * Lake and sea cells are bridged instead, each at the bridge's price per
+ * speed unit of its width, whatever the cell's own cost; and each crossing
+ * of a river adds a river bridge.
  *
  * A land cell's price is its terrain cost — land cover plus slope, each
  * weighed by its tuning knob — turned into dollars by the board's price
@@ -23,8 +24,7 @@ import {
   terrainCost
 } from '@/composables/map/trackCost'
 import { gameRules } from '@/config/game'
-import { bridgeCellCost } from '@/composables/map/water'
-import { nlcdCostMap } from '@/config/nlcd'
+import { riverIndex } from '@/composables/map/water'
 import { cellCenter } from '@/composables/map/cellGrid'
 import { makeTestGrid, CELL, CELL_METERS } from '../utils/testGrid'
 import { pinKnobs } from '../utils/boardScale'
@@ -45,6 +45,25 @@ function rowOfCells(covers, slopes = []) {
     cell: (row, col) => ({ landCover: covers[col], slope: slopes[col] })
   })
 }
+
+/** The test grids' cells' width, in km: also the speed unit priced at here */
+const CELL_KM = CELL_METERS / 1000
+
+/**
+ * What a line is priced against (see `linePrice`): a grid, its price scale,
+ * and a speed unit one cell wide, so a water cell's bridge costs exactly the
+ * bridge rate per speed unit.
+ * @param {Object} grid - The grid
+ * @param {number} [priceScale] - Dollars per point of terrain cost
+ * @param {Object} [rivers] - Rivers on the grid (see `riverIndex`)
+ * @returns {Object} The board
+ */
+const board = (grid, priceScale = 1, rivers = null) => ({
+  grid,
+  priceScale,
+  speedUnitKm: CELL_KM,
+  rivers
+})
 
 // The knobs are meant to be edited after playtests. Every test here starts
 // them at 1, so a level cell at a price scale of 1 costs its land cover, and
@@ -107,7 +126,7 @@ describe('trackCost', () => {
       })
 
       // 1 for (0, 0), 3 for the sliver of (1, 0), 4 for (1, 1)
-      expect(linePrice([at(0.5, 0.5), at(1.5, 1.6)], grid, 1).total).toBe(8)
+      expect(linePrice([at(0.5, 0.5), at(1.5, 1.6)], board(grid, 1)).total).toBe(8)
     })
 
     it('should go straight from cell to cell through a corner it passes exactly through', () => {
@@ -175,19 +194,19 @@ describe('trackCost', () => {
     it('should charge the cell a line starts in as soon as it starts', () => {
       const grid = rowOfCells([700, 2000])
 
-      expect(linePrice([centerOf(0)], grid, 1).total).toBe(700)
+      expect(linePrice([centerOf(0)], board(grid, 1)).total).toBe(700)
     })
 
     it('should charge each cell the line crosses once, start included', () => {
       const grid = rowOfCells([100, 200, 300])
 
-      expect(linePrice([centerOf(0), centerOf(2)], grid, 1).total).toBe(600)
+      expect(linePrice([centerOf(0), centerOf(2)], board(grid, 1)).total).toBe(600)
     })
 
     it('should not charge again for the cell a leg shares with the leg before it', () => {
       const grid = rowOfCells([100, 200, 300])
 
-      expect(linePrice([centerOf(0), centerOf(1), centerOf(2)], grid, 1).total).toBe(600)
+      expect(linePrice([centerOf(0), centerOf(1), centerOf(2)], board(grid, 1)).total).toBe(600)
     })
 
     // The bug: pricing added a cell each time the cursor entered one, so a leg
@@ -195,8 +214,8 @@ describe('trackCost', () => {
     it('should cost less again once a leg is brought back closer to its start', () => {
       const grid = rowOfCells([100, 200, 300, 400])
 
-      const pulledOut = linePrice([centerOf(0), centerOf(3)], grid, 1).total
-      const broughtBack = linePrice([centerOf(0), centerOf(1)], grid, 1).total
+      const pulledOut = linePrice([centerOf(0), centerOf(3)], board(grid, 1)).total
+      const broughtBack = linePrice([centerOf(0), centerOf(1)], board(grid, 1)).total
 
       expect(pulledOut).toBe(1000)
       expect(broughtBack).toBe(300)
@@ -205,63 +224,82 @@ describe('trackCost', () => {
     it('should charge nothing for a cell whose terrain failed to load', () => {
       const grid = rowOfCells([100, 200, 300], [0, NaN, 0])
 
-      expect(linePrice([centerOf(0), centerOf(2)], grid, 1).total).toBe(400)
+      expect(linePrice([centerOf(0), centerOf(2)], board(grid, 1)).total).toBe(400)
     })
 
     it('should charge nothing for a line with no vertices', () => {
-      expect(linePrice([], rowOfCells([100]), 1).total).toBe(0)
+      expect(linePrice([], board(rowOfCells([100]), 1)).total).toBe(0)
     })
   })
 
   describe('bridges', () => {
-    // The first water cell of a crossing, and the second, on 10 km cells
-    const BRIDGE = bridgeCellCost(1, CELL_METERS / 1000)
-    const SECOND = bridgeCellCost(2, CELL_METERS / 1000)
+    // A water cell's bridge on these grids: one speed unit's worth
+    const BRIDGE = gameRules.bridges.perSpeedUnit
+    const RIVER = gameRules.bridges.riverCrossing
 
     /**
-     * A row of cells where 'W' is a water cell and a number is a land cell
+     * A row of cells where 'W' is a lake cell and a number is a land cell
      * costing that much.
      */
     function rowWithWater(cells) {
-      return rowOfCells(cells.map((cell) => (cell === 'W' ? nlcdCostMap[11] : cell)))
+      return makeTestGrid({
+        rows: 1,
+        cols: cells.length,
+        south: -CELL / 2,
+        cell: (row, col) => (cells[col] === 'W' ? { water: true } : { landCover: cells[col] })
+      })
     }
 
-    it("should charge a bridge for a water cell instead of the cell's own cost", () => {
+    it("should charge a bridge for a lake cell instead of the cell's own cost", () => {
       const grid = rowWithWater([100, 'W', 300])
 
-      expect(linePrice([centerOf(0), centerOf(2)], grid, 1).total).toBe(100 + BRIDGE + 300)
+      expect(linePrice([centerOf(0), centerOf(2)], board(grid)).total).toBe(100 + BRIDGE + 300)
     })
 
-    it('should charge more for each water cell further into a crossing', () => {
-      const grid = rowWithWater([100, 'W', 'W', 300])
+    it('should charge every cell of a crossing the same, so it costs by how far it spans', () => {
+      const grid = rowWithWater([100, 'W', 'W', 'W', 300])
 
-      expect(linePrice([centerOf(0), centerOf(3)], grid, 1).total).toBe(100 + BRIDGE + SECOND + 300)
+      expect(linePrice([centerOf(0), centerOf(4)], board(grid)).total).toBe(400 + 3 * BRIDGE)
     })
 
-    it('should start each separate crossing at the first price again', () => {
-      const grid = rowWithWater([100, 'W', 200, 'W', 300])
+    it('should charge a lake cell crossed twice once', () => {
+      const grid = rowWithWater([100, 'W', 300])
 
-      expect(linePrice([centerOf(0), centerOf(4)], grid, 1).total).toBe(
-        100 + BRIDGE + 200 + BRIDGE + 300
+      expect(linePrice([centerOf(0), centerOf(2), centerOf(0)], board(grid)).total).toBe(
+        100 + BRIDGE + 300
       )
     })
 
-    // Following a shore can take a line back over land it has crossed already;
-    // the water either side of that land is two crossings, not one long one
-    it('should count water either side of land crossed twice as two crossings', () => {
-      const grid = rowWithWater(['W', 100, 'W'])
+    it('should charge a river bridge each time the line crosses a river', () => {
+      const grid = rowWithWater([100, 200, 300])
+      // A river running north to south through the middle cell
+      const rivers = riverIndex(grid, [
+        [
+          [1.5 * CELL, -CELL],
+          [1.5 * CELL, CELL]
+        ]
+      ])
 
-      expect(linePrice([centerOf(1), centerOf(0), centerOf(2)], grid, 1).total).toBe(
-        100 + BRIDGE + BRIDGE
+      expect(linePrice([centerOf(0), centerOf(2)], board(grid, 1, rivers)).total).toBe(600 + RIVER)
+      // Across and back again further north: two bridges
+      const back = { lat: 0.3 * CELL, lng: 0.5 * CELL }
+      expect(linePrice([centerOf(0), centerOf(2), back], board(grid, 1, rivers)).total).toBe(
+        600 + 2 * RIVER
       )
     })
 
-    it('should say how much of the price is bridges', () => {
-      const grid = rowWithWater([100, 'W', 'W', 300])
+    it('should say how much of the price is bridges, rivers included', () => {
+      const grid = rowWithWater([100, 'W', 300, 400])
+      const rivers = riverIndex(grid, [
+        [
+          [2.5 * CELL, -CELL],
+          [2.5 * CELL, CELL]
+        ]
+      ])
 
-      expect(linePrice([centerOf(0), centerOf(3)], grid, 1)).toEqual({
-        total: 400 + BRIDGE + SECOND,
-        bridges: BRIDGE + SECOND
+      expect(linePrice([centerOf(0), centerOf(3)], board(grid, 1, rivers))).toEqual({
+        total: 800 + BRIDGE + RIVER,
+        bridges: BRIDGE + RIVER
       })
     })
   })
@@ -271,11 +309,17 @@ describe('trackCost', () => {
     const cellKm = 10
 
     it('should multiply land cells by the price scale but leave bridges alone', () => {
-      const grid = rowOfCells([100, nlcdCostMap[11], 300])
+      const grid = makeTestGrid({
+        rows: 1,
+        cols: 3,
+        south: -CELL / 2,
+        cell: (row, col) => (col === 1 ? { water: true } : { landCover: 100 * (col + 1) })
+      })
+      const { perSpeedUnit } = gameRules.bridges
 
-      expect(linePrice([centerOf(0), centerOf(2)], grid, 3)).toEqual({
-        total: 3 * 100 + bridgeCellCost(1, CELL_METERS / 1000) + 3 * 300,
-        bridges: bridgeCellCost(1, CELL_METERS / 1000)
+      expect(linePrice([centerOf(0), centerOf(2)], board(grid, 3))).toEqual({
+        total: 3 * 100 + perSpeedUnit + 3 * 300,
+        bridges: perSpeedUnit
       })
     })
 
@@ -284,7 +328,7 @@ describe('trackCost', () => {
 
       const scale = trackPriceScale(grid, cellKm)
 
-      expect(linePrice([centerOf(0)], grid, scale).total).toBeCloseTo(
+      expect(linePrice([centerOf(0)], board(grid, scale)).total).toBeCloseTo(
         gameRules.trackPrice.perSpeedUnit,
         6
       )
@@ -302,8 +346,8 @@ describe('trackCost', () => {
       const grid = rowOfCells([openGroundCost, 3 * openGroundCost])
       const scale = trackPriceScale(grid, cellKm)
 
-      expect(linePrice([centerOf(1)], grid, scale).total).toBeCloseTo(
-        3 * linePrice([centerOf(0)], grid, scale).total,
+      expect(linePrice([centerOf(1)], board(grid, scale)).total).toBeCloseTo(
+        3 * linePrice([centerOf(0)], board(grid, scale)).total,
         6
       )
     })
@@ -313,9 +357,9 @@ describe('trackCost', () => {
       const cap = maxTerrainFactor * openGroundCost
       const grid = rowOfCells([cap, 10 * cap, 0], [0, 0, 1])
 
-      expect(linePrice([centerOf(0)], grid, 1).total).toBe(cap)
-      expect(linePrice([centerOf(1)], grid, 1).total).toBe(cap)
-      expect(linePrice([centerOf(2)], grid, 1).total).toBe(cap)
+      expect(linePrice([centerOf(0)], board(grid, 1)).total).toBe(cap)
+      expect(linePrice([centerOf(1)], board(grid, 1)).total).toBe(cap)
+      expect(linePrice([centerOf(2)], board(grid, 1)).total).toBe(cap)
     })
   })
 

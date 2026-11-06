@@ -40,9 +40,7 @@ import { useGridStore } from '@/stores/grid'
 import { useTownsStore } from '@/stores/towns'
 import { formatCurrency } from '@/composables/utils'
 import { gameRules } from '@/config/game'
-import { bridgeCellCost } from '@/composables/map/water'
-import { nlcdCostMap } from '@/config/nlcd'
-import { makeTestGrid, CELL, CELL_METERS } from '../utils/testGrid'
+import { makeTestGrid, CELL } from '../utils/testGrid'
 import { pinPlainScale } from '../utils/boardScale'
 
 /**
@@ -821,7 +819,7 @@ describe('useBuildTrack', () => {
       placeVertex(workingLayer, centerOf(4))
 
       expect(workingLayer.getLatLngs()).toHaveLength(1)
-      expect(api.buildError.value).toBe("Track can't go outside Testland.")
+      expect(api.buildError.value).toBe("Track can't go onto land outside Testland.")
       // Priced as the line now stands, without the leg taken back
       expect(api.pendingCost.value).toBe(100)
     })
@@ -832,7 +830,9 @@ describe('useBuildTrack', () => {
       hintMarker.setLatLng(centerOf(4))
       vi.advanceTimersByTime(200)
 
-      expect(hintMarker.getTooltip().getContent()).toBe("Track can't go outside Testland.")
+      expect(hintMarker.getTooltip().getContent()).toBe(
+        "Track can't go onto land outside Testland."
+      )
     })
 
     it('should not build or charge for a finished line that leaves the region', () => {
@@ -861,15 +861,19 @@ describe('useBuildTrack', () => {
 
   describe('bridging water', () => {
     const centerOf = (i) => L.latLng(0, (i + 0.5) * CELL)
-    /** Land, then more water cells in a row than a bridge may cross, then land */
-    const span = Math.floor(gameRules.bridges.maxKm / (CELL_METERS / 1000)) + 1
+    /**
+     * Land, then more water cells in a row than a bridge may cross, then
+     * land. The speed unit is one cell here (see `pinPlainScale`), so the
+     * longest bridge is as many cells as it is speed units.
+     */
+    const span = gameRules.bridges.maxSpeedUnits + 1
     const grid = makeTestGrid({
       rows: 1,
       cols: span + 2,
       south: -CELL / 2,
       cell: (row, col) => {
         const isWater = col > 0 && col <= span
-        return { landCover: isWater ? nlcdCostMap[11] : 100 }
+        return isWater ? { water: true } : { landCover: 100 }
       }
     })
 
@@ -897,7 +901,8 @@ describe('useBuildTrack', () => {
       hintMarker.setLatLng(centerOf(1))
       vi.advanceTimersByTime(200)
 
-      const bridge = formatCurrency(bridgeCellCost(1, CELL_METERS / 1000))
+      // One cell of water: a speed unit's worth of bridge
+      const bridge = formatCurrency(gameRules.bridges.perSpeedUnit)
       expect(hintMarker.getTooltip().getContent()).toContain(`Cost: ${bridge} (bridge ${bridge})`)
     })
 

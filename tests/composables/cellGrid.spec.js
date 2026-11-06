@@ -15,6 +15,7 @@ import {
   cellCenter,
   cellBounds,
   cellNeighbors,
+  reverseStep,
   stepsBetween,
   cellIndexes,
   isEmptyGrid,
@@ -170,6 +171,21 @@ describe('cellGrid', () => {
       expect(northEast.sides.sort()).toEqual([5, 7])
       const east = cellNeighbors(grid, 4).find(({ index }) => index === 5)
       expect(east.sides).toEqual([])
+    })
+
+    it('should number each step the same wherever the cell is, the way back as its reverse', () => {
+      const grid = makeTestGrid({ rows: 3, cols: 3 })
+      /** The number of the step from one cell to a neighbor */
+      const stepTo = (from, to) => cellNeighbors(grid, from).find(({ index }) => index === to).step
+
+      // North-east from the middle and from the south-west corner: the same
+      // step, though the corner has only three neighbors
+      expect(stepTo(4, 8)).toBe(stepTo(0, 4))
+      // Every step from the middle is numbered apart, and each way back is
+      // its reverse
+      const steps = cellNeighbors(grid, 4)
+      expect(new Set(steps.map(({ step }) => step)).size).toBe(8)
+      steps.forEach(({ index, step }) => expect(stepTo(index, 4)).toBe(reverseStep(step)))
     })
   })
 

@@ -3,8 +3,11 @@
 // map NLCD classes to cost
 
 export const nlcdCostMap = {
-  // Water and Ice/Snow
-  11: 9990, // Open Water
+  // Water and Ice/Snow. Open water is priced as ground, like a wetland: the
+  // water track has to bridge comes from Natural Earth instead (see
+  // composables/map/water.js), so the NLCD's ponds, wide streams and marsh
+  // pools are just wet ground to build over.
+  11: 450, // Open Water
   12: 9990, // Perennial Ice/Snow
   // Developed Areas
   21: 350, // Developed, Open Space

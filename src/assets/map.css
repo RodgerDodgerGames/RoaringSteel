@@ -135,6 +135,22 @@
 }
 
 /*
+  A commodity the train can pick up where it stands (see useTowns): ringed in
+  the success color, drawn over any demand halo, and clickable. It grows a
+  little under the pointer, so it reads as a button.
+*/
+.commodity-icon.is-pickable {
+  cursor: pointer;
+  outline: 2px solid var(--bulma-success);
+  outline-offset: 2px;
+  transition: transform 0.1s ease-out;
+}
+
+.commodity-icon.is-pickable:hover {
+  transform: scale(1.2);
+}
+
+/*
   Demand lines picked out on the cards (see useTowns). A marked town dot or
   commodity icon gets a halo, drawn as an inline box-shadow in the line's
   colors. A town's halo is round whatever the town's shape, a ring the

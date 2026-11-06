@@ -25,6 +25,7 @@ import { useGameStore } from '@/stores/game'
 import { usePlayerStore } from '@/stores/players'
 import { useTrainsStore } from '@/stores/trains'
 import { useDemandCardsStore } from '@/stores/demandCards'
+import { useTrainStopStore } from '@/stores/trainStop'
 import { useVictory } from '@/composables/victory'
 import { useGamePersistence } from '@/composables/useGamePersistence'
 import { turnAfter } from '@/composables/turnOrder'
@@ -34,6 +35,7 @@ export function useTurn() {
   const playerStore = usePlayerStore()
   const trainsStore = useTrainsStore()
   const demandCardsStore = useDemandCardsStore()
+  const trainStopStore = useTrainStopStore()
   const { autoSave } = useGamePersistence()
   const { checkForWinner } = useVictory()
 
@@ -104,6 +106,8 @@ export function useTurn() {
     if (finishingId !== undefined) playerStore.resetTrackSpend(finishingId)
     // Likewise the train's run: the next turn is a full one
     if (finishingId !== undefined) trainsStore.endTurn(finishingId)
+    // And the stop card and the report of the train's last move with it
+    trainStopStore.reset()
 
     if (endsRound) {
       gameStore.advanceTurn()

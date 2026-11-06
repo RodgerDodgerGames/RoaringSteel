@@ -33,6 +33,7 @@ import { useTrackStore } from '@/stores/track'
 import { useSettingsStore } from '@/stores/settings'
 import { useTrainsStore } from '@/stores/trains'
 import { useBotsStore } from '@/stores/bots'
+import { useTrainStopStore } from '@/stores/trainStop'
 import { turnAfter } from '@/composables/turnOrder'
 import { packGrid, unpackGrid } from '@/composables/map/cellGrid'
 import { addAutoSave, getAutoSave, getAutoSaves as readAutoSaves, plain } from './database'
@@ -58,6 +59,7 @@ export function useGamePersistence() {
   const settingsStore = useSettingsStore()
   const trainsStore = useTrainsStore()
   const botsStore = useBotsStore()
+  const trainStopStore = useTrainStopStore()
 
   /**
    * Serializes the current game state into a JSON-safe object.
@@ -181,8 +183,8 @@ export function useGamePersistence() {
 
   /**
    * Clears away every part of the game: region, turn, players, towns, grid,
-   * demand cards, map view, track, trains, and what the computer players did
-   * last. Used before a save is restored, and
+   * demand cards, map view, track, trains, the train's open stop card, and
+   * what the computer players did last. Used before a save is restored, and
    * when the game is given up for a new one.
    *
    * The player's settings are not part of this: they belong to the person at
@@ -197,6 +199,7 @@ export function useGamePersistence() {
     mapStore.reset()
     trackStore.reset()
     trainsStore.reset()
+    trainStopStore.reset()
     botsStore.reset()
   }
 

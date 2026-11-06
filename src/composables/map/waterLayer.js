@@ -28,6 +28,7 @@ import { useWaterStore } from '@/stores/water'
 import { isEmptyGrid } from '@/composables/map/cellGrid'
 import { featuresIn, gridBounds } from '@/composables/map/waterData'
 import { waterStyleConfig } from '@/config/map'
+import { escapeHtml } from '@/composables/utils'
 
 /**
  * The map panes the water is drawn in. The water goes above the region mask
@@ -210,15 +211,6 @@ export function areaLabelPlaces(lakes, bays) {
     const [lng, lat] = point.geometry.coordinates
     return { name: feature.properties.name, label: feature.properties.label, lat, lng }
   })
-}
-
-/**
- * A name's text made safe to put in HTML.
- * @param {string} text - The name
- * @returns {string} Escaped
- */
-function escapeHtml(text) {
-  return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 }
 
 /**

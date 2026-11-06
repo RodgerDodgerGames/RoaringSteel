@@ -294,3 +294,13 @@ const shortCurrencyFormat = new Intl.NumberFormat('en-US', {
  * @returns {string} Short currency string
  */
 export const formatShortCurrency = (value) => shortCurrencyFormat.format(value).replace('K', 'k')
+
+/**
+ * Text made safe to put in HTML, as an element's text or an attribute's
+ * value: a name such as "Oil & Gas" or one with a quote in it.
+ * @param {string} text - The text
+ * @returns {string} Escaped
+ */
+export function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
+}

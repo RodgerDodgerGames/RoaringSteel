@@ -6,6 +6,7 @@
  * - Loading state transitions
  * - Error handling
  * - Cache usage, and the data window it was built for
+ * - Placing towns at their main city, and leaving off those off the board
  * - Town classification
  */
 
@@ -15,6 +16,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 const mockFetchPopulationData = vi.hoisted(() => vi.fn())
 const mockPopulationData = vi.hoisted(() => ({ value: [] }))
 const mockGetMSALatLon = vi.hoisted(() => vi.fn())
+const mockFindPrincipalCity = vi.hoisted(() => vi.fn())
 const mockUseCensus = vi.hoisted(() => vi.fn())
 const mockFetchDataWindow = vi.hoisted(() => vi.fn())
 
@@ -33,7 +35,8 @@ vi.mock('@/composables/setup/dataWindow', () => ({
 }))
 
 vi.mock('@/composables/setup/useTigerWeb', () => ({
-  default: mockGetMSALatLon
+  default: mockGetMSALatLon,
+  findPrincipalCity: mockFindPrincipalCity
 }))
 
 import { useTownsStore } from '@/stores/towns'
@@ -47,14 +50,25 @@ const WINDOW = { start: 2021, end: 2025, middle: 2023 }
 /** The window a year earlier, before the latest year of QWI came out */
 const EARLIER_WINDOW = { start: 2020, end: 2024, middle: 2022 }
 
-/** A town as the cache holds it */
-const CACHED_TOWN = { msa: '12345', name: 'Minneapolis', population: 400000, size: 'large' }
+/** A town's site as the cache holds it: where it is, and its population */
+const CACHED_SITE = {
+  msa: '12345',
+  fullName: 'Minneapolis-St. Paul',
+  name: 'Minneapolis',
+  stateCode: '27',
+  population: 400000,
+  lon: -93.265,
+  lat: 44.9778
+}
 
-/** The towns an earlier game kept for state 27, for an earlier window */
-const EARLIER_CACHE = { dataWindow: EARLIER_WINDOW, towns: [CACHED_TOWN] }
+/** The sites an earlier game kept for state 27, for an earlier window */
+const EARLIER_CACHE = { dataWindow: EARLIER_WINDOW, sites: [CACHED_SITE] }
 
-/** What the database keeps for state 27's towns */
-const cachedTowns = () => readCache('towns_27')
+/** What the database keeps for state 27's town sites */
+const cachedTowns = () => readCache('townSites_27')
+
+/** The MSA codes of the towns in play */
+const msaCodes = (towns) => towns.map((town) => town.msa)
 
 describe('Towns Store', () => {
   let townsStore
@@ -71,6 +85,9 @@ describe('Towns Store', () => {
       centroidLatitude: '44.9778'
     })
     mockFetchDataWindow.mockResolvedValue(WINDOW)
+    // No main city found unless a test says so: the town goes in the middle
+    // of its area, at the coordinates above
+    mockFindPrincipalCity.mockResolvedValue(null)
 
     industryStore = useIndustryStore()
     // The industry fetch is the industry store's to test. Stubbed here, the
@@ -99,26 +116,28 @@ describe('Towns Store', () => {
 
   /** Sets the stubbed lookups up to build one town, Duluth */
   function oneTownToBuild() {
-    industryStore.MSAs.push('20260')
     mockPopulationData.value = [
       { msa_code: '20260', name: 'Duluth, MN-WI', population: '280000', state_code: '27' }
     ]
   }
 
   describe('setupTowns with cached data', () => {
-    it('should use cached towns built for the same data window', async () => {
-      await writeCache('towns_27', { dataWindow: WINDOW, towns: [CACHED_TOWN] })
+    it('should use cached town sites built for the same data window', async () => {
+      await writeCache('townSites_27', { dataWindow: WINDOW, sites: [CACHED_SITE] })
 
       await townsStore.setupTowns('27')
 
-      expect(townsStore.towns).toEqual([CACHED_TOWN])
+      expect(msaCodes(townsStore.towns)).toEqual(['12345'])
+      // A town made from its site, with its size and industries
+      expect(townsStore.towns[0]).toMatchObject({ ...CACHED_SITE, size: 'large' })
       expect(townsStore.dataWindow).toEqual(WINDOW)
       expect(mockFetchPopulationData).not.toHaveBeenCalled()
       expect(mockGetMSALatLon).not.toHaveBeenCalled()
+      expect(mockFindPrincipalCity).not.toHaveBeenCalled()
     })
 
     it('should build the towns again once the data window has moved on', async () => {
-      await writeCache('towns_27', EARLIER_CACHE)
+      await writeCache('townSites_27', EARLIER_CACHE)
       oneTownToBuild()
 
       await townsStore.setupTowns('27')
@@ -128,34 +147,47 @@ describe('Towns Store', () => {
       expect(townsStore.dataWindow).toEqual(WINDOW)
     })
 
-    it('should cache new towns with the window they were built for', async () => {
+    it("should cache the new towns' sites with the window they were built for", async () => {
       oneTownToBuild()
 
       await townsStore.setupTowns('27')
 
-      expect(await cachedTowns()).toEqual({ dataWindow: WINDOW, towns: townsStore.towns })
+      expect(await cachedTowns()).toEqual({
+        dataWindow: WINDOW,
+        sites: [
+          {
+            msa: '20260',
+            fullName: 'Duluth',
+            name: 'Duluth',
+            stateCode: '27',
+            population: 280000,
+            lon: -93.265,
+            lat: 44.9778
+          }
+        ]
+      })
     })
 
     it('should keep playing the cached towns when the new ones come out empty', async () => {
       // The window has moved on, but every lookup for the new towns failed
-      await writeCache('towns_27', EARLIER_CACHE)
+      await writeCache('townSites_27', EARLIER_CACHE)
 
       await townsStore.setupTowns('27')
 
-      expect(townsStore.towns).toEqual([CACHED_TOWN])
+      expect(msaCodes(townsStore.towns)).toEqual(['12345'])
       expect(townsStore.dataWindow).toEqual(EARLIER_WINDOW)
       expect(townsStore.error).toBeNull()
       expect(await cachedTowns()).toEqual(EARLIER_CACHE)
     })
 
     it('should keep playing the cached towns when the population fetch fails', async () => {
-      await writeCache('towns_27', EARLIER_CACHE)
+      await writeCache('townSites_27', EARLIER_CACHE)
       oneTownToBuild()
       mockFetchPopulationData.mockRejectedValue(new Error('Census API error'))
 
       await townsStore.setupTowns('27')
 
-      expect(townsStore.towns).toEqual([CACHED_TOWN])
+      expect(msaCodes(townsStore.towns)).toEqual(['12345'])
       expect(townsStore.error).toBeNull()
     })
 
@@ -180,14 +212,18 @@ describe('Towns Store', () => {
     })
 
     it('should play with the cached towns, whatever window they were built for', async () => {
-      await writeCache('towns_27', EARLIER_CACHE)
+      await writeCache('townSites_27', EARLIER_CACHE)
 
       await townsStore.setupTowns('27')
 
-      expect(townsStore.towns).toEqual([CACHED_TOWN])
+      expect(msaCodes(townsStore.towns)).toEqual(['12345'])
       expect(townsStore.dataWindow).toEqual(EARLIER_WINDOW)
       expect(townsStore.error).toBeNull()
       expect(mockFetchPopulationData).not.toHaveBeenCalled()
+      // The industries come from the cache too, whatever window it was for
+      expect(industryStore.useIndustryData).toHaveBeenCalledWith('27', EARLIER_WINDOW, {
+        anyWindow: true
+      })
     })
 
     it('should report an error when nothing is cached', async () => {
@@ -243,9 +279,6 @@ describe('Towns Store', () => {
     })
 
     it('should set isLoadingCoordinates to true during coordinate fetch', async () => {
-      // Setup MSAs in industry store
-      industryStore.MSAs.push('12345')
-
       mockPopulationData.value = [
         { msa_code: '12345', name: 'Minneapolis, MN', population: '400000', state_code: '27' }
       ]
@@ -290,9 +323,6 @@ describe('Towns Store', () => {
     })
 
     it('should handle coordinate fetch errors and continue to next MSA', async () => {
-      // Setup MSAs
-      industryStore.MSAs.push('12345', '12346')
-
       mockPopulationData.value = [
         { msa_code: '12345', name: 'Minneapolis, MN', population: '400000', state_code: '27' },
         { msa_code: '12346', name: 'St. Paul, MN', population: '300000', state_code: '27' }
@@ -319,7 +349,6 @@ describe('Towns Store', () => {
   describe('setupTowns when some lookups fail', () => {
     // Two towns to build: Duluth and Rochester
     beforeEach(() => {
-      industryStore.MSAs.push('20260', '40340')
       mockPopulationData.value = [
         { msa_code: '20260', name: 'Duluth, MN-WI', population: '280000', state_code: '27' },
         { msa_code: '40340', name: 'Rochester, MN', population: '220000', state_code: '27' }
@@ -334,7 +363,7 @@ describe('Towns Store', () => {
     }
 
     it('should play without a town whose lookup failed, and not cache the towns', async () => {
-      await writeCache('towns_27', EARLIER_CACHE)
+      await writeCache('townSites_27', EARLIER_CACHE)
       lookUpDuluth(() => {
         throw new Error('TIGERweb lookup failed: 500')
       })
@@ -356,7 +385,7 @@ describe('Towns Store', () => {
 
       expect(townsStore.towns.map((town) => town.msa)).toEqual(['40340'])
       expect(townsStore.towns.every((town) => Number.isFinite(town.lon))).toBe(true)
-      expect((await cachedTowns()).towns).toHaveLength(1)
+      expect((await cachedTowns()).sites).toHaveLength(1)
     })
 
     it('should leave out a town whose lookup was turned down, and still cache the towns', async () => {
@@ -368,7 +397,7 @@ describe('Towns Store', () => {
       await townsStore.setupTowns('27')
 
       expect(townsStore.towns.map((town) => town.msa)).toEqual(['40340'])
-      expect((await cachedTowns()).towns).toHaveLength(1)
+      expect((await cachedTowns()).sites).toHaveLength(1)
     })
 
     it('should play without an industry whose fetch failed, and not cache the towns', async () => {
@@ -429,7 +458,6 @@ describe('Towns Store', () => {
   describe('setupTowns data processing', () => {
     beforeEach(() => {
       // Setup industry store with test data
-      industryStore.MSAs.push('12345', '12346', '12347')
       industryStore.employmentData.push({
         industry: 111,
         meanEmp: { 12345: 1000, 12346: 500, 12347: 100 },
@@ -454,13 +482,19 @@ describe('Towns Store', () => {
       })
     })
 
-    it('should skip MSAs without population data', async () => {
-      industryStore.MSAs.push('99999') // MSA without population data
+    it("should make a town of an area with people but no jobs in the game's industries", async () => {
+      // No jobs in any of the game's industries
+      mockPopulationData.value.push({
+        msa_code: '99999',
+        name: 'Nantucket, MA',
+        population: '14000',
+        state_code: '27'
+      })
 
       await townsStore.setupTowns('27')
 
-      const msaCodes = townsStore.towns.map((t) => t.msa)
-      expect(msaCodes).not.toContain('99999')
+      const nantucket = townsStore.towns.find((t) => t.msa === '99999')
+      expect(nantucket.industries).toEqual([])
     })
 
     it('should parse full name correctly from MSA name', async () => {
@@ -477,7 +511,7 @@ describe('Towns Store', () => {
       expect(minneapolis.name).toBe('Minneapolis')
     })
 
-    it('should classify towns by population size using natural breaks', async () => {
+    it('should give every town a size', async () => {
       await townsStore.setupTowns('27')
 
       // All towns should have a size property
@@ -530,6 +564,101 @@ describe('Towns Store', () => {
       const town = townsStore.towns[0]
       expect(town.lon).toBe(-93.265)
       expect(town.lat).toBe(44.9778)
+    })
+  })
+
+  describe('placing towns', () => {
+    beforeEach(() => {
+      mockPopulationData.value = [
+        {
+          msa_code: '14460',
+          name: 'Boston-Cambridge-Newton, MA-NH Metro Area (part); Massachusetts',
+          population: '4468755',
+          state_code: '25'
+        },
+        {
+          msa_code: '39300',
+          name: 'Providence-Warwick, RI-MA Metro Area (part); Massachusetts',
+          population: '578436',
+          state_code: '25'
+        }
+      ]
+      mockFindPrincipalCity.mockImplementation(async (name) =>
+        name.startsWith('Boston')
+          ? { lon: -71.0135, lat: 42.3327, name: 'Boston', stateFips: '25' }
+          : { lon: -71.4188, lat: 41.823, name: 'Providence', stateFips: '44' }
+      )
+    })
+
+    /** A box around eastern Massachusetts, leaving Providence just outside */
+    const easternMassachusetts = {
+      type: 'Feature',
+      properties: { NAME: 'Massachusetts', STATE: '25' },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [-72, 41.9],
+            [-70, 41.9],
+            [-70, 42.9],
+            [-72, 42.9],
+            [-72, 41.9]
+          ]
+        ]
+      }
+    }
+
+    it('should put a town at its main city, not the middle of its area', async () => {
+      await townsStore.setupTowns('25')
+
+      const boston = townsStore.towns.find((town) => town.msa === '14460')
+      expect(boston).toMatchObject({ name: 'Boston', lon: -71.0135, lat: 42.3327 })
+      expect(mockGetMSALatLon).not.toHaveBeenCalledWith('14460')
+    })
+
+    it('should leave off the board a town whose main city is outside it', async () => {
+      await townsStore.setupTowns('25', easternMassachusetts)
+
+      expect(msaCodes(townsStore.towns)).toEqual(['14460'])
+    })
+
+    it('should keep a town left off the board in the cache, for a board it is on', async () => {
+      await townsStore.setupTowns('25', easternMassachusetts)
+
+      expect((await readCache('townSites_25')).sites.map((site) => site.msa)).toEqual([
+        '14460',
+        '39300'
+      ])
+    })
+
+    it('should put a town in the middle of its area when its main city cannot be found', async () => {
+      mockFindPrincipalCity.mockResolvedValue(null)
+
+      await townsStore.setupTowns('25')
+
+      expect(townsStore.towns[0]).toMatchObject({ lon: -93.265, lat: 44.9778 })
+      expect(mockGetMSALatLon).toHaveBeenCalledWith('14460')
+    })
+
+    it("should name a town after its main city's own name", async () => {
+      mockPopulationData.value = [
+        {
+          msa_code: '49180',
+          name: 'Winston-Salem, NC Metro Area',
+          population: '690000',
+          state_code: '37'
+        }
+      ]
+      mockFindPrincipalCity.mockResolvedValue({
+        lon: -80.26,
+        lat: 36.1,
+        name: 'Winston-Salem',
+        stateFips: '37'
+      })
+
+      await townsStore.setupTowns('37')
+
+      expect(townsStore.towns[0].name).toBe('Winston-Salem')
     })
   })
 })

@@ -48,8 +48,7 @@ async function cacheFrom(dataWindow) {
   const cached = {
     dataWindow,
     industries: [{ naics_code: 111, label: 'Agriculture' }],
-    employmentData: [{ industry: 111, meanEmp: { 12345: 100 } }],
-    MSAs: ['12345']
+    employmentData: [{ industry: 111, meanEmp: { 12345: 100 } }]
   }
   await writeCache('industry_27', cached)
   return cached
@@ -83,10 +82,6 @@ describe('Industry Store', () => {
       expect(industryStore.industries).toEqual([])
     })
 
-    it('should start with empty MSAs', () => {
-      expect(industryStore.MSAs).toEqual([])
-    })
-
     it('should start with isLoadingCSV as false', () => {
       expect(industryStore.isLoadingCSV).toBe(false)
     })
@@ -104,7 +99,6 @@ describe('Industry Store', () => {
 
       expect(industryStore.industries).toEqual(cached.industries)
       expect(industryStore.employmentData).toEqual(cached.employmentData)
-      expect(industryStore.MSAs).toEqual(cached.MSAs)
       // Should not fetch when cached
       expect(mockFetch).not.toHaveBeenCalled()
     })
@@ -122,7 +116,24 @@ describe('Industry Store', () => {
 
       expect(mockFetchQWI).toHaveBeenCalled()
       expect(industryStore.employmentData.map((e) => e.industry)).toEqual([112])
-      expect(industryStore.MSAs).toEqual(['22222'])
+      expect(Object.keys(industryStore.employmentData[0].meanEmp)).toEqual(['22222'])
+    })
+
+    it('should use the cache whatever window it was built for, when told to take any', async () => {
+      // The data window could not be looked up: play from what is cached
+      const cached = await cacheFrom({ start: 2020, end: 2024 })
+
+      await industryStore.useIndustryData('27', WINDOW, { anyWindow: true })
+
+      expect(industryStore.employmentData).toEqual(cached.employmentData)
+      expect(mockFetchQWI).not.toHaveBeenCalled()
+    })
+
+    it('should fetch nothing, and have no data, when told to take any cache and there is none', async () => {
+      await industryStore.useIndustryData('27', WINDOW, { anyWindow: true })
+
+      expect(industryStore.employmentData).toEqual([])
+      expect(mockFetch).not.toHaveBeenCalled()
     })
 
     it("should fetch each industry over the data window's years", async () => {
@@ -148,8 +159,7 @@ describe('Industry Store', () => {
       expect(await cachedIndustry()).toEqual({
         dataWindow: { start: 2021, end: 2025 },
         industries: industryStore.industries,
-        employmentData: industryStore.employmentData,
-        MSAs: ['12345']
+        employmentData: industryStore.employmentData
       })
     })
 
@@ -165,7 +175,6 @@ describe('Industry Store', () => {
       await industryStore.useIndustryData('27', { start: 2022, end: 2026, middle: 2024 })
 
       expect(industryStore.employmentData).toHaveLength(1)
-      expect(industryStore.MSAs).toEqual(['12345'])
     })
   })
 
@@ -392,24 +401,6 @@ describe('Industry Store', () => {
 
       expect(industryStore.employmentData[0].meanEmp['12345']).toBe(150) // (100+200)/2
       expect(industryStore.employmentData[0].meanEmp['12346']).toBe(300) // 300/1
-    })
-
-    it('should populate MSAs list from employment data', async () => {
-      mockFetch.mockResolvedValue({
-        text: async () => 'naics_code,label,ind_level\n111,Agriculture,2'
-      })
-
-      mockFetchQWI.mockImplementation(async () => {
-        mockQWIData.value = [
-          { Emp: 100, msa_code: '12345' },
-          { Emp: 200, msa_code: '12346' }
-        ]
-      })
-
-      await industryStore.useIndustryData('27', WINDOW)
-
-      expect(industryStore.MSAs).toContain('12345')
-      expect(industryStore.MSAs).toContain('12346')
     })
 
     it('should calculate proportions capped at 0.2', async () => {

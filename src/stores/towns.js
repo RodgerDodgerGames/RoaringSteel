@@ -2,17 +2,19 @@
  * Towns Store (towns.js)
  *
  * Manages town data for the game including loading, classification, and industry assignment.
- * Towns are populated from Census MSA (Metropolitan Statistical Area) data and classified
- * by population size using a natural breaks algorithm.
+ * Towns are populated from Census MSA (Metropolitan Statistical Area) data, placed at
+ * each area's main city, and sorted into sizes by population rank (see townSizes.js).
  *
  * Data Flow:
  * 0. Look up the state's data window: the years the jobs data covers, which
  *    every other source follows (see dataWindow.js)
  * 1. Fetch industry data from industryStore
- * 2. Fetch population data from Census API
- * 3. Fetch lat/lon coordinates for each MSA from TigerWeb
- * 4. Classify towns by population (small/medium/large)
- * 5. Assign industries based on employment density
+ * 2. Fetch population data from Census API: every metro and micro area in
+ *    the state, each of which is a town
+ * 3. Place each MSA's town at its main city, from TigerWeb (see useTigerWeb.js)
+ * 4. Leave out the towns whose main city is off the board
+ * 5. Classify towns by population (small/medium/large)
+ * 6. Assign industries based on employment density
  *
  * Town Object Structure:
  * {
@@ -31,17 +33,16 @@
  */
 
 import { ref } from 'vue'
-import { defineStore, storeToRefs } from 'pinia'
+import { defineStore } from 'pinia'
 import { useIndustryStore } from './industry'
 import useCensus from '../composables/setup/useCensus'
-import getMSALatLon from '../composables/setup/useTigerWeb'
+import getMSALatLon, { findPrincipalCity } from '../composables/setup/useTigerWeb'
+import { assignSizes } from '../composables/setup/townSizes'
+import { regionTest } from '@/composables/map/region'
 import { fetchDataWindow } from '../composables/setup/dataWindow'
 import { isRefusal, refusalMessage } from '../composables/utils'
 import { readCache, writeCache } from '../composables/database'
 import { debug } from '@/composables/debug'
-
-/** Size classification labels for towns based on population */
-const sizeClasses = ['small', 'medium', 'large']
 
 /**
  * Maximum proportion of towns that can have any single industry (20%).
@@ -54,6 +55,21 @@ const sizeClasses = ['small', 'medium', 'large']
 /** Maximum number of industries a single town can have */
 const maxIndustries = 3
 
+/**
+ * The steps of the town setup, as the towns store reports them (see
+ * `setupStep`), so the setup screen can tell them apart
+ */
+export const SETUP_STEPS = Object.freeze({
+  dataWindow: 'dataWindow',
+  industry: 'industry',
+  population: 'population',
+  placing: 'placing',
+  assigning: 'assigning'
+})
+
+/** Shown when no town on the board could be found */
+const NO_TOWNS_ON_BOARD_MESSAGE = 'None of the towns found are on this board.'
+
 /** Shown when the towns could not be built and none are cached */
 const NO_TOWNS_MESSAGE =
   "Could not load this state's towns from the Census Bureau. Check your connection and retry."
@@ -65,7 +81,6 @@ export const useTownsStore = defineStore('towns', () => {
   // STATE
   const towns = ref([])
   const selectedState = ref('')
-  const { MSAs } = storeToRefs(industryStore)
 
   /**
    * The years this game's data comes from, {start, end, middle}, once setup
@@ -86,146 +101,188 @@ export const useTownsStore = defineStore('towns', () => {
   /** Loading state for coordinate data fetching */
   const isLoadingCoordinates = ref(false)
 
+  /**
+   * Which step of the town setup is running, for the setup screen: one of
+   * SETUP_STEPS, or empty when it is doing nothing
+   */
+  const setupStep = ref('')
+
+  /**
+   * What the setup screen says the town setup is doing, such as "Placing
+   * towns (3 of 12)…"; empty when it is doing nothing
+   */
+  const setupMessage = ref('')
+
+  /**
+   * Moves the setup on to a step, with what the setup screen says for it.
+   * @param {string} step - One of SETUP_STEPS, or empty when done
+   * @param {string} [message] - What to tell the player
+   */
+  function setStep(step, message = '') {
+    setupStep.value = step
+    setupMessage.value = message
+  }
+
   // ACTIONS
 
   /**
-   * Initializes towns for the selected state by fetching and processing MSA data.
-   * Keeps each state's towns in the browser's database (see database.js) to
-   * avoid redundant API calls.
+   * Sets up the towns for a new game on a state's board.
+   *
+   * A town is a metro or micro area, placed at its main city (see
+   * useTigerWeb.js). What is fetched for a state — each town's place, name
+   * and population, its "site" — is kept in the browser's database (see
+   * database.js), so the next game there need not ask again. The towns
+   * themselves are made from the sites afresh each game: those on the board
+   * kept, their sizes set and their industries assigned (see `playSites`).
    *
    * Every new game first looks up the state's data window, one small request.
-   * The cached towns are used when they were built for that same window;
+   * The cached sites are used when they were built for that same window;
    * once a new year of jobs data is out, the window has moved on and the
-   * towns are built again from the new years.
+   * sites are built again from the new years.
    *
    * If the lookup fails — the Census Bureau's API is down, say — the cached
-   * towns are used as they are, whatever window they were built for. So they
-   * are if building the new towns fails, or comes out with no towns at all,
-   * and the cache is left as it was. With nothing cached there is nothing to
-   * play with, and `error` is set for the setup screen to show.
+   * sites and industry data are used as they are, whatever window they were
+   * built for. So they are if building the new sites fails, or comes out
+   * with no towns at all, and the cache is left as it was. With nothing
+   * cached there is nothing to play with, and `error` is set for the setup
+   * screen to show.
    *
    * An industry or a town whose own lookup fails is left out of the game,
-   * and the towns are not cached, so the next game builds them again rather
+   * and the sites are not cached, so the next game builds them again rather
    * than keep the gap for the rest of the window. The cache keeps the last
    * complete build.
    *
    * @param {string} stateFipsCode - Two-digit FIPS code for the state (e.g., "27" for Minnesota)
+   * @param {Object|null} [region] - The board's outline (GeoJSON); towns
+   *   whose main city is outside it are left off the board. With none, every
+   *   town is kept.
    * @returns {Promise<void>}
    */
-  async function setupTowns(stateFipsCode) {
+  async function setupTowns(stateFipsCode, region = null) {
     selectedState.value = stateFipsCode
     error.value = null
     debug.log('Selected state:', stateFipsCode)
+    const isOnBoard = regionTest(region)
 
-    // Each state's towns are kept under their own name, along with the data
+    // Each state's sites are kept under their own name, along with the data
     // window they were built for
-    const cacheName = `towns_${stateFipsCode}`
-    const saved = savedTowns(await readCache(cacheName))
+    const cacheName = `townSites_${stateFipsCode}`
+    const saved = savedSites(await readCache(cacheName))
 
     let latestWindow
+    setStep(SETUP_STEPS.dataWindow, 'Looking up which years of jobs data to use…')
     try {
       latestWindow = await fetchDataWindow(stateFipsCode)
     } catch (e) {
       console.error('Error looking up the data window:', e)
-      fallBackTo(saved, failureMessage(e, "this state's jobs data"))
+      await fallBackTo(saved, failureMessage(e, "this state's jobs data"), isOnBoard)
       return
     }
 
-    // Load cached data if it was built for the same years
+    // Use the cached sites if they were built for the same years. Their
+    // industry data is usually cached too; if it has to be fetched and
+    // fails, the industry data cached for any window will do.
     if (
       saved &&
       saved.dataWindow.start === latestWindow.start &&
       saved.dataWindow.end === latestWindow.end
     ) {
-      loadSavedTowns(saved)
+      isLoadingIndustry.value = true
+      setStep(SETUP_STEPS.industry, 'Fetching jobs by industry…')
+      try {
+        await industryStore.useIndustryData(stateFipsCode, latestWindow)
+        playSites(saved, isOnBoard)
+      } catch (e) {
+        console.error('Error fetching industry data:', e)
+        await fallBackTo(saved, NO_TOWNS_MESSAGE, isOnBoard)
+      } finally {
+        isLoadingIndustry.value = false
+      }
       return
     }
 
-    dataWindow.value = latestWindow
-    // The fetch below adds to this; start it empty rather than on top of the
-    // towns of an earlier window or an attempt that failed part-way
-    towns.value = []
-
     // Fetch industry data for the selected state
     isLoadingIndustry.value = true
+    setStep(SETUP_STEPS.industry, 'Fetching jobs by industry…')
     try {
       await industryStore.useIndustryData(stateFipsCode, latestWindow)
     } catch (e) {
       console.error('Error fetching industry data:', e)
       isLoadingIndustry.value = false
-      fallBackTo(saved, NO_TOWNS_MESSAGE)
+      await fallBackTo(saved, NO_TOWNS_MESSAGE, isOnBoard)
       return
     }
     isLoadingIndustry.value = false
 
     // Fetch population data for the selected state
     isLoadingPopulation.value = true
+    setStep(SETUP_STEPS.population, 'Fetching population…')
     const { populationData, fetchPopulationData } = useCensus(stateFipsCode, latestWindow)
     try {
       await fetchPopulationData()
     } catch (e) {
       console.error('Error fetching population data:', e)
       isLoadingPopulation.value = false
-      fallBackTo(saved, failureMessage(e, "this state's population"))
+      await fallBackTo(saved, failureMessage(e, "this state's population"), isOnBoard)
       return
     }
     isLoadingPopulation.value = false
 
-    // Fetch latitude and longitude data for each MSA and populate towns
+    // Place a town for every metro and micro area with people in the state.
+    // Every one is a town, whether or not it has jobs in the game's
+    // industries: one that makes nothing is still somewhere to deliver to.
     isLoadingCoordinates.value = true
+    const sites = []
     // Whether any town was left out because its lookup failed
     let missedTowns = false
-    for (const msaCode of MSAs.value) {
-      debug.log('Fetching lat/lon data for MSA:', msaCode)
-      let coordinates
+    for (const [index, popData] of populationData.value.entries()) {
+      setStep(
+        SETUP_STEPS.placing,
+        `Placing towns (${index + 1} of ${populationData.value.length})…`
+      )
+      const msaCode = popData.msa_code
+
+      let place
       try {
-        coordinates = await getMSALatLon(msaCode)
+        place = await placeTown(msaCode, popData.name)
       } catch (e) {
-        console.error(`Error fetching coordinates for MSA ${msaCode}:`, e)
+        console.error(`Error placing the town for MSA ${msaCode}:`, e)
         // Continue to next MSA on error. A lookup turned down would be turned
-        // down again next game, so only one that failed keeps the towns out
+        // down again next game, so only one that failed keeps the sites out
         // of the cache.
         if (!isRefusal(e)) missedTowns = true
         continue
       }
 
-      // TIGERweb has no such area: there is no town to place
-      if (!coordinates) {
-        console.warn(`No coordinates for MSA ${msaCode}; leaving it out`)
+      // TIGERweb has neither the city nor the area: there is no town to place
+      if (!place) {
+        console.warn(`No place found for MSA ${msaCode}; leaving it out`)
         continue
       }
-      const { centroidLongitude, centroidLatitude } = coordinates
-      debug.log('Lat/Lon data fetched:', centroidLongitude, centroidLatitude)
+      debug.log('Town placed:', place)
 
-      const popData = populationData.value.find((data) => data.msa_code === msaCode)
-
-      // if there is no population data for the MSA, skip it
-      if (!popData) {
-        continue
-      }
-
-      towns.value.push({
+      const fullName = popData.name.split(', ')[0]
+      sites.push({
         msa: msaCode,
-        fullName: popData.name.split(', ')[0],
-        // just grab the first name for the short name
-        name: popData.name.split(', ')[0].split('-')[0],
+        fullName,
+        // The main city's own name, or else the first name in the area's
+        name: place.name ?? fullName.split('-')[0],
         stateCode: popData.state_code,
         population: parseFloat(popData.population),
-        lon: parseFloat(centroidLongitude),
-        lat: parseFloat(centroidLatitude),
-        industries: []
+        lon: place.lon,
+        lat: place.lat
       })
     }
     isLoadingCoordinates.value = false
 
     // Every lookup that a town needs failed, or found nothing
-    if (towns.value.length === 0) {
-      fallBackTo(saved, NO_TOWNS_MESSAGE)
+    if (sites.length === 0) {
+      await fallBackTo(saved, NO_TOWNS_MESSAGE, isOnBoard)
       return
     }
 
-    // Assign tourism, industries, and sizes to towns
-    assignTowns()
+    const built = { dataWindow: latestWindow, sites }
+    playSites(built, isOnBoard)
 
     // Play with what came back, but leave a build with gaps out of the cache
     if (missedTowns || industryStore.failedIndustries.length > 0) {
@@ -233,9 +290,9 @@ export const useTownsStore = defineStore('towns', () => {
       return
     }
 
-    // Keep the towns for the next game in this state
-    await writeCache(cacheName, { dataWindow: latestWindow, towns: towns.value })
-    debug.log(`Cached towns data for state ${stateFipsCode}`)
+    // Keep the sites for the next game in this state
+    await writeCache(cacheName, built)
+    debug.log(`Cached town sites for state ${stateFipsCode}`)
   }
 
   /**
@@ -249,15 +306,38 @@ export const useTownsStore = defineStore('towns', () => {
   // HELPERS
 
   /**
-   * The cached towns, if they can be played with: some towns, and the data
+   * Where an MSA's town goes: at its main city (see `findPrincipalCity`),
+   * or, if TIGERweb has no such city, in the middle of the area, as towns
+   * used to be placed.
+   * @param {string} msaCode - The MSA's code
+   * @param {string} msaName - Its name, as the Census Bureau writes it
+   * @returns {Promise<{lon: number, lat: number, name: string|null}|null>}
+   *   Where, and the city's name (null for the middle of the area); null if
+   *   neither can be found
+   * @throws When a lookup fails (see useTigerWeb.js)
+   */
+  async function placeTown(msaCode, msaName) {
+    const city = await findPrincipalCity(msaName)
+    if (city) return { lon: city.lon, lat: city.lat, name: city.name }
+    const middle = await getMSALatLon(msaCode)
+    if (!middle) return null
+    return {
+      lon: parseFloat(middle.centroidLongitude),
+      lat: parseFloat(middle.centroidLatitude),
+      name: null
+    }
+  }
+
+  /**
+   * The cached sites, if they can be played with: some sites, and the data
    * window they were built for.
    *
    * @param {Object|undefined} cached - What the database holds for the state
-   * @returns {{dataWindow: Object, towns: Array}|null} The saved towns, or null
+   * @returns {{dataWindow: Object, sites: Array}|null} The saved sites, or null
    */
-  function savedTowns(cached) {
+  function savedSites(cached) {
     const usable =
-      cached?.dataWindow != null && Array.isArray(cached.towns) && cached.towns.length > 0
+      cached?.dataWindow != null && Array.isArray(cached.sites) && cached.sites.length > 0
     return usable ? cached : null
   }
 
@@ -275,29 +355,44 @@ export const useTownsStore = defineStore('towns', () => {
   }
 
   /**
-   * What to do when the new towns cannot be had: play with the cached towns
-   * if there are any, or else report the failure for the setup screen.
+   * What to do when the new sites cannot be had: play with the cached sites
+   * if there are any, with the industry data cached for the state, or else
+   * report the failure for the setup screen.
    *
-   * @param {{dataWindow: Object, towns: Array}|null} saved - From `savedTowns`
+   * @param {{dataWindow: Object, sites: Array}|null} saved - From `savedSites`
    * @param {string} message - Player-facing explanation, when nothing is cached
+   * @param {Function} isOnBoard - The board's point test (see `regionTest`)
    */
-  function fallBackTo(saved, message) {
+  async function fallBackTo(saved, message, isOnBoard) {
     if (saved) {
-      loadSavedTowns(saved)
+      await industryStore.useIndustryData(selectedState.value, saved.dataWindow, {
+        anyWindow: true
+      })
+      playSites(saved, isOnBoard)
     } else {
       towns.value = []
+      setStep('')
       error.value = message
     }
   }
 
   /**
-   * Plays with cached towns, and the data window they were built for.
-   * @param {{dataWindow: Object, towns: Array}} saved - From `savedTowns`
+   * Makes the game's towns from a state's sites: those whose main city is on
+   * the board, each with its size and industries (see `assignTowns`). A
+   * board none of whose towns is on it cannot be played: `error` says so.
+   * @param {{dataWindow: Object, sites: Array}} built - The sites, and the
+   *   data window they were built for
+   * @param {Function} isOnBoard - The board's point test (see `regionTest`)
    */
-  function loadSavedTowns(saved) {
-    towns.value = saved.towns
-    dataWindow.value = saved.dataWindow
-    debug.log(`Loaded cached towns data for state ${selectedState.value}`)
+  function playSites(built, isOnBoard) {
+    setStep(SETUP_STEPS.assigning, 'Assigning industries to towns…')
+    dataWindow.value = built.dataWindow
+    towns.value = built.sites
+      .filter((site) => isOnBoard({ lat: site.lat, lng: site.lon }))
+      .map((site) => ({ ...site, industries: [] }))
+    if (towns.value.length === 0) error.value = NO_TOWNS_ON_BOARD_MESSAGE
+    else assignTowns()
+    setStep('')
   }
 
   /**
@@ -306,8 +401,8 @@ export const useTownsStore = defineStore('towns', () => {
    */
   function assignTowns() {
     debug.log('Assigning towns...')
-    // group towns by population
-    towns.value = naturalBreaks(towns.value, 'population', sizeClasses)
+    // major cities, medium and small towns, by population
+    towns.value = assignSizes(towns.value)
     assignTourism()
     assignIndustries()
   }
@@ -511,6 +606,7 @@ export const useTownsStore = defineStore('towns', () => {
     isLoadingIndustry.value = false
     isLoadingPopulation.value = false
     isLoadingCoordinates.value = false
+    setStep('')
   }
 
   /**
@@ -530,6 +626,8 @@ export const useTownsStore = defineStore('towns', () => {
     isLoadingIndustry,
     isLoadingPopulation,
     isLoadingCoordinates,
+    setupStep,
+    setupMessage,
     setupTowns,
     clearError,
     reset,

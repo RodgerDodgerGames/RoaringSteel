@@ -13,7 +13,7 @@ import { useGameStore } from '@/stores/game'
 import { useGridStore } from '@/stores/grid'
 import { lineBlock } from '@/composables/map/buildRules'
 import { isEmptyGrid } from '@/composables/map/cellGrid'
-import { useTrackBuilder, START_RULE } from '@/composables/trackBuilder'
+import { useTrackBuilder } from '@/composables/trackBuilder'
 import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 import {
   UNOWNED_TRACK_COLOR,
@@ -353,6 +353,7 @@ export default function useBuildTrack(formatCurrency) {
     // Before drawing starts, so the map is already zoomed in and limited to
     // the Build view's range by the time the player places a first point
     mapStore.setViewMode(BUILD_VIEW)
+    setTooltips()
     snapToOwnTrackOnly(playerStore.activePlayer?.id)
     mapStore.map.pm.enableDraw('Line', drawingLineStyles(playerStore.activePlayer?.id))
     mapStore.setIsDrawingActive(true)
@@ -906,8 +907,9 @@ export default function useBuildTrack(formatCurrency) {
   }
 
   /**
-   * Whether the active player may start a line here: in a major city or at
-   * an end or bend of their own track (see the track builder).
+   * Whether the active player may start a line here: in a town the start
+   * rule allows (see startRule.js) or at an end or bend of their own track
+   * (see the track builder).
    * @param {Object} latlng - Where the line would start
    * @returns {boolean} True if it may start here
    */
@@ -945,17 +947,27 @@ export default function useBuildTrack(formatCurrency) {
   }
 
   /**
-   * Configures Geoman global drawing options, including tooltips and snapping behavior.
+   * Sets the text Geoman shows by the cursor while drawing. The first point's
+   * text is the start rule, which is this game's (see startRule.js); a game
+   * loaded during play may have a different one, so this is set again as
+   * each drawing starts.
    */
-  function setGeomanOptions() {
+  function setTooltips() {
     mapStore.map.pm.setLang('en', {
       tooltips: {
         placeMarker: 'Place your marker here!',
-        firstVertex: START_RULE,
+        firstVertex: builder.startRule(),
         continueLine: '',
         finishLine: 'Click to finish the track'
       }
     })
+  }
+
+  /**
+   * Configures Geoman global drawing options, including tooltips and snapping behavior.
+   */
+  function setGeomanOptions() {
+    setTooltips()
 
     mapStore.map.pm.setGlobalOptions({
       snappable: true,

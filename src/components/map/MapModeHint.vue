@@ -9,6 +9,11 @@
   player's eyes are on the map while they use them, so the instructions are
   put where they are looking. Renders nothing in the ordinary mode.
 
+  Each banner is a help screen (see useHelpScreens.js): its "Don't show
+  again" button hides it for the rest of the game, and it is not shown at
+  all while help is turned off in Settings. Esc still ends the mode either
+  way.
+
   @prop isDrawing  - True while a line of track is being drawn
   @prop isRemoving - True while removal mode is on
   @prop pickPrompt - While a town is being chosen on the map, what clicking
@@ -17,6 +22,9 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useGameStore } from '@/stores/game'
+import { useHelpScreens, HELP_SCREENS } from '@/composables/useHelpScreens'
+import { startPlace } from '@/composables/startRule'
 
 const props = defineProps({
   isDrawing: {
@@ -33,29 +41,40 @@ const props = defineProps({
   }
 })
 
+const gameStore = useGameStore()
+const { isShown, dismiss } = useHelpScreens()
+
 /**
- * The banner's wording for the current mode, or null when there is no mode to
- * explain. Only one mode is ever on — each switches the others off as it
- * starts.
+ * The banner for the current mode — its help screen's name and wording — or
+ * null when there is no mode to explain. Only one mode is ever on — each
+ * switches the others off as it starts.
  */
-const hint = computed(() => {
+const modeHint = computed(() => {
   if (props.isDrawing) {
+    const where = startPlace(gameStore.gameSettings.requireMajorCityStart)
     return {
+      name: HELP_SCREENS.building,
       title: 'Building track',
-      body: 'Start in a major city or on your own track. Click a town or double-click to finish.'
+      body: `Start in ${where} or on your own track. Click a town or double-click to finish.`
     }
   }
   if (props.pickPrompt) {
-    return { title: 'Choosing a town', body: props.pickPrompt }
+    return { name: HELP_SCREENS.choosingTown, title: 'Choosing a town', body: props.pickPrompt }
   }
   if (props.isRemoving) {
     return {
+      name: HELP_SCREENS.removing,
       title: 'Removing track',
       body: 'Click a section you built this turn to tear it up and get your money back.'
     }
   }
   return null
 })
+
+/** The banner to show: the mode's, unless its help screen is hidden */
+const hint = computed(() =>
+  modeHint.value && isShown(modeHint.value.name) ? modeHint.value : null
+)
 </script>
 
 <template>
@@ -65,6 +84,9 @@ const hint = computed(() => {
     <span>{{ hint.body }}</span>
     <kbd class="map-mode-hint__key">Esc</kbd>
     <span class="map-mode-hint__key-label">to stop</span>
+    <button type="button" class="map-mode-hint__dismiss" @click="dismiss(hint.name)">
+      Don't show again
+    </button>
   </div>
 </template>
 
@@ -89,7 +111,9 @@ const hint = computed(() => {
   box-shadow: var(--bulma-shadow);
   font-size: 0.9rem;
   /* Information only: clicks pass straight through to the map beneath, so the
-     banner never blocks a town or track end the player is aiming for */
+     banner never blocks a town or track end the player is aiming for. Only
+     its "Don't show again" button takes clicks. (The banner sits beside the
+     map, not inside it, so a click on the button never reaches the map.) */
   pointer-events: none;
 }
 
@@ -108,5 +132,25 @@ const hint = computed(() => {
 
 .map-mode-hint__key-label {
   opacity: 0.85;
+}
+
+/* The one part of the banner that takes clicks: a small text button set
+   apart from the instructions */
+.map-mode-hint__dismiss {
+  pointer-events: auto;
+  margin-left: 0.5rem;
+  padding: 0 0.4rem;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-family: var(--font-label);
+  font-size: 0.75rem;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.map-mode-hint__dismiss:hover {
+  opacity: 1;
 }
 </style>

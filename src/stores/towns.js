@@ -39,6 +39,7 @@ import useCensus from '../composables/setup/useCensus'
 import getMSALatLon, { findPrincipalCity } from '../composables/setup/useTigerWeb'
 import { assignSizes } from '../composables/setup/townSizes'
 import { regionTest } from '@/composables/map/region'
+import usStates from '@/config/usStates'
 import { fetchDataWindow } from '../composables/setup/dataWindow'
 import { isRefusal, refusalMessage } from '../composables/utils'
 import { readCache, writeCache } from '../composables/database'
@@ -70,9 +71,52 @@ export const SETUP_STEPS = Object.freeze({
 /** Shown when no town on the board could be found */
 const NO_TOWNS_ON_BOARD_MESSAGE = 'None of the towns found are on this board.'
 
-/** Shown when the towns could not be built and none are cached */
-const NO_TOWNS_MESSAGE =
-  "Could not load this state's towns from the Census Bureau. Check your connection and retry."
+/**
+ * Shown when a state's towns could not be built and none are cached.
+ * @param {string|null} name - The state's name, on a board of several; null
+ *   on a board of one
+ * @returns {string} Player-facing message
+ */
+function noTownsMessage(name) {
+  const whose = name ? `${name}'s` : "this state's"
+  return `Could not load ${whose} towns from the Census Bureau. Check your connection and retry.`
+}
+
+/**
+ * The name the database keeps a state's town sites under.
+ * @param {string} state - The state's FIPS code
+ * @returns {string} Such as "townSites_27"
+ */
+function sitesCacheName(state) {
+  return `townSites_${state}`
+}
+
+/**
+ * A state's name, from its FIPS code.
+ * @param {string} state - The FIPS code
+ * @returns {string} The name, or the code if it is not a known state
+ */
+function stateName(state) {
+  return usStates.find(({ fips }) => fips === state)?.name ?? state
+}
+
+/**
+ * Town sites from several states, with each area that crosses a state line
+ * made one site: the first part's place and name (every part names the same
+ * main city), and all the parts' people. An area's sites come in one per
+ * state it has people in (see `setupTowns`).
+ * @param {Array<Object>} sites - The sites, any area's parts among them
+ * @returns {Array<Object>} One site per area
+ */
+export function mergeSites(sites) {
+  const byArea = new Map()
+  sites.forEach((site) => {
+    const merged = byArea.get(site.msa)
+    if (merged) merged.population += site.population
+    else byArea.set(site.msa, { ...site })
+  })
+  return [...byArea.values()]
+}
 
 // STORE
 export const useTownsStore = defineStore('towns', () => {
@@ -80,7 +124,6 @@ export const useTownsStore = defineStore('towns', () => {
 
   // STATE
   const towns = ref([])
-  const selectedState = ref('')
 
   /**
    * The years this game's data comes from, {start, end, middle}, once setup
@@ -126,7 +169,7 @@ export const useTownsStore = defineStore('towns', () => {
   // ACTIONS
 
   /**
-   * Sets up the towns for a new game on a state's board.
+   * Sets up the towns for a new game on a board of one state or several.
    *
    * A town is a metro or micro area, placed at its main city (see
    * useTigerWeb.js). What is fetched for a state — each town's place, name
@@ -134,99 +177,130 @@ export const useTownsStore = defineStore('towns', () => {
    * database.js), so the next game there need not ask again. The towns
    * themselves are made from the sites afresh each game: those on the board
    * kept, their sizes set and their industries assigned (see `playSites`).
+   * On a board of several states, an area that crosses a state line between
+   * two of them is one town, its parts' people and jobs added together.
    *
-   * Every new game first looks up the state's data window, one small request.
-   * The cached sites are used when they were built for that same window;
-   * once a new year of jobs data is out, the window has moved on and the
-   * sites are built again from the new years.
+   * Every new game first looks up each state's data window, one small
+   * request each, and plays each state from its own latest years. (The
+   * board's land cover is drawn from the earliest of them; see
+   * `playStates`.) A state's cached sites are used when they were built for
+   * those same years; once a new year of jobs data is out, the window has
+   * moved on and the sites are built again from the new years. A state is
+   * set up the same whether it is played alone or in a region, so its cache
+   * serves both.
    *
-   * If the lookup fails — the Census Bureau's API is down, say — the cached
-   * sites and industry data are used as they are, whatever window they were
-   * built for. So they are if building the new sites fails, or comes out
-   * with no towns at all, and the cache is left as it was. With nothing
-   * cached there is nothing to play with, and `error` is set for the setup
-   * screen to show.
+   * If a state's lookup fails — the Census Bureau's API is down, say — its
+   * cached sites and industry data are used as they are, whatever window
+   * they were built for. So are they if building its new sites fails, or
+   * comes out with no towns at all, and its cache is left as it was. A
+   * state with nothing cached leaves nothing to play with, and `error` is
+   * set for the setup screen to show, naming the state on a board of
+   * several.
    *
    * An industry or a town whose own lookup fails is left out of the game,
-   * and the sites are not cached, so the next game builds them again rather
-   * than keep the gap for the rest of the window. The cache keeps the last
-   * complete build.
+   * and that state's sites are not cached, so the next game builds them
+   * again rather than keep the gap for the rest of the window. The cache
+   * keeps the last complete build.
    *
-   * @param {string} stateFipsCode - Two-digit FIPS code for the state (e.g., "27" for Minnesota)
+   * @param {string|Array<string>} stateFipsCodes - The board's states' FIPS
+   *   codes (see `boardStates`), or a single state's (e.g. "27" for Minnesota)
    * @param {Object|null} [region] - The board's outline (GeoJSON); towns
    *   whose main city is outside it are left off the board. With none, every
    *   town is kept.
    * @returns {Promise<void>}
    */
-  async function setupTowns(stateFipsCode, region = null) {
-    selectedState.value = stateFipsCode
+  async function setupTowns(stateFipsCodes, region = null) {
+    const states = [].concat(stateFipsCodes)
     error.value = null
-    debug.log('Selected state:', stateFipsCode)
+    debug.log('Setting up towns for states:', states)
     const isOnBoard = regionTest(region)
+    const isOneState = states.length === 1
+    // Where each area's town goes, looked up once even when the area is in
+    // two of the board's states
+    const placed = new Map()
 
-    // Each state's sites are kept under their own name, along with the data
-    // window they were built for
-    const cacheName = `townSites_${stateFipsCode}`
+    const results = []
+    for (const state of states) {
+      const result = await stateSites(state, isOneState, placed)
+      if (result.error) {
+        fail(result.error)
+        return
+      }
+      results.push(result)
+    }
+    playStates(results, isOnBoard)
+  }
+
+  /**
+   * One state's sites and industry data, for the years asked for: from its
+   * cache, or built afresh (and cached, if every lookup worked). If building
+   * them fails, the state's cache is used whatever years it was built for.
+   *
+   * @param {string} state - The state's FIPS code
+   * @param {boolean} isOneState - Whether the board is this state alone, so
+   *   the setup screen need not name it
+   * @param {Map<string, Promise>} placed - Where each area's town goes, as
+   *   looked up so far in this setup (see `placeTown`); added to here
+   * @returns {Promise<{dataWindow: Object, sites: Array, employment: Array}|{error: string}>}
+   *   The state's sites and industry data, and the years they are for; or
+   *   what to tell the player when there are none
+   */
+  async function stateSites(state, isOneState, placed) {
+    const where = isOneState ? '' : ` in ${stateName(state)}`
+    const whose = isOneState ? "this state's" : `${stateName(state)}'s`
+    const cacheName = sitesCacheName(state)
     const saved = savedSites(await readCache(cacheName))
+    const noTowns = noTownsMessage(isOneState ? null : stateName(state))
+    /** The cache whatever its years, or the message for the player */
+    const fallBack = async (message) => (saved ? playFromCache(state, saved) : { error: message })
 
-    let latestWindow
-    setStep(SETUP_STEPS.dataWindow, 'Looking up which years of jobs data to use…')
+    // The state's latest years of jobs data
+    let window
+    setStep(SETUP_STEPS.dataWindow, `Looking up which years of jobs data to use${where}…`)
     try {
-      latestWindow = await fetchDataWindow(stateFipsCode)
+      window = await fetchDataWindow(state)
     } catch (e) {
       console.error('Error looking up the data window:', e)
-      await fallBackTo(saved, failureMessage(e, "this state's jobs data"), isOnBoard)
-      return
+      return fallBack(failureMessage(e, `${whose} jobs data`))
     }
 
-    // Use the cached sites if they were built for the same years. Their
-    // industry data is usually cached too; if it has to be fetched and
-    // fails, the industry data cached for any window will do.
-    if (
-      saved &&
-      saved.dataWindow.start === latestWindow.start &&
-      saved.dataWindow.end === latestWindow.end
-    ) {
-      isLoadingIndustry.value = true
-      setStep(SETUP_STEPS.industry, 'Fetching jobs by industry…')
-      try {
-        await industryStore.useIndustryData(stateFipsCode, latestWindow)
-        playSites(saved, isOnBoard)
-      } catch (e) {
-        console.error('Error fetching industry data:', e)
-        await fallBackTo(saved, NO_TOWNS_MESSAGE, isOnBoard)
-      } finally {
-        isLoadingIndustry.value = false
-      }
-      return
-    }
-
-    // Fetch industry data for the selected state
+    // Fetch industry data for the state. A state whose sites are cached for
+    // these years usually has its industry data cached too.
     isLoadingIndustry.value = true
-    setStep(SETUP_STEPS.industry, 'Fetching jobs by industry…')
+    setStep(SETUP_STEPS.industry, `Fetching jobs by industry${where}…`)
     try {
-      await industryStore.useIndustryData(stateFipsCode, latestWindow)
+      await industryStore.useIndustryData(state, window)
     } catch (e) {
       console.error('Error fetching industry data:', e)
+      return fallBack(noTowns)
+    } finally {
       isLoadingIndustry.value = false
-      await fallBackTo(saved, NO_TOWNS_MESSAGE, isOnBoard)
-      return
     }
-    isLoadingIndustry.value = false
+    const employment = [...industryStore.employmentData]
+    const isComplete = industryStore.failedIndustries.length === 0
 
-    // Fetch population data for the selected state
+    // Use the cached sites if they were built for the same years
+    if (saved && saved.dataWindow.start === window.start && saved.dataWindow.end === window.end) {
+      return { dataWindow: window, sites: saved.sites, employment }
+    }
+
+    // Fetch population data for the state
     isLoadingPopulation.value = true
-    setStep(SETUP_STEPS.population, 'Fetching population…')
-    const { populationData, fetchPopulationData } = useCensus(stateFipsCode, latestWindow)
+    setStep(SETUP_STEPS.population, `Fetching population${where}…`)
+    const { populationData, fetchPopulationData } = useCensus(state, window)
     try {
       await fetchPopulationData()
     } catch (e) {
       console.error('Error fetching population data:', e)
+      return fallBack(
+        failureMessage(
+          e,
+          isOneState ? "this state's population" : `${stateName(state)}'s population`
+        )
+      )
+    } finally {
       isLoadingPopulation.value = false
-      await fallBackTo(saved, failureMessage(e, "this state's population"), isOnBoard)
-      return
     }
-    isLoadingPopulation.value = false
 
     // Place a town for every metro and micro area with people in the state.
     // Every one is a town, whether or not it has jobs in the game's
@@ -238,13 +312,14 @@ export const useTownsStore = defineStore('towns', () => {
     for (const [index, popData] of populationData.value.entries()) {
       setStep(
         SETUP_STEPS.placing,
-        `Placing towns (${index + 1} of ${populationData.value.length})…`
+        `Placing towns${where} (${index + 1} of ${populationData.value.length})…`
       )
       const msaCode = popData.msa_code
 
       let place
       try {
-        place = await placeTown(msaCode, popData.name)
+        if (!placed.has(msaCode)) placed.set(msaCode, placeTown(msaCode, popData.name))
+        place = await placed.get(msaCode)
       } catch (e) {
         console.error(`Error placing the town for MSA ${msaCode}:`, e)
         // Continue to next MSA on error. A lookup turned down would be turned
@@ -267,7 +342,9 @@ export const useTownsStore = defineStore('towns', () => {
         fullName,
         // The main city's own name, or else the first name in the area's
         name: place.name ?? fullName.split('-')[0],
-        stateCode: popData.state_code,
+        // The main city's state, so every state's part of an area agrees on
+        // it; the state the people were counted in, if the city was not found
+        stateCode: place.stateFips ?? popData.state_code,
         population: parseFloat(popData.population),
         lon: place.lon,
         lat: place.lat
@@ -276,23 +353,18 @@ export const useTownsStore = defineStore('towns', () => {
     isLoadingCoordinates.value = false
 
     // Every lookup that a town needs failed, or found nothing
-    if (sites.length === 0) {
-      await fallBackTo(saved, NO_TOWNS_MESSAGE, isOnBoard)
-      return
-    }
+    if (sites.length === 0) return fallBack(noTowns)
 
-    const built = { dataWindow: latestWindow, sites }
-    playSites(built, isOnBoard)
-
+    const built = { dataWindow: window, sites }
     // Play with what came back, but leave a build with gaps out of the cache
-    if (missedTowns || industryStore.failedIndustries.length > 0) {
-      console.warn(`Not caching towns for state ${stateFipsCode}: some lookups failed`)
-      return
+    if (missedTowns || !isComplete) {
+      console.warn(`Not caching towns for state ${state}: some lookups failed`)
+    } else {
+      // Keep the sites for the next game in this state
+      await writeCache(cacheName, built)
+      debug.log(`Cached town sites for state ${state}`)
     }
-
-    // Keep the sites for the next game in this state
-    await writeCache(cacheName, built)
-    debug.log(`Cached town sites for state ${stateFipsCode}`)
+    return { ...built, employment }
   }
 
   /**
@@ -311,20 +383,21 @@ export const useTownsStore = defineStore('towns', () => {
    * used to be placed.
    * @param {string} msaCode - The MSA's code
    * @param {string} msaName - Its name, as the Census Bureau writes it
-   * @returns {Promise<{lon: number, lat: number, name: string|null}|null>}
-   *   Where, and the city's name (null for the middle of the area); null if
-   *   neither can be found
+   * @returns {Promise<{lon: number, lat: number, name: string|null, stateFips: string|null}|null>}
+   *   Where, and the city's name and state (null for the middle of the
+   *   area); null if neither can be found
    * @throws When a lookup fails (see useTigerWeb.js)
    */
   async function placeTown(msaCode, msaName) {
     const city = await findPrincipalCity(msaName)
-    if (city) return { lon: city.lon, lat: city.lat, name: city.name }
+    if (city) return { lon: city.lon, lat: city.lat, name: city.name, stateFips: city.stateFips }
     const middle = await getMSALatLon(msaCode)
     if (!middle) return null
     return {
       lon: parseFloat(middle.centroidLongitude),
       lat: parseFloat(middle.centroidLatitude),
-      name: null
+      name: null,
+      stateFips: null
     }
   }
 
@@ -355,25 +428,52 @@ export const useTownsStore = defineStore('towns', () => {
   }
 
   /**
-   * What to do when the new sites cannot be had: play with the cached sites
-   * if there are any, with the industry data cached for the state, or else
-   * report the failure for the setup screen.
-   *
-   * @param {{dataWindow: Object, sites: Array}|null} saved - From `savedSites`
-   * @param {string} message - Player-facing explanation, when nothing is cached
+   * A state's cached sites, played with its cached industry data, whatever
+   * years each was built for: what a state falls back on when its new data
+   * cannot be had.
+   * @param {string} state - The state's FIPS code
+   * @param {{dataWindow: Object, sites: Array}} saved - From `savedSites`
+   * @returns {Promise<{dataWindow: Object, sites: Array, employment: Array}>}
+   */
+  async function playFromCache(state, saved) {
+    await industryStore.useIndustryData(state, saved.dataWindow, { anyWindow: true })
+    return {
+      dataWindow: saved.dataWindow,
+      sites: saved.sites,
+      employment: [...industryStore.employmentData]
+    }
+  }
+
+  /**
+   * Gives up on the towns: there are none to play with, and `error` says why
+   * for the setup screen.
+   * @param {string} message - Player-facing explanation
+   */
+  function fail(message) {
+    towns.value = []
+    setStep('')
+    error.value = message
+  }
+
+  /**
+   * Makes the game's towns from the board's states: their industry data put
+   * together (see `combineStates`), and their sites, an area crossing a
+   * line between two of them made one (see `mergeSites`). The game is
+   * played from the earliest of the states' years: the ones asked for, or,
+   * for a state that fell back on its cache, the years that was built for.
+   * @param {Array<{dataWindow: Object, sites: Array, employment: Array}>} states -
+   *   Each state's sites and industry data, and the years they are for
    * @param {Function} isOnBoard - The board's point test (see `regionTest`)
    */
-  async function fallBackTo(saved, message, isOnBoard) {
-    if (saved) {
-      await industryStore.useIndustryData(selectedState.value, saved.dataWindow, {
-        anyWindow: true
-      })
-      playSites(saved, isOnBoard)
-    } else {
-      towns.value = []
-      setStep('')
-      error.value = message
-    }
+  function playStates(states, isOnBoard) {
+    industryStore.combineStates(states.map(({ employment }) => employment))
+    const window = states
+      .map(({ dataWindow }) => dataWindow)
+      .reduce((earliest, next) => (next.end < earliest.end ? next : earliest))
+    playSites(
+      { dataWindow: window, sites: mergeSites(states.flatMap(({ sites }) => sites)) },
+      isOnBoard
+    )
   }
 
   /**
@@ -600,7 +700,6 @@ export const useTownsStore = defineStore('towns', () => {
    */
   function reset() {
     towns.value = []
-    selectedState.value = ''
     dataWindow.value = null
     error.value = null
     isLoadingIndustry.value = false

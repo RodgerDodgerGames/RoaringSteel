@@ -192,6 +192,29 @@ export const useIndustryStore = defineStore('qwiStore', () => {
     })
   }
 
+  /**
+   * Puts several states' industry data together, for a board of more than
+   * one state: each industry's employment in every area, from every state,
+   * with each industry's share of all the board's employment worked out
+   * again. An area that crosses a state line (Boston's reaches into New
+   * Hampshire) has its parts' employment added together.
+   *
+   * @param {Array<Array<Object>>} perState - Each state's `employmentData`,
+   *   as `useIndustryData` left it
+   */
+  function combineStates(perState) {
+    const byIndustry = new Map()
+    perState.flat().forEach(({ industry, level, meanEmp }) => {
+      const merged = byIndustry.get(industry) ?? { industry, level, meanEmp: {} }
+      Object.entries(meanEmp).forEach(([msaCode, emp]) => {
+        merged.meanEmp[msaCode] = (merged.meanEmp[msaCode] ?? 0) + emp
+      })
+      byIndustry.set(industry, merged)
+    })
+    employmentData.value = [...byIndustry.values()]
+    calculateAndAssignProportions()
+  }
+
   return {
     // STATE
     employmentData,
@@ -201,7 +224,8 @@ export const useIndustryStore = defineStore('qwiStore', () => {
     isLoadingQWI,
     progress,
     // ACTIONS
-    useIndustryData
+    useIndustryData,
+    combineStates
   }
 
   // HELPERS

@@ -39,7 +39,7 @@ vi.mock('@/composables/setup/useTigerWeb', () => ({
   findPrincipalCity: mockFindPrincipalCity
 }))
 
-import { useTownsStore } from '@/stores/towns'
+import { useTownsStore, mergeSites } from '@/stores/towns'
 import { useIndustryStore } from '@/stores/industry'
 import { RequestError } from '@/composables/utils'
 import { readCache, writeCache } from '@/composables/database'
@@ -616,6 +616,13 @@ describe('Towns Store', () => {
       expect(mockGetMSALatLon).not.toHaveBeenCalledWith('14460')
     })
 
+    it("should give a town its main city's state", async () => {
+      await townsStore.setupTowns('25')
+
+      // Counted in Massachusetts, but Providence is in Rhode Island
+      expect(townsStore.towns.find((town) => town.msa === '39300').stateCode).toBe('44')
+    })
+
     it('should leave off the board a town whose main city is outside it', async () => {
       await townsStore.setupTowns('25', easternMassachusetts)
 
@@ -659,6 +666,154 @@ describe('Towns Store', () => {
       await townsStore.setupTowns('37')
 
       expect(townsStore.towns[0].name).toBe('Winston-Salem')
+    })
+  })
+
+  describe('boards of several states', () => {
+    // Massachusetts and New Hampshire: Boston's area reaches into both, and
+    // each has a town of its own
+    const PEOPLE = {
+      25: [
+        {
+          msa_code: '14460',
+          name: 'Boston-Cambridge-Newton, MA-NH',
+          population: '4400000',
+          state_code: '25'
+        },
+        { msa_code: '49340', name: 'Worcester, MA', population: '860000', state_code: '25' }
+      ],
+      33: [
+        {
+          msa_code: '14460',
+          name: 'Boston-Cambridge-Newton, MA-NH',
+          population: '100000',
+          state_code: '33'
+        },
+        { msa_code: '31700', name: 'Manchester-Nashua, NH', population: '420000', state_code: '33' }
+      ]
+    }
+
+    beforeEach(() => {
+      // Each state's population, as asked for
+      mockFetchPopulationData.mockImplementation(async () => {
+        mockPopulationData.value = PEOPLE[mockUseCensus.mock.lastCall[0]]
+      })
+      // Each state's jobs: Boston's area has some in both
+      industryStore.useIndustryData = vi.fn(async (state) => {
+        industryStore.employmentData = [
+          {
+            industry: 111,
+            level: 3,
+            meanEmp: state === '25' ? { 14460: 900, 49340: 300 } : { 14460: 100, 31700: 400 }
+          }
+        ]
+      })
+    })
+
+    it("should make one town of an area in both states, with both parts' people", async () => {
+      await townsStore.setupTowns(['25', '33'])
+
+      expect(msaCodes(townsStore.towns).sort()).toEqual(['14460', '31700', '49340'])
+      expect(townsStore.towns.find((t) => t.msa === '14460').population).toBe(4500000)
+    })
+
+    it("should add up an area's jobs from both states", async () => {
+      await townsStore.setupTowns(['25', '33'])
+
+      expect(industryStore.employmentData[0].meanEmp).toEqual({
+        14460: 1000,
+        49340: 300,
+        31700: 400
+      })
+    })
+
+    it('should play each state from its own latest years, and the board from the earliest', async () => {
+      mockFetchDataWindow.mockImplementation(async (state) =>
+        state === '33' ? EARLIER_WINDOW : WINDOW
+      )
+
+      await townsStore.setupTowns(['25', '33'])
+
+      expect(industryStore.useIndustryData).toHaveBeenCalledWith('25', WINDOW)
+      expect(industryStore.useIndustryData).toHaveBeenCalledWith('33', EARLIER_WINDOW)
+      // The land cover is drawn from the board's window
+      expect(townsStore.dataWindow).toEqual(EARLIER_WINDOW)
+    })
+
+    it('should look up an area in two of the states once', async () => {
+      await townsStore.setupTowns(['25', '33'])
+
+      const bostonLookups = mockGetMSALatLon.mock.calls.filter(([msa]) => msa === '14460')
+      expect(bostonLookups).toHaveLength(1)
+    })
+
+    it('should play a state from its cache when its years cannot be looked up, and the rest as usual', async () => {
+      await writeCache('townSites_33', {
+        dataWindow: EARLIER_WINDOW,
+        sites: [{ ...CACHED_SITE, msa: '31700', stateCode: '33' }]
+      })
+      mockFetchDataWindow.mockImplementation(async (state) => {
+        if (state === '33') throw new Error('QWI year lookup failed: 500')
+        return WINDOW
+      })
+
+      await townsStore.setupTowns(['25', '33'])
+
+      expect(townsStore.error).toBeNull()
+      expect(msaCodes(townsStore.towns).sort()).toEqual(['14460', '31700', '49340'])
+    })
+
+    it("should keep each state's sites in its own cache", async () => {
+      await townsStore.setupTowns(['25', '33'])
+
+      expect((await readCache('townSites_25')).sites.map((site) => site.msa)).toEqual([
+        '14460',
+        '49340'
+      ])
+      expect((await readCache('townSites_33')).sites.map((site) => site.msa)).toEqual([
+        '14460',
+        '31700'
+      ])
+    })
+
+    it('should give up, naming the state, when one state has no towns and none cached', async () => {
+      PEOPLE[33] = []
+      try {
+        await townsStore.setupTowns(['25', '33'])
+      } finally {
+        PEOPLE[33] = [
+          {
+            msa_code: '14460',
+            name: 'Boston-Cambridge-Newton, MA-NH',
+            population: '100000',
+            state_code: '33'
+          },
+          {
+            msa_code: '31700',
+            name: 'Manchester-Nashua, NH',
+            population: '420000',
+            state_code: '33'
+          }
+        ]
+      }
+
+      expect(townsStore.towns).toEqual([])
+      expect(townsStore.error).toMatch(/New Hampshire's towns/)
+    })
+  })
+
+  describe('mergeSites', () => {
+    it('should make one site of an area from two states, and leave the rest alone', () => {
+      const sites = mergeSites([
+        { msa: '1', name: 'Boston', population: 10, lat: 42.3 },
+        { msa: '2', name: 'Worcester', population: 5, lat: 42.2 },
+        { msa: '1', name: 'Boston', population: 3, lat: 42.3 }
+      ])
+
+      expect(sites).toEqual([
+        { msa: '1', name: 'Boston', population: 13, lat: 42.3 },
+        { msa: '2', name: 'Worcester', population: 5, lat: 42.2 }
+      ])
     })
   })
 })

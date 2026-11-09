@@ -1,44 +1,54 @@
 <!--
   AreaSelectView.vue
+  Board selection screen where players choose the land for their game: a
+  single state, or a region of several (see useBoardChoices.js). The panel
+  above the map switches between the ways of choosing and shows the board
+  chosen; the map shows the boards on offer.
 
-  Region selection screen where players choose the geographic area
-  for their game. Displays a clickable map of US states and a panel
-  showing the selected region.
-
-  @emits play-game - When the player confirms their region selection
+  @emits play-game - When the player confirms their board
 -->
 
 <script setup>
+import { computed, onMounted } from 'vue'
 import AreaSelectMap from '@/components/setup/AreaSelectMap.vue'
 import AreaSelectPanel from '@/components/setup/AreaSelectPanel.vue'
 import { useGameStore } from '@/stores/game'
+import { useBoardChoices } from '@/composables/setup/useBoardChoices'
+import { boardKey } from '@/composables/setup/boards'
 
 const gameStore = useGameStore()
 const emit = defineEmits(['play-game'])
 
+const { groupings, grouping, boards, stateFeatures, error, load } = useBoardChoices()
+onMounted(load)
+
+/** The key of the board chosen, so the map can mark it */
+const selectedKey = computed(() => (gameStore.region ? boardKey(gameStore.region) : null))
+
 /**
- * Handles state selection from the map component.
- * Stores the selected region in the game store.
- * @param {Object} selectedState - GeoJSON feature of the selected state
+ * Makes a board the one the game is played on.
+ * @param {Object} board - The board's feature (see boards.js)
  */
-const handleStateClick = (selectedState) => {
-  gameStore.setRegion(selectedState)
+function handleSelect(board) {
+  gameStore.setRegion(board)
 }
 </script>
 
 <template>
   <div class="section">
-    <div class="fixed-grid has-1-cols">
-      <div class="grid">
-        <div class="cell">
-          <AreaSelectPanel :region="gameStore.region" @play-game="emit('play-game')" />
-        </div>
-        <div class="cell">
-          <AreaSelectMap @state-click="handleStateClick" />
-        </div>
-      </div>
-    </div>
+    <AreaSelectPanel
+      v-model:grouping="grouping"
+      :region="gameStore.region"
+      :groupings="groupings"
+      class="mb-4"
+      @play-game="emit('play-game')"
+    />
+    <p v-if="error" class="notification is-danger is-light">{{ error }}</p>
+    <AreaSelectMap
+      :boards="boards"
+      :state-features="stateFeatures"
+      :selected-key="selectedKey"
+      @select="handleSelect"
+    />
   </div>
 </template>
-
-<style scoped></style>

@@ -137,4 +137,62 @@ describe('Game Store', () => {
       expect(gameStore.turn).toBe(2)
     })
   })
+
+  describe('game settings', () => {
+    it('should let track start in any town in a new game until told otherwise', () => {
+      expect(gameStore.gameSettings).toEqual({ requireMajorCityStart: false })
+    })
+
+    it("should take only the game settings from the player's settings", () => {
+      gameStore.setGameSettings({ requireMajorCityStart: true, theme: 'dark', pinLimit: 2 })
+
+      expect(gameStore.gameSettings).toEqual({ requireMajorCityStart: true })
+    })
+
+    it("should keep its own copy, untouched by later changes to the player's settings", () => {
+      const settings = { requireMajorCityStart: true }
+      gameStore.setGameSettings(settings)
+
+      settings.requireMajorCityStart = false
+
+      expect(gameStore.gameSettings.requireMajorCityStart).toBe(true)
+    })
+
+    it('should go on playing a save made before game settings existed by the rules it was played by', () => {
+      // Track had to start in a major city then
+      gameStore.setGameState({ region: { name: 'Old' }, turn: 4 })
+
+      expect(gameStore.gameSettings).toEqual({ requireMajorCityStart: true })
+    })
+
+    it('should give a game setting a save does not know its default', () => {
+      gameStore.setGameState({ region: { name: 'Newer' }, settings: {} })
+
+      expect(gameStore.gameSettings).toEqual({ requireMajorCityStart: false })
+    })
+
+    it('should go back to the defaults on reset', () => {
+      gameStore.setGameSettings({ requireMajorCityStart: true })
+
+      gameStore.reset()
+
+      expect(gameStore.gameSettings.requireMajorCityStart).toBe(false)
+    })
+  })
+
+  describe('dismissed help', () => {
+    it('should remember each help screen dismissed, once', () => {
+      gameStore.dismissHelp('building')
+      gameStore.dismissHelp('removing')
+      gameStore.dismissHelp('building')
+
+      expect(gameStore.dismissedHelp).toEqual(['building', 'removing'])
+    })
+
+    it('should ignore anything in a save that is not a help screen name', () => {
+      gameStore.setGameState({ dismissedHelp: ['building', 7, null] })
+
+      expect(gameStore.dismissedHelp).toEqual(['building'])
+    })
+  })
 })

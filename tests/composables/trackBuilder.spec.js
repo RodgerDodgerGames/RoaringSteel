@@ -2,12 +2,14 @@
  * Track Builder Tests
  *
  * The one way track is built, with or without the map: by the player whose
- * turn it is, starting in a major city or at the end of their own track,
- * within the build rules, and paid for out of cash and the turn's allowance.
+ * turn it is, starting in a town (only a major city, if the game says so) or
+ * at the end of their own track, within the build rules, and paid for out of
+ * cash and the turn's allowance.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { useTrackBuilder, START_RULE } from '@/composables/trackBuilder'
+import { useTrackBuilder } from '@/composables/trackBuilder'
+import { startRuleMessage } from '@/composables/startRule'
 import { usePlayerStore } from '@/stores/players'
 import { useGameStore } from '@/stores/game'
 import { useGridStore } from '@/stores/grid'
@@ -103,18 +105,39 @@ describe('useTrackBuilder', () => {
     )
   })
 
-  it('should not start a section in a town that is not a major city', () => {
+  it('should start a section in a town that is not a major city, when the game allows it', () => {
+    expect(builder.buildSection(ANN, [centerOf(5), centerOf(3)]).ok).toBe(true)
+  })
+
+  it('should not start a section in a town that is not a major city, when the game says so', () => {
+    useGameStore().setGameSettings({ requireMajorCityStart: true })
+
     expect(builder.buildSection(ANN, [centerOf(5), centerOf(3)])).toEqual({
       ok: false,
-      error: START_RULE
+      error: startRuleMessage(true)
     })
     expect(trackStore.segments).toEqual([])
+  })
+
+  it('should still start a section in a major city when the game says so', () => {
+    useGameStore().setGameSettings({ requireMajorCityStart: true })
+
+    expect(builder.buildSection(ANN, [centerOf(0), centerOf(2)]).ok).toBe(true)
+  })
+
+  it('should not start a section away from any town or track of their own', () => {
+    expect(builder.buildSection(ANN, [centerOf(2), centerOf(4)])).toEqual({
+      ok: false,
+      error: startRuleMessage(false)
+    })
   })
 
   it("should not start a section at the end of another player's track", () => {
     trackStore.addSegment({ ownerId: BO, coordinates: [centerOf(0), centerOf(2)] })
 
-    expect(builder.buildSection(ANN, [centerOf(2), centerOf(4)]).error).toBe(START_RULE)
+    expect(builder.buildSection(ANN, [centerOf(2), centerOf(4)]).error).toBe(
+      startRuleMessage(false)
+    )
   })
 
   it("should not build on another player's turn", () => {
@@ -194,9 +217,17 @@ describe('useTrackBuilder', () => {
   })
 
   describe('startPoints', () => {
-    it("should be the major cities and the points of the player's own track", () => {
+    it("should be every town and the points of the player's own track", () => {
       trackStore.addSegment({ ownerId: ANN, coordinates: [centerOf(2), centerOf(3)] })
-      trackStore.addSegment({ ownerId: BO, coordinates: [centerOf(4), centerOf(5)] })
+      trackStore.addSegment({ ownerId: BO, coordinates: [centerOf(1), centerOf(4)] })
+
+      expect(builder.startPoints(ANN)).toEqual([centerOf(0), centerOf(5), centerOf(2), centerOf(3)])
+    })
+
+    it("should be the major cities and the points of the player's own track when the game says so", () => {
+      useGameStore().setGameSettings({ requireMajorCityStart: true })
+      trackStore.addSegment({ ownerId: ANN, coordinates: [centerOf(2), centerOf(3)] })
+      trackStore.addSegment({ ownerId: BO, coordinates: [centerOf(1), centerOf(4)] })
 
       expect(builder.startPoints(ANN)).toEqual([centerOf(0), centerOf(2), centerOf(3)])
     })

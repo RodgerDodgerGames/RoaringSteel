@@ -3,8 +3,10 @@
  *
  * Building track into a town costs a fee by the town's size, paid the first
  * time the player's track reaches it: when a line has a point on the town.
- * The town a line starts from, towns the player's track already reaches, and
- * towns a line only passes near are not charged. Tearing a section up gives
+ * A line starting in a town pays for it too — a network may start in any
+ * town, and the town would otherwise be joined for free — but starting out
+ * of a major city is free, as in Empire Builder. Towns the player's track
+ * already reaches, and towns a line only passes near, are not charged. Tearing a section up gives
  * back its entry fees, except for a town the player's other track still
  * reaches.
  */
@@ -33,11 +35,33 @@ describe('entryFees', () => {
   })
 
   it('should charge a major city the major city fee', () => {
-    expect(entryFees([on(little), on(big)], towns, NOTHING_REACHED)).toBe(gameRules.townEntry.large)
+    expect(entryFees([on(middling), on(big)], towns, NOTHING_REACHED)).toBe(
+      gameRules.townEntry.medium + gameRules.townEntry.large
+    )
   })
 
-  it('should not charge for the town the line starts from', () => {
+  it('should not charge for a major city the line starts from', () => {
     expect(entryFees([on(big), { lat: 0.5, lng: 0.5 }], towns, NOTHING_REACHED)).toBe(0)
+  })
+
+  it('should charge for a smaller town the line starts from', () => {
+    // Otherwise a line started there and run back to the player's own track
+    // would join the town for nothing
+    expect(entryFees([on(little), { lat: 0.5, lng: 1.5 }], towns, NOTHING_REACHED)).toBe(
+      gameRules.townEntry.small
+    )
+  })
+
+  it("should not charge for a town the line starts from that the player's track reaches already", () => {
+    const reached = new Set([pointKey(on(little))])
+
+    expect(entryFees([on(little), { lat: 0.5, lng: 1.5 }], towns, reached)).toBe(0)
+  })
+
+  it('should charge a smaller town once when the line starts from it and comes back to it', () => {
+    expect(entryFees([on(little), on(middling), on(little)], towns, NOTHING_REACHED)).toBe(
+      gameRules.townEntry.small + gameRules.townEntry.medium
+    )
   })
 
   it("should not charge for a town the player's track reaches already", () => {

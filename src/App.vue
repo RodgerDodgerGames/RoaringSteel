@@ -16,6 +16,7 @@ import { useTownsStore } from '@/stores/towns'
 import { useGridStore } from '@/stores/grid'
 import { useDemandCardsStore } from '@/stores/demandCards'
 import { usePlayerStore } from '@/stores/players'
+import { useSettingsStore } from '@/stores/settings'
 
 // import composables
 import { useGamePersistence } from '@/composables/useGamePersistence'
@@ -30,6 +31,7 @@ const gameStore = useGameStore()
 const gridStore = useGridStore()
 const demandCardsStore = useDemandCardsStore()
 const playerStore = usePlayerStore()
+const settingsStore = useSettingsStore()
 
 // setup composables
 const { autoSave, startNewGame } = useGamePersistence()
@@ -96,6 +98,9 @@ async function handlePlayGameClick() {
   // Ask the browser to keep the saves and grids. Not waited for: Firefox
   // asks the player, and setup should not sit behind the question.
   keepStorage()
+
+  // The game is played by the game settings chosen for it, fixed from here
+  gameStore.setGameSettings(settingsStore.settings)
 
   try {
     // run setup towns after the region is selected

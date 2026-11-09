@@ -2,12 +2,14 @@
   DisplaySettings.vue
 
   The display settings, as form fields: how the game looks and what it shows,
-  none of which changes how it is played. Used by the Settings dialog.
+  none of which changes how it is played. Used by the Settings dialog and the
+  Confirm Setup screen.
 
-  It edits the draft it is bound to with v-model (see useSettingsDraft.js),
-  never the saved settings: the dialog decides when the draft is saved. The
-  fields change the draft object's own properties, in place, rather than
-  handing back a new object, so the dialog's draft is always the one
+  It edits the object it is bound to with v-model: in the Settings dialog a
+  draft (see useSettingsDraft.js), which the dialog saves or throws away; on
+  the Confirm Setup screen the settings themselves, as there is no Save
+  there. The fields change the object's own properties, in place, rather
+  than handing back a new object, so the object bound is always the one
   edited.
 
   @model - The settings being edited, changed in place
@@ -50,6 +52,19 @@ const themes = [
       </button>
     </div>
     <p class="help">System follows your computer's light or dark setting.</p>
+  </div>
+
+  <div class="field">
+    <div class="control">
+      <label class="checkbox">
+        <input v-model="draft.showHelp" type="checkbox" />
+        Show help screens
+      </label>
+    </div>
+    <p class="help">
+      The banners over the map that explain building, removing track and choosing a town. Each has a
+      "Don't show again" button that hides it for the rest of the game.
+    </p>
   </div>
 
   <div class="field">

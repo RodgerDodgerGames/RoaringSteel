@@ -76,7 +76,11 @@ export function useGamePersistence() {
         region: gameStore.region,
         turn: gameStore.turn,
         // Null while the game is still on
-        winnerId: gameStore.winnerId
+        winnerId: gameStore.winnerId,
+        // The settings this game is played by, fixed when it started
+        settings: gameStore.gameSettings,
+        // The help banners dismissed for the rest of this game
+        dismissedHelp: gameStore.dismissedHelp
       },
       players: playerStore.players,
       mapView: {

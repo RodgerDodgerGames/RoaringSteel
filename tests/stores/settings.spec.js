@@ -10,7 +10,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { setActivePinia, createPinia } from 'pinia'
-import { useSettingsStore, SETTINGS_STORAGE_KEY, DEFAULT_SETTINGS } from '@/stores/settings'
+import {
+  useSettingsStore,
+  SETTINGS_STORAGE_KEY,
+  DEFAULT_SETTINGS,
+  gameSettingsFrom
+} from '@/stores/settings'
 import { PIN_COLORS } from '@/config/demands'
 
 /**
@@ -117,6 +122,14 @@ describe('settings store', () => {
       expect(store.settings.showDeckCount).toBe(false)
     })
 
+    it("should keep this browser's choices for its next game, whatever the save's game was played by", () => {
+      const store = useSettingsStore()
+
+      store.applySettings({ requireMajorCityStart: true })
+
+      expect(store.settings.requireMajorCityStart).toBe(false)
+    })
+
     it("should keep this browser's theme, whatever theme the save was made in", () => {
       const store = useSettingsStore()
 
@@ -200,6 +213,21 @@ describe('settings store', () => {
       store.saveSettings({ pinLimit: 99, theme: 'sepia' })
 
       expect(store.settings).toEqual(DEFAULT_SETTINGS)
+    })
+  })
+
+  describe('gameSettingsFrom', () => {
+    it('should pick out just the game settings', () => {
+      expect(gameSettingsFrom({ requireMajorCityStart: true, theme: 'dark' })).toEqual({
+        requireMajorCityStart: true
+      })
+    })
+
+    it('should give a missing or unusable game setting its default', () => {
+      expect(gameSettingsFrom(undefined)).toEqual({ requireMajorCityStart: false })
+      expect(gameSettingsFrom({ requireMajorCityStart: 'yes' })).toEqual({
+        requireMajorCityStart: false
+      })
     })
   })
 })

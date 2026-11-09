@@ -22,6 +22,7 @@ import { useGamePersistence } from '@/composables/useGamePersistence'
 import { keepStorage } from '@/composables/database'
 import { debug } from '@/composables/debug'
 import { cellSizeFor } from '@/composables/boardScale'
+import { useTheme } from '@/composables/useTheme'
 
 // setup stores
 const townsStore = useTownsStore()
@@ -32,6 +33,8 @@ const playerStore = usePlayerStore()
 
 // setup composables
 const { autoSave, startNewGame } = useGamePersistence()
+// The page's light or dark colors follow the Theme setting from the start
+useTheme()
 
 // STATE
 

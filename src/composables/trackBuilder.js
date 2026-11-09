@@ -281,6 +281,7 @@ export function useTrackBuilder() {
   }
 
   return {
+    boardRules,
     buildRules,
     startPoints,
     canStartAt,

@@ -3,20 +3,20 @@
  */
 export const mapViewConfig = {
   /**
-   * How many pixels across a grid cell is at the Build view's closest zoom:
-   * enough to aim at one cell with a mouse (about a centimeter on screen).
-   * Zoom comes in whole levels, each doubling a cell's size, so the closest
-   * zoom is whichever puts a cell nearest this, about 23 to 45 pixels. Any
-   * closer would show less of the map and nothing new: a cell costs the same
-   * all the way across.
+   * How many pixels across a grid cell is at the Build view's closest zoom,
+   * at most. Zoom comes in whole levels, each doubling a cell's size, so the
+   * closest zoom is the closest whole level at which a cell is no bigger
+   * than this: between half this and this many pixels. Rounding down rather
+   * than to the nearest keeps more of the board, and so more of the towns
+   * near the one being built from, on screen.
    */
-  buildCellPixels: 32,
+  buildCellPixels: 10,
   /**
-   * How many zoom levels out from its closest the Build view may go. At
-   * three, a cell is an eighth of its closest size at the furthest: about
-   * four pixels. The whole region is seen in the Plan view.
+   * How many zoom levels out from its closest the Build view may go. At one,
+   * the Build view has two zooms, the further showing cells half as wide.
+   * The whole region is seen in the Plan view.
    */
-  buildZoomSteps: 3,
+  buildZoomSteps: 1,
   /**
    * How far past the edge of the region the Build view may pan, as a share of
    * the region's height and width. Enough to bring towns on the border away
@@ -54,4 +54,18 @@ export const waterStyleConfig = {
    * it to show more.
    */
   labelZoomOffset: 0
+}
+
+/**
+ * How bridges are drawn on finished track (see composables/map/bridges.js
+ * and BRIDGE_DECK_STYLE in trackStyles.js).
+ */
+export const bridgeStyleConfig = {
+  /**
+   * How long a river bridge is drawn, in grid cells. A river is a line, so
+   * track crosses it at a single point; the bridge is drawn this long,
+   * centered on the crossing, so it can be seen. (What it costs does not
+   * change: a river crossing is one price however it is drawn.)
+   */
+  riverBridgeCells: 2
 }

@@ -62,3 +62,34 @@ export const TIES_STYLE = {
   lineJoin: 'bevel',
   snapIgnore: true
 }
+
+/**
+ * A bridge's deck: where track crosses water, the ties give way to a solid
+ * dark deck as wide as the ties, so a bridge reads as a plain bar with the
+ * rail running along it (see bridges.js for where the bridges are). It is
+ * drawn above the ties, so it hides them, and below the rail. Butt caps:
+ * the deck ends square, at its posts.
+ */
+export const BRIDGE_DECK_STYLE = {
+  color: TRACK_EDGE_COLOR,
+  weight: TIES_STYLE.weight,
+  opacity: 1,
+  lineCap: 'butt',
+  lineJoin: 'round',
+  snapIgnore: true
+}
+
+/**
+ * A bridge's posts: a round post at each end of the deck, a little wider
+ * than it, marking where the bridge leaves the bank. Drawn as Leaflet circle
+ * markers, whose radius is in screen pixels, so they keep their size at
+ * every zoom as the deck's width does.
+ */
+export const BRIDGE_POST_STYLE = {
+  radius: TIES_STYLE.weight / 2 + 1.5,
+  color: TRACK_EDGE_COLOR,
+  weight: 0,
+  fillColor: TRACK_EDGE_COLOR,
+  fillOpacity: 1,
+  snapIgnore: true
+}

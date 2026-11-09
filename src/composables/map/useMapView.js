@@ -29,6 +29,7 @@ import {
   BUILD_VIEW,
   PLAN_VIEW,
   buildViewStart,
+  buildViewAt,
   buildZoomRange,
   panLimits,
   regionBounds
@@ -105,19 +106,25 @@ export function useMapView() {
     fitRegion()
   }
 
-  /** Reopens the Build view where it was left, within its limits */
+  /**
+   * Reopens the Build view where it was left, within its limits, or over the
+   * point it was sent to (the map store's `buildFocus`, see `buildViewAt`).
+   */
   function showBuild() {
     const range = buildRange()
     // Measured while zoom may still fall between whole levels, so it is the
     // Plan view's exact zoom (the first opening is one level closer than it)
     const planZoom = map.getBoundsZoom(bounds.value, false, planPaddingTotal())
     map.options.zoomSnap = 1
-    const { zoom, center } = buildViewStart(
-      { zoom: mapStore.mapZoom, center: mapStore.mapCenter },
-      bounds.value,
-      planZoom,
-      range
-    )
+    const { zoom, center } = mapStore.buildFocus
+      ? buildViewAt(mapStore.buildFocus, mapStore.mapZoom, range)
+      : buildViewStart(
+          { zoom: mapStore.mapZoom, center: mapStore.mapCenter },
+          bounds.value,
+          planZoom,
+          range
+        )
+    mapStore.clearBuildFocus()
     // Moved into place before the limits go on, so the limits never push
     // the map somewhere on the way
     map.setView(center, zoom, { animate: false })

@@ -12,8 +12,9 @@ import {
   panLimits,
   buildViewStart,
   buildZoomRange,
-  planPopupOffset
+  buildViewAt
 } from '@/composables/map/mapViews'
+import { metersPerPixel } from '@/composables/setup/useElevationTiles'
 
 /** A Colorado-shaped rectangle: 37–41°N, 109–102°W */
 const colorado = {
@@ -60,9 +61,17 @@ describe('mapViews', () => {
   })
 
   describe('buildZoomRange', () => {
-    it('should put a cell nearest 32 pixels across at the closest zoom', () => {
-      // A 1 km cell at the equator is 32 px across at zoom 12.03
-      expect(buildZoomRange(1, 0)).toEqual({ min: 9, max: 12 })
+    it('should stop at the closest zoom that draws a cell no more than 10 pixels across', () => {
+      // A 1 km cell at the equator is 10 px across at zoom 10.61. Zoom 11
+      // would be nearer, but draws it 13 px across; zoom 10 draws it 6.5 px.
+      // The furthest zoom is one level out from that.
+      expect(buildZoomRange(1, 0)).toEqual({ min: 9, max: 10 })
+    })
+
+    it('should keep a zoom that draws a cell exactly 10 pixels across', () => {
+      // Zoom 10 draws a cell this wide exactly 10 px across at the equator
+      const exactKm = (10 * metersPerPixel(10, 0)) / 1000
+      expect(buildZoomRange(exactKm, 0).max).toBe(10)
     })
 
     it('should go one zoom closer for cells half the size', () => {
@@ -157,48 +166,17 @@ describe('mapViews', () => {
     })
   })
 
-  describe('planPopupOffset', () => {
-    /** A popup the size of a small town's: name, size and one industry */
-    const popup = { width: 110, height: 140 }
-    /** A desktop-sized map */
-    const mapSize = { x: 1100, y: 700 }
-
-    it("should leave a popup above its town, as Leaflet places it, when there's room", () => {
-      expect(planPopupOffset(popup, { x: 550, y: 400 }, mapSize)).toEqual({
-        offset: [0, 7],
-        showTip: true
-      })
+  describe('buildViewAt', () => {
+    it('should open over the point at the zoom the Build view was left at', () => {
+      expect(buildViewAt([39.7, -105], 8, RANGE)).toEqual({ zoom: 8, center: [39.7, -105] })
     })
 
-    it('should drop a popup below a town near the top of the map, clear of its name', () => {
-      const { offset, showTip } = planPopupOffset(popup, { x: 550, y: 60 }, mapSize)
-
-      // Its top edge (offset less the popup's height and Leaflet's 20px tip
-      // space) lands 34px below the town: past the dot and the name under it
-      expect(offset).toEqual([0, 34 + 140 + 20])
-      // A tip on the bottom edge would point away from the town
-      expect(showTip).toBe(false)
+    it('should open at the closest zoom when the Build view has not been left anywhere', () => {
+      expect(buildViewAt([39.7, -105], null, RANGE)).toEqual({ zoom: 9, center: [39.7, -105] })
     })
 
-    it('should slide a popup right, off the left edge of the map', () => {
-      const { offset, showTip } = planPopupOffset(popup, { x: 20, y: 400 }, mapSize)
-
-      // Its left edge would be at 20 - 55 = -35; it is kept 8px in
-      expect(offset).toEqual([43, 7])
-      expect(showTip).toBe(false)
-    })
-
-    it('should slide a popup left, off the right edge of the map', () => {
-      expect(planPopupOffset(popup, { x: 1090, y: 400 }, mapSize).offset).toEqual([-53, 7])
-    })
-
-    it('should put a popup on whichever side has more room when it fits neither', () => {
-      const short = { x: 1100, y: 200 }
-
-      // Nearer the bottom: more room above, though not enough
-      expect(planPopupOffset(popup, { x: 550, y: 150 }, short).offset[1]).toBe(7)
-      // Nearer the top: more room below
-      expect(planPopupOffset(popup, { x: 550, y: 40 }, short).offset[1]).toBe(194)
+    it('should open at the closest zoom when left at a zoom the Build view no longer goes to', () => {
+      expect(buildViewAt([39.7, -105], 3, RANGE).zoom).toBe(9)
     })
   })
 })

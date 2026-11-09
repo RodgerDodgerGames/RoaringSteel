@@ -196,6 +196,29 @@ describe('Map Store', () => {
     })
   })
 
+  describe('showInBuildView', () => {
+    it('should switch to the Build view, to open over the point', () => {
+      mapStore.showInBuildView([39.74, -104.99])
+
+      expect(mapStore.viewMode).toBe(BUILD_VIEW)
+      expect(mapStore.buildFocus).toEqual([39.74, -104.99])
+    })
+
+    it('should drop the point on going back to the Plan view, so a later switch reopens where the player left off', () => {
+      mapStore.showInBuildView([39.74, -104.99])
+      mapStore.setViewMode(PLAN_VIEW)
+
+      expect(mapStore.buildFocus).toBeNull()
+    })
+
+    it('should drop the point once it has been used', () => {
+      mapStore.showInBuildView([39.74, -104.99])
+      mapStore.clearBuildFocus()
+
+      expect(mapStore.buildFocus).toBeNull()
+    })
+  })
+
   describe('State Independence', () => {
     it('should maintain all states independently', () => {
       const mockMap = { id: 'map' }

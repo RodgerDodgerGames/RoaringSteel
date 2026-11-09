@@ -1,7 +1,8 @@
 /**
  * useTigerWeb Composable Tests
  *
- * Tests for TigerWeb API integration (MSA coordinates)
+ * Tests for TigerWeb API integration: where a town goes, at its area's main
+ * city (found from the area's name), or else the middle of the area.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -20,7 +21,12 @@ vi.mock('@/composables/utils', async (importOriginal) => {
   }
 })
 
-import getMSALatLon from '@/composables/setup/useTigerWeb'
+import getMSALatLon, {
+  parseCbsaName,
+  cityCandidates,
+  pickPlace,
+  findPrincipalCity
+} from '@/composables/setup/useTigerWeb'
 import { isRefusal } from '@/composables/utils'
 
 describe('useTigerWeb (getMSALatLon)', () => {
@@ -290,5 +296,134 @@ describe('useTigerWeb (getMSALatLon)', () => {
       expect(calls[0][0]).toContain('33460')
       expect(calls[1][0]).toContain('34820')
     })
+  })
+})
+
+describe('parseCbsaName', () => {
+  it("should read the cities and states from an area's name", () => {
+    expect(
+      parseCbsaName('Boston-Cambridge-Newton, MA-NH Metro Area (part); Massachusetts')
+    ).toEqual({ cities: ['Boston', 'Cambridge', 'Newton'], states: ['MA', 'NH'] })
+  })
+
+  it('should read an area with one city in one state', () => {
+    expect(parseCbsaName('Pittsfield, MA Metro Area')).toEqual({
+      cities: ['Pittsfield'],
+      states: ['MA']
+    })
+  })
+})
+
+describe('cityCandidates', () => {
+  it('should try a city with a hyphen in its own name', () => {
+    expect(cityCandidates(['Winston', 'Salem'])).toEqual(['Winston', 'Winston-Salem'])
+  })
+
+  it('should try the part of a city joined to its county before the slash', () => {
+    expect(cityCandidates(['Louisville/Jefferson County'])).toEqual([
+      'Louisville',
+      'Louisville/Jefferson County'
+    ])
+  })
+
+  it('should try at most the first three pieces', () => {
+    expect(cityCandidates(['A', 'B', 'C', 'D'])).toEqual(['A', 'A-B', 'A-B-C'])
+  })
+})
+
+describe('pickPlace', () => {
+  it('should prefer the place named exactly as the longest candidate', () => {
+    const places = [{ BASENAME: 'Winston' }, { BASENAME: 'Winston-Salem' }]
+    expect(pickPlace(places, ['Winston', 'Winston-Salem'])).toEqual({ BASENAME: 'Winston-Salem' })
+  })
+
+  it("should take a place whose name only starts with the city's when none is exact", () => {
+    const nashville = { BASENAME: 'Nashville-Davidson metropolitan government (balance)' }
+    expect(pickPlace([nashville], ['Nashville', 'Nashville-Davidson'])).toBe(nashville)
+  })
+
+  it('should find nothing among no places', () => {
+    expect(pickPlace([], ['Boston'])).toBeNull()
+  })
+})
+
+describe('findPrincipalCity', () => {
+  /** An answer from the places service with these places */
+  const answer = (places) => ({
+    ok: true,
+    json: async () => ({ features: places.map((attributes) => ({ attributes })) })
+  })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("should find the main city in its state, at the city's point", async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        answer([
+          { BASENAME: 'Boston', STATE: '25', INTPTLON: '-071.0135134', INTPTLAT: '+42.3327346' }
+        ])
+      )
+      .mockResolvedValue(answer([]))
+
+    const city = await findPrincipalCity('Boston-Cambridge-Newton, MA-NH Metro Area')
+
+    expect(city).toEqual({ lon: -71.0135134, lat: 42.3327346, name: 'Boston', stateFips: '25' })
+    const where = new URL(mockFetch.mock.calls[0][0]).searchParams.get('where')
+    expect(where).toContain("STATE IN ('25','33')")
+  })
+
+  it('should take the city in the state named first, when more than one has it', async () => {
+    mockFetch.mockResolvedValueOnce(
+      answer([
+        { BASENAME: 'Texarkana', STATE: '05', INTPTLON: '-94.0', INTPTLAT: '33.4' },
+        { BASENAME: 'Texarkana', STATE: '48', INTPTLON: '-94.1', INTPTLAT: '33.4' }
+      ])
+    )
+    mockFetch.mockResolvedValue(answer([]))
+
+    const city = await findPrincipalCity('Texarkana, TX-AR Metro Area')
+
+    expect(city.stateFips).toBe('48')
+  })
+
+  it('should take an exactly named census designated place over a place only starting with its name', async () => {
+    // Incorporated places first: only one whose name starts the same way
+    mockFetch
+      .mockResolvedValueOnce(
+        answer([{ BASENAME: 'Urban Honolulu Heights', STATE: '15', INTPTLON: '-1', INTPTLAT: '1' }])
+      )
+      .mockResolvedValueOnce(
+        answer([{ BASENAME: 'Urban Honolulu', STATE: '15', INTPTLON: '-157.8', INTPTLAT: '21.3' }])
+      )
+
+    const city = await findPrincipalCity('Urban Honolulu, HI Metro Area')
+
+    expect(city).toMatchObject({ name: 'Urban Honolulu', lon: -157.8 })
+  })
+
+  it('should ask each kind of place once, for every named state together', async () => {
+    mockFetch.mockResolvedValue(answer([]))
+
+    await findPrincipalCity('Philadelphia-Camden-Wilmington, PA-NJ-DE-MD Metro Area')
+
+    expect(mockFetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('should find nothing when no state has the city', async () => {
+    mockFetch.mockResolvedValue(answer([]))
+
+    expect(await findPrincipalCity('Nowhere, MA Micro Area')).toBeNull()
+  })
+
+  it('should quote a name with an apostrophe the way the query needs', async () => {
+    mockFetch.mockResolvedValue(answer([]))
+
+    await findPrincipalCity("Coeur d'Alene, ID Metro Area")
+
+    expect(decodeURIComponent(mockFetch.mock.calls[0][0].replaceAll('+', ' '))).toContain(
+      "'Coeur d''Alene'"
+    )
   })
 })

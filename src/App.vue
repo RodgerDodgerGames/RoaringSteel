@@ -104,7 +104,8 @@ async function handlePlayGameClick() {
 
   try {
     // run setup towns after the region is selected
-    await townsStore.setupTowns(region.value.properties.STATE)
+    // Towns whose main city is off the board are left out
+    await townsStore.setupTowns(region.value.properties.STATE, region.value)
     // Leave the modal up on failure, as for the grid below: it shows the
     // error and offers a retry
     if (townsStore.error) return

@@ -38,7 +38,7 @@ const DB_NAME = 'roaring-steel'
  * state, cell size and year alone, so a grid built the old way would
  * otherwise go on being used.
  */
-const DB_VERSION = 3
+const DB_VERSION = 4
 
 /** How many autosaves are kept; the oldest goes when another is added */
 export const MAX_AUTOSAVES = 3
@@ -75,7 +75,8 @@ function openDatabase() {
         // state's grid at one cell size sits together and can be listed at
         // once.
         db.createObjectStore('grids', { keyPath: ['state', 'cellSize', 'landCoverYear'] })
-        // Towns and industry data, each under a name such as "towns_27"
+        // Town sites and industry data, each under a name such as
+        // "townSites_27"
         db.createObjectStore('caches')
       }
       if (oldVersion >= 1 && oldVersion < 3) {
@@ -86,6 +87,19 @@ function openDatabase() {
         // game's water data, keeps the sea on the board, and prices the land
         // cover's open water as ground.
         transaction.objectStore('grids').clear()
+      }
+      if (oldVersion >= 1 && oldVersion < 4) {
+        // Version 4 (2026-11-06) keeps each state's town sites
+        // ("townSites_27") rather than its finished towns ("towns_27"),
+        // which nothing reads now, so those go
+        const caches = transaction.objectStore('caches')
+        caches
+          .getAllKeys()
+          .then((keys) =>
+            keys
+              .filter((key) => String(key).startsWith('towns_'))
+              .forEach((key) => caches.delete(key))
+          )
       }
     }
   })
@@ -202,7 +216,7 @@ export async function getGridYears(state, cellSize) {
 /**
  * What is kept under a name in the caches. A database that cannot be read
  * counts as keeping nothing: the data is fetched afresh instead.
- * @param {string} name - Such as "towns_27"
+ * @param {string} name - Such as "townSites_27"
  * @returns {Promise<*>} What was kept, or undefined
  */
 export async function readCache(name) {
@@ -218,7 +232,7 @@ export async function readCache(name) {
  * Keeps data under a name in the caches, replacing what was there. Data that
  * cannot be kept is only fetched again next time, so a failure is logged and
  * not passed on.
- * @param {string} name - Such as "towns_27"
+ * @param {string} name - Such as "townSites_27"
  * @param {*} value - JSON-safe data; reactive store state is fine (see `plain`)
  * @returns {Promise<void>}
  */

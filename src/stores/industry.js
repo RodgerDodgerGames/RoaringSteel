@@ -42,9 +42,6 @@ export const useIndustryStore = defineStore('qwiStore', () => {
   /** Industry definitions loaded from CSV (naics_code, label, ind_level) */
   const industries = ref([])
 
-  /** List of MSA codes found in the employment data */
-  const MSAs = ref([])
-
   /**
    * NAICS codes of the industries whose QWI request failed in the last fetch,
    * even after a few tries. They are missing from `employmentData`, and the
@@ -59,6 +56,12 @@ export const useIndustryStore = defineStore('qwiStore', () => {
 
   /** Loading state for QWI API data fetching */
   const isLoadingQWI = ref(false)
+
+  /**
+   * How far the QWI fetch has got, for the setup screen: industries fetched
+   * so far, out of how many. Zero of zero when nothing is being fetched.
+   */
+  const progress = ref({ done: 0, total: 0 })
 
   // ACTIONS
 
@@ -75,11 +78,18 @@ export const useIndustryStore = defineStore('qwiStore', () => {
    * (see `failedIndustries`): a game can be played without it, but should not
    * be stuck without it for the rest of the window.
    *
+   * When the data window could not be looked up at all (the Census Bureau's
+   * API is down), the game is played from what is cached, whatever window it
+   * was built for: `anyWindow` takes the cache as it is, and fetches nothing.
+   *
    * @param {string} stateFipsCode - Two-digit FIPS code (e.g. "27" for Minnesota)
    * @param {{start: number, end: number}} dataWindow - The years to average over
+   * @param {Object} [options]
+   * @param {boolean} [options.anyWindow] - Use the cache whatever window it
+   *   was built for, and fetch nothing if there is none
    * @returns {Promise<void>}
    */
-  async function useIndustryData(stateFipsCode, dataWindow) {
+  async function useIndustryData(stateFipsCode, dataWindow, { anyWindow = false } = {}) {
     debug.log('useIndustryData called with stateFipsCode:', stateFipsCode)
 
     // Each state's industry data is kept under its own name, along with the
@@ -90,21 +100,22 @@ export const useIndustryStore = defineStore('qwiStore', () => {
     failedIndustries.value = []
 
     // Load cached data if available
-    if (
-      cached?.employmentData?.length > 0 &&
-      cached.dataWindow?.start === dataWindow.start &&
-      cached.dataWindow?.end === dataWindow.end
-    ) {
+    const hasCache = cached?.employmentData?.length > 0
+    const isSameWindow =
+      cached?.dataWindow?.start === dataWindow?.start && cached?.dataWindow?.end === dataWindow?.end
+    if (hasCache && (anyWindow || isSameWindow)) {
       industries.value = cached.industries
       employmentData.value = cached.employmentData
-      MSAs.value = cached.MSAs
+      return
+    }
+    if (anyWindow) {
+      employmentData.value = []
       return
     }
 
     // Start from nothing. The fetch below adds to these, and they may still
     // hold an earlier game's state, or an earlier window's numbers.
     employmentData.value = []
-    MSAs.value = []
 
     // load the industry data from the CSV file
     isLoadingCSV.value = true
@@ -119,7 +130,9 @@ export const useIndustryStore = defineStore('qwiStore', () => {
 
     // iterate over each industry and fetch the QWI data
     isLoadingQWI.value = true
+    progress.value = { done: 0, total: industries.value.length }
     for (const industry of industries.value) {
+      progress.value = { ...progress.value, done: progress.value.done + 1 }
       debug.log('Fetching QWI data for industry:', industry)
 
       // fetch the QWI data for the industry
@@ -175,8 +188,7 @@ export const useIndustryStore = defineStore('qwiStore', () => {
     await writeCache(cacheName, {
       dataWindow: { start: dataWindow.start, end: dataWindow.end },
       industries: industries.value,
-      employmentData: employmentData.value,
-      MSAs: MSAs.value
+      employmentData: employmentData.value
     })
   }
 
@@ -184,10 +196,10 @@ export const useIndustryStore = defineStore('qwiStore', () => {
     // STATE
     employmentData,
     industries,
-    MSAs,
     failedIndustries,
     isLoadingCSV,
     isLoadingQWI,
+    progress,
     // ACTIONS
     useIndustryData
   }
@@ -232,11 +244,6 @@ export const useIndustryStore = defineStore('qwiStore', () => {
   function calculateAverageEmployment(data) {
     const employment = data.reduce((acc, row) => {
       const msaCode = row.msa_code
-
-      // add msacode to MSAs if it doesn't exist
-      if (!MSAs.value.includes(msaCode)) {
-        MSAs.value.push(msaCode)
-      }
 
       // if row.Emp is null count it as zero
       const emp = parseInt(row.Emp) || 0

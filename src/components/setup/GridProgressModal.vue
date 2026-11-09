@@ -17,7 +17,8 @@
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useGridStore } from '@/stores/grid'
-import { useTownsStore } from '@/stores/towns'
+import { useTownsStore, SETUP_STEPS } from '@/stores/towns'
+import { useIndustryStore } from '@/stores/industry'
 
 defineProps({
   isActive: {
@@ -31,7 +32,12 @@ defineEmits(['retry', 'cancel'])
 const gridStore = useGridStore()
 const { currentPhase, progressPercent, elevationProgress, landCoverProgress } =
   storeToRefs(gridStore)
-const { error: townsError } = storeToRefs(useTownsStore())
+const {
+  error: townsError,
+  setupStep: townsStep,
+  setupMessage: townsMessage
+} = storeToRefs(useTownsStore())
+const { progress: industryProgress } = storeToRefs(useIndustryStore())
 
 // Towns are set up first, so at most one of the two has failed
 const error = computed(() => townsError.value || gridStore.error)
@@ -39,16 +45,32 @@ const error = computed(() => townsError.value || gridStore.error)
 const phaseLabel = computed(() => {
   switch (currentPhase.value) {
     case 'initializing':
-      return 'Initializing grid...'
+      return 'Initializing grid…'
     case 'elevation':
-      return 'Fetching elevation data...'
+      return 'Fetching elevation data…'
     case 'landcover':
-      return 'Fetching land cover data...'
+      return 'Fetching land cover data…'
     case 'calculating':
-      return 'Calculating terrain costs...'
+      return 'Calculating terrain costs…'
     default:
-      return 'Preparing game...'
+      return townsStepLabel.value
   }
+})
+
+/**
+ * What the town setup is doing, before the grid starts: the towns store's
+ * message, with a count of the industries while the jobs data comes in (the
+ * industry store counts them; none are counted when they come from the
+ * cache). Between steps, a general word.
+ */
+const townsStepLabel = computed(() => {
+  const message = townsMessage.value
+  if (!message) return 'Preparing game…'
+  const { done, total } = industryProgress.value
+  if (townsStep.value === SETUP_STEPS.industry && total > 0) {
+    return `Fetching jobs by industry (${done} of ${total})…`
+  }
+  return message
 })
 
 // Town and demand card setup runs before the grid store reports any phase.

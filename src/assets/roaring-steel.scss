@@ -104,44 +104,55 @@ $timetable-paper: #f1e6cf; // the panels, and light (drawn a shade deeper)
   --timetable-paper: #{$timetable-paper};
 }
 
-// Dark mode, which follows the computer's own light/dark setting. Bulma
-// already has a dark theme; these lines give it the Western Line look:
-// coal-black panels, paper-colored text, and each named color lifted so it
-// still reads on the dark panels. A color keeps its hue from section 1 and
-// only its lightness changes: `-l` is the color of a filled button, and
-// `-on-scheme-l` is the color of text and outlines drawn on a panel.
-// The top bar and the town shapes look the same in both modes.
+// Dark mode. Bulma already has a dark theme; these lines give it the
+// Western Line look: coal-black panels, paper-colored text, and each named
+// color lifted so it still reads on the dark panels. A color keeps its hue
+// from section 1 and only its lightness changes: `-l` is the color of a
+// filled button, and `-on-scheme-l` is the color of text and outlines drawn
+// on a panel. The top bar and the town shapes look the same in both modes.
+@mixin western-dark {
+  // Panels: coal night, #1f1a16, with raised panels at #28211c
+  --bulma-scheme-h: 26;
+  --bulma-scheme-s: 17%;
+  --bulma-scheme-main-l: 10%;
+  --bulma-scheme-main-bis-l: 13%;
+  --bulma-scheme-main-ter-l: 16%;
+  --bulma-background-l: 13%;
+  --bulma-border-weak-l: 20%;
+  --bulma-border-l: 26%;
+
+  // Text: paper, #eadcc0. The weak text, dust, is a grayer brown than the
+  // paper's hue allows, so it is set outright.
+  --bulma-text-h: 40;
+  --bulma-text-s: 52%;
+  --bulma-text-l: 83%;
+  --bulma-text-strong-l: 90%;
+  --bulma-text-title-l: 95%;
+  --bulma-text-weak: #a89880;
+
+  --bulma-primary-l: 40%; // #a13d2c, still dark enough for white text
+  --bulma-primary-on-scheme-l: 66%; // ember, for outlines and red text
+  --bulma-link-on-scheme-l: 64%; // #7fb0c8
+  --bulma-info-on-scheme-l: 56%; // #6f98b0
+  --bulma-success-on-scheme-l: 59%; // #7fae88
+  --bulma-warning-l: 56%; // #d9a043
+  --bulma-warning-on-scheme-l: 56%;
+  --bulma-danger-l: 46%; // buttons, about #c2472a, for white text
+  --bulma-danger-on-scheme-l: 59%; // #e46a47
+}
+
+// Which theme is shown is the player's Theme setting (see useTheme.js). On
+// "System" the page follows the computer's own light/dark setting; on
+// "Light" or "Dark" the page carries data-theme="light" or "dark", which
+// Bulma's own themes answer to as well.
 @media (prefers-color-scheme: dark) {
-  :root {
-    // Panels: coal night, #1f1a16, with raised panels at #28211c
-    --bulma-scheme-h: 26;
-    --bulma-scheme-s: 17%;
-    --bulma-scheme-main-l: 10%;
-    --bulma-scheme-main-bis-l: 13%;
-    --bulma-scheme-main-ter-l: 16%;
-    --bulma-background-l: 13%;
-    --bulma-border-weak-l: 20%;
-    --bulma-border-l: 26%;
-
-    // Text: paper, #eadcc0. The weak text, dust, is a grayer brown than the
-    // paper's hue allows, so it is set outright.
-    --bulma-text-h: 40;
-    --bulma-text-s: 52%;
-    --bulma-text-l: 83%;
-    --bulma-text-strong-l: 90%;
-    --bulma-text-title-l: 95%;
-    --bulma-text-weak: #a89880;
-
-    --bulma-primary-l: 40%; // #a13d2c, still dark enough for white text
-    --bulma-primary-on-scheme-l: 66%; // ember, for outlines and red text
-    --bulma-link-on-scheme-l: 64%; // #7fb0c8
-    --bulma-info-on-scheme-l: 56%; // #6f98b0
-    --bulma-success-on-scheme-l: 59%; // #7fae88
-    --bulma-warning-l: 56%; // #d9a043
-    --bulma-warning-on-scheme-l: 56%;
-    --bulma-danger-l: 46%; // buttons, about #c2472a, for white text
-    --bulma-danger-on-scheme-l: 59%; // #e46a47
+  :root:not([data-theme='light']) {
+    @include western-dark;
   }
+}
+
+:root[data-theme='dark'] {
+  @include western-dark;
 }
 
 /////////////////////////////////////////////////////////////

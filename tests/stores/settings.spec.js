@@ -117,6 +117,15 @@ describe('settings store', () => {
       expect(store.settings.showDeckCount).toBe(false)
     })
 
+    it("should keep this browser's theme, whatever theme the save was made in", () => {
+      const store = useSettingsStore()
+
+      store.applySettings({ theme: 'dark', pinLimit: 2 })
+
+      expect(store.settings.theme).toBe('system')
+      expect(store.settings.pinLimit).toBe(2)
+    })
+
     it('should keep the current value of a setting the save does not mention', () => {
       const store = useSettingsStore()
       store.settings.showDeckCount = true
@@ -124,6 +133,73 @@ describe('settings store', () => {
       store.applySettings({})
 
       expect(store.settings.showDeckCount).toBe(true)
+    })
+  })
+
+  describe('the theme', () => {
+    it("should follow the computer's own light or dark setting until the player changes it", () => {
+      expect(useSettingsStore().settings.theme).toBe('system')
+    })
+
+    it('should use the default for a stored theme that is not one of the choices', () => {
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ theme: 'sepia' }))
+
+      expect(settingsAfterReload().theme).toBe('system')
+    })
+
+    it('should show a theme being tried without saving it', () => {
+      const store = useSettingsStore()
+
+      store.previewTheme('dark')
+
+      expect(store.shownTheme).toBe('dark')
+      expect(store.settings.theme).toBe('system')
+    })
+
+    it('should go back to the saved theme when the preview ends', () => {
+      const store = useSettingsStore()
+      store.previewTheme('dark')
+
+      store.previewTheme(null)
+
+      expect(store.shownTheme).toBe('system')
+    })
+
+    it('should not preview something that is not a theme', () => {
+      const store = useSettingsStore()
+
+      store.previewTheme('sepia')
+
+      expect(store.shownTheme).toBe('system')
+    })
+  })
+
+  describe('saveSettings', () => {
+    it("should keep the dialog's settings and remember them", async () => {
+      useSettingsStore().saveSettings({ ...DEFAULT_SETTINGS, pinLimit: 2, theme: 'light' })
+      await nextTick()
+
+      const settings = settingsAfterReload()
+      expect(settings.pinLimit).toBe(2)
+      expect(settings.theme).toBe('light')
+    })
+
+    it('should end the theme preview, leaving the saved theme shown', () => {
+      const store = useSettingsStore()
+      store.previewTheme('dark')
+
+      store.saveSettings({ ...DEFAULT_SETTINGS, theme: 'light' })
+
+      expect(store.themePreview).toBeNull()
+      expect(store.shownTheme).toBe('light')
+    })
+
+    it('should ignore an unusable value', () => {
+      const store = useSettingsStore()
+
+      store.saveSettings({ pinLimit: 99, theme: 'sepia' })
+
+      expect(store.settings).toEqual(DEFAULT_SETTINGS)
     })
   })
 })

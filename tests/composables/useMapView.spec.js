@@ -47,8 +47,9 @@ const coloradoBox = [
 const coloradoBounds = L.latLngBounds(coloradoBox)
 
 /**
- * The Build view's zoom range for the cells Colorado's grid will be cut into
- * (about 1 km): 9 to 12
+ * The Build view's zoom range for the cells Colorado's grid will be cut into.
+ * With the grid settings at the time of writing, cells are about 1.3 km and
+ * the range is 8 to 9; it moves whenever those settings change.
  */
 const coloradoRange = buildZoomRange(cellSizeFor([-109, 37, -102, 41]) / 1000, 39)
 
@@ -180,21 +181,25 @@ describe('useMapView', () => {
       expect(map.options.maxBounds).toEqual(L.latLngBounds(panLimits(coloradoBox)))
     })
 
+    // These move to the Build view's closest zoom, which depends on the cell
+    // size the grid settings give Colorado, rather than to a fixed level
+    // that a change to those settings could put out of range
+
     it('should reopen where the player left it', () => {
-      moveTo([38.3, -104.6], 10)
+      moveTo([38.3, -104.6], coloradoRange.max)
 
       mapStore.setViewMode(PLAN_VIEW)
       mapStore.setViewMode(BUILD_VIEW)
 
-      expect(map.getZoom()).toBe(10)
+      expect(map.getZoom()).toBe(coloradoRange.max)
       expect(map.getCenter().lat).toBeCloseTo(38.3, 2)
       expect(map.getCenter().lng).toBeCloseTo(-104.6, 2)
     })
 
     it('should record where it is for the save', () => {
-      moveTo([38.3, -104.6], 10)
+      moveTo([38.3, -104.6], coloradoRange.max)
 
-      expect(mapStore.mapZoom).toBe(10)
+      expect(mapStore.mapZoom).toBe(coloradoRange.max)
       expect(mapStore.mapCenter[0]).toBeCloseTo(38.3, 2)
     })
 

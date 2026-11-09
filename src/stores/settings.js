@@ -1,9 +1,16 @@
 /**
  * Settings Store (settings.js)
  *
- * The player's preferences for how the game is shown — not the rules of the
- * game itself. They are set from the Settings dialog, which opens from the
- * Settings button on the New Game steps and from the Game menu during play.
+ * The player's settings, in two groups:
+ * - display settings: how the game is shown, changeable at any time;
+ * - game settings (GAME_SETTINGS): choices that change how a game is played,
+ *   such as where track may start. Here they are the choices for the next
+ *   new game. When a game starts it takes its own copy (the game store's
+ *   `gameSettings`), which is saved with it and stays fixed until it ends.
+ *
+ * The settings are set from the Settings dialog, which opens from the
+ * Settings button on the New Game steps and from the Game menu during play,
+ * and on the Confirm Setup screen, which edits them directly.
  *
  * Changes are made in the Settings dialog on a draft (see
  * useSettingsDraft.js) and only reach the settings when the player presses
@@ -13,9 +20,10 @@
  *
  * Settings are remembered in this browser (localStorage), so they carry from
  * game to game on the same computer. They are also written into every saved
- * game, and loading a save applies its settings, so a game picks up looking
- * the way it did when it was saved. A save made before settings existed
- * leaves the browser's settings as they are.
+ * game, and loading a save applies its display settings, so a game picks up
+ * looking the way it did when it was saved — all but the browser-only ones
+ * (BROWSER_ONLY_SETTINGS). A save made before settings existed leaves the
+ * browser's settings as they are.
  *
  * @module stores/settings
  */
@@ -44,15 +52,34 @@ export const DEFAULT_SETTINGS = Object.freeze({
    * Light or dark colors: "system" follows the computer's own light/dark
    * setting, "light" and "dark" keep to one whatever it is (see useTheme.js)
    */
-  theme: 'system'
+  theme: 'system',
+  /**
+   * Show the help banners over the map (building, removing track, choosing
+   * a town), each until the player dismisses it for the rest of the game
+   * (see useHelpScreens.js)
+   */
+  showHelp: true,
+  /**
+   * Game setting: a player's track network must start in a major city, as
+   * in Empire Builder. Off, any town will do (see startRule.js).
+   */
+  requireMajorCityStart: false
 })
 
 /**
- * Settings that belong to this browser alone: kept here, but never taken
- * from a loaded save. Light or dark colors suit the person at the screen,
- * not whoever saved the game.
+ * The game settings: the settings a game is played by, copied into each new
+ * game as it starts (see the game store's `gameSettings`).
  */
-export const BROWSER_ONLY_SETTINGS = Object.freeze(['theme'])
+export const GAME_SETTINGS = Object.freeze(['requireMajorCityStart'])
+
+/**
+ * Settings that belong to this browser alone: kept here, but never taken
+ * from a loaded save. Light or dark colors, and whether help is shown, suit
+ * the person at the screen, not whoever saved the game; and the game
+ * settings here are this browser's choices for its next new game, while a
+ * save carries the settings its own game is played by separately.
+ */
+export const BROWSER_ONLY_SETTINGS = Object.freeze(['theme', 'showHelp', ...GAME_SETTINGS])
 
 /**
  * The values a choice setting may take, in the order the Settings dialog
@@ -105,6 +132,21 @@ function usableSettings(source) {
     Object.keys(DEFAULT_SETTINGS)
       .filter((name) => isUsable(name, source?.[name]))
       .map((name) => [name, source[name]])
+  )
+}
+
+/**
+ * A full set of game settings from settings read back from somewhere — the
+ * settings store, or a save — each usable one taken as it is and any other
+ * left at its default. So a save made before a game setting existed is
+ * played by that setting's default.
+ * @param {Object} source - Settings as read back; may be anything at all
+ * @returns {Object} One value for each of GAME_SETTINGS
+ */
+export function gameSettingsFrom(source) {
+  const usable = usableSettings(source)
+  return Object.fromEntries(
+    GAME_SETTINGS.map((name) => [name, name in usable ? usable[name] : DEFAULT_SETTINGS[name]])
   )
 }
 

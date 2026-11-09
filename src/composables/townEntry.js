@@ -11,10 +11,14 @@
  * A line reaches a town where one of its points sits on the town, which is
  * what joins it to the network so trains can stop there (see network.js).
  * Passing through a town's grid cell without a point on the town joins
- * nothing, so it pays only for the cell, like any other. The town a line
- * starts from is not entered, so it pays nothing either: a player starts
- * from a major city or from their own track, which already reaches any town
- * on it.
+ * nothing, so it pays only for the cell, like any other.
+ *
+ * A line that starts in a town joins that town too, and pays for it the
+ * same way, unless the player's track reaches it already or it is a major
+ * city. A network may start in any town (see startRule.js); without the fee,
+ * starting a line in a town and running it back to the player's own track
+ * would join the town for nothing. Starting out of a major city stays free,
+ * as in Empire Builder, where every network begins in one.
  *
  * Pure functions over plain data, so the rule can be tested without stores.
  *
@@ -45,31 +49,34 @@ export function townEntryFee(town) {
 }
 
 /**
- * The towns a line enters, by key: those it has a point on, other than the
- * one it starts from and any in `reached`, each once.
+ * The towns a line enters, by key: those it has a point on, its start
+ * included unless that is a major city, other than any in `reached`, each
+ * once.
  * @param {Array<{lat: number, lng: number}>} latlngs - The line's points
  * @param {Map<string, Object>} byKey - Towns by point key (see `townsByKey`)
  * @param {Set<string>} reached - Point keys already reached
  * @returns {Array<string>} The keys of the towns entered, in order
  */
 function townsEntered(latlngs, byKey, reached) {
-  // The start is never entered; listing it here also keeps a line that loops
-  // back to where it began from paying for it
-  const counted = new Set(latlngs.length ? [pointKey(latlngs[0])] : [])
+  const counted = new Set()
   const entered = []
-  latlngs.slice(1).forEach((point) => {
+  latlngs.forEach((point, i) => {
     const key = pointKey(point)
     if (!byKey.has(key) || reached.has(key) || counted.has(key)) return
+    // Counted even when free, so a line that loops back to a major city it
+    // started from does not pay for it on the way back
     counted.add(key)
-    entered.push(key)
+    const isFreeStart = i === 0 && byKey.get(key).size === 'large'
+    if (!isFreeStart) entered.push(key)
   })
   return entered
 }
 
 /**
- * What a line costs in town entry: the fee for every town it reaches, other
- * than the one it starts from and those the player's track reaches already,
- * each counted once however often the line comes back to it.
+ * What a line costs in town entry: the fee for every town it reaches, the
+ * one it starts in included unless that is a major city, other than those
+ * the player's track reaches already, each counted once however often the
+ * line comes back to it.
  *
  * @param {Array<{lat: number, lng: number}>} latlngs - The line's points
  * @param {Map<string, Object>} byKey - Towns by point key (see `townsByKey`)

@@ -23,8 +23,8 @@
  *    toward the towns the cheapest demand still needs joined.
  *
  * The player's network is kept in one piece, so its train can get anywhere
- * on it: track starts from a major city only for the very first section, and
- * from the player's own track after that.
+ * on it: track starts in a town (see startRule.js) only for the very first
+ * section, and from the player's own track after that.
  *
  * Ending the turn is left to the caller (see useBotRunner.js), except when
  * the hand is thrown in, which ends the turn itself.
@@ -45,6 +45,7 @@ import { useTurn } from '@/composables/useTurn'
 import { useVictory } from '@/composables/victory'
 import { townKey } from '@/composables/network'
 import { formatCurrency } from '@/composables/utils'
+import { botStartTowns } from '@/composables/startRule'
 import { searchBoard, costField, planLine, affordableSection } from './botPathfinder'
 import {
   upgradeFor,
@@ -133,10 +134,12 @@ export function useBot() {
    * whether to throw in the hand.
    *
    * A player with track builds on from it, which keeps their network in one
-   * piece so the train can reach all of it. A player with none yet may start
-   * in any major city (the start rule — see trackBuilder.js), but a network
-   * has to start in one of them: the city whose best demand is cheapest to
-   * connect from there is picked, and planned from as though already joined.
+   * piece so the train can reach all of it. A player with none yet picks a
+   * town to start in, among those the start rule allows (see startRule.js):
+   * the major cities and the towns its demand cards want deliveries in, or
+   * only the major cities if the game says track must start in one (see
+   * `botStartTowns`). The town whose best demand is cheapest to connect from
+   * there is picked, and planned from as though already joined.
    *
    * @param {number} playerId - The player
    * @returns {Object} The picture: `sources` to build from and the search
@@ -177,13 +180,15 @@ export function useBot() {
     const own = trackStore.segmentsForOwner(playerId).flatMap(({ coordinates }) => coordinates)
     if (own.length) return { ...held, board, ...planFrom(own, held.isJoined) }
 
-    const starts = townsStore.towns
-      .filter((town) => town.size === 'large')
-      .map((city) => ({
-        start: city,
-        ...planFrom([pointOf(city)], (town) => town.msa === city.msa)
-      }))
-    // The city whose cheapest demand costs least to connect. Whenever any
+    const destinations = held.lines.map(({ demand }) => demand.destination)
+    const requireMajorCity = gameStore.gameSettings.requireMajorCityStart
+    const starts = botStartTowns(townsStore.towns, requireMajorCity, destinations).map(
+      (startTown) => ({
+        start: startTown,
+        ...planFrom([pointOf(startTown)], (town) => town.msa === startTown.msa)
+      })
+    )
+    // The town whose cheapest demand costs least to connect. Whenever any
     // demand is workable from some city, the cheapest one anywhere is, so
     // this is the city with the cheapest workable demand. When none is, it
     // still picks the city that comes closest, so the review it hands back
@@ -217,8 +222,8 @@ export function useBot() {
    * - `demands`: every demand in hand, weighed up (see `reviewDemands`), as
    *   last seen when deciding to throw in the hand or to build; `demandsWhen`
    *   says which. Absent if neither was looked at.
-   * - `startCity`: for a player with no track yet, the major city their
-   *   building was planned from (see `survey`)
+   * - `startCity`: for a player with no track yet, the town their building
+   *   was planned from (see `survey`)
    * - `trainStop`: why the train stopped where it did
    * - `build`: each try at building, in order (see `buildTrack`), and
    *   `buildStop`: why building stopped

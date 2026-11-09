@@ -9,10 +9,11 @@
  *
  * A section must:
  * - be built by the player whose turn it is, while the game is on;
- * - start in a major city or on the player's own track — Empire Builder's
- *   rule, so every network grows out of a major city. "On" means at one of
- *   the points the track is drawn through (its ends and bends): that is
- *   where a new section joins the network (see network.js);
+ * - start in a town or on the player's own track — or, with the game
+ *   setting for it on, in a major city, Empire Builder's own rule, so every
+ *   network grows out of one (see startRule.js). "On" means at one of the
+ *   points the track is drawn through (its ends and bends): that is where a
+ *   new section joins the network (see network.js);
  * - keep to the build rules (inside the region, bridges, spacing — see
  *   buildRules.js);
  * - cost no more than the player has left to spend this turn, in cash and
@@ -46,10 +47,7 @@ import { regionTest } from '@/composables/map/region'
 import { riversFor } from '@/composables/map/waterData'
 import { pointKey } from '@/composables/network'
 import { formatCurrency } from '@/composables/utils'
-
-/** What to tell a player whose line starts somewhere track may not start */
-export const START_RULE =
-  'Track must start in a major city, or at an end or bend of your own track.'
+import { startTowns, startRuleMessage } from '@/composables/startRule'
 
 export function useTrackBuilder() {
   const gameStore = useGameStore()
@@ -58,6 +56,12 @@ export function useTrackBuilder() {
   const townsStore = useTownsStore()
   const trackStore = useTrackStore()
   const waterStore = useWaterStore()
+
+  /** Whether this game makes track start in a major city (see startRule.js) */
+  const requireMajorCity = () => gameStore.gameSettings.requireMajorCityStart
+
+  /** The start rule for this game, as told to a player who breaks it */
+  const startRule = () => startRuleMessage(requireMajorCity())
 
   /**
    * What every line is checked against before it is built (see buildRules.js):
@@ -96,26 +100,27 @@ export function useTrackBuilder() {
   }))
 
   /**
-   * Every point a player may start a section from: each major city, and
-   * every point their own track is drawn through — its ends, and its bends,
+   * Every point a player may start a section from: each town track may start
+   * in (see startRule.js), and every point their own track is drawn through — its ends, and its bends,
    * so a branch can leave a line part way along.
    * @param {number} playerId - The player
    * @returns {Array<{lat: number, lng: number}>} The points
    */
   function startPoints(playerId) {
-    const cities = townsStore.towns
-      .filter((town) => town.size === 'large')
-      .map((town) => ({ lat: town.lat, lng: town.lon }))
+    const towns = startTowns(townsStore.towns, requireMajorCity()).map((town) => ({
+      lat: town.lat,
+      lng: town.lon
+    }))
     const ownPoints = trackStore
       .segmentsForOwner(playerId)
       .flatMap(({ coordinates }) => coordinates)
-    return [...cities, ...ownPoints]
+    return [...towns, ...ownPoints]
   }
 
   /**
    * Every player's start points as keys (see `pointKey`), worked out once per
    * change to the towns or track rather than on every move of the cursor:
-   * `cities` for everyone, and `own` by player id.
+   * `towns` for everyone, and `own` by player id.
    */
   const startKeys = computed(() => {
     const own = new Map()
@@ -123,12 +128,12 @@ export function useTrackBuilder() {
       if (!own.has(ownerId)) own.set(ownerId, new Set())
       coordinates.forEach((point) => own.get(ownerId).add(pointKey(point)))
     })
-    const cities = new Set(
-      townsStore.towns
-        .filter((town) => town.size === 'large')
-        .map((town) => pointKey({ lat: town.lat, lng: town.lon }))
+    const towns = new Set(
+      startTowns(townsStore.towns, requireMajorCity()).map((town) =>
+        pointKey({ lat: town.lat, lng: town.lon })
+      )
     )
-    return { cities, own }
+    return { towns, own }
   })
 
   /** Every town by the key of the point it sits on (see `townsByKey`) */
@@ -153,8 +158,8 @@ export function useTrackBuilder() {
    */
   function canStartAt(playerId, point) {
     const key = pointKey(point)
-    const { cities, own } = startKeys.value
-    return cities.has(key) || Boolean(own.get(playerId)?.has(key))
+    const { towns, own } = startKeys.value
+    return towns.has(key) || Boolean(own.get(playerId)?.has(key))
   }
 
   /**
@@ -233,7 +238,7 @@ export function useTrackBuilder() {
     if (!Array.isArray(latlngs) || latlngs.length < 2) {
       return { ok: false, error: 'A section needs at least two points.' }
     }
-    if (!canStartAt(playerId, latlngs[0])) return { ok: false, error: START_RULE }
+    if (!canStartAt(playerId, latlngs[0])) return { ok: false, error: startRule() }
 
     const blocked = whyNotBuildable(latlngs, { isFinished: true })
     if (blocked) return { ok: false, error: blocked }
@@ -281,6 +286,7 @@ export function useTrackBuilder() {
   }
 
   return {
+    startRule,
     boardRules,
     buildRules,
     startPoints,

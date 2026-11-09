@@ -173,7 +173,7 @@ function openDialog(name) {
   />
   <SaveGameDialog v-if="openDialogName === 'save'" @close="openDialogName = null" />
   <LoadGameDialog v-if="openDialogName === 'load'" @close="openDialogName = null" />
-  <SettingsDialog v-if="openDialogName === 'settings'" @close="openDialogName = null" />
+  <SettingsDialog v-if="openDialogName === 'settings'" in-game @close="openDialogName = null" />
   <AboutDialog v-if="openDialogName === 'about'" @close="openDialogName = null" />
 </template>
 

@@ -525,6 +525,32 @@ describe('useGamePersistence', () => {
       expect(useDemandCardsStore().drawPile[0].demands[0].payoff).toBe(600)
     })
 
+    it('should keep the settings the game is played by, whatever this browser would choose next', async () => {
+      gameStore.setGameSettings({ requireMajorCityStart: true })
+      useSettingsStore().settings.requireMajorCityStart = false
+
+      await roundTrip()
+
+      expect(gameStore.gameSettings.requireMajorCityStart).toBe(true)
+      expect(useSettingsStore().settings.requireMajorCityStart).toBe(false)
+    })
+
+    it('should keep the help screens dismissed in the game', async () => {
+      gameStore.dismissHelp('building')
+
+      await roundTrip()
+
+      expect(gameStore.dismissedHelp).toEqual(['building'])
+    })
+
+    it('should start a new game with every help screen showing', () => {
+      gameStore.dismissHelp('building')
+
+      persistence.startNewGame()
+
+      expect(gameStore.dismissedHelp).toEqual([])
+    })
+
     it('should keep the played demand cards', async () => {
       const demandCardsStore = useDemandCardsStore()
       demandCardsStore.setDeck({ drawPile: [], discardPile: [{ id: 9, demands: [] }] })

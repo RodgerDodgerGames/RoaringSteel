@@ -45,17 +45,17 @@
      readable on dark forest and lifts it off any track running under it,
      without the box a solid backing would draw over the terrain. The map
      is the same in light and dark mode, so these colors do not change. */
-  color: #2a211b;
+  color: var(--timetable-paper);
   /* A blurred shadow alone is too faint round letters this small, so a
      2px paper stroke, painted under the letters (paint-order) so only its
      outer 1px shows, lays a solid rim first; the two blurred shadows then
      fade it into the terrain. One stroke and two shadows keep the many
      always-showing names cheap to redraw as the map zooms. */
-  -webkit-text-stroke: 2px var(--timetable-paper);
+  -webkit-text-stroke: 2px var(--coal);
   paint-order: stroke fill;
   text-shadow:
-    0 0 3px var(--timetable-paper),
-    0 0 6px rgba(241, 230, 207, 0.9);
+    0 0 3px var(--coal),
+    0 0 6px var(--coal);
   border: none;
   box-shadow: none;
   background: none;

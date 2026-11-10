@@ -65,6 +65,19 @@
   line-height: 1.5;
 }
 
+/* A town name the Plan view found no clear spot for (see townNames.js) is
+   hidden, and shows again below its dot while the town is hovered, marked
+   by a demand line, or has a train in it. Hidden with visibility, not
+   display, so it can still be measured when the names are laid out again.
+   Shown again it is likely over another name, so it is lifted above them. */
+.town-tooltip.is-name-hidden:not(.is-hovered, .is-demand-marked, .has-train) {
+  visibility: hidden;
+}
+
+.town-tooltip.is-name-hidden {
+  z-index: 1;
+}
+
 /* town popup */
 .town-popup {
   font-family: var(--bulma-family-primary);

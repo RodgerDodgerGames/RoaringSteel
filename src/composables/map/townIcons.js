@@ -72,8 +72,11 @@ export const TOWN_ICONS = {
  */
 const BUILDING_BASE_DROP = 0.1
 
-/** Space between the bottom of a town's shape and its name, in px */
-const NAME_GAP = 2
+/**
+ * Space between a town's shape and its name, in px. The Plan view's name
+ * layout (townNames.js) keeps the same gap on every side it puts a name.
+ */
+export const NAME_GAP = 2
 
 /**
  * Half the height of a town's name on the map, in px. The name is centered

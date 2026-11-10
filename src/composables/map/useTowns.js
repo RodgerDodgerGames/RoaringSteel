@@ -27,6 +27,12 @@
  * may load, that town's commodity icons are shown in either view, ringed,
  * and clicking one picks the load up (see the train stop store).
  *
+ * In the Plan view the towns' names are laid out so none covers another
+ * name, a dot or a commodity icon (see townNames.js): a name that would
+ * moves beside or below its dot, and one with nowhere to go is hidden. A
+ * hidden name still shows while its town is hovered, marked by a demand
+ * line, or has a train in it. The Build view hangs every name below its dot.
+ *
  * Where the map looks is not decided here: useMapView fits the Plan view
  * to the region.
  *
@@ -43,6 +49,7 @@ import { storeToRefs } from 'pinia'
 import { useMapStore } from '@/stores/map'
 import { useDemandCardsStore } from '@/stores/demandCards'
 import { useTrainStopStore } from '@/stores/trainStop'
+import { useTrainsStore } from '@/stores/trains'
 import { PLAN_VIEW } from '@/composables/map/mapViews'
 import { escapeHtml } from '@/composables/utils'
 import { demandMarks } from '@/composables/map/demandMarks'
@@ -53,6 +60,7 @@ import {
   iconRingRadius
 } from '@/composables/map/commodityIcons'
 import { iconClearance, shapeSize, townIconHtml, townNameOffset } from '@/composables/map/townIcons'
+import { layoutTownNames } from '@/composables/map/townNames'
 
 /**
  * The map pane the commodity icons are drawn in: above track (panes 410–430)
@@ -74,6 +82,18 @@ const MARKED_CLASS = 'is-demand-marked'
  * load there: the icon is ringed, and a click on it picks the load up
  */
 const PICKABLE_CLASS = 'is-pickable'
+
+/**
+ * Class on a town's name when the Plan view has no clear spot for it, which
+ * hides it unless one of the classes below shows it again (see map.css)
+ */
+const NAME_HIDDEN_CLASS = 'is-name-hidden'
+
+/** Class on a town's name while the pointer is over its dot */
+const NAME_HOVERED_CLASS = 'is-hovered'
+
+/** Class on the name of a town a train stands in */
+const TRAIN_TOWN_CLASS = 'has-train'
 
 /** Class on the map while a demand line is pointed at, which dims the rest */
 const HOVERING_CLASS = 'is-demand-hovering'
@@ -146,6 +166,7 @@ export function useTowns() {
   const { isDrawingActive } = storeToRefs(mapStore)
   const demandCardsStore = useDemandCardsStore()
   const trainStopStore = useTrainStopStore()
+  const trainsStore = useTrainsStore()
 
   /**
    * The town the train can load in from the map, with the commodities it can
@@ -163,6 +184,15 @@ export function useTowns() {
   }
 
   /**
+   * The ids of the towns any player's train stands in.
+   * @returns {Set<string>} Town ids (`msa` codes)
+   */
+  function trainTownIds() {
+    const ids = Object.values(trainsStore.trains).map((train) => train.position?.townId)
+    return new Set(ids.filter((id) => id != null))
+  }
+
+  /**
    * Shows the commodity icons and town buildings the view calls for, and
    * marks the towns of the demand lines the player has picked out.
    *
@@ -172,6 +202,9 @@ export function useTowns() {
    * commodity keeps its dot and name clear of the dimming while the line is
    * pointed at; only the destination's dot gets a halo, since the producer's
    * halo goes on the commodity's icon.
+   *
+   * The names of marked towns, and of towns with a train in them, show even
+   * where the Plan view's layout hid them.
    */
   function showMarks() {
     if (!townsMap) return
@@ -179,12 +212,15 @@ export function useTowns() {
     const { destinations, producers } = demandMarks(lines, drawnTowns)
     const isPlanView = mapStore.viewMode === PLAN_VIEW
     const pickable = pickableIcons()
+    const trainTowns = trainTownIds()
 
     townsLayer.value.eachLayer((marker) => {
-      const name = marker.feature.properties.name
+      const { name, msa } = marker.feature.properties
       const isMarked = Boolean(destinations[name] || producers[name])
       setMark(marker.getElement(), isMarked, destinations[name])
-      marker.getTooltip()?.getElement()?.classList.toggle(MARKED_CLASS, isMarked)
+      const nameElement = marker.getTooltip()?.getElement()
+      nameElement?.classList.toggle(MARKED_CLASS, isMarked)
+      nameElement?.classList.toggle(TRAIN_TOWN_CLASS, trainTowns.has(msa))
     })
 
     commodityMarkers.forEach(({ town, marker }) => {
@@ -215,6 +251,9 @@ export function useTowns() {
     const pickable = pickableIcons()
     return pickable ? `${pickable.townId}|${[...pickable.industries].join('|')}` : ''
   }, showMarks)
+  // Keyed on the towns trains stand in, so a train's every move between
+  // towns does not redraw the marks unless it changes which towns those are
+  watch(() => [...trainTownIds()].sort().join('|'), showMarks)
 
   /**
    * Picks up the load whose icon was clicked, if it is one of the train's
@@ -238,22 +277,92 @@ export function useTowns() {
 
   /**
    * Draws every town's dot, name and commodity icons at the current view's
-   * sizes (see `shapeSize`). A new icon is a new element, so the marks are
-   * gone from it: `showMarks` has to follow.
+   * sizes (see `shapeSize`), and places the names to suit. A new icon is a
+   * new element, so the marks are gone from it: `showMarks` has to follow.
    */
   function drawForView() {
     if (!townsMap) return
     const view = mapStore.viewMode
     townsLayer.value.eachLayer((marker) => {
-      const size = marker.feature.properties.size
-      marker.setIcon(townDivIcon(size, view))
-      const tooltip = marker.getTooltip()
-      if (tooltip) {
-        tooltip.options.offset = L.point(townNameOffset(size, view))
-        tooltip.update()
-      }
+      marker.setIcon(townDivIcon(marker.feature.properties.size, view))
     })
     commodityMarkers.forEach(({ town, marker }) => marker.setIcon(commodityDivIcon(town, view)))
+    placeNames()
+  }
+
+  /**
+   * Puts every town's name where the view wants it. The Build view hangs
+   * each below its dot. The Plan view lays them out so none covers another
+   * name, a dot or a commodity icon (see `layoutTownNames`), and hides the
+   * names that fit nowhere; a hidden name keeps the spot below its dot, so
+   * it shows there when something shows it again.
+   *
+   * The Plan view's names are measured as the map draws them, so the layout
+   * is redone whenever the view could have changed under them: on a change
+   * of view, after the map is refitted (a resize), and once the names' font
+   * has loaded.
+   */
+  function placeNames() {
+    if (!townsMap) return
+    const view = mapStore.viewMode
+    const markers = []
+    townsLayer.value.eachLayer((marker) => {
+      if (marker.getTooltip()?.getElement()) markers.push(marker)
+    })
+    const defaultSpot = (marker) => townNameOffset(marker.feature.properties.size, view)
+
+    if (view !== PLAN_VIEW) {
+      markers.forEach((marker) => setNameSpot(marker, defaultSpot(marker), true))
+      return
+    }
+
+    // Every name is measured before any is moved, so the browser lays the
+    // page out once rather than once per name
+    const towns = markers.map((marker) => {
+      const town = marker.feature.properties
+      const { x, y } = townsMap.latLngToContainerPoint(marker.getLatLng())
+      const nameElement = marker.getTooltip().getElement()
+      return {
+        id: town.msa,
+        x,
+        y,
+        size: town.size,
+        population: town.population,
+        dotSize: shapeSize(town.size, view),
+        icons: commodityOffsets(town, view),
+        nameWidth: nameElement.offsetWidth,
+        nameHeight: nameElement.offsetHeight
+      }
+    })
+    const { x: width, y: height } = townsMap.getSize()
+    const spots = layoutTownNames(towns, { width, height })
+    markers.forEach((marker) => {
+      const spot = spots.get(marker.feature.properties.msa)
+      setNameSpot(marker, spot ? [spot.x, spot.y] : defaultSpot(marker), Boolean(spot))
+    })
+  }
+
+  /**
+   * Moves a town's name to an offset from its town's center, and shows or
+   * hides it. It also forgets any hover: a redraw replaces the town's dot,
+   * and the pointer leaving a dot that is gone never tells the marker, so a
+   * hidden name would otherwise stay shown until the town is next hovered.
+   * @param {Object} marker - The town's marker
+   * @param {Array<number>} offset - [x, y] from the town's center to the
+   *   name's center, in px
+   * @param {boolean} isShown - False to hide the name
+   */
+  function setNameSpot(marker, offset, isShown) {
+    const tooltip = marker.getTooltip()
+    tooltip.options.offset = L.point(offset)
+    tooltip.update()
+    tooltip.getElement().classList.toggle(NAME_HIDDEN_CLASS, !isShown)
+    tooltip.getElement().classList.remove(NAME_HOVERED_CLASS)
+  }
+
+  /** Lays the Plan view's names out again after the map is refitted */
+  function onMoveEnd() {
+    if (mapStore.viewMode === PLAN_VIEW) placeNames()
   }
 
   /**
@@ -326,6 +435,12 @@ export function useTowns() {
           offset: townNameOffset(size, mapStore.viewMode)
         })
 
+        // A name the Plan view hid shows while the pointer is over the town
+        const setHovered = (isHovered) =>
+          marker.getTooltip()?.getElement()?.classList.toggle(NAME_HOVERED_CLASS, isHovered)
+        marker.on('mouseover', () => setHovered(true))
+        marker.on('mouseout', () => setHovered(false))
+
         // Add a click event handler to display town information
         marker.on('click', () => {
           // exit early if drawing is active
@@ -376,6 +491,12 @@ export function useTowns() {
     commodityMarkers = drawnTowns.map((town) => ({ town, marker: createCommodityMarker(town) }))
     commodityLayer = L.layerGroup(commodityMarkers.map(({ marker }) => marker)).addTo(townsMap)
     showMarks()
+
+    placeNames()
+    townsMap.on('moveend', onMoveEnd)
+    // The names are measured in their own font; until it has loaded they
+    // are drawn, and measured, in a fallback of another width
+    document.fonts?.ready.then(placeNames)
   }
 
   /**
@@ -407,8 +528,7 @@ export function useTowns() {
    * @returns {Object} Leaflet DivIcon
    */
   function commodityDivIcon(town, view) {
-    const count = town.industries.length
-    const offsets = iconRingOffsets(count, iconRingRadius(iconClearance(town.size, view), count))
+    const offsets = commodityOffsets(town, view)
     const half = COMMODITY_ICON_SIZE / 2
     const html = town.industries
       .map(({ name, industry }, i) => {
@@ -422,7 +542,22 @@ export function useTowns() {
     return L.divIcon({ html, className: 'commodity-ring', iconSize: [0, 0] })
   }
 
+  /**
+   * Where a town's commodity icons sit round its dot in a view, as offsets
+   * from the town's center (see `iconRingOffsets`).
+   * @param {Object} town - Town with size and industries
+   * @param {string} view - The map's view
+   * @returns {Array<{x: number, y: number}>} One offset per icon
+   */
+  function commodityOffsets(town, view) {
+    const count = town.industries.length
+    return iconRingOffsets(count, iconRingRadius(iconClearance(town.size, view), count))
+  }
+
   onUnmounted(() => {
+    townsMap?.off('moveend', onMoveEnd)
+    // Nothing still pending (the names' font loading, say) reaches the map
+    townsMap = null
     if (townsLayer.value) {
       townsLayer.value.clearLayers()
     }

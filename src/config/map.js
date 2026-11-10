@@ -10,7 +10,7 @@ export const mapViewConfig = {
    * than to the nearest keeps more of the board, and so more of the towns
    * near the one being built from, on screen.
    */
-  buildCellPixels: 10,
+  buildCellPixels: 25,
   /**
    * How many zoom levels out from its closest the Build view may go. At one,
    * the Build view has two zooms, the further showing cells half as wide.

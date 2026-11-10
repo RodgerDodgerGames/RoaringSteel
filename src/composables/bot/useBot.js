@@ -44,7 +44,6 @@ import { useTrackBuilder } from '@/composables/trackBuilder'
 import { useTurn } from '@/composables/useTurn'
 import { useVictory } from '@/composables/victory'
 import { townKey } from '@/composables/network'
-import { formatCurrency } from '@/composables/utils'
 import { botStartTowns } from '@/composables/startRule'
 import { searchBoard, costField, planLine, affordableSection } from './botPathfinder'
 import {
@@ -546,60 +545,4 @@ export function useBot() {
   }
 
   return { playTurn }
-}
-
-/**
- * A computer player's turn in a sentence, for the people at the table:
- * "Bot 1 delivered Coal to Lowell for $12,000, picked up Steel in Boston,
- * and built $9,500 of track toward Worcester."
- * @param {string} name - The computer player's name
- * @param {Array<Object>} events - What it did (see `playTurn`)
- * @returns {string} The sentence
- */
-export function describeTurn(name, events) {
-  if (events.some(({ type }) => type === 'discard')) {
-    return `${name} threw in their demand cards for new ones.`
-  }
-
-  const parts = []
-  events.forEach((event) => {
-    switch (event.type) {
-      case 'place':
-        parts.push(`put their train in ${event.town}`)
-        break
-      case 'deliver':
-        parts.push(
-          `delivered ${event.industry} to ${event.town} for ${formatCurrency(event.payoff)}`
-        )
-        break
-      case 'pickup':
-        parts.push(`picked up ${event.industry} in ${event.town}`)
-        break
-      case 'drop':
-        parts.push(`dropped ${event.industry} in ${event.town}`)
-        break
-      case 'upgrade':
-        parts.push(`upgraded to a ${event.to}`)
-        break
-    }
-  })
-
-  // Building is summed up: one figure for the turn, and where it was headed
-  const builds = events.filter(({ type }) => type === 'build')
-  if (builds.length) {
-    const total = builds.reduce((sum, { cost }) => sum + cost, 0)
-    const toward = [...new Set(builds.map((build) => build.toward))].join(' and ')
-    parts.push(`built ${formatCurrency(total)} of track toward ${toward}`)
-  }
-
-  // Where the train ended up, if its last stop had nothing else to say so
-  const trainEvents = events.filter(({ type }) => type !== 'build' && type !== 'upgrade')
-  const lastMove = trainEvents.at(-1)?.type === 'move' ? trainEvents.at(-1) : null
-  if (lastMove) {
-    parts.push(lastMove.arrived ? `ran to ${lastMove.town}` : `headed for ${lastMove.town}`)
-  }
-
-  if (!parts.length) return `${name} passed.`
-  const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')}, and ${parts.at(-1)}` : parts[0]
-  return `${name} ${list}.`
 }

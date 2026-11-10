@@ -15,6 +15,15 @@ import {
   buildViewAt
 } from '@/composables/map/mapViews'
 import { metersPerPixel } from '@/composables/setup/useElevationTiles'
+import { mapViewConfig } from '@/config/map'
+
+/**
+ * How many pixels across a cell is drawn at a zoom, at the equator.
+ * @param {number} cellKm - The cell's width
+ * @param {number} zoom - The map's zoom
+ * @returns {number} Width in px
+ */
+const cellPixelsAt = (cellKm, zoom) => (cellKm * 1000) / metersPerPixel(zoom, 0)
 
 /** A Colorado-shaped rectangle: 37–41°N, 109–102°W */
 const colorado = {
@@ -61,16 +70,23 @@ describe('mapViews', () => {
   })
 
   describe('buildZoomRange', () => {
-    it('should stop at the closest zoom that draws a cell no more than 10 pixels across', () => {
-      // A 1 km cell at the equator is 10 px across at zoom 10.61. Zoom 11
-      // would be nearer, but draws it 13 px across; zoom 10 draws it 6.5 px.
-      // The furthest zoom is one level out from that.
-      expect(buildZoomRange(1, 0)).toEqual({ min: 9, max: 10 })
+    // Written against the configured cell width rather than a number, so
+    // tuning `buildCellPixels` (it went from 10 to 25) does not break them
+
+    it('should stop at the closest zoom that draws a cell no more than buildCellPixels across', () => {
+      const { min, max } = buildZoomRange(1, 0)
+      // The closest zoom draws a 1 km cell no wider than the setting; one
+      // level nearer would draw it wider
+      expect(cellPixelsAt(1, max)).toBeLessThanOrEqual(mapViewConfig.buildCellPixels)
+      expect(cellPixelsAt(1, max + 1)).toBeGreaterThan(mapViewConfig.buildCellPixels)
+      // The furthest zoom is `buildZoomSteps` out from that
+      expect(min).toBe(max - mapViewConfig.buildZoomSteps)
     })
 
-    it('should keep a zoom that draws a cell exactly 10 pixels across', () => {
-      // Zoom 10 draws a cell this wide exactly 10 px across at the equator
-      const exactKm = (10 * metersPerPixel(10, 0)) / 1000
+    it('should keep a zoom that draws a cell exactly buildCellPixels across', () => {
+      // Zoom 10 draws a cell this wide exactly buildCellPixels across at the
+      // equator, so floating-point noise must not drop it to zoom 9
+      const exactKm = (mapViewConfig.buildCellPixels * metersPerPixel(10, 0)) / 1000
       expect(buildZoomRange(exactKm, 0).max).toBe(10)
     })
 

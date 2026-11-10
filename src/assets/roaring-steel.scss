@@ -163,7 +163,7 @@ $timetable-paper: #f1e6cf; // the panels, and light (drawn a shade deeper)
 // - Averia Serif Libre: the body text and the side panel (Bulma's
 //   $family-primary, section 2)
 // - Oswald: labels and buttons
-// - Rye: the game's name, in the top bar and on the welcome screen
+// - Rye: the game's name in the top bar
 // - Libre Baskerville: town names on the map, in capitals
 @import url('https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Libre+Baskerville:wght@400;700&family=Oswald:wght@400..700&family=Rye&display=swap');
 
@@ -172,7 +172,7 @@ $timetable-paper: #f1e6cf; // the panels, and light (drawn a shade deeper)
 // them. `font-display: swap` shows the text in the fallback font while the
 // file loads, rather than hiding it.
 // - Eutemia: an ornate Western display face
-// - Saddlebag: a Western poster face
+// - Saddlebag: a Western poster face; the welcome screen's title
 @font-face {
   font-family: 'Eutemia';
   src: url('./fonts/eutemia-i/Eutemia.ttf') format('truetype');
@@ -192,7 +192,7 @@ $timetable-paper: #f1e6cf; // the panels, and light (drawn a shade deeper)
   // The "Roaring Steel" name in the game screen's top bar
   --font-brand: 'Rye', serif;
   // The welcome screen's title
-  --font-welcome-title: 'Rye', serif;
+  --font-welcome-title: 'Saddlebag', serif;
   // Town names on the map
   --font-town-name: 'Libre Baskerville', serif;
   // Buttons and small capitals labels

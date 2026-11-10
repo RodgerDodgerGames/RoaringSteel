@@ -23,6 +23,10 @@
  * those icons are the only ones shown. While a line is pointed at, the rest
  * of the towns are dimmed.
  *
+ * While the train of the person whose turn it is stands in a town where it
+ * may load, that town's commodity icons are shown in either view, ringed,
+ * and clicking one picks the load up (see the train stop store).
+ *
  * Where the map looks is not decided here: useMapView fits the Plan view
  * to the region.
  *
@@ -38,7 +42,9 @@ import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 import { storeToRefs } from 'pinia'
 import { useMapStore } from '@/stores/map'
 import { useDemandCardsStore } from '@/stores/demandCards'
+import { useTrainStopStore } from '@/stores/trainStop'
 import { PLAN_VIEW } from '@/composables/map/mapViews'
+import { escapeHtml } from '@/composables/utils'
 import { demandMarks } from '@/composables/map/demandMarks'
 import {
   COMMODITY_ICON_SIZE,
@@ -46,7 +52,7 @@ import {
   iconRingOffsets,
   iconRingRadius
 } from '@/composables/map/commodityIcons'
-import { shapeSize, townIconHtml, townNameOffset } from '@/composables/map/townIcons'
+import { iconClearance, shapeSize, townIconHtml, townNameOffset } from '@/composables/map/townIcons'
 
 /**
  * The map pane the commodity icons are drawn in: above track (panes 410–430)
@@ -62,6 +68,12 @@ const COMMODITY_PANE_Z_INDEX = 590
  * demand line. They stay at full strength while the rest are dimmed.
  */
 const MARKED_CLASS = 'is-demand-marked'
+
+/**
+ * Class on each commodity icon of the town the train stands in, while it may
+ * load there: the icon is ringed, and a click on it picks the load up
+ */
+const PICKABLE_CLASS = 'is-pickable'
 
 /** Class on the map while a demand line is pointed at, which dims the rest */
 const HOVERING_CLASS = 'is-demand-hovering'
@@ -133,6 +145,22 @@ export function useTowns() {
   const mapStore = useMapStore()
   const { isDrawingActive } = storeToRefs(mapStore)
   const demandCardsStore = useDemandCardsStore()
+  const trainStopStore = useTrainStopStore()
+
+  /**
+   * The town the train can load in from the map, with the commodities it can
+   * pick up there, or null. Not while track is being drawn, when a click on
+   * the map belongs to the drawing.
+   * @returns {{townId: string, industries: Set<string>}|null}
+   */
+  function pickableIcons() {
+    const town = trainStopStore.loadingTown
+    if (!town || isDrawingActive.value) return null
+    const industries = trainStopStore.pickups
+      .filter(({ hasRoom }) => hasRoom)
+      .map(({ industry }) => industry)
+    return { townId: town.msa, industries: new Set(industries) }
+  }
 
   /**
    * Shows the commodity icons and town buildings the view calls for, and
@@ -150,6 +178,7 @@ export function useTowns() {
     const { isHovering, lines } = demandCardsStore.markedLines
     const { destinations, producers } = demandMarks(lines, drawnTowns)
     const isPlanView = mapStore.viewMode === PLAN_VIEW
+    const pickable = pickableIcons()
 
     townsLayer.value.eachLayer((marker) => {
       const name = marker.feature.properties.name
@@ -159,14 +188,20 @@ export function useTowns() {
     })
 
     commodityMarkers.forEach(({ town, marker }) => {
+      const isTrainHere = pickable !== null && pickable.townId === town.msa
       // One icon per industry, in the same order
       const icons = marker.getElement().querySelectorAll('.commodity-icon')
       town.industries.forEach(({ name }, i) => {
         const colors = producers[town.name]?.[name]
+        const isPickable = isTrainHere && pickable.industries.has(name)
         setMark(icons[i], Boolean(colors), colors)
-        icons[i].hidden = !isPlanView && !colors
+        icons[i].classList.toggle(PICKABLE_CLASS, isPickable)
+        icons[i].title = isPickable ? `Pick up ${name}` : name
+        // The train's town shows all it makes, so the player can load from it
+        icons[i].hidden = !isPlanView && !colors && !isTrainHere
       })
-      marker.setZIndexOffset(producers[town.name] ? MARKED_RING_Z_OFFSET : 0)
+      const isLifted = producers[town.name] || isTrainHere
+      marker.setZIndexOffset(isLifted ? MARKED_RING_Z_OFFSET : 0)
     })
 
     townsMap.getContainer().classList.toggle(HOVERING_CLASS, isHovering)
@@ -174,6 +209,25 @@ export function useTowns() {
   }
 
   watch(() => demandCardsStore.markedLines, showMarks)
+  // Keyed on what can be loaded where, so the marks are not redrawn for
+  // every change to the train or the hand that leaves that alone
+  watch(() => {
+    const pickable = pickableIcons()
+    return pickable ? `${pickable.townId}|${[...pickable.industries].join('|')}` : ''
+  }, showMarks)
+
+  /**
+   * Picks up the load whose icon was clicked, if it is one of the train's
+   * town's. The click goes no further, so the map beneath does not take it
+   * too (as a click to draw track from, say).
+   * @param {MouseEvent} event - A click in the commodity icons' pane
+   */
+  function onCommodityClick(event) {
+    const icon = event.target.closest?.(`.commodity-icon.${PICKABLE_CLASS}`)
+    if (!icon) return
+    L.DomEvent.stop(event)
+    trainStopStore.pickUp(icon.dataset.industry)
+  }
   watch(
     () => mapStore.viewMode,
     () => {
@@ -314,7 +368,9 @@ export function useTowns() {
 
     townsMap = map.value
     if (!townsMap.getPane(COMMODITY_PANE)) {
-      townsMap.createPane(COMMODITY_PANE).style.zIndex = COMMODITY_PANE_Z_INDEX
+      const pane = townsMap.createPane(COMMODITY_PANE)
+      pane.style.zIndex = COMMODITY_PANE_Z_INDEX
+      L.DomEvent.on(pane, 'click', onCommodityClick)
     }
     drawnTowns = towns.value
     commodityMarkers = drawnTowns.map((town) => ({ town, marker: createCommodityMarker(town) }))
@@ -344,21 +400,23 @@ export function useTowns() {
     })
 
   /**
-   * A town's commodity icons, fanned round its dot as a view draws the dot.
+   * A town's commodity icons, fanned round its dot as a view draws the dot,
+   * clear of its building in the Build view (see `iconClearance`).
    * @param {Object} town - Town with size and industries
    * @param {string} view - The map's view
    * @returns {Object} Leaflet DivIcon
    */
   function commodityDivIcon(town, view) {
     const count = town.industries.length
-    const offsets = iconRingOffsets(count, iconRingRadius(shapeSize(town.size, view), count))
+    const offsets = iconRingOffsets(count, iconRingRadius(iconClearance(town.size, view), count))
     const half = COMMODITY_ICON_SIZE / 2
     const html = town.industries
       .map(({ name, industry }, i) => {
         const { x, y } = offsets[i]
         // Offsets are to each icon's center; the image is placed by its corner
         const style = `left:${x - half}px;top:${y - half}px;width:${COMMODITY_ICON_SIZE}px;height:${COMMODITY_ICON_SIZE}px`
-        return `<img class="commodity-icon" src="${commodityIconUrl(industry)}" alt="${name}" title="${name}" style="${style}" draggable="false">`
+        const label = escapeHtml(name)
+        return `<img class="commodity-icon" src="${commodityIconUrl(industry)}" alt="${label}" title="${label}" data-industry="${label}" style="${style}" draggable="false">`
       })
       .join('')
     return L.divIcon({ html, className: 'commodity-ring', iconSize: [0, 0] })

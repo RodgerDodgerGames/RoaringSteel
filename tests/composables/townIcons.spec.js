@@ -15,6 +15,7 @@ import {
   TOWN_ICONS,
   townIcon,
   buildingPosition,
+  iconClearance,
   shapeSize,
   townNameOffset
 } from '@/composables/map/townIcons'
@@ -56,6 +57,22 @@ describe('shapeSize', () => {
       expect(shapeSize('medium', view)).toBeGreaterThan(shapeSize('small', view))
       expect(shapeSize('large', view)).toBeGreaterThan(shapeSize('medium', view))
     })
+  })
+})
+
+describe('iconClearance', () => {
+  it.each(Object.keys(TOWN_ICONS))(
+    "should keep a %s town's icons clear of its building in the Build view",
+    (size) => {
+      // The building's top, in px above the town's center
+      const rise = shapeSize(size, BUILD_VIEW) / 2 - buildingPosition(size).top
+
+      expect(iconClearance(size, BUILD_VIEW) / 2).toBeGreaterThanOrEqual(rise)
+    }
+  )
+
+  it('should keep icons just clear of the shape in the Plan view, which has no buildings', () => {
+    expect(iconClearance('large', PLAN_VIEW)).toBe(shapeSize('large', PLAN_VIEW))
   })
 })
 

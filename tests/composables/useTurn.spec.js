@@ -18,6 +18,7 @@ import { useTownsStore } from '@/stores/towns'
 import { useTrackStore } from '@/stores/track'
 import { useTrainsStore } from '@/stores/trains'
 import { useDemandCardsStore } from '@/stores/demandCards'
+import { useTrainStopStore } from '@/stores/trainStop'
 import { gameRules } from '@/config/game'
 
 // autoSave is stubbed so these tests exercise turn logic, not persistence
@@ -328,6 +329,24 @@ describe('useTurn', () => {
       endTurn()
 
       expect(trainsStore.trainOf(1).hasActed).toBe(false)
+    })
+
+    it('should close the stop card and clear the report of the last move, even in a solo game', () => {
+      seedPlayers(['Alice'])
+      useTownsStore().setTowns([
+        { name: 'Alpha', msa: 'A', lat: 0, lon: 0, size: 'small', industries: [{ name: 'Coal' }] }
+      ])
+      gameStore.setGameState({ turn: 2 })
+      const trainStopStore = useTrainStopStore()
+      trainStopStore.report(useTrainsStore().placeTrain(1, 'A'), () => 'Your train is in Alpha.')
+      trainStopStore.arrive()
+      expect(trainStopStore.stopTown?.name).toBe('Alpha')
+      const { endTurn } = useTurn()
+
+      endTurn()
+
+      expect(trainStopStore.stopTown).toBeNull()
+      expect(trainStopStore.notice).toBeNull()
     })
   })
 

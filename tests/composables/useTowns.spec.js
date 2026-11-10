@@ -17,6 +17,9 @@
  * Towns are drawn bigger in the Build view than in the Plan view. A town
  * clicked in the Plan view takes the player to the Build view over it.
  *
+ * The commodity icons of the town a person's train stands in are ringed and
+ * shown in either view, and clicking one loads it onto the train.
+ *
  * These tests run against a real Leaflet map with Geoman attached, because
  * the behavior under test is Geoman's own removal mode.
  */
@@ -28,6 +31,9 @@ import { useTowns } from '@/composables/map/useTowns'
 import { useMapStore } from '@/stores/map'
 import { useDemandCardsStore } from '@/stores/demandCards'
 import { usePlayerStore } from '@/stores/players'
+import { useTownsStore } from '@/stores/towns'
+import { useGameStore } from '@/stores/game'
+import { useTrainsStore } from '@/stores/trains'
 import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 
 /** Two towns, Pueblo producing two commodities */
@@ -241,6 +247,64 @@ describe('useTowns', () => {
       expect(dotOf(markers, 'Pueblo').classList).toContain('is-demand-marked')
       // Pueblo produces the coal, but is not where it is going
       expect(dotOf(markers, 'Pueblo').style.boxShadow).toBe('')
+    })
+  })
+
+  describe('loading from the map', () => {
+    /** The test towns, each with an id, as the trains store finds them */
+    const stopTowns = towns.map((town) => ({ ...town, msa: town.name }))
+
+    /**
+     * Starts a game past the building rounds with Ann's train in a town,
+     * then draws the towns.
+     * @param {string} name - The town
+     * @returns {number} Ann's player id
+     */
+    function annsTrainIn(name) {
+      useTownsStore().setTowns(stopTowns)
+      const playerStore = usePlayerStore()
+      playerStore.addPlayer({ name: 'Ann', color: 'red', cash: 40000 })
+      playerStore.startGame()
+      useGameStore().setGameState({ turn: 2 })
+      const annId = playerStore.activePlayer.id
+      useTrainsStore().placeTrain(annId, name)
+      useTowns().addTownsToMap(map, ref(stopTowns))
+      return annId
+    }
+
+    /** Whether each of Pueblo's two commodity icons is ringed for loading */
+    const iconsPickable = () =>
+      Object.values(commodityIcons()).map((img) => img.classList.contains('is-pickable'))
+
+    it("should ring the train's town's commodities, and show them in the Build view", () => {
+      useMapStore().setViewMode(BUILD_VIEW)
+      annsTrainIn('Pueblo')
+
+      expect(iconsPickable()).toEqual([true, true])
+      expect(iconsHidden()).toEqual([false, false])
+    })
+
+    it("should not ring another town's commodities", () => {
+      annsTrainIn('Denver-Aurora')
+
+      expect(iconsPickable()).toEqual([false, false])
+    })
+
+    it('should load the commodity whose icon is clicked', () => {
+      const annId = annsTrainIn('Pueblo')
+
+      commodityIcons()['Coal Mining'].click()
+
+      expect(useTrainsStore().trainOf(annId).loads).toEqual(['Coal Mining'])
+    })
+
+    it('should not ring anything while track is being drawn', async () => {
+      annsTrainIn('Pueblo')
+
+      useMapStore().setIsDrawingActive(true)
+      await nextTick()
+
+      expect(iconsPickable()).toEqual([false, false])
     })
   })
 

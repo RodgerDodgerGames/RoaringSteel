@@ -7,8 +7,12 @@
  * sentence for the player.
  *
  * The rules themselves are all in the trains store; this only puts them in
- * front of a person. It also runs choosing a town on the map: while that is
- * on, clicking a town places the train there, or runs it there.
+ * front of a person. Loading and unloading, and the report of how each
+ * action went, are shared with the map's stop card and commodity icons
+ * through the train stop store. This also runs choosing a town on the map:
+ * while that is on, clicking a town places the train there, or runs it
+ * there. Placing the train in a town, or running it into one, opens the
+ * town's stop card when it has anything for the train.
  *
  * Must be called from a component's setup: it stops choosing a town when
  * that component goes, and listens for Escape.
@@ -16,13 +20,14 @@
  * @module composables/useTrainControls
  */
 
-import { ref, computed, watch, inject, onBeforeUnmount } from 'vue'
+import { computed, watch, inject, onBeforeUnmount } from 'vue'
 import { onKeyStroke } from '@vueuse/core'
 import { usePlayerStore } from '@/stores/players'
 import { useGameStore } from '@/stores/game'
 import { useTrainsStore } from '@/stores/trains'
 import { useTownsStore } from '@/stores/towns'
 import { useMapStore } from '@/stores/map'
+import { useTrainStopStore } from '@/stores/trainStop'
 import { buildTrackKey } from '@/composables/map/useBuildTrack'
 import { formatCurrency } from '@/composables/utils'
 import { formatDistance } from '@/composables/boardScale'
@@ -33,6 +38,7 @@ export function useTrainControls() {
   const trainsStore = useTrainsStore()
   const townsStore = useTownsStore()
   const mapStore = useMapStore()
+  const trainStopStore = useTrainStopStore()
   // The game view's build-track instance, so choosing a town can end any
   // drawing or removal first: all three act on map clicks
   const buildTrack = inject(buildTrackKey, null)
@@ -74,28 +80,18 @@ export function useTrainControls() {
     moveBlock.value ? [] : trainsStore.destinations(playerId.value)
   )
 
-  /** What the train can pick up and deliver where it stands */
-  const pickups = computed(() => trainsStore.pickupOptions(playerId.value))
-  const deliveries = computed(() => trainsStore.deliveryOptions(playerId.value))
+  /**
+   * What the train can pick up and deliver where it stands: the same lists
+   * the map's stop card shows (see the train stop store)
+   */
+  const pickups = computed(() => trainStopStore.pickups)
+  const deliveries = computed(() => trainStopStore.deliveries)
 
   /** Every town, by name, for placing the train */
   const towns = computed(() => [...townsStore.towns].sort((a, b) => a.name.localeCompare(b.name)))
 
   /** What the last action did, or why it could not: { text, isError } */
-  const notice = ref(null)
-
-  /**
-   * Shows how an action went.
-   * @param {{ok: boolean, error?: string}} result - What the store answered
-   * @param {Function} describe - Makes the sentence for a success, from the result
-   * @returns {Object} The result, passed through
-   */
-  function report(result, describe) {
-    notice.value = result.ok
-      ? { text: describe(result), isError: false }
-      : { text: result.error, isError: true }
-    return result
-  }
+  const notice = computed(() => trainStopStore.notice)
 
   /**
    * A player's name, for saying who was paid.
@@ -111,10 +107,11 @@ export function useTrainControls() {
    * @param {string} townId - The town's id
    */
   function place(townId) {
-    report(
+    const result = trainStopStore.report(
       trainsStore.placeTrain(playerId.value, townId),
       () => `Your train is in ${town.value.name}.`
     )
+    if (result.ok) trainStopStore.arrive()
   }
 
   /**
@@ -123,44 +120,25 @@ export function useTrainControls() {
    */
   function move(townId) {
     const target = townsStore.towns.find((t) => t.msa === townId)
-    report(trainsStore.moveTrain(playerId.value, townId), ({ arrived, km, paid }) => {
-      const run = arrived
-        ? `Arrived in ${target.name} (${Math.round(km)} km).`
-        : `Ran ${Math.round(km)} km toward ${target.name} and stopped on the way.`
-      const fees = paid.map(
-        ({ ownerId, amount }) => `${formatCurrency(amount)} to ${nameOf(ownerId)}`
-      )
-      return fees.length ? `${run} Paid ${fees.join(' and ')} to use their track.` : run
-    })
-  }
-
-  /**
-   * Loads one of the town's commodities.
-   * @param {string} industry - The commodity
-   */
-  function pickUp(industry) {
-    report(trainsStore.pickUp(playerId.value, industry), () => `Loaded ${industry}.`)
-  }
-
-  /**
-   * Delivers a load for one of the player's demands.
-   * @param {number} cardId - The card
-   * @param {number} line - The demand's place on the card
-   */
-  function deliver(cardId, line) {
-    report(
-      trainsStore.deliver(playerId.value, cardId, line),
-      ({ payoff }) => `Delivered for ${formatCurrency(payoff)}. A new demand card was drawn.`
+    const result = trainStopStore.report(
+      trainsStore.moveTrain(playerId.value, townId),
+      ({ arrived, km, paid }) => {
+        const run = arrived
+          ? `Arrived in ${target.name} (${Math.round(km)} km).`
+          : `Ran ${Math.round(km)} km toward ${target.name} and stopped on the way.`
+        const fees = paid.map(
+          ({ ownerId, amount }) => `${formatCurrency(amount)} to ${nameOf(ownerId)}`
+        )
+        return fees.length ? `${run} Paid ${fees.join(' and ')} to use their track.` : run
+      }
     )
+    // Stopped on the way, the train is in no town, and any card closes
+    if (result.ok) trainStopStore.arrive()
   }
 
-  /**
-   * Drops a load in the town, for nothing.
-   * @param {string} industry - The commodity
-   */
-  function drop(industry) {
-    report(trainsStore.dropLoad(playerId.value, industry), () => `Dropped ${industry}.`)
-  }
+  // Loading and unloading go through the train stop store, which the map's
+  // stop card and commodity icons use too
+  const { pickUp, deliver, drop } = trainStopStore
 
   // CHOOSING A TOWN ON THE MAP
 
@@ -196,11 +174,9 @@ export function useTrainControls() {
     mapStore.setTownPicker(null)
   }
 
-  // A new turn starts clean: no choosing, no report of the last player's moves
-  watch(playerId, () => {
-    stopPicking()
-    notice.value = null
-  })
+  // A new turn starts clean: no choosing (the train stop store clears the
+  // report of the last turn's moves)
+  watch(playerId, stopPicking)
   onKeyStroke('Escape', stopPicking)
   onBeforeUnmount(stopPicking)
 

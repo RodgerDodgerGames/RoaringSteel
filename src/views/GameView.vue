@@ -40,6 +40,7 @@ import GameTopBar from '@/components/GameTopBar.vue'
 import MainMap from '@/components/map/MainMap.vue'
 import MapModeHint from '@/components/map/MapModeHint.vue'
 import MapLegend from '@/components/map/MapLegend.vue'
+import TownStopCard from '@/components/map/TownStopCard.vue'
 import PlayerDock from '@/components/panel/PlayerDock.vue'
 import DemandStrip from '@/components/demands/DemandStrip.vue'
 import GameOverDialog from '@/components/dialogs/GameOverDialog.vue'
@@ -102,6 +103,8 @@ onBeforeUnmount(() => document.documentElement.classList.remove(PAGE_CLASS))
           :is-removing="isRemoving"
           :pick-prompt="pickPrompt"
         />
+        <!-- What the train can load and deliver in the town it just reached -->
+        <TownStopCard />
         <!-- What the towns, track and icons on the map mean -->
         <MapLegend />
       </div>

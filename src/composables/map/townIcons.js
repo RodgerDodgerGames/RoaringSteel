@@ -122,6 +122,24 @@ export function buildingPosition(size) {
 }
 
 /**
+ * How wide a circle round a town's center its commodity icons have to stay
+ * clear of (see `iconRingRadius`): the shape in the Plan view; in the Build
+ * view the building too, which rises above the shape, where the icons fan
+ * out. Clear of it, an icon shown in the Build view (a demand line's, or one
+ * the train can load) is neither hidden behind the building nor covered by
+ * it for clicks.
+ * @param {string} size - The town's size
+ * @param {string} view - The map's view
+ * @returns {number} The circle's width, in px
+ */
+export function iconClearance(size, view) {
+  const shape = shapeSize(size, view)
+  if (view === PLAN_VIEW) return shape
+  const rise = shape / 2 - buildingPosition(size).top
+  return Math.max(shape, 2 * rise)
+}
+
+/**
  * The markup for a town's icon on the map: its shape, filled with
  * TOWN_COLOR, with its building standing on it. The building is always
  * there; the Plan view hides it with CSS.

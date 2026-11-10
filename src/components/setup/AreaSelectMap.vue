@@ -43,7 +43,7 @@ const props = defineProps({
 const emit = defineEmits(['select'])
 
 /**
- * How the boards are drawn, in the game's Western Line
+ * How the boards and state lines are drawn, in the game's Western Line
  * colors: boards on timetable paper with a boxcar red edge, the chosen
  * board filled red, and the state lines in thin coal.
  */
@@ -51,10 +51,17 @@ const BOARD_STYLE = {
   color: '#7A2E22',
   weight: 1.5,
   fillColor: '#F1E6CF',
-  fillOpacity: 0.15
+  fillOpacity: 0.35
 }
 const HOVER_STYLE = { weight: 2.5, fillOpacity: 0.6 }
 const SELECTED_STYLE = { color: '#7A2E22', weight: 3, fillColor: '#7A2E22', fillOpacity: 0.5 }
+const STATE_LINE_STYLE = {
+  color: '#2A211B',
+  weight: 0.75,
+  opacity: 0.45,
+  fill: false,
+  interactive: false
+}
 
 /** The lower 48 states, which the map opens on */
 const LOWER_48 = [
@@ -65,16 +72,22 @@ const LOWER_48 = [
 const mapContainer = ref(null)
 let map = null
 let boardsLayer = null
+let stateLinesLayer = null
 
 onMounted(() => {
   map = L.map(mapContainer.value, { attributionControl: false })
   map.fitBounds(LOWER_48)
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.{ext}', {
+  L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_terrain_background/{z}/{x}/{y}{r}.{ext}', {
     minZoom: 0,
     maxZoom: 18,
     ext: 'png'
   }).addTo(map)
+  // The state lines go in a pane of their own, above the boards, so they
+  // show over a chosen board's fill
+  map.createPane('stateLines').style.zIndex = 450
+  map.getPane('stateLines').style.pointerEvents = 'none'
   drawBoards()
+  drawStateLines()
 })
 
 onBeforeUnmount(() => {
@@ -115,8 +128,18 @@ function drawBoards() {
   ).addTo(map)
 }
 
+/** Draws the state lines, once the outlines are in */
+function drawStateLines() {
+  if (!map || stateLinesLayer || props.stateFeatures.length === 0) return
+  stateLinesLayer = L.geoJSON(
+    { type: 'FeatureCollection', features: props.stateFeatures },
+    { style: () => STATE_LINE_STYLE, pane: 'stateLines' }
+  ).addTo(map)
+}
+
 // A new grouping redraws the boards; a new choice only restyles them
 watch(() => props.boards, drawBoards)
+watch(() => props.stateFeatures, drawStateLines)
 watch(
   () => props.selectedKey,
   () => boardsLayer?.setStyle(styleFor)

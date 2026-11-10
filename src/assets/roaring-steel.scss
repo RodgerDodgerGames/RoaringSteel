@@ -159,13 +159,31 @@ $timetable-paper: #f1e6cf; // the panels, and light (drawn a shade deeper)
 /// 5. Fonts
 /////////////////////////////////////////////////////////////
 
-// All from Google Fonts:
+// From Google Fonts:
 // - Averia Serif Libre: the body text and the side panel (Bulma's
 //   $family-primary, section 2)
 // - Oswald: labels and buttons
 // - Rye: the game's name, in the top bar and on the welcome screen
 // - Libre Baskerville: town names on the map, in capitals
 @import url('https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Libre+Baskerville:wght@400;700&family=Oswald:wght@400..700&family=Rye&display=swap');
+
+// From 1001 Fonts, downloaded into ./fonts (each folder keeps its license).
+// They're loaded so any font slot below, or an is-family-* class, can use
+// them. `font-display: swap` shows the text in the fallback font while the
+// file loads, rather than hiding it.
+// - Eutemia: an ornate Western display face
+// - Saddlebag: a Western poster face
+@font-face {
+  font-family: 'Eutemia';
+  src: url('./fonts/eutemia-i/Eutemia.ttf') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Saddlebag';
+  src: url('./fonts/saddlebag/Saddlebag.ttf') format('truetype');
+  font-display: swap;
+}
 
 // Font slots: which font each part of the game uses. To try a different font
 // for a part, change its line here. The body text's font, which the town
@@ -198,6 +216,14 @@ $timetable-paper: #f1e6cf; // the panels, and light (drawn a shade deeper)
 
 .is-family-baskerville {
   font-family: 'Libre Baskerville', serif !important;
+}
+
+.is-family-eutemia {
+  font-family: 'Eutemia', serif !important;
+}
+
+.is-family-saddlebag {
+  font-family: 'Saddlebag', serif !important;
 }
 
 /////////////////////////////////////////////////////////////

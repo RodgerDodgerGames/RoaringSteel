@@ -99,6 +99,11 @@ export const CREDIT_GROUPS = [
         url: 'https://fonts.google.com/',
         note: 'The Rye, Oswald, Averia Serif Libre and Libre Baskerville typefaces'
       },
+      {
+        name: '1001 Fonts',
+        url: 'https://www.1001fonts.com/',
+        note: 'The Eutemia I and Saddlebag typefaces'
+      },
       { name: 'Font Awesome', url: 'https://fontawesome.com/', note: 'Interface icons' }
     ]
   },

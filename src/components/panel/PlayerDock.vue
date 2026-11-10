@@ -21,10 +21,11 @@
 
   On a computer player's turn there is nothing for a person to do: the
   steps and End Turn give way to a note that the computer player is taking
-  its turn (it plays and ends it by itself — see useBotRunner). Whenever
-  there are computer players, what each did on its last turn is listed too,
-  so the people at the table can catch up on what happened while they
-  waited.
+  its turn (it plays and ends it by itself — see useBotRunner).
+
+  Under the steps, whoever's turn it is and once the game is over, is the
+  turn history: what every player has done, so the people at the table can
+  catch up on what happened while they waited (TurnHistory).
 
   The middle scrolls on its own if it outgrows the window, so the player card
   and End Turn never leave the screen.
@@ -41,9 +42,9 @@ import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import MoveControls from '@/components/panel/MoveControls.vue'
 import BuildControls from '@/components/panel/BuildControls.vue'
 import UpgradeControls from '@/components/panel/UpgradeControls.vue'
+import TurnHistory from '@/components/panel/TurnHistory.vue'
 import { useGameStore } from '@/stores/game'
 import { usePlayerStore } from '@/stores/players'
-import { useBotsStore } from '@/stores/bots'
 import { useTurn } from '@/composables/useTurn'
 import { gameRules } from '@/config/game'
 
@@ -56,12 +57,6 @@ const { nextPlayer, playsAgain, endTurn, canDiscardHand, discardHand } = useTurn
 
 /** Whether the turn is a computer player's, which plays itself */
 const isBotTurn = computed(() => playerStore.activePlayer?.isBot === true)
-
-/** Each computer player's last turn, the latest first */
-const { reports: botReports } = storeToRefs(useBotsStore())
-
-/** A player's name, by id */
-const nameOf = (playerId) => playerStore.players.find((p) => p.id === playerId)?.name ?? ''
 
 /** The winner, once there is one */
 const winner = computed(() => playerStore.players.find((p) => p.id === winnerId.value))
@@ -165,22 +160,8 @@ function confirmDiscardHand() {
         </CollapsibleSection>
       </template>
 
-      <!-- What the computer players did last -->
-      <CollapsibleSection v-if="botReports.length" title="Computer players" storage-key="dock_bots">
-        <ul class="bot-reports">
-          <li v-for="report in botReports" :key="report.playerId" class="bot-report">
-            <span class="bot-report__round">Round {{ report.round + 1 }}</span>
-            {{ report.summary }}
-            <span
-              v-if="report.hadProblem"
-              class="bot-report__problem"
-              :title="`The rules refused something ${nameOf(report.playerId)} tried; see the browser console.`"
-            >
-              (hit a problem)
-            </span>
-          </li>
-        </ul>
-      </CollapsibleSection>
+      <!-- What every player has done, the latest first -->
+      <TurnHistory />
     </div>
 
     <footer v-if="!isOver && !isBotTurn" class="player-dock__footer">
@@ -279,23 +260,6 @@ function confirmDiscardHand() {
   gap: 0.5rem;
   padding: 1rem;
   font-weight: 700;
-}
-
-.bot-reports {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  list-style: none;
-  font-size: 0.85rem;
-}
-
-.bot-report__round {
-  margin-right: 0.25rem;
-  font-weight: 700;
-}
-
-.bot-report__problem {
-  color: var(--bulma-danger);
 }
 
 /* Where the steps were, once the game is over */

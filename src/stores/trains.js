@@ -25,6 +25,10 @@
  * use anyone's, paying each other owner whose track it runs on a fee, once
  * per turn (`gameRules.trackUseFee`).
  *
+ * Every action that goes through is also recorded in the turn history (see
+ * the history store), whoever takes it, so the table can read back what each
+ * player did.
+ *
  * Train Object Structure (keyed by player id, like the demand hands):
  * {
  *   type: string,           // A key of TRAIN_TYPES
@@ -50,6 +54,7 @@ import { usePlayerStore } from './players'
 import { useTownsStore } from './towns'
 import { useNetworkStore } from './network'
 import { useDemandCardsStore } from './demandCards'
+import { useHistoryStore } from './history'
 
 /**
  * A train as every player starts with it: a Freight, empty, not yet placed.
@@ -75,6 +80,7 @@ export const useTrainsStore = defineStore('trains', () => {
   const townsStore = useTownsStore()
   const networkStore = useNetworkStore()
   const demandCardsStore = useDemandCardsStore()
+  const historyStore = useHistoryStore()
   const { checkForWinner } = useVictory()
 
   // STATE
@@ -359,6 +365,7 @@ export const useTrainsStore = defineStore('trains', () => {
     const train = storedTrain(playerId)
     train.position = positionAtNode(networkStore.network, townKey(town))
     train.hasActed = true
+    historyStore.record(playerId, { type: 'place', town: town.name })
     return { ok: true }
   }
 
@@ -404,12 +411,9 @@ export const useTrainsStore = defineStore('trains', () => {
     train.position = run.position
     train.kmThisTurn += run.km
     train.hasActed = true
-    return {
-      ok: true,
-      arrived: run.arrived,
-      km: run.km,
-      paid: payTo.map((ownerId) => ({ ownerId, amount: gameRules.trackUseFee }))
-    }
+    const paid = payTo.map((ownerId) => ({ ownerId, amount: gameRules.trackUseFee }))
+    historyStore.record(playerId, { type: 'move', town: town.name, arrived: run.arrived, paid })
+    return { ok: true, arrived: run.arrived, km: run.km, paid }
   }
 
   /**
@@ -429,6 +433,7 @@ export const useTrainsStore = defineStore('trains', () => {
     const train = storedTrain(playerId)
     train.loads = [...train.loads, industry]
     train.hasActed = true
+    historyStore.record(playerId, { type: 'pickup', industry, town: townOf(playerId).name })
     return { ok: true }
   }
 
@@ -454,7 +459,14 @@ export const useTrainsStore = defineStore('trains', () => {
     playerStore.earnCash(playerId, option.demand.payoff)
     demandCardsStore.discardCard(playerId, cardId)
     train.hasActed = true
-    return { ok: true, payoff: option.demand.payoff, won: checkForWinner(playerId) }
+    const { industry, payoff } = option.demand
+    historyStore.record(playerId, {
+      type: 'deliver',
+      industry,
+      town: townOf(playerId).name,
+      payoff
+    })
+    return { ok: true, payoff, won: checkForWinner(playerId) }
   }
 
   /**
@@ -473,6 +485,7 @@ export const useTrainsStore = defineStore('trains', () => {
 
     train.loads = train.loads.filter((_, i) => i !== loadIndex)
     train.hasActed = true
+    historyStore.record(playerId, { type: 'drop', industry, town: townOf(playerId).name })
     return { ok: true }
   }
 
@@ -490,7 +503,10 @@ export const useTrainsStore = defineStore('trains', () => {
     if (option.error) return refuse(option.error)
     if (!playerStore.spendOnTrack(playerId, option.cost)) return refuse(playerStore.error)
 
-    storedTrain(playerId).type = toType
+    const train = storedTrain(playerId)
+    const from = TRAIN_TYPES[train.type].name
+    train.type = toType
+    historyStore.record(playerId, { type: 'upgrade', from, to: TRAIN_TYPES[toType].name })
     return { ok: true }
   }
 

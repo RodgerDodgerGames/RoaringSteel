@@ -14,6 +14,9 @@
  * player on someone else's turn — a fee for running on their track — counts
  * when their own turn comes round.
  *
+ * No turn ends once the game is won, so the winning turn is closed into the
+ * turn history (see the history store) as the win is declared.
+ *
  * @module composables/victory
  */
 
@@ -23,6 +26,7 @@ import { useGameStore } from '@/stores/game'
 import { usePlayerStore } from '@/stores/players'
 import { useTownsStore } from '@/stores/towns'
 import { useNetworkStore } from '@/stores/network'
+import { useHistoryStore } from '@/stores/history'
 
 /**
  * How many major cities a player must join to win, out of however many the
@@ -39,6 +43,7 @@ export function useVictory() {
   const playerStore = usePlayerStore()
   const townsStore = useTownsStore()
   const networkStore = useNetworkStore()
+  const historyStore = useHistoryStore()
 
   /**
    * How close a player is to winning: their cash against what is needed,
@@ -63,7 +68,8 @@ export function useVictory() {
   }
 
   /**
-   * Ends the game if a player has won.
+   * Ends the game if a player has won, closing their winning turn into the
+   * history.
    * @param {number} playerId - The player to check
    * @returns {boolean} True if they have won (now, or already)
    */
@@ -71,6 +77,7 @@ export function useVictory() {
     if (gameStore.winnerId !== null) return gameStore.winnerId === playerId
     if (!progress(playerId).hasWon) return false
     gameStore.declareWinner(playerId)
+    historyStore.closeTurn(playerId)
     return true
   }
 

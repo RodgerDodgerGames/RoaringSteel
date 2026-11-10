@@ -17,6 +17,7 @@ import { useTrainsStore } from '@/stores/trains'
 import { useTownsStore } from '@/stores/towns'
 import { useGridStore } from '@/stores/grid'
 import { useMapStore } from '@/stores/map'
+import { useHistoryStore } from '@/stores/history'
 import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 import { useGamePersistence } from '@/composables/useGamePersistence'
 import { getGrid, putGrid } from '@/composables/database'
@@ -504,6 +505,31 @@ describe('useGamePersistence', () => {
 
       expect(useTrainsStore().trainOf(1).type).toBe('fastFreight')
       expect(useTrainsStore().trainOf(2).type).toBe('freight')
+    })
+
+    it('should carry the turn history, and the turn in progress, through a save and reload', async () => {
+      const historyStore = useHistoryStore()
+      historyStore.record(1, { type: 'discard' })
+      historyStore.closeTurn(1)
+      historyStore.record(2, { type: 'place', town: 'Denver' })
+      // Copied, so the comparison is with the history as it was saved
+      const { turns, current } = JSON.parse(
+        JSON.stringify({ turns: historyStore.turns, current: historyStore.current })
+      )
+
+      await roundTrip()
+
+      expect(historyStore.turns).toEqual(turns)
+      expect(historyStore.current).toEqual(current)
+    })
+
+    it('should start a new game with an empty history', () => {
+      const historyStore = useHistoryStore()
+      historyStore.closeTurn(1)
+
+      persistence.startNewGame()
+
+      expect(historyStore.turns).toEqual([])
     })
 
     it('should keep the winner of a game that is over', async () => {

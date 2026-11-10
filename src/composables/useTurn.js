@@ -6,7 +6,9 @@
  * Ending a turn also clears the finishing player's track building allowance
  * and what their train did this turn, and checks whether they have won (see
  * victory.js) — a win made by building the last link to a city shows up
- * here. Once someone has won, no more turns are played.
+ * here. Once someone has won, no more turns are played. The finished turn
+ * goes into the turn history (see the history store) as play moves on; a
+ * winning turn has gone in already, as the win was declared.
  *
  * A player may instead give up their turn to throw in their hand of demand
  * cards for a new one (`discardHand`), as long as they have not yet done
@@ -26,6 +28,7 @@ import { usePlayerStore } from '@/stores/players'
 import { useTrainsStore } from '@/stores/trains'
 import { useDemandCardsStore } from '@/stores/demandCards'
 import { useTrainStopStore } from '@/stores/trainStop'
+import { useHistoryStore } from '@/stores/history'
 import { useVictory } from '@/composables/victory'
 import { useGamePersistence } from '@/composables/useGamePersistence'
 import { turnAfter } from '@/composables/turnOrder'
@@ -36,6 +39,7 @@ export function useTurn() {
   const trainsStore = useTrainsStore()
   const demandCardsStore = useDemandCardsStore()
   const trainStopStore = useTrainStopStore()
+  const historyStore = useHistoryStore()
   const { autoSave } = useGamePersistence()
   const { checkForWinner } = useVictory()
 
@@ -97,6 +101,10 @@ export function useTurn() {
 
     if (!playerStore.setActivePlayer(nextPlayer.value.id)) return false
 
+    // Closed before the round moves on: the history files the turn under
+    // the round it was played in, and reads that round's track off the board
+    if (finishingId !== undefined) historyStore.closeTurn(finishingId)
+
     // The build allowance is per turn, so it is cleared as the turn ends
     // rather than when it next comes round — a player who never builds still
     // gets a full budget back, and the counter in the save is always the
@@ -135,7 +143,9 @@ export function useTurn() {
    */
   function discardHand() {
     if (!canDiscardHand.value) return false
-    demandCardsStore.discardHand(playerStore.activePlayer.id)
+    const playerId = playerStore.activePlayer.id
+    demandCardsStore.discardHand(playerId)
+    historyStore.record(playerId, { type: 'discard' })
     return endTurn()
   }
 

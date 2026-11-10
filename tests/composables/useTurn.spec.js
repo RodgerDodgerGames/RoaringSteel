@@ -8,6 +8,7 @@
  * - Naming who is up next
  * - Auto-saving after each turn
  * - Clearing the finishing player's track building allowance
+ * - Closing the finished turn into the turn history
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -19,6 +20,7 @@ import { useTrackStore } from '@/stores/track'
 import { useTrainsStore } from '@/stores/trains'
 import { useDemandCardsStore } from '@/stores/demandCards'
 import { useTrainStopStore } from '@/stores/trainStop'
+import { useHistoryStore } from '@/stores/history'
 import { gameRules } from '@/config/game'
 
 // autoSave is stubbed so these tests exercise turn logic, not persistence
@@ -184,6 +186,30 @@ describe('useTurn', () => {
     })
   })
 
+  describe('the turn history', () => {
+    it('should close the finished turn under its own player and round', () => {
+      seedPlayers(['Alice', 'Bob'])
+      const { endTurn } = useTurn()
+
+      endTurn() // Alice -> Bob
+      endTurn() // Bob -> Bob, who opens the second building round
+
+      expect(useHistoryStore().turns).toMatchObject([
+        { playerId: 1, round: 0 },
+        { playerId: 2, round: 0 }
+      ])
+    })
+
+    it('should not close a turn that could not be ended', () => {
+      seedPlayers(['Alice'])
+      gameStore.declareWinner(1)
+
+      useTurn().endTurn()
+
+      expect(useHistoryStore().turns).toEqual([])
+    })
+  })
+
   describe('the switchback start', () => {
     it('should play the building rounds out and back, then normal rounds in order', () => {
       seedPlayers()
@@ -296,6 +322,14 @@ describe('useTurn', () => {
       expect(autoSave).toHaveBeenCalled()
     })
 
+    it('should close the winning turn into the history, marked as won', () => {
+      playerStore.updatePlayer(1, { cash: gameRules.victory.cash })
+
+      useTurn().endTurn()
+
+      expect(useHistoryStore().turns).toMatchObject([{ playerId: 1, won: true }])
+    })
+
     it('should pass the turn as usual short of the winning cash', () => {
       playerStore.updatePlayer(1, { cash: gameRules.victory.cash - 1 })
       const { endTurn } = useTurn()
@@ -372,6 +406,14 @@ describe('useTurn', () => {
           .map((c) => c.id)
       ).toEqual([4, 5, 6])
       expect(playerStore.activePlayer.name).toBe('Bob')
+    })
+
+    it('should go into the history as the whole of the turn', () => {
+      useTurn().discardHand()
+
+      expect(useHistoryStore().turns).toMatchObject([
+        { playerId: 1, events: [{ type: 'discard' }] }
+      ])
     })
 
     it('should be refused once the player has built this turn', () => {

@@ -6,7 +6,7 @@
  * up, delivering and dropping loads, and changing the train for another
  * kind. Each action answers { ok, error }, and is refused outside the
  * player's own turn, in the building rounds, and once they have started
- * building.
+ * building. Each that goes through is recorded in the turn history.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
@@ -16,6 +16,7 @@ import { useGameStore } from '@/stores/game'
 import { useTownsStore } from '@/stores/towns'
 import { useTrackStore } from '@/stores/track'
 import { useDemandCardsStore } from '@/stores/demandCards'
+import { useHistoryStore } from '@/stores/history'
 import { gameRules } from '@/config/game'
 import { trainRangeKm } from '@/config/trains'
 import { kmBetween } from '@/composables/map/trackCost'
@@ -358,6 +359,24 @@ describe('trains store', () => {
       expect(gameStore.winnerId).toBe(ANN)
     })
 
+    it('should close the winning turn into the history, since no turn ends after it', () => {
+      lay(ANN, 'East', 'Far')
+      playerStore.updatePlayer(ANN, { cash: gameRules.victory.cash - 9000 })
+
+      store.deliver(ANN, 7, 0)
+
+      const history = useHistoryStore()
+      expect(history.current).toBeNull()
+      expect(history.turns).toHaveLength(1)
+      expect(history.turns[0]).toMatchObject({ playerId: ANN, round: 2, won: true })
+      expect(history.turns[0].events.at(-1)).toEqual({
+        type: 'deliver',
+        industry: 'Beef',
+        town: 'East',
+        payoff: 9000
+      })
+    })
+
     it('should not end the game with the cash but not the cities', () => {
       playerStore.updatePlayer(ANN, { cash: gameRules.victory.cash })
 
@@ -445,6 +464,50 @@ describe('trains store', () => {
       store.endTurn(ANN)
 
       expect(store.kmLeft(ANN)).toBe(trainRangeKm('fastFreight', SPEED_UNIT_KM))
+    })
+  })
+
+  describe('the turn history', () => {
+    /** What the turn in progress has recorded so far */
+    const recorded = () => useHistoryStore().current?.events ?? []
+
+    it('should record what the train does, as it is done', () => {
+      store.placeTrain(ANN, 'Middle')
+      store.pickUp(ANN, 'Beef')
+      store.moveTrain(ANN, 'East')
+      store.dropLoad(ANN, 'Beef')
+
+      expect(recorded()).toEqual([
+        { type: 'place', town: 'Middle' },
+        { type: 'pickup', industry: 'Beef', town: 'Middle' },
+        { type: 'move', town: 'East', arrived: true, paid: [] },
+        { type: 'drop', industry: 'Beef', town: 'East' }
+      ])
+    })
+
+    it("should record the fees paid to run on another player's track", () => {
+      store.placeTrain(ANN, 'East')
+      store.moveTrain(ANN, 'Far')
+
+      expect(recorded().at(-1)).toEqual({
+        type: 'move',
+        town: 'Far',
+        arrived: true,
+        paid: [{ ownerId: BO, amount: gameRules.trackUseFee }]
+      })
+    })
+
+    it('should record an upgrade with the train it replaced', () => {
+      store.changeTrain(ANN, 'fastFreight')
+
+      expect(recorded()).toEqual([{ type: 'upgrade', from: 'Freight', to: 'Fast Freight' }])
+    })
+
+    it('should record nothing the rules refused', () => {
+      store.placeTrain(ANN, 'Nowhere')
+      store.moveTrain(ANN, 'East')
+
+      expect(recorded()).toEqual([])
     })
   })
 

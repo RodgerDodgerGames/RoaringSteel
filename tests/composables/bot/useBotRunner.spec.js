@@ -11,14 +11,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { effectScope, nextTick } from 'vue'
 import { usePlayerStore } from '@/stores/players'
 import { useGameStore } from '@/stores/game'
-import { useBotsStore } from '@/stores/bots'
+import { useHistoryStore } from '@/stores/history'
 import { useBotRunner, BOT_PAUSE_MS, THINK_DELAY_MS } from '@/composables/bot/useBotRunner'
 
 // The turn itself is tested in useBot.spec.js; here it only has to be called
 const playTurn = vi.fn()
 vi.mock('@/composables/bot/useBot', () => ({
-  useBot: () => ({ playTurn }),
-  describeTurn: (name) => `${name} played.`
+  useBot: () => ({ playTurn })
 }))
 
 describe('useBotRunner', () => {
@@ -64,12 +63,13 @@ describe('useBotRunner', () => {
 
     await vi.advanceTimersByTimeAsync(THINK_DELAY_MS)
     expect(playTurn).toHaveBeenCalledWith(1)
-    // Still up for people to read
+    // Still up for people to look at the map
     expect(playerStore.activePlayer.name).toBe('Bot 1')
-    expect(useBotsStore().reports[0]).toMatchObject({ playerId: 1, summary: 'Bot 1 played.' })
 
     await vi.advanceTimersByTimeAsync(BOT_PAUSE_MS)
     expect(playerStore.activePlayer.name).toBe('Ann')
+    // Ended like anyone's turn, so it is in the history
+    expect(useHistoryStore().turns).toMatchObject([{ playerId: 1, hadProblem: false }])
   })
 
   it("should leave a person's turn alone", async () => {
@@ -177,7 +177,7 @@ describe('useBotRunner', () => {
 
     await wholeTurn()
 
-    expect(useBotsStore().reports[0]).toMatchObject({ playerId: 1, hadProblem: true })
+    expect(useHistoryStore().turns).toMatchObject([{ playerId: 1, hadProblem: true }])
     expect(playerStore.activePlayer.name).toBe('Ann')
   })
 })

@@ -5,11 +5,11 @@
  * people at the table can follow. When a computer player's turn comes:
  * 1. a moment's wait (`THINK_DELAY_MS`), so the screen can show whose turn
  *    it is before the work of the turn holds the browser up;
- * 2. the whole turn is played at once (see useBot.js), and what it did is
- *    put up for everyone to read (see the bots store) — and, in debug
- *    mode, printed to the console with the reasoning behind it (see
- *    botTurnLog.js);
- * 3. a pause (`BOT_PAUSE_MS`), so the map and the summary can be taken in;
+ * 2. the whole turn is played at once (see useBot.js). What it did goes
+ *    into the turn history like anyone's turn (see the history store), and,
+ *    in debug mode, is printed to the console with the reasoning behind it
+ *    (see botTurnLog.js);
+ * 3. a pause (`BOT_PAUSE_MS`), so the map can be taken in;
  * 4. the turn is ended, and the next player is up — another computer
  *    player's turn starts over at step 1.
  *
@@ -19,8 +19,8 @@
  * rather than playing or ending a turn in it.
  *
  * A computer player's turn that goes wrong in a way nobody foresaw (the code
- * throws) is not allowed to stop the game: it is logged, put up as a
- * problem, and the turn is ended as it stands.
+ * throws) is not allowed to stop the game: it is logged, marked as a
+ * problem in the turn history, and the turn is ended as it stands.
  *
  * @module composables/bot/useBotRunner
  */
@@ -28,9 +28,9 @@
 import { watch, onScopeDispose } from 'vue'
 import { useGameStore } from '@/stores/game'
 import { usePlayerStore } from '@/stores/players'
-import { useBotsStore } from '@/stores/bots'
+import { useHistoryStore } from '@/stores/history'
 import { useTurn } from '@/composables/useTurn'
-import { useBot, describeTurn } from './useBot'
+import { useBot } from './useBot'
 import { logBotTurn } from './botTurnLog'
 
 /** How long a computer player's finished turn stays up before play moves on, in ms */
@@ -42,7 +42,7 @@ export const THINK_DELAY_MS = 50
 export function useBotRunner() {
   const gameStore = useGameStore()
   const playerStore = usePlayerStore()
-  const botsStore = useBotsStore()
+  const historyStore = useHistoryStore()
   const { endTurn } = useTurn()
   const { playTurn } = useBot()
 
@@ -73,8 +73,7 @@ export function useBotRunner() {
   }
 
   /**
-   * Plays a computer player's turn, puts up what it did, and ends the turn
-   * after the pause.
+   * Plays a computer player's turn, and ends it after the pause.
    * @param {Object} player - The computer player
    */
   function takeTurn(player) {
@@ -92,12 +91,9 @@ export function useBotRunner() {
     }
     // In debug mode, the turn and the reasoning behind it, in the console
     logBotTurn({ name: player.name, round, isBuildingRound, report })
-    botsStore.addReport({
-      playerId: player.id,
-      round,
-      summary: describeTurn(player.name, report.events),
-      hadProblem: report.errors.length > 0
-    })
+    // The turn's own record is kept as it plays (see the history store);
+    // all the runner adds is whether anything went wrong
+    if (report.errors.length) historyStore.flagProblem(player.id, round)
 
     // Throwing in the hand ends the turn by itself
     if (report.endedTurn) return schedule()

@@ -93,8 +93,8 @@ function handleConfirmed() {
           v-if="activePane === 'gameButtons'"
           class="buttons are-large mt-6 is-flex is-justify-content-center"
         >
-          <button class="button is-light is-outlined mr-6" @click="newGame">New Game</button>
-          <button class="button is-light is-outlined" @click="loadGame">Load Game</button>
+          <button class="button is-info is-outlined mr-6" @click="newGame">New Game</button>
+          <button class="button is-link is-outlined" @click="loadGame">Load Game</button>
         </div>
 
         <!-- Add player form -->
@@ -133,11 +133,26 @@ function handleConfirmed() {
   font-size: 4rem;
 }
 /* The night-sky picture is dark in light and dark mode alike, so the
-   title and subtitle are always timetable paper, and the buttons are pale
-   outlines (is-light is-outlined) */
+   title and subtitle are always timetable paper */
 .roaring-title,
 .roaring-subtitle {
   color: var(--timetable-paper);
+}
+/* The two buttons keep the colors they had before the Western Line
+   restyle: Bulma's default cyan for New Game and the old pink for Load
+   Game. The palette's own info and link colors (steel blue, denim) all but
+   vanish on the blue night sky. Bulma draws an outlined button's border and
+   text from --bulma-button-h/s/l, so setting those here recolors only these
+   two buttons and leaves is-info and is-link alone everywhere else. */
+.button.is-info.is-outlined {
+  --bulma-button-h: 198;
+  --bulma-button-s: 100%;
+  --bulma-button-l: 70%;
+}
+.button.is-link.is-outlined {
+  --bulma-button-h: 350;
+  --bulma-button-s: 93%;
+  --bulma-button-l: 73%;
 }
 #welcomeContainer {
   margin-bottom: 30%;

@@ -32,7 +32,7 @@ import { useMapStore } from '@/stores/map'
 import { useTrackStore } from '@/stores/track'
 import { useSettingsStore } from '@/stores/settings'
 import { useTrainsStore } from '@/stores/trains'
-import { useBotsStore } from '@/stores/bots'
+import { useHistoryStore } from '@/stores/history'
 import { useTrainStopStore } from '@/stores/trainStop'
 import { turnAfter } from '@/composables/turnOrder'
 import { packGrid, unpackGrid } from '@/composables/map/cellGrid'
@@ -58,7 +58,7 @@ export function useGamePersistence() {
   const trackStore = useTrackStore()
   const settingsStore = useSettingsStore()
   const trainsStore = useTrainsStore()
-  const botsStore = useBotsStore()
+  const historyStore = useHistoryStore()
   const trainStopStore = useTrainStopStore()
 
   /**
@@ -107,6 +107,8 @@ export function useGamePersistence() {
       // Every player's train: its kind, loads, where it is, and what it has
       // done this turn
       trains: trainsStore.trains,
+      // The turn history: every finished turn, and the turn in progress
+      history: { turns: historyStore.turns, current: historyStore.current },
       // The player's display settings at the time of saving. Copied, so the
       // snapshot doesn't follow later changes to the live settings.
       settings: { ...settingsStore.settings }
@@ -168,6 +170,7 @@ export function useGamePersistence() {
       }
       trackStore.setTrack(data.track)
       trainsStore.setTrains(data.trains)
+      historyStore.setHistory(data.history)
       if (data.mapView) mapStore.setMapView(data.mapView)
       // A save's settings replace the browser's (the player chose this: a game
       // picks up looking as it was saved)
@@ -184,7 +187,7 @@ export function useGamePersistence() {
   /**
    * Clears away every part of the game: region, turn, players, towns, grid,
    * demand cards, map view, track, trains, the train's open stop card, and
-   * what the computer players did last. Used before a save is restored, and
+   * the turn history. Used before a save is restored, and
    * when the game is given up for a new one.
    *
    * The player's settings are not part of this: they belong to the person at
@@ -200,7 +203,7 @@ export function useGamePersistence() {
     trackStore.reset()
     trainsStore.reset()
     trainStopStore.reset()
-    botsStore.reset()
+    historyStore.reset()
   }
 
   /**

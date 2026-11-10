@@ -40,7 +40,7 @@ describe('commodityIcons', () => {
       expect(crateUrl).toMatch(/\.svg\b/)
     })
 
-    it.each(['label_industry_curated.csv', 'label_industry_curated_test.csv'])(
+    it.each(['label_industry_curated.csv', 'game_industries.csv'])(
       'should have an icon of its own for every industry in %s',
       (file) => {
         const missing = industryCodes(file).filter((code) => {

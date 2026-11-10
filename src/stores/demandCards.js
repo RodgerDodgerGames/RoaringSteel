@@ -37,6 +37,7 @@ import { useSettingsStore } from './settings'
 import { useGameStore } from './game'
 import { PIN_COLORS } from '@/config/demands'
 import { demandPayoff, mapSpanKm } from '@/composables/payoffs'
+import { buildDemandDeck } from '@/composables/demandDeck'
 import { debug } from '@/composables/debug'
 
 /** How many demand cards each player holds, per the Empire Builder rules */
@@ -211,32 +212,6 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
       return
     }
 
-    const industries = []
-    const townWeights = []
-    const totalDemands = townsData.length * 6 // 6x the number of towns
-
-    // Aggregate industry data and calculate town weights
-    townsData.forEach((town) => {
-      townWeights.push(1 / (1 + town.industries.length)) // Weight inversely proportional to number of industries
-      town.industries.forEach((ind) => industries.push(ind.name))
-    })
-
-    // Calculate industry proportions
-    const industryCounts = industries.reduce((acc, ind) => {
-      acc[ind] = (acc[ind] || 0) + 1
-      return acc
-    }, {})
-    const totalIndustryCount = industries.length
-
-    const industryProportions = Object.keys(industryCounts).map((name) => ({
-      name,
-      proportion: industryCounts[name] / totalIndustryCount
-    }))
-
-    // Normalize town weights
-    const totalWeight = townWeights.reduce((a, b) => a + b, 0)
-    const normalizedTownWeights = townWeights.map((w) => w / totalWeight)
-
     // The distance between the map's two furthest-apart towns, which the
     // long-haul bonus is measured against. Worked out once here because it
     // compares every pair of towns (see payoffs.js)
@@ -248,75 +223,12 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
         `${turnsToCross.toFixed(1)} turns; speed unit ${speedUnitKm.toFixed(2)} km`
     )
 
-    // Generate demand options
-    const options = []
-    for (let i = 0; i < totalDemands; i++) {
-      const demandOptions = []
-      const visitedTowns = new Set()
-
-      // Add a tracking object to count how often each town is selected
-      const townSelectionCounts = Array(townsData.length).fill(0)
-
-      while (demandOptions.length < 3) {
-        // Adjust weights dynamically based on selection counts
-        const adjustedWeights = normalizedTownWeights.map((weight, idx) => {
-          // Inverse proportionality: towns selected more often get lower adjusted weight
-          return weight / (1 + townSelectionCounts[idx])
-        })
-
-        // Normalize the adjusted weights
-        const totalAdjustedWeight = adjustedWeights.reduce((a, b) => a + b, 0)
-        const finalWeights = adjustedWeights.map((w) => w / totalAdjustedWeight)
-
-        // Select a random destination town using the adjusted weights
-        let randTownIdx
-        do {
-          randTownIdx = weightedRandom(finalWeights)
-        } while (visitedTowns.has(randTownIdx))
-
-        const destination = townsData[randTownIdx]
-        visitedTowns.add(randTownIdx)
-
-        // Increment the selection count for the chosen town
-        townSelectionCounts[randTownIdx]++
-
-        debug.log(
-          `Destination: ${destination.name} (selected ${townSelectionCounts[randTownIdx]} times)`
-        )
-
-        // Select an industry, ensuring it's not produced by the destination town
-        const availableIndustries = industryProportions.filter(
-          (ind) => !destination.industries.some((prod) => prod.name === ind.name)
-        )
-
-        if (availableIndustries.length === 0) continue
-
-        const selectedIndustry = weightedRandomSelect(availableIndustries, 'proportion')
-        debug.log(`selected industry: ${selectedIndustry.name}`)
-
-        // Pays by how far the commodity has to come, with a bonus for long
-        // hauls (see payoffs.js)
-        const payoff = demandPayoff(
-          destination,
-          selectedIndustry.name,
-          townsData,
-          spanKm,
-          speedUnitKm
-        )
-
-        // Create a demand option
-        demandOptions.push({
-          destination: destination.name,
-          industry: selectedIndustry.name,
-          payoff
-        })
-      }
-
-      // Numbered in deck order; the id is what tells two cards apart once they
-      // are spread across the draw pile and players' hands
-      options.push({ id: options.length + 1, demands: demandOptions })
-    }
-
+    // Every town-and-commodity pair at most once, three to a card (see
+    // demandDeck.js). Each pays by how far the commodity has to come, with a
+    // bonus for long hauls (see payoffs.js).
+    const options = buildDemandDeck(townsData, (destination, industry) =>
+      demandPayoff(destination, industry, townsData, spanKm, speedUnitKm)
+    )
     drawPile.value = options
 
     // Summarize the demand cards
@@ -349,27 +261,6 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
 
     if (playerIds.some((playerId) => handOf(playerId).length < HAND_SIZE)) {
       console.warn('The demand deck ran out before every hand was full')
-    }
-  }
-
-  // Helper to pick a random index based on weights
-  const weightedRandom = (weights) => {
-    const rand = Math.random()
-    let cumulative = 0
-    for (let i = 0; i < weights.length; i++) {
-      cumulative += weights[i]
-      if (rand < cumulative) return i
-    }
-  }
-
-  // Helper to select weighted random from an array of objects
-  const weightedRandomSelect = (array, weightKey) => {
-    const totalWeight = array.reduce((acc, obj) => acc + obj[weightKey], 0)
-    const rand = Math.random() * totalWeight
-    let cumulative = 0
-    for (const obj of array) {
-      cumulative += obj[weightKey]
-      if (rand < cumulative) return obj
     }
   }
 

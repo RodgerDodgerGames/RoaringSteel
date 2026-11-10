@@ -71,10 +71,13 @@ describe('demandCards store', () => {
       useTownsStore().setTowns(towns)
     })
 
-    it('should build a deck of six cards per town, each with a unique id', () => {
+    it('should build a deck from the demands the towns have, each card with a unique id', () => {
       store.generateDemandCards()
 
-      expect(store.drawPile).toHaveLength(towns.length * 6)
+      // Four towns, each wanting the other three's commodities: twelve
+      // demands, enough for four cards at most (see demandDeck.spec.js)
+      expect(store.drawPile.length).toBeGreaterThan(0)
+      expect(store.drawPile.length).toBeLessThanOrEqual(4)
       expect(new Set(idsOf(store.drawPile)).size).toBe(store.drawPile.length)
     })
 

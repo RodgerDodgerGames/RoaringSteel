@@ -14,7 +14,10 @@
  * 3. Place each MSA's town at its main city, from TigerWeb (see useTigerWeb.js)
  * 4. Leave out the towns whose main city is off the board
  * 5. Classify towns by population (small/medium/large)
- * 6. Assign industries based on employment density
+ * 6. For the towns' areas the jobs data has no numbers for as areas, add up
+ *    their counties' jobs instead (see the industry store's `fillAreas`)
+ * 7. Give the towns their industries: each the things its jobs lean on most
+ *    (see townIndustries.js)
  *
  * Town Object Structure:
  * {
@@ -38,23 +41,13 @@ import { useIndustryStore } from './industry'
 import useCensus from '../composables/setup/useCensus'
 import getMSALatLon, { findPrincipalCity } from '../composables/setup/useTigerWeb'
 import { assignSizes } from '../composables/setup/townSizes'
+import { assignIndustries as assignTownIndustries } from '../composables/setup/townIndustries'
 import { regionTest } from '@/composables/map/region'
 import usStates from '@/config/usStates'
 import { fetchDataWindow } from '../composables/setup/dataWindow'
 import { isRefusal, refusalMessage } from '../composables/utils'
 import { readCache, writeCache } from '../composables/database'
 import { debug } from '@/composables/debug'
-
-/**
- * Maximum proportion of towns that can have any single industry (20%).
- * Not enforced yet: assignIndustries() never checks it. Kept, commented out,
- * for the upcoming review of how towns are set up, which will decide whether
- * the cap belongs in the game.
- */
-// const maxTownsForIndustry = 0.2
-
-/** Maximum number of industries a single town can have */
-const maxIndustries = 3
 
 /**
  * The steps of the town setup, as the towns store reports them (see
@@ -241,9 +234,10 @@ export const useTownsStore = defineStore('towns', () => {
    *   the setup screen need not name it
    * @param {Map<string, Promise>} placed - Where each area's town goes, as
    *   looked up so far in this setup (see `placeTown`); added to here
-   * @returns {Promise<{dataWindow: Object, sites: Array, employment: Array}|{error: string}>}
-   *   The state's sites and industry data, and the years they are for; or
-   *   what to tell the player when there are none
+   * @returns {Promise<{dataWindow: Object, sites: Array, employment: Array, totalJobs: Object}|{error: string}>}
+   *   The state's sites and industry data (each industry's jobs, and every
+   *   area's total), and the years they are for; or what to tell the player
+   *   when there are none
    */
   async function stateSites(state, isOneState, placed) {
     const where = isOneState ? '' : ` in ${stateName(state)}`
@@ -276,12 +270,14 @@ export const useTownsStore = defineStore('towns', () => {
     } finally {
       isLoadingIndustry.value = false
     }
-    const employment = [...industryStore.employmentData]
     const isComplete = industryStore.failedIndustries.length === 0
 
-    // Use the cached sites if they were built for the same years
+    // Use the cached sites if they were built for the same years. Their
+    // areas the jobs data has no numbers for are filled in from their
+    // counties, which, once done, is kept with the industry data.
     if (saved && saved.dataWindow.start === window.start && saved.dataWindow.end === window.end) {
-      return { dataWindow: window, sites: saved.sites, employment }
+      await fillAreas(state, window, saved.sites, where)
+      return { dataWindow: window, sites: saved.sites, ...jobsData() }
     }
 
     // Fetch population data for the state
@@ -355,8 +351,12 @@ export const useTownsStore = defineStore('towns', () => {
     // Every lookup that a town needs failed, or found nothing
     if (sites.length === 0) return fallBack(noTowns)
 
+    await fillAreas(state, window, sites, where)
+
     const built = { dataWindow: window, sites }
-    // Play with what came back, but leave a build with gaps out of the cache
+    // Play with what came back, but leave a build with gaps out of the cache.
+    // A gap in the counties' jobs does not count: those are kept with the
+    // industry data, and filled in next game whatever the sites' cache.
     if (missedTowns || !isComplete) {
       console.warn(`Not caching towns for state ${state}: some lookups failed`)
     } else {
@@ -364,7 +364,7 @@ export const useTownsStore = defineStore('towns', () => {
       await writeCache(cacheName, built)
       debug.log(`Cached town sites for state ${state}`)
     }
-    return { ...built, employment }
+    return { ...built, ...jobsData() }
   }
 
   /**
@@ -376,6 +376,39 @@ export const useTownsStore = defineStore('towns', () => {
   }
 
   // HELPERS
+
+  /**
+   * Fills in the jobs of a state's towns' areas that the jobs data has no
+   * numbers for (see the industry store's `fillAreas`). A failure leaves
+   * those towns making nothing this game.
+   * @param {string} state - The state's FIPS code
+   * @param {{start: number, end: number}} window - The data window
+   * @param {Array<{msa: string}>} sites - The state's town sites
+   * @param {string} where - " in Wisconsin" on a board of several states,
+   *   for the setup screen; empty on a board of one
+   * @returns {Promise<void>}
+   */
+  async function fillAreas(state, window, sites, where) {
+    const msaCodes = sites.map(({ msa }) => msa)
+    if (industryStore.areasToFill(msaCodes).length === 0) return
+    setStep(SETUP_STEPS.industry, `Fetching jobs by county${where}…`)
+    if (!(await industryStore.fillAreas(state, window, msaCodes))) {
+      console.warn(`Some towns in state ${state} have no jobs data this game`)
+    }
+  }
+
+  /**
+   * The industry store's data for the state just fetched, copied out before
+   * the next state's fetch replaces it.
+   * @returns {{employment: Array, totalJobs: Object}} Each industry's jobs,
+   *   and every area's total
+   */
+  function jobsData() {
+    return {
+      employment: [...industryStore.employmentData],
+      totalJobs: { ...industryStore.totalJobs }
+    }
+  }
 
   /**
    * Where an MSA's town goes: at its main city (see `findPrincipalCity`),
@@ -433,15 +466,11 @@ export const useTownsStore = defineStore('towns', () => {
    * cannot be had.
    * @param {string} state - The state's FIPS code
    * @param {{dataWindow: Object, sites: Array}} saved - From `savedSites`
-   * @returns {Promise<{dataWindow: Object, sites: Array, employment: Array}>}
+   * @returns {Promise<{dataWindow: Object, sites: Array, employment: Array, totalJobs: Object}>}
    */
   async function playFromCache(state, saved) {
     await industryStore.useIndustryData(state, saved.dataWindow, { anyWindow: true })
-    return {
-      dataWindow: saved.dataWindow,
-      sites: saved.sites,
-      employment: [...industryStore.employmentData]
-    }
+    return { dataWindow: saved.dataWindow, sites: saved.sites, ...jobsData() }
   }
 
   /**
@@ -461,12 +490,14 @@ export const useTownsStore = defineStore('towns', () => {
    * line between two of them made one (see `mergeSites`). The game is
    * played from the earliest of the states' years: the ones asked for, or,
    * for a state that fell back on its cache, the years that was built for.
-   * @param {Array<{dataWindow: Object, sites: Array, employment: Array}>} states -
+   * @param {Array<{dataWindow: Object, sites: Array, employment: Array, totalJobs: Object}>} states -
    *   Each state's sites and industry data, and the years they are for
    * @param {Function} isOnBoard - The board's point test (see `regionTest`)
    */
   function playStates(states, isOnBoard) {
-    industryStore.combineStates(states.map(({ employment }) => employment))
+    industryStore.combineStates(
+      states.map(({ employment, totalJobs }) => ({ employment, totalJobs }))
+    )
     const window = states
       .map(({ dataWindow }) => dataWindow)
       .reduce((earliest, next) => (next.end < earliest.end ? next : earliest))
@@ -521,178 +552,33 @@ export const useTownsStore = defineStore('towns', () => {
   }
 
   /**
-   * Calculates the maximum number of towns each industry can be assigned to
-   * based on that industry's employment proportion.
-   *
-   * @returns {Array<{industry: number, maxTowns: number}>} Array of industry limits
-   */
-  function calcMaxTownsPerIndustry() {
-    const maxTowns = industryStore.employmentData.map((industry) => ({
-      industry: industry.industry,
-      maxTowns: Math.floor(towns.value.length * industry.proportion) || 1
-    }))
-    debug.log('Max towns per industry:', maxTowns)
-    return maxTowns
-  }
-
-  /**
-   * Assigns industries to towns based on employment density.
-   * Uses natural breaks to classify towns by employment density for each industry,
-   * then assigns to high-density towns first, then medium-density if slots remain.
-   *
-   * Algorithm:
-   * 1. For each industry, calculate employment density (employment / population)
-   * 2. Use natural breaks to classify towns into low/medium/high density
-   * 3. Assign industry to high-density towns first
-   * 4. Fill remaining slots with medium-density towns
-   * 5. Respect maxIndustries per town (there is no per-industry cap yet)
+   * Gives the towns their industries (see townIndustries.js). Tourism is
+   * given out first, so it counts toward a major city's three. An industry
+   * in the list without its share of the country's jobs cannot be scored,
+   * so it is left out, with a warning: the share is filled in by
+   * scripts/build-national-shares.mjs.
    */
   function assignIndustries() {
-    debug.log('Starting industry assignment to towns...')
-
-    // Enrich employment data with industry labels
-    const enrichedEmploymentData = enrichEmploymentData(
-      industryStore.employmentData,
-      industryStore.industries
-    )
-
-    // Step 1: Calculate the maximum number of towns each industry can be assigned to
-    const maxTownsPerIndustry = calcMaxTownsPerIndustry()
-
-    // Track assignments for each industry
-    const industryAssignmentCounts = new Map(maxTownsPerIndustry.map((ind) => [ind.industry, 0]))
-
-    // Step 2: Loop through each industry, applying natural breaks to the normalized employment data
-    for (const industry of enrichedEmploymentData) {
-      const { industry: industryId, label, meanEmp } = industry
-      debug.log(`\nAssigning industry: ${label} (ID: ${industryId})`)
-
-      // Get the maximum number of towns allowed for this industry
-      const maxAllowed = maxTownsPerIndustry.find((ind) => ind.industry === industryId).maxTowns
-      // Prepare an array of towns with normalized employment data (employment density)
-      const townsWithEmploymentDensity = towns.value
-        .map((town) => ({
-          ...town,
-          // Normalize by dividing employment by town's population
-          employmentDensity: meanEmp[town.msa] ? meanEmp[town.msa] / town.population : 0
-        }))
-        .filter((town) => town.employmentDensity > 0) // Consider only towns with employment in this industry
-
-      // Apply natural breaks to group towns by employment density for this industry
-      const groupedTowns = naturalBreaks(townsWithEmploymentDensity, 'employmentDensity', [
-        'low',
-        'medium',
-        'high'
-      ])
-      const highDensityTowns = groupedTowns.filter((town) => town.size === 'high')
-      debug.log(`Top towns: ${highDensityTowns.map((town) => town.name)}`)
-
-      // Assign industry to towns in the 'high' density group first
-      let assignments = 0
-      for (const town of highDensityTowns) {
-        const assignedCount = industryAssignmentCounts.get(industryId) || 0
-
-        // no checks for max allowed per town or per industry, just assign to town
-        town.industries.push({ name: label, industry: industryId })
-        industryAssignmentCounts.set(industryId, assignedCount + 1)
-        assignments++
-        debug.log(`Assigned ${label} to ${town.name} based on high employment density`)
-      }
-
-      // Step 3: If industry hasn't reached max allowed, assign to 'medium' group next
-      if (assignments < maxTownsPerIndustry.find((ind) => ind.industry === industryId).maxTowns) {
-        const mediumDensityTowns = groupedTowns.filter((town) => town.size === 'medium')
-        // sort medium towns by employment density
-        mediumDensityTowns.sort((a, b) => b.employmentDensity - a.employmentDensity)
-        debug.log(`Medium density towns: ${mediumDensityTowns.map((town) => town.name)}`)
-
-        for (const town of mediumDensityTowns) {
-          if (
-            industryAssignmentCounts.get(industryId) < maxAllowed &&
-            town.industries.length < maxIndustries
-          ) {
-            town.industries.push({ name: label, industry: industryId })
-            industryAssignmentCounts.set(
-              industryId,
-              (industryAssignmentCounts.get(industryId) || 0) + 1
-            )
-            assignments++
-            debug.log(`Assigned ${label} to ${town.fullName} from medium density groups`)
-          }
-          if (assignments >= maxAllowed) break
+    const listed = new Map(industryStore.industries.map((ind) => [String(ind.naics_code), ind]))
+    const employment = industryStore.employmentData
+      .filter(({ industry }) => {
+        const entry = listed.get(String(industry))
+        if (entry && !(entry.national_share > 0)) {
+          console.warn(`Industry ${industry} has no national share; leaving it out`)
         }
-      }
-
-      debug.log(
-        `Final assignments for industry ${label}:`,
-        industryAssignmentCounts.get(industryId)
+        return entry?.national_share > 0
+      })
+      .map((data) => {
+        const { label, national_share } = listed.get(String(data.industry))
+        return { ...data, label, nationalShare: national_share }
+      })
+    towns.value = assignTownIndustries(towns.value, employment, industryStore.totalJobs)
+    debug.log(
+      'Industries on the board:',
+      towns.value.flatMap(({ name, industries }) =>
+        industries.map((made) => `${made.name} (${name})`)
       )
-    }
-  }
-
-  /**
-   * Enriches employment data with human-readable industry labels.
-   *
-   * @param {Array} employmentData - Raw employment data from QWI
-   * @param {Array} industries - Industry definitions with naics_code and label
-   * @returns {Array} Employment data with added label field
-   */
-  function enrichEmploymentData(employmentData, industries) {
-    const industryMap = new Map(industries.map((ind) => [ind.naics_code, ind.label]))
-    return employmentData.map((data) => ({
-      ...data,
-      label: industryMap.get(data.industry) || 'Unknown Industry' // Default label if not found
-    }))
-  }
-
-  /**
-   * Classifies data into groups based on the largest breaks between values, adding a "size" property.
-   *
-   * @param {Array} data - Array of objects to classify.
-   * @param {String} property - The numeric property to base classifications on.
-   * @param {Array} sizeClasses - Array of size classes (e.g., ['small', 'medium', 'large']).
-   * @returns {Array} - Original array with updated objects, each containing a "size" property.
-   */
-  function naturalBreaks(data, property, sizeClasses) {
-    const numClasses = sizeClasses.length
-
-    // Sort data ascending by the target property (e.g., population)
-    const sortedData = [...data].sort((a, b) => a[property] - b[property])
-
-    // Calculate the "gap" between each consecutive pair of values
-    // Larger gaps indicate natural breakpoints in the data distribution
-    const gaps = sortedData.map((item, index) => {
-      if (index === 0) return 0
-      return sortedData[index][property] - sortedData[index - 1][property]
-    })
-
-    // Find the N-1 largest gaps (where N = number of classes)
-    // These gaps become the boundaries between classes
-    // Example: 3 classes need 2 breakpoints (small|medium|large)
-    const largestGaps = [...gaps]
-      .map((gap, index) => ({ gap, index }))
-      .sort((a, b) => b.gap - a.gap)
-      .slice(0, numClasses - 1)
-      .map((g) => g.index)
-      .sort((a, b) => a - b) // Re-sort by position for sequential processing
-
-    // Assign class labels based on where items fall relative to breakpoints
-    let startIdx = 0
-    for (let i = 0; i < largestGaps.length; i++) {
-      const endIdx = largestGaps[i]
-      // All items from startIdx to endIdx get the i-th class label
-      for (let j = startIdx; j < endIdx; j++) {
-        sortedData[j].size = sizeClasses[i]
-      }
-      startIdx = endIdx
-    }
-
-    // Items after the last breakpoint get the final class label
-    for (let j = startIdx; j < sortedData.length; j++) {
-      sortedData[j].size = sizeClasses[sizeClasses.length - 1]
-    }
-
-    return sortedData
+    )
   }
 
   /**

@@ -6,9 +6,10 @@
  * each town in the map's Plan view and beside each industry in a town's popup.
  *
  * A town's commodities are its industries, each identified by a NAICS
- * industry code (see the industry store). Every code in the curated industry
- * list has an icon, so switching between the test list and the full list
- * needs no change here. A code without one gets a plain cargo crate.
+ * industry code (see the industry store). Every code in the full curated
+ * industry list has an icon, the game's own list (game_industries.csv)
+ * among them, so the game's list can take any of them without a change
+ * here. A code without one gets a plain cargo crate.
  *
  * The icons are from game-icons.net (CC BY 3.0); the authors are listed in
  * src/assets/icons/commodities/CREDITS.md, and the map credits the site.
@@ -36,8 +37,11 @@ const iconUrls = Object.fromEntries(
 const FALLBACK_ICON = 'wooden-crate'
 
 /**
- * Icon file names by NAICS industry code, in the order of the curated list
- * (public/data/label_industry_curated.csv).
+ * Icon file names by NAICS industry code, in NAICS order: every industry in
+ * the curated list (public/data/label_industry_curated.csv) and in the
+ * game's own list (public/data/game_industries.csv), which has some the
+ * curated list does not. A comment names each industry: its NAICS title, or
+ * its label in the game's list.
  */
 export const commodityIconNames = {
   // Oilseed and Grain Farming
@@ -48,6 +52,8 @@ export const commodityIconNames = {
   1113: 'fruit-tree',
   // Greenhouse, Nursery, and Floriculture Production
   1114: 'greenhouse',
+  // Cotton & Hay
+  1119: 'cotton-flower',
   // Cattle Ranching and Farming
   1121: 'cow',
   // Hog and Pig Farming
@@ -56,10 +62,20 @@ export const commodityIconNames = {
   1123: 'chicken',
   // Sheep and Goat Farming
   1124: 'sheep',
+  // Catfish & Oysters
+  1125: 'oyster',
+  // Horses
+  1129: 'horse-head',
   // Forestry and Logging
   113: 'log',
   // Fishing, Hunting and Trapping
   114: 'fishing-pole',
+  // Farming
+  1151: 'pitchfork',
+  // Ranching
+  1152: 'lasso',
+  // Timber Crews
+  1153: 'chainsaw',
   // Oil and Gas Extraction
   211: 'oil-pump',
   // Coal Mining
@@ -68,6 +84,8 @@ export const commodityIconNames = {
   2122: 'gold-nuggets',
   // Nonmetallic Mineral Mining and Quarrying
   2123: 'stone-pile',
+  // Oilfield Supplies
+  2131: 'oil-rig',
   // Construction
   23: 'crane',
   // Animal Food Manufacturing
@@ -86,24 +104,56 @@ export const commodityIconNames = {
   3117: 'shrimp',
   // Bakeries and Tortilla Manufacturing
   3118: 'bread',
+  // Snack Foods
+  3119: 'chips-bag',
   // Beverage Manufacturing
   3121: 'beer-bottle',
   // Tobacco Manufacturing
   3122: 'cigar',
   // Textile Mills
   313: 'yarn',
+  // Yarn & Thread
+  3131: 'yarn',
+  // Fabric
+  3132: 'rolled-cloth',
+  // Dyed Fabric
+  3133: 'clothesline',
   // Textile Product Mills
   314: 'sewing-machine',
+  // Carpets & Curtains
+  3141: 'red-carpet',
+  // Rope & Tents
+  3149: 'rope-coil',
   // Apparel Manufacturing
   315: 't-shirt',
+  // Knitwear
+  3151: 'wool',
+  // Clothing
+  3152: 't-shirt',
+  // Hats & Gloves
+  3159: 'gloves',
   // Leather and Hide Tanning and Finishing
   3161: 'leather-vest',
   // Footwear Manufacturing
   3162: 'leather-boot',
+  // Purses & Luggage
+  3169: 'suitcase',
   // Wood Product Manufacturing
   321: 'planks',
+  // Lumber
+  3211: 'planks',
+  // Plywood
+  3212: 'wood-pile',
+  // Millwork & Mobile Homes
+  3219: 'door',
   // Paper Manufacturing
   322: 'scroll-unfurled',
+  // Paper
+  3221: 'scroll-unfurled',
+  // Cardboard Boxes
+  3222: 'cardboard-box',
+  // Printing
+  3231: 'stamper',
   // Petroleum and Coal Products Manufacturing
   324: 'oil-drum',
   // Basic Chemical Manufacturing
@@ -118,6 +168,8 @@ export const commodityIconNames = {
   3255: 'paint-bucket',
   // Soap, Cleaning Compound, and Toilet Preparation Manufacturing
   3256: 'soap',
+  // Explosives & Ink
+  3259: 'dynamite',
   // Plastics Product Manufacturing
   3261: 'plastic-duck',
   // Rubber Product Manufacturing
@@ -130,6 +182,8 @@ export const commodityIconNames = {
   3273: 'concrete-bag',
   // Lime and Gypsum Product Manufacturing
   3274: 'stone-block',
+  // Insulation & Cut Stone
+  3279: 'brick-pile',
   // Iron and Steel Mills and Ferroalloy Manufacturing
   3311: 'furnace',
   // Steel Product Manufacturing from Purchased Steel
@@ -156,6 +210,8 @@ export const commodityIconNames = {
   3327: 'screw',
   // Coating, Engraving, Heat Treating, and Allied Activities
   3328: 'paint-roller',
+  // Valves & Fittings
+  3329: 'valve',
   // Agriculture, Construction, and Mining Machinery Manufacturing
   3331: 'farm-tractor',
   // Industrial Machinery Manufacturing
@@ -188,6 +244,8 @@ export const commodityIconNames = {
   3352: 'washing-machine',
   // Electrical Equipment Manufacturing
   3353: 'plug',
+  // Batteries & Wire
+  3359: 'battery-pack-alt',
   // Motor Vehicle Manufacturing
   3361: 'city-car',
   // Motor Vehicle Body and Trailer Manufacturing
@@ -200,10 +258,22 @@ export const commodityIconNames = {
   3365: 'steam-locomotive',
   // Ship and Boat Building
   3366: 'sailboat',
+  // Motorcycles
+  3369: 'full-motorcycle-helmet',
   // Furniture and Related Product Manufacturing
   337: 'sofa',
+  // Furniture
+  3371: 'sofa',
+  // Office Furniture
+  3372: 'office-chair',
+  // Mattresses & Blinds
+  3379: 'bed',
   // Medical Equipment and Supplies Manufacturing
   3391: 'stethoscope',
+  // Toys & Sporting Goods
+  3399: 'kite',
+  // Grain Elevators
+  4245: 'round-silo',
   // Building Material and Garden Equipment and Supplies Dealers
   444: 'toolbox',
   // Building Material and Supplies Dealers
@@ -224,18 +294,50 @@ export const commodityIconNames = {
   487: 'mountain-road',
   // Support Activities for Transportation
   488: 'forklift',
+  // Imports
+  4883: 'harbor-dock',
   // Postal Service
   491: 'envelope',
   // Couriers and Messengers
   492: 'cardboard-box-closed',
   // Warehousing and Storage
   493: 'warehouse',
+  // Movies
+  5121: 'clapperboard',
+  // Music
+  5122: 'musical-notes',
   // Publishing Industries
   513: 'book-pile',
   // Newspaper, Periodical, Book, and Directory Publishers
   5131: 'newspaper',
+  // Software
+  5132: 'cloud-download',
+  // TV & Radio
+  5161: 'old-microphone',
+  // Data Centers
+  5182: 'server-rack',
+  // Credit Cards
+  5222: 'wallet',
+  // Stocks & Bonds
+  5231: 'chart',
+  // Stock Exchanges
+  5232: 'charging-bull',
+  // Investment Funds
+  5239: 'piggy-bank',
+  // Advertising
+  5418: 'megaphone',
   // Waste Management and Remediation Services
   562: 'recycle',
+  // Trash
+  5621: 'trash-can',
+  // Landfill Waste
+  5622: 'bulldozer',
+  // Recycling
+  5629: 'recycle',
+  // Sports Teams
+  7112: 'american-football-helmet',
+  // Theme Parks
+  7131: 'carousel',
   // Tourism: not a NAICS industry; the towns store gives it to every large town
   9999: 'photo-camera'
 }
@@ -256,8 +358,9 @@ export const COMMODITY_ICON_SIZE = 18
  * How far from a town's center its commodity icons sit: just clear of the
  * town's dot, with a 2px gap between dot and icon. A town with too many
  * commodities to fit around its dot that way gets a wider ring, so the icons
- * never overlap each other; the industry assignment caps most towns at three
- * plus Tourism, but not the towns where an industry is most concentrated.
+ * never overlap each other. The industry assignment holds every town to
+ * three things, its Tourism included; the ring still widens should a town
+ * ever have more.
  * @param {number} dotSize - Width of the town's dot icon, in px
  * @param {number} count - How many icons go around it
  * @returns {number} Distance from the dot's center to each icon's center, in px

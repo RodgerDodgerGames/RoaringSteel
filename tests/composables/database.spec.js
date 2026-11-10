@@ -55,15 +55,15 @@ describe('database', () => {
         }
       })
       await old.put('grids', { state: '27', cellSize: 10000, landCoverYear: 2023, grid: grid('a') })
-      await old.put('caches', 'kept', 'industry_27')
+      await old.put('caches', 'kept', 'townSites_27')
       old.close()
 
       expect(await getGrid('27', 10000, 2023)).toBeUndefined()
-      // Only the grids: everything else is kept
-      expect(await readCache('industry_27')).toBe('kept')
+      // Only the grids and the caches nothing reads now: the rest is kept
+      expect(await readCache('townSites_27')).toBe('kept')
     })
 
-    it('should throw away the finished towns earlier versions kept, but not the town sites', async () => {
+    it('should throw away the finished towns and test-list jobs earlier versions kept, but not what is read now', async () => {
       // A browser that last ran version 3, with each kind of cache in it
       const old = await openDB('roaring-steel', 3, {
         upgrade(db) {
@@ -74,12 +74,31 @@ describe('database', () => {
       })
       await old.put('caches', 'old towns', 'towns_27')
       await old.put('caches', 'sites', 'townSites_27')
-      await old.put('caches', 'jobs', 'industry_27')
+      await old.put('caches', 'test-list jobs', 'industry_27')
+      await old.put('caches', 'jobs', 'industryJobs_27')
       old.close()
 
       expect(await readCache('towns_27')).toBeUndefined()
+      expect(await readCache('industry_27')).toBeUndefined()
       expect(await readCache('townSites_27')).toBe('sites')
-      expect(await readCache('industry_27')).toBe('jobs')
+      expect(await readCache('industryJobs_27')).toBe('jobs')
+    })
+
+    it('should throw away only the test-list jobs a version 4 database kept', async () => {
+      // A browser that last ran version 4: its town sites are current
+      const old = await openDB('roaring-steel', 4, {
+        upgrade(db) {
+          db.createObjectStore('autosaves', { keyPath: 'id', autoIncrement: true })
+          db.createObjectStore('grids', { keyPath: ['state', 'cellSize', 'landCoverYear'] })
+          db.createObjectStore('caches')
+        }
+      })
+      await old.put('caches', 'sites', 'townSites_27')
+      await old.put('caches', 'test-list jobs', 'industry_27')
+      old.close()
+
+      expect(await readCache('industry_27')).toBeUndefined()
+      expect(await readCache('townSites_27')).toBe('sites')
     })
 
     it("should keep a grid's typed arrays as they are", async () => {

@@ -42,6 +42,11 @@ public/data
 - CSV files for generating towns
 - GeoJSON files for generating towns
 
+scripts (run by hand, never at game time; each file's header says when)
+- `node scripts/build-national-shares.mjs`: fills in each industry's share of
+  the country's jobs in game_industries.csv. Run it after adding an industry.
+- `node scripts/build-water-data.mjs`: rebuilds water.json
+
 src/assets
 - icons/towns
 - icons/commodities: what towns produce, from [game-icons.net](https://game-icons.net)

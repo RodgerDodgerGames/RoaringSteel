@@ -8,7 +8,11 @@
  * Requires: VITE_QWI_KEY environment variable
  *
  * Data returned includes employment counts (Emp) by MSA, by quarter, over the
- * game's data window (see dataWindow.js).
+ * game's data window (see dataWindow.js), for each industry asked for. One
+ * request can ask for several industries; each row says which it is for.
+ * It can ask for some of the state's counties instead of its metro and
+ * micro areas, for the areas QWI has no numbers for as areas (see the
+ * industry store's `fillAreas`).
  *
  * @module composables/setup/useQWI
  */
@@ -26,11 +30,17 @@ import { debug } from '@/composables/debug'
  * Composable for fetching QWI employment data.
  *
  * @param {string} state - Two-digit state FIPS code (e.g., "27" for Minnesota)
- * @param {number} industry - NAICS industry code to query
+ * @param {number|Array<number>} industries - The NAICS industry codes to
+ *   ask for: one, or several in one request
  * @param {{start: number, end: number}} dataWindow - The years to fetch, inclusive
+ * @param {Object} [options]
+ * @param {Array<string>} [options.counties] - Three-digit county codes: ask
+ *   for these counties rather than every metro and micro area. Each row
+ *   then has its county's code in `county`, rather than an area's in
+ *   `msa_code`.
  * @returns {Object} { data, error, refused, fetchQWI }
  */
-export default function useQWI(state, industry, dataWindow) {
+export default function useQWI(state, industries, dataWindow, { counties } = {}) {
   const data = ref([])
   const error = ref(null)
 
@@ -51,23 +61,24 @@ export default function useQWI(state, industry, dataWindow) {
     const params = {
       key: key,
       get: 'Emp', // Indicator code for Employment Stability
-      for: `metropolitan statistical area/micropolitan statistical area:*`,
-      // for: `metropolitan statistical area/micropolitan statistical area:33460`,
+      // Every metro and micro area in the state, or the counties asked for
+      for: counties
+        ? `county:${counties.join(',')}`
+        : `metropolitan statistical area/micropolitan statistical area:*`,
       in: `state:${state}`, // FIPS code for the state
       // every quarter of the data window's years
       time: `from ${dataWindow.start} to ${dataWindow.end}`,
-      industry: industry // NAICS code for all industries
-      // ind_level: '3',  // Level of industry detail
+      // Each industry is its own `industry=` in the query, which the API
+      // takes as "any of these"
+      industry: [].concat(industries)
     }
 
-    // iterate over the params object and add each key-value pair to the URL
-    const url = Object.keys(params).reduce((acc, key) => {
-      // don't add the "&" character before the first key-value pair
-      if (acc !== `${rootUrl}?`) {
-        acc += '&'
-      }
-      return acc + `${key}=${params[key]}`
-    }, `${rootUrl}?`)
+    // Every parameter in the URL, a parameter with a list of values once for
+    // each of them
+    const query = Object.entries(params)
+      .flatMap(([name, value]) => [].concat(value).map((one) => `${name}=${one}`))
+      .join('&')
+    const url = `${rootUrl}?${query}`
 
     // Log the key and URL for debugging purposes
     debug.log('QWI URL:', url)
@@ -110,10 +121,12 @@ export default function useQWI(state, industry, dataWindow) {
       // First row is headers, subsequent rows are data
       debug.log('Processing the data...')
 
-      // The Census API uses a long column name for MSA codes - rename it for easier access
-      jsonData[0][
-        jsonData[0].indexOf('metropolitan statistical area/micropolitan statistical area')
-      ] = 'msa_code'
+      // The Census API uses a long column name for MSA codes - rename it for
+      // easier access. A request for counties has none.
+      const msaColumn = jsonData[0].indexOf(
+        'metropolitan statistical area/micropolitan statistical area'
+      )
+      if (msaColumn >= 0) jsonData[0][msaColumn] = 'msa_code'
 
       // Transform from array-of-arrays to array-of-objects format
       // Input:  [["Emp", "msa_code", ...], ["100", "12345", ...], ...]

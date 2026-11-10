@@ -63,11 +63,13 @@ onMounted(() => {
   // add map to store
   mapStore.setMap(map.value)
 
-  L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_terrain_background/{z}/{x}/{y}{r}.{ext}', {
-    minZoom: 0,
-    maxZoom: 18,
-    ext: 'png'
-  }).addTo(map.value)
+  L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    {
+      minZoom: 0,
+      maxZoom: 18
+    }
+  ).addTo(map.value)
 
   // Into the Plan view (or whichever the store holds) before the towns go on
   mapView.attach(map.value)

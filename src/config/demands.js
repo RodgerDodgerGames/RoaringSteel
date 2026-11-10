@@ -18,8 +18,9 @@ export const PIN_COLORS = Object.freeze([
 
 /**
  * How big the demand deck is (see demandDeck.js). Every card's three demands
- * are different pairs of town and commodity, and no pair is on two cards, so
- * the deck is also never bigger than a third of the pairs the board has.
+ * go to three different towns, and no pair of town and commodity is on two
+ * cards, so the deck is also never bigger than a third of the pairs the
+ * board has.
  */
 export const demandDeckConfig = {
   /** Cards per town on the board, at most */

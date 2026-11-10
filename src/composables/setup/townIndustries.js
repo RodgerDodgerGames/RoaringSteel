@@ -1,39 +1,44 @@
 /**
  * Town Industries (townIndustries.js)
  *
- * Which industries a board plays with, and which towns make them.
+ * Which towns make which industries.
  *
- * The game knows about fifty industries (public/data/game_industries.csv),
- * each in a category: Farm, Mining, Food, Materials, Metals, Goods,
- * Machinery, Vehicles. A board plays with only some of them, so its demand
- * cards and its map's icons stay few enough to learn in one game.
+ * The game knows about 125 industries (public/data/game_industries.csv).
+ * Every board can draw on all of them; which ones it ends up with depends on
+ * where its towns' jobs are.
  *
- * 1. Choosing (`chooseIndustries`): a bigger board, with more towns, plays
- *    with more industries, between a floor and a ceiling (see
- *    `townIndustryConfig`). They are taken a category at a time, round and
- *    round: each category's biggest industry on the board, then each one's
- *    next biggest, and so on, the categories with the most jobs going first.
- *    So a farming state still gets a factory or two, and an industrial one
- *    still gets its farms. An industry with only a sliver of the board's jobs
- *    is passed over. Only jobs in the board's own towns count (see
- *    `boardEmployment`).
+ * 1. Scoring (`candidatePairs`): each town's industries are scored by their
+ *    "extra jobs": the town's jobs in the industry, minus what an average
+ *    town with the same total jobs would have (its total jobs times the
+ *    industry's share of the country's jobs). So a town counts for what it
+ *    is unusually good at, not for what every town has: a small town with a
+ *    tannery scores for leather, and a big city scores for little but what
+ *    it is known for. An industry whose extra jobs are under a small share
+ *    of the town's jobs is not a candidate there at all.
  *
- * 2. Assigning (`assignIndustries`): an industry goes to the towns where it
- *    is most concentrated — its jobs per person — rather than simply the
- *    biggest towns. Its towns are split by concentration into high, medium
- *    and low (see `naturalBreaks`); it can go to the high ones first, then
- *    the medium ones, and to a low one only if it would otherwise go to no
- *    town at all.
+ *    The farm and fishing industries are scored with their jobs multiplied
+ *    (see `undercountMultiplier`): the jobs data counts only jobs on a
+ *    payroll, and most farmers and fishermen work for themselves.
  *
- *    Two limits hold throughout: a town makes at most three things, its
- *    Tourism included; and an industry goes to no more towns than its share
- *    of the board's jobs in the chosen industries, held to at most 20%, says
- *    (but always at least one). The industries take turns, each getting its
- *    best town still free before any gets its second, and those with the
- *    fewest towns to choose from going first in every round, so one with
- *    many choices cannot fill the towns another needed.
+ * 2. Handing out (`assignIndustries`): every pair of town and industry, from
+ *    the most extra jobs down, is given out unless the town already makes
+ *    three things (its Tourism included) or the industry already has its
+ *    share of the board's towns.
  *
- * Pure functions over plain data, so they are tested without stores.
+ * 3. Shaping: then, so the board looks something like Empire Builder's,
+ *    where most cities make one or two things:
+ *    - only so many towns keep a third thing: those where it is the biggest
+ *      part of the town's jobs, its extra jobs over the town's jobs, a
+ *      town's "strength" in it. The others drop it;
+ *    - likewise, only so many keep a second thing;
+ *    - and if too few towns make nothing, the towns whose best thing is the
+ *      weakest are emptied, until enough are.
+ *    Ranking by strength rather than by jobs lets a small town that leans
+ *    hard on an industry beat a big city where it is one of many. Tourism
+ *    is never dropped, so a major city is never emptied.
+ *
+ * The limits are in `townIndustryConfig`. Pure functions over plain data, so
+ * they are tested without stores.
  *
  * @module composables/setup/townIndustries
  */
@@ -41,232 +46,129 @@
 import { townIndustryConfig } from '@/config/towns'
 
 /**
- * How many jobs an industry has on the board, across all its areas.
- * @param {{meanEmp: Object}} industry - The industry's jobs, by area
- * @returns {number} Its jobs
+ * Takes away floating-point noise before rounding a share of the towns up:
+ * 14% of 50 towns comes out a hair over 7, which would round up to 8
  */
-function jobsOf(industry) {
-  return Object.values(industry.meanEmp).reduce((sum, jobs) => sum + jobs, 0)
-}
+const ROUNDING_ALLOWANCE = 1e-9
 
 /**
- * The board's jobs by industry: each industry's jobs in the areas whose
- * towns are on the board, and only those. A state's jobs data covers every
- * area with a part in it, some of whose towns are off the board
- * (Massachusetts's covers Providence's area, whose town is in Rhode
- * Island); counted, an industry could be chosen for jobs no town on the
- * board has.
- * @param {Array<{meanEmp: Object}>} employment - Jobs by industry and area
- *   (the industry store's `employmentData`)
+ * Every pair of town and industry that could be given out: an industry
+ * whose extra jobs in a town are at least `minExtraShare` of the town's jobs.
+ *
  * @param {Array<{msa: string}>} towns - The towns on the board
- * @returns {Array<Object>} The industries, each with only its jobs on the
- *   board in `meanEmp`
- */
-export function boardEmployment(employment, towns) {
-  const onBoard = new Set(towns.map(({ msa }) => String(msa)))
-  return employment.map((industry) => ({
-    ...industry,
-    meanEmp: Object.fromEntries(
-      Object.entries(industry.meanEmp).filter(([msa]) => onBoard.has(msa))
-    )
-  }))
-}
-
-/**
- * How many industries a board with this many towns plays with: a share of
- * its towns, between the floor and the ceiling, and no more than its towns
- * have room for.
- * @param {number} townCount - The towns on the board
- * @param {number} freeSlots - How many industries its towns can still take,
- *   with their Tourism counted
+ * @param {Array<{industry: number, label: string, nationalShare: number, meanEmp: Object}>} employment -
+ *   The industries: each one's NAICS code, its name in the game, its share
+ *   of the country's jobs, and its jobs by area code
+ * @param {Object} totalJobs - Each area's jobs in all industries, by area code
  * @param {Object} [config] - See `townIndustryConfig`
- * @returns {number} How many industries
+ * @returns {Array<{town: number, industry: Object, extra: number, strength: number}>}
+ *   The pairs, most extra jobs first: the town's index in `towns`, the
+ *   industry from `employment`, its extra jobs there, and those as a share
+ *   of the town's jobs. Ties go by NAICS code and then town, so the same
+ *   data always gives the same board.
  */
-export function industryCount(townCount, freeSlots, config = townIndustryConfig) {
-  const { industriesPerTown, minIndustries, maxIndustries } = config
-  const wanted = Math.round(townCount * industriesPerTown)
-  const held = Math.min(maxIndustries, Math.max(minIndustries, wanted))
-  return Math.max(0, Math.min(held, freeSlots))
-}
-
-/**
- * Chooses the industries a board plays with, taking turns between the
- * categories so the board gets a spread of them (see the module's notes).
- *
- * @param {Array<{industry: number, category: string, meanEmp: Object}>} employment -
- *   The board's jobs by industry and area (the industry store's
- *   `employmentData`)
- * @param {number} count - How many to choose (see `industryCount`)
- * @param {Object} [config] - See `townIndustryConfig`
- * @returns {Array<Object>} The industries chosen, from `employment`, in the
- *   order they were chosen
- */
-export function chooseIndustries(employment, count, config = townIndustryConfig) {
-  const withJobs = employment.map((industry) => ({ industry, jobs: jobsOf(industry) }))
-  const boardJobs = withJobs.reduce((sum, { jobs }) => sum + jobs, 0)
-  if (boardJobs === 0) return []
-
-  // Each category's industries, biggest first, leaving out the slivers
-  const byCategory = new Map()
-  withJobs
-    .filter(({ jobs }) => jobs / boardJobs >= config.minJobShare)
-    .sort((a, b) => b.jobs - a.jobs)
-    .forEach((entry) => {
-      const category = entry.industry.category ?? ''
-      if (!byCategory.has(category)) byCategory.set(category, { jobs: 0, queue: [] })
-      const group = byCategory.get(category)
-      group.jobs += entry.jobs
-      group.queue.push(entry.industry)
+export function candidatePairs(towns, employment, totalJobs, config = townIndustryConfig) {
+  const undercounted = new Set(config.undercountIndustries.map(String))
+  const pairs = []
+  towns.forEach((town, index) => {
+    const total = totalJobs[town.msa] ?? 0
+    if (!(total > 0)) return
+    employment.forEach((industry) => {
+      const jobs = industry.meanEmp[town.msa] ?? 0
+      if (!(jobs > 0)) return
+      const multiplier = undercounted.has(String(industry.industry))
+        ? config.undercountMultiplier
+        : 1
+      // Multiplied after the average town's share is taken off, which is
+      // the same as multiplying both the town's jobs and the country's
+      const extra = multiplier * (jobs - total * industry.nationalShare)
+      if (extra >= config.minExtraShare * total) {
+        pairs.push({ town: index, industry, extra, strength: extra / total })
+      }
     })
-
-  // The categories with the most jobs choose first in every round
-  const categories = [...byCategory.values()].sort((a, b) => b.jobs - a.jobs)
-  const chosen = []
-  while (chosen.length < count && categories.some(({ queue }) => queue.length > 0)) {
-    for (const { queue } of categories) {
-      if (chosen.length >= count) break
-      if (queue.length > 0) chosen.push(queue.shift())
-    }
-  }
-  return chosen
-}
-
-/**
- * Splits values into classes at their widest gaps: three classes are split
- * at the two widest gaps between neighboring values, so the values in a
- * class sit closer to one another than to the next class.
- *
- * @param {Array<number>} values - The values, in any order
- * @param {number} classCount - How many classes
- * @returns {Array<number>} Each value's class, in the order given: 0 for the
- *   lowest, classCount - 1 for the highest
- */
-export function naturalBreaks(values, classCount) {
-  const order = values.map((value, index) => ({ value, index })).sort((a, b) => a.value - b.value)
-
-  // The gap below each value; the lowest has none. The widest are where the
-  // classes break: a class starts at each of them.
-  const starts = order
-    .map((entry, i) => ({ i, gap: i === 0 ? 0 : entry.value - order[i - 1].value }))
-    .sort((a, b) => b.gap - a.gap)
-    .slice(0, classCount - 1)
-    .map(({ i }) => i)
-    .sort((a, b) => a - b)
-
-  // Every value from one break up to the next is in that break's class, and
-  // those past the last break in the highest. A break at the very bottom
-  // leaves its class empty, as when there are fewer values than classes.
-  const classes = new Array(values.length)
-  let from = 0
-  starts.forEach((end, cls) => {
-    for (let i = from; i < end; i++) classes[order[i].index] = cls
-    from = end
   })
-  for (let i = from; i < order.length; i++) classes[order[i].index] = classCount - 1
-  return classes
-}
-
-/**
- * The towns an industry may go to, best first: those in its high class of
- * concentration, then its medium class, each most concentrated first. Its
- * low class is kept apart, for an industry that would otherwise go nowhere.
- * @param {Object} industry - From the industry store's `employmentData`
- * @param {Array<Object>} towns - The towns on the board, each with msa and
- *   population
- * @returns {{preferred: Array<number>, fallback: Array<number>}} Indexes into
- *   `towns`: the high and medium classes, and the low class
- */
-function candidateTowns(industry, towns) {
-  const concentrated = towns
-    .map((town, index) => ({
-      index,
-      density: town.population > 0 ? (industry.meanEmp[town.msa] ?? 0) / town.population : 0
-    }))
-    .filter(({ density }) => density > 0)
-  const HIGH = 2
-  const MEDIUM = 1
-  const LOW = 0
-  const classes = naturalBreaks(
-    concentrated.map(({ density }) => density),
-    3
+  return pairs.sort(
+    (a, b) =>
+      b.extra - a.extra ||
+      String(a.industry.industry).localeCompare(String(b.industry.industry)) ||
+      a.town - b.town
   )
-  const inClass = (cls) =>
-    concentrated
-      .filter((_, i) => classes[i] === cls)
-      .sort((a, b) => b.density - a.density)
-      .map(({ index }) => index)
-  return { preferred: [...inClass(HIGH), ...inClass(MEDIUM)], fallback: inClass(LOW) }
 }
 
 /**
- * The next town an industry should try. An industry whose concentrated towns
- * are all full (often a major city that makes three things already), and has
- * no town yet, moves on to the towns where it is less concentrated, rather
- * than be left off the board.
- * @param {{candidates: Array<number>, fallback: Array<number>, taken: number}} queue -
- *   The industry's towns still to try, and how many it has
- * @returns {number|undefined} The town's index; none when there is no town left
+ * Keeps a thing in a given place of the towns' lists only in the strongest
+ * towns: those whose thing there is the biggest share of their jobs. The
+ * rest drop it, and anything after it.
+ * @param {Array<Array<{strength: number}>>} held - Each town's things, in
+ *   the order they were given; changed here
+ * @param {number} place - Which thing: 1 for the second, 2 for the third
+ * @param {number} limit - How many towns may keep one there
  */
-function nextCandidate(queue) {
-  if (queue.candidates.length === 0 && queue.taken === 0) {
-    queue.candidates = queue.fallback
-    queue.fallback = []
-  }
-  return queue.candidates.shift()
+function keepStrongest(held, place, limit) {
+  held
+    .map((things, town) => ({ things, town }))
+    .filter(({ things }) => things.length > place)
+    .sort((a, b) => b.things[place].strength - a.things[place].strength || a.town - b.town)
+    .slice(limit)
+    .forEach(({ things }) => things.splice(place))
+}
+
+/**
+ * Empties the towns whose best thing is weakest until enough towns make
+ * nothing. That is nearly always a town that makes one thing, since a town
+ * that kept a second is strong in its first. A town that makes something
+ * it always does (Tourism) is never emptied.
+ * @param {Array<Array<{strength: number}>>} held - Each town's things;
+ *   changed here
+ * @param {number} wanted - How many towns should make nothing
+ */
+function emptyWeakest(held, wanted) {
+  const alreadyEmpty = held.filter((things) => things.length === 0).length
+  held
+    .map((things, town) => ({ things, town }))
+    .filter(
+      ({ things }) => things.length > 0 && things.every(({ strength }) => strength < Infinity)
+    )
+    .sort((a, b) => a.things[0].strength - b.things[0].strength || a.town - b.town)
+    .slice(0, Math.max(0, wanted - alreadyEmpty))
+    .forEach(({ things }) => things.splice(0))
 }
 
 /**
  * Gives the board's towns their industries (see the module's notes).
  *
- * @param {Array<Object>} towns - The towns on the board, each with msa,
- *   population and industries (Tourism already given to the major cities)
- * @param {Array<Object>} chosen - The industries the board plays with (see
- *   `chooseIndustries`), each with industry (its NAICS code), meanEmp, and
- *   label (its name in the game)
+ * @param {Array<Object>} towns - The towns on the board, each with msa and
+ *   industries (Tourism already given to the major cities, which keep it)
+ * @param {Array<Object>} employment - The industries (see `candidatePairs`)
+ * @param {Object} totalJobs - Each area's jobs in all industries, by area code
  * @param {Object} [config] - See `townIndustryConfig`
  * @returns {Array<Object>} The towns, copied, each with its industries added
  *   as {name, industry}
  */
-export function assignIndustries(towns, chosen, config = townIndustryConfig) {
-  const result = towns.map((town) => ({ ...town, industries: [...town.industries] }))
-  const chosenJobs = chosen.reduce((sum, industry) => sum + jobsOf(industry), 0)
+export function assignIndustries(towns, employment, totalJobs, config = townIndustryConfig) {
+  const townCount = towns.length
 
-  // Each industry's best towns still to try, and how many more it may have.
-  // The industries with the fewest towns to choose from choose first: one
-  // made in only two towns must not find them both taken by one that could
-  // have gone to five.
-  const queues = chosen.map((industry) => {
-    const share = chosenJobs > 0 ? Math.min(jobsOf(industry) / chosenJobs, config.maxTownShare) : 0
-    const { preferred, fallback } = candidateTowns(industry, result)
-    return {
-      industry,
-      candidates: preferred,
-      fallback,
-      taken: 0,
-      left: Math.max(1, Math.floor(result.length * share))
-    }
+  // Each town's things, what it already makes first, never to be dropped
+  const held = towns.map((town) => town.industries.map((made) => ({ made, strength: Infinity })))
+
+  // From the most extra jobs down, within the limits per town and per industry
+  const perIndustry = Math.max(1, Math.floor(config.maxTownShare * townCount))
+  const townsOf = new Map()
+  candidatePairs(towns, employment, totalJobs, config).forEach(({ town, industry, strength }) => {
+    const taken = townsOf.get(industry.industry) ?? 0
+    if (held[town].length >= config.maxPerTown || taken >= perIndustry) return
+    held[town].push({ made: { name: industry.label, industry: industry.industry }, strength })
+    townsOf.set(industry.industry, taken + 1)
   })
-  queues.sort(
-    (a, b) => a.candidates.length + a.fallback.length - (b.candidates.length + b.fallback.length)
-  )
 
-  // Round after round, each industry takes its best town that still has room
-  let isAnyTaken = true
-  while (isAnyTaken) {
-    isAnyTaken = false
-    for (const queue of queues) {
-      if (queue.left === 0) continue
-      let next
-      while ((next = nextCandidate(queue)) !== undefined) {
-        const town = result[next]
-        if (town.industries.length >= config.maxPerTown) continue
-        town.industries.push({ name: queue.industry.label, industry: queue.industry.industry })
-        queue.taken++
-        queue.left--
-        isAnyTaken = true
-        break
-      }
-    }
-  }
-  return result
+  // The town shapes: few with three things, not too many with two, and
+  // some with none
+  keepStrongest(held, 2, Math.floor(config.maxThreeShare * townCount))
+  keepStrongest(held, 1, Math.floor(config.maxTwoShare * townCount))
+  emptyWeakest(held, Math.ceil(config.minNoneShare * townCount - ROUNDING_ALLOWANCE))
+
+  return towns.map((town, index) => ({
+    ...town,
+    industries: held[index].map(({ made }) => made)
+  }))
 }

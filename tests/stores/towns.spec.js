@@ -93,6 +93,9 @@ describe('Towns Store', () => {
     // The industry fetch is the industry store's to test. Stubbed here, the
     // industry data a test seeds is what town setup works from.
     industryStore.useIndustryData = vi.fn(async () => {})
+    // So is filling in areas from their counties: every area needs it
+    industryStore.areasToFill = vi.fn((msaCodes) => msaCodes)
+    industryStore.fillAreas = vi.fn(async () => true)
     townsStore = useTownsStore()
   })
 
@@ -134,6 +137,14 @@ describe('Towns Store', () => {
       expect(mockFetchPopulationData).not.toHaveBeenCalled()
       expect(mockGetMSALatLon).not.toHaveBeenCalled()
       expect(mockFindPrincipalCity).not.toHaveBeenCalled()
+    })
+
+    it("should fill in the cached towns' areas the jobs data has no numbers for", async () => {
+      await writeCache('townSites_27', { dataWindow: WINDOW, sites: [CACHED_SITE] })
+
+      await townsStore.setupTowns('27')
+
+      expect(industryStore.fillAreas).toHaveBeenCalledWith('27', WINDOW, ['12345'])
     })
 
     it('should build the towns again once the data window has moved on', async () => {
@@ -463,7 +474,12 @@ describe('Towns Store', () => {
         category: 'Farm',
         meanEmp: { 12345: 1000, 12346: 500, 12347: 100 }
       })
-      industryStore.industries.push({ naics_code: 111, label: 'Agriculture' })
+      industryStore.industries.push({
+        naics_code: 111,
+        label: 'Agriculture',
+        national_share: 0.001
+      })
+      industryStore.totalJobs = { 12345: 2000000, 12346: 10000, 12347: 50000 }
 
       mockPopulationData.value = [
         {
@@ -495,6 +511,49 @@ describe('Towns Store', () => {
 
       const nantucket = townsStore.towns.find((t) => t.msa === '99999')
       expect(nantucket.industries).toEqual([])
+    })
+
+    it("should fill in the new towns' areas the jobs data has no numbers for", async () => {
+      await townsStore.setupTowns('27')
+
+      expect(industryStore.fillAreas).toHaveBeenCalledWith('27', WINDOW, [
+        '12345',
+        '12346',
+        '12347'
+      ])
+    })
+
+    it('should skip filling in areas when every area has jobs data', async () => {
+      industryStore.areasToFill = vi.fn(() => [])
+
+      await townsStore.setupTowns('27')
+
+      expect(industryStore.fillAreas).not.toHaveBeenCalled()
+    })
+
+    it('should give a town an industry it has far more jobs in than an average town', async () => {
+      // Rochester: 500 of 10,000 jobs, against 10 in an average town of its
+      // size. Minneapolis has fewer than average; Duluth, too few more.
+      await townsStore.setupTowns('27')
+
+      const made = (msa) =>
+        townsStore.towns.find((t) => t.msa === msa).industries.map(({ name }) => name)
+      expect(made('12346')).toEqual(['Agriculture'])
+      expect(made('12345')).toEqual(['Tourism'])
+      expect(made('12347')).toEqual([])
+    })
+
+    it("should leave out an industry without its share of the country's jobs", async () => {
+      industryStore.industries[0].national_share = null
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      await townsStore.setupTowns('27')
+
+      const makers = townsStore.towns.filter((t) =>
+        t.industries.some((i) => i.name === 'Agriculture')
+      )
+      expect(makers).toEqual([])
+      expect(console.warn).toHaveBeenCalledWith(expect.stringMatching(/no national share/))
     })
 
     it('should parse full name correctly from MSA name', async () => {
@@ -700,7 +759,9 @@ describe('Towns Store', () => {
       })
       // Each state's jobs: Boston's area has some in both
       industryStore.useIndustryData = vi.fn(async (state) => {
-        industryStore.industries = [{ naics_code: 111, label: 'Grain', category: 'Farm' }]
+        industryStore.industries = [
+          { naics_code: 111, label: 'Grain', category: 'Farm', national_share: 0.001 }
+        ]
         industryStore.employmentData = [
           {
             industry: 111,
@@ -708,6 +769,8 @@ describe('Towns Store', () => {
             meanEmp: state === '25' ? { 14460: 900, 49340: 300 } : { 14460: 100, 31700: 400 }
           }
         ]
+        industryStore.totalJobs =
+          state === '25' ? { 14460: 50000, 49340: 10000 } : { 14460: 5000, 31700: 20000 }
       })
     })
 
@@ -726,6 +789,7 @@ describe('Towns Store', () => {
         49340: 300,
         31700: 400
       })
+      expect(industryStore.totalJobs).toEqual({ 14460: 55000, 49340: 10000, 31700: 20000 })
     })
 
     it("should give the board's towns industries from both states' jobs", async () => {

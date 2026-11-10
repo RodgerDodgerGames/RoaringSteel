@@ -1,51 +1,126 @@
-naics_code,label,category
-1111,Grain,Farm
-1112,Vegetables,Farm
-1113,Fruit,Farm
-1121,Cattle,Farm
-1122,Hogs,Farm
-1123,Poultry,Farm
-113,Logs,Farm
-114,Fish,Farm
-211,Oil & Gas,Mining
-2121,Coal,Mining
-2122,Metal Ore,Mining
-2123,Stone & Gravel,Mining
-3112,Flour,Food
-3113,Sugar & Candy,Food
-3114,Canned Goods,Food
-3115,Dairy,Food
-3116,Meat,Food
-3117,Seafood,Food
-3121,Beverages,Food
-3122,Tobacco,Food
-321,Lumber,Materials
-322,Paper,Materials
-324,Fuel,Materials
-3251,Chemicals,Materials
-3253,Fertilizer,Materials
-3261,Plastics,Materials
-3262,Rubber,Materials
-3271,Bricks,Materials
-3272,Glass,Materials
-3273,Cement,Materials
-3311,Steel,Metals
-3313,Aluminum,Metals
-3314,Copper,Metals
-313,Textiles,Goods
-315,Clothing,Goods
-3254,Medicine,Goods
-337,Furniture,Goods
-3352,Appliances,Goods
-3391,Medical Supplies,Goods
-3331,Farm Machinery,Machinery
-3332,Machinery,Machinery
-3336,Engines,Machinery
-3341,Computers,Machinery
-3344,Microchips,Machinery
-3361,Cars,Vehicles
-3362,Trailers,Vehicles
-3363,Auto Parts,Vehicles
-3364,Aircraft Parts,Vehicles
-3365,Railcars,Vehicles
-3366,Boats,Vehicles
+naics_code,label,category,national_share
+1111,Grain,Farm,0.0002363
+1112,Vegetables,Farm,0.0004824
+1113,Fruit & Nuts,Farm,0.001
+1114,Flowers & Plants,Farm,0.001093
+1119,Cotton & Hay,Farm,0.0003861
+1121,Cattle,Farm,0.0008035
+1122,Hogs,Farm,0.00006506
+1123,Poultry & Eggs,Farm,0.0001991
+1124,Sheep & Goats,Farm,0.000005665
+1125,Catfish & Oysters,Farm,0.00003157
+1129,Horses,Farm,0.000113
+1151,Farming,Farm,0.002121
+1152,Ranching,Farm,0.0001914
+1153,Timber Crews,Farm,0.0001279
+113,Logs,Farm,0.0002078
+114,Fish,Farm,0.00003805
+211,Oil & Gas,Mining,0.0007459
+2121,Coal,Mining,0.0001486
+2122,Metal Ore,Mining,0.0001745
+2123,Stone & Gravel,Mining,0.0005396
+2131,Oilfield Supplies,Mining,0.001608
+3111,Animal Feed,Food,0.0003793
+3112,Flour,Food,0.0003201
+3113,Sugar & Candy,Food,0.0004687
+3114,Canned & Frozen Food,Food,0.0009752
+3115,Dairy,Food,0.0008877
+3116,Meat,Food,0.002822
+3117,Seafood,Food,0.0001208
+3118,Bread,Food,0.002212
+3119,Snack Foods,Food,0.001593
+3121,Beverages,Food,0.002107
+3122,Tobacco,Food,0.00005591
+3131,Yarn & Thread,Goods,0.0001043
+3132,Fabric,Goods,0.0002303
+3133,Dyed Fabric,Goods,0.0001065
+3141,Carpets & Curtains,Goods,0.0002637
+3149,Rope & Tents,Goods,0.0003497
+3151,Knitwear,Goods,0.00003032
+3152,Clothing,Goods,0.0002787
+3159,Hats & Gloves,Goods,0.00005348
+3161,Leather,Goods,0.000007134
+3162,Shoes,Goods,0.00002608
+3169,Purses & Luggage,Goods,0.00004388
+3211,Lumber,Materials,0.0003723
+3212,Plywood,Materials,0.0003851
+3219,Millwork & Mobile Homes,Materials,0.001412
+3221,Paper,Materials,0.0003421
+3222,Cardboard Boxes,Materials,0.001657
+3231,Printing,Materials,0.002475
+324,Fuel,Materials,0.000672
+3251,Chemicals,Materials,0.0009437
+3252,Plastic Resin,Materials,0.0005711
+3253,Fertilizer,Materials,0.0001926
+3254,Medicine,Goods,0.002345
+3255,Paint,Materials,0.0003808
+3256,Soap & Cosmetics,Goods,0.0007199
+3259,Explosives & Ink,Materials,0.0004684
+3261,Plastic Goods,Materials,0.003759
+3262,Tires & Rubber,Materials,0.0006445
+3271,Bricks & Tile,Materials,0.0001819
+3272,Glass,Materials,0.0004129
+3273,Cement & Concrete,Materials,0.001317
+3274,Lime & Plaster,Materials,0.00005904
+3279,Insulation & Cut Stone,Materials,0.0004787
+3311,Steel,Metals,0.0004749
+3312,Steel Pipe,Metals,0.000303
+3313,Aluminum,Metals,0.0002541
+3314,Copper & Brass,Metals,0.0002918
+3315,Castings,Metals,0.0004881
+3321,Metal Stampings,Metals,0.0004718
+3322,Hand Tools,Metals,0.0001744
+3323,Structural Steel,Metals,0.002638
+3324,Tanks & Boilers,Metals,0.0005045
+3325,Hardware,Metals,0.0001184
+3326,Springs & Wire,Metals,0.000193
+3327,Nuts & Bolts,Metals,0.002034
+3329,Valves & Fittings,Metals,0.001724
+3331,Tractors & Bulldozers,Machinery,0.001222
+3332,Factory Machines,Machinery,0.0008019
+3333,Office Machines,Machinery,0.0005144
+3334,Furnaces & Air Conditioners,Machinery,0.0008139
+3335,Machine Tools,Machinery,0.0009878
+3336,Engines & Turbines,Machinery,0.0005296
+3339,Pumps & Compressors,Machinery,0.001704
+3341,Computers,Machinery,0.0008172
+3342,Phones & Radios,Machinery,0.0005509
+3343,Stereos & TVs,Machinery,0.00009461
+3344,Microchips,Machinery,0.002544
+3345,Instruments,Machinery,0.002716
+3346,CDs & DVDs,Machinery,0.00006219
+3351,Light Fixtures,Machinery,0.000187
+3352,Appliances,Goods,0.0003237
+3353,Electrical Gear,Machinery,0.000868
+3359,Batteries & Wire,Machinery,0.0009955
+3361,Cars,Vehicles,0.001666
+3362,Trailers & RVs,Vehicles,0.000869
+3363,Auto Parts,Vehicles,0.003471
+3364,Aircraft,Vehicles,0.003222
+3365,Railcars,Vehicles,0.00009174
+3366,Boats & Ships,Vehicles,0.0009928
+3369,Motorcycles,Vehicles,0.0001989
+3371,Furniture,Goods,0.001348
+3372,Office Furniture,Goods,0.0006195
+3379,Mattresses & Blinds,Goods,0.0001785
+3391,Medical Supplies,Goods,0.002077
+3399,Toys & Sporting Goods,Goods,0.001868
+4245,Grain Elevators,Services,0.000304
+4883,Imports,Services,0.0007238
+492,Packages,Services,0.007541
+5131,Books & Newspapers,Services,0.001902
+5132,Software,Services,0.004438
+5121,Movies,Services,0.002355
+5122,Music,Services,0.0001125
+5161,TV & Radio,Services,0.0007856
+5182,Data Centers,Services,0.003232
+5222,Credit Cards,Services,0.003925
+5231,Stocks & Bonds,Services,0.003397
+5232,Stock Exchanges,Services,0.00004596
+5239,Investment Funds,Services,0.004069
+5418,Advertising,Services,0.003279
+5621,Trash,Services,0.001387
+5622,Landfill Waste,Services,0.0008016
+5629,Recycling,Services,0.00118
+7112,Sports Teams,Services,0.001106
+7131,Theme Parks,Services,0.001409

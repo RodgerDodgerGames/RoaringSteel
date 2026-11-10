@@ -79,13 +79,23 @@ describe('buildDemandDeck', () => {
     expect(new Set(demands).size).toBe(demands.length)
   })
 
-  it('should send each demand on a card to a different town, for a different commodity', () => {
+  it('should send each demand on a card to a different town', () => {
     const deck = buildDemandDeck(TOWNS, payoffOf, { random: seeded(11) })
 
     deck.forEach(({ demands }) => {
       expect(new Set(demands.map((d) => d.destination)).size).toBe(3)
-      expect(new Set(demands.map((d) => d.industry)).size).toBe(3)
     })
+  })
+
+  it('should let a card ask for the same commodity more than once, as the draw falls', () => {
+    // Some card, in one of a few decks, asks for one commodity twice
+    const repeats = [1, 2, 3, 4, 5, 6, 7, 8].some((seed) =>
+      buildDemandDeck(TOWNS, payoffOf, { random: seeded(seed) }).some(
+        ({ demands }) => new Set(demands.map((d) => d.industry)).size < 3
+      )
+    )
+
+    expect(repeats).toBe(true)
   })
 
   it('should never ask a town for a commodity it makes', () => {

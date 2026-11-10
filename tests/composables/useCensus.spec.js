@@ -1,7 +1,8 @@
 /**
  * useCensus Composable Tests
  *
- * Tests for Census API integration (ACS population data)
+ * Tests for Census API integration (ACS population data, and the counties
+ * that make up an area)
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -20,7 +21,7 @@ vi.mock('@/composables/utils', async (importOriginal) => {
   }
 })
 
-import useCensus from '@/composables/setup/useCensus'
+import useCensus, { fetchAreaCounties } from '@/composables/setup/useCensus'
 import { isRefusal } from '@/composables/utils'
 
 /** A game's data window: QWI from 2021 to 2025 */
@@ -320,6 +321,88 @@ describe('useCensus Composable', () => {
       expect(item.population).toBe('50000')
       expect(item.state_code).toBe('27')
       expect(item.msa_code).toBe('99999')
+    })
+  })
+
+  describe('fetchAreaCounties', () => {
+    /**
+     * The ACS's answer for an area's counties.
+     * @param {Array<string>} counties - The counties' three-digit codes
+     * @returns {Object} The response
+     */
+    const countiesAnswer = (counties) => ({
+      ok: true,
+      status: 200,
+      json: async () => [
+        [
+          'NAME',
+          'state',
+          'metropolitan statistical area/micropolitan statistical area (or part)',
+          'county'
+        ],
+        ...counties.map((county) => [`County ${county}`, '55', '24580', county])
+      ]
+    })
+
+    /** The area code a request asks for */
+    const areaOf = (url) => decodeURIComponent(url).match(/\(or part\):(\d+)/)[1]
+
+    it("should give each area's counties", async () => {
+      mockFetch.mockImplementation(async (url) =>
+        countiesAnswer(areaOf(url) === '24580' ? ['009', '061'] : ['045'])
+      )
+
+      const counties = await fetchAreaCounties('55', ['24580', '38420'], WINDOW)
+
+      expect(counties).toEqual(
+        new Map([
+          ['24580', ['009', '061']],
+          ['38420', ['045']]
+        ])
+      )
+      const url = decodeURIComponent(mockFetch.mock.calls[0][0])
+      expect(url).toContain('for=county:*')
+      expect(url).toContain(
+        'in=state:55 metropolitan statistical area/micropolitan statistical area (or part):24580'
+      )
+    })
+
+    it("should find the release with the first area, and ask for the others' from it", async () => {
+      mockFetch.mockImplementation(async (url) =>
+        url.includes('/data/2025/') ? noSuchRelease : countiesAnswer(['001'])
+      )
+
+      await fetchAreaCounties('55', ['1', '2', '3'], WINDOW)
+
+      const asked = mockFetch.mock.calls.map(([url]) => [
+        areaOf(url),
+        url.match(/data\/(\d{4})\/acs/)[1]
+      ])
+      expect(asked).toEqual([
+        ['1', '2025'],
+        ['1', '2024'],
+        ['2', '2024'],
+        ['3', '2024']
+      ])
+    })
+
+    it('should give no counties for an area the release has none for', async () => {
+      mockFetch.mockResolvedValue({ ok: true, status: 204 })
+
+      const counties = await fetchAreaCounties('55', ['99999'], WINDOW)
+
+      expect(counties.get('99999')).toEqual([])
+    })
+
+    it('should ask nothing when there are no areas', async () => {
+      expect(await fetchAreaCounties('55', [], WINDOW)).toEqual(new Map())
+      expect(mockFetch).not.toHaveBeenCalled()
+    })
+
+    it('should throw when a lookup fails', async () => {
+      mockFetch.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) })
+
+      await expect(fetchAreaCounties('55', ['24580'], WINDOW)).rejects.toThrow('counties')
     })
   })
 })

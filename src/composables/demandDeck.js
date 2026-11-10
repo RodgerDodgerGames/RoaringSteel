@@ -7,7 +7,8 @@
  * Every demand on the board is a pair of a town and a commodity some other
  * town on the board makes. Each pair is on at most one card, so a deck never
  * asks for the same thing in the same place twice. The three demands on a
- * card go to three different towns and ask for three different commodities.
+ * card go to three different towns; they may ask for the same commodity,
+ * as the draw falls.
  *
  * Which pairs make it into the deck, and in what order, is drawn at random,
  * weighted two ways, as the deck has always been:
@@ -17,8 +18,10 @@
  *   weight is how many towns make it.
  * A pair's weight is the two multiplied. The pairs are put in a random order
  * in which heavier pairs tend to come first (each pair's place is drawn as
- * random^(1 / weight), highest first), and the cards are dealt out of that
- * order.
+ * random^(1 / weight), highest first), and the cards are made out of that
+ * order. The finished cards are then shuffled: the weights choose which
+ * demands make it into the deck, but a heavy demand is no likelier to be
+ * near the top than a light one.
  *
  * The deck has at most `cardsPerTown` cards per town (see config/demands.js),
  * and at most a third as many as there are pairs.
@@ -70,6 +73,20 @@ function weightedOrder(pairs, random) {
 }
 
 /**
+ * Shuffles a list in place, every order equally likely (Fisher-Yates).
+ * @param {Array} items - The list; reordered
+ * @param {Function} random - Draws a number in [0, 1)
+ * @returns {Array} The same list
+ */
+function shuffle(items, random) {
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1))
+    ;[items[i], items[j]] = [items[j], items[i]]
+  }
+  return items
+}
+
+/**
  * Builds the demand deck for a board.
  *
  * @param {Array<Object>} towns - The towns on the board, each with name and
@@ -95,15 +112,12 @@ export function buildDemandDeck(
 
   const deck = []
   while (deck.length < size) {
-    // The first pairs left in the order that go to towns, and ask for
-    // commodities, not already on the card. The ones passed over stay where
-    // they are, for later cards.
+    // The first pairs left in the order that go to towns not already on the
+    // card. The ones passed over stay where they are, for later cards.
     const card = []
     for (let i = 0; i < order.length && card.length < DEMANDS_PER_CARD; i++) {
       const pair = order[i]
-      const isRepeat = card.some(
-        (taken) => taken.town === pair.town || taken.industry === pair.industry
-      )
+      const isRepeat = card.some((taken) => taken.town === pair.town)
       if (!isRepeat) {
         card.push(pair)
         order.splice(i, 1)
@@ -113,14 +127,13 @@ export function buildDemandDeck(
     // What is left cannot make a card of its own; the deck stops short
     if (card.length < DEMANDS_PER_CARD) break
 
-    deck.push({
-      id: deck.length + 1,
-      demands: card.map(({ town, industry }) => ({
+    deck.push(
+      card.map(({ town, industry }) => ({
         destination: town.name,
         industry,
         payoff: payoffOf(town, industry)
       }))
-    })
+    )
   }
-  return deck
+  return shuffle(deck, random).map((demands, index) => ({ id: index + 1, demands }))
 }

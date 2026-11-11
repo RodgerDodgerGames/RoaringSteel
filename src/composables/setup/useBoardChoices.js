@@ -1,9 +1,9 @@
 /**
  * Board Choices (useBoardChoices.js)
  *
- * What the Area Select screen offers: the ways of choosing a board (single
- * states, or a grouping of regions — see config/regions.js), the one being
- * shown, and the boards it offers (see boards.js).
+ * What the Area Select screen offers: the ways of choosing a board (a
+ * grouping of regions — see config/regions.js — or single states), the one
+ * being shown, and the boards it offers (see boards.js).
  *
  * The state outlines are fetched once, when the screen opens. A grouping's
  * boards are worked out the first time it is shown, and kept for the rest of
@@ -31,8 +31,11 @@ export function useBoardChoices() {
   /** Every state's outline, once fetched */
   const stateFeatures = shallowRef([])
 
-  /** The grouping shown on the map */
-  const grouping = ref('regions')
+  /** Every way of choosing a board, in the order the screen offers them */
+  const groupings = boardGroupings()
+
+  /** The grouping shown on the map: the first offered, when the screen opens */
+  const grouping = ref(groupings[0].id)
 
   /** Why the outlines could not be fetched, for the screen; null if they were */
   const error = ref(null)
@@ -76,5 +79,5 @@ export function useBoardChoices() {
     }
   }
 
-  return { groupings: boardGroupings(), grouping, boards, stateFeatures, error, load }
+  return { groupings, grouping, boards, stateFeatures, error, load }
 }

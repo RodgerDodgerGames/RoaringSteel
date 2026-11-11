@@ -34,7 +34,8 @@ export const STATES_GROUPING = 'states'
 
 /**
  * Every way of choosing a board, in the order the Area Select screen offers
- * them: single states, then each grouping of regions.
+ * them: each grouping of regions, in the order regions.js lists them, then
+ * single states.
  * @returns {Array<{id: string, label: string}>} The groupings
  */
 export function boardGroupings() {

@@ -15,6 +15,9 @@
  * - { type: 'place', town }                 the train put on the board
  * - { type: 'move', town, arrived, paid }   a run toward a town; `paid` is
  *                                           the track fees, [{ ownerId, amount }]
+ * - { type: 'move', onTrack: true, town, arrived, paid }   a run to a point on
+ *                                           the track; `town` is the one nearest
+ *                                           it by track, or null
  * - { type: 'pickup', industry, town }
  * - { type: 'deliver', industry, town, payoff }
  * - { type: 'drop', industry, town }
@@ -101,6 +104,17 @@ function feesPaid(events) {
   return [...byOwner].map(([ownerId, amount]) => ({ ownerId, amount }))
 }
 
+/**
+ * Where a run went, in words: the town, or, for a run to a point on the
+ * track, "the track near Pueblo".
+ * @param {Object} event - A 'move' event
+ * @returns {string} The place
+ */
+function movePlace({ town, onTrack }) {
+  if (!onTrack) return town
+  return town ? `the track near ${town}` : 'a point on the track'
+}
+
 /** A section of track in words: "built $5,000 of track, reaching Denver" */
 function buildPhrase(cost, reached) {
   const reaching = reached.length ? `, reaching ${listOf(reached)}` : ''
@@ -120,7 +134,7 @@ export function describeEvent(event, nameOf) {
       return `Put the train in ${event.town}`
     case 'move': {
       const run = event.arrived
-        ? `Ran to ${event.town}`
+        ? `Ran to ${movePlace(event)}`
         : `Headed for ${event.town}, stopping short`
       const fees = (event.paid ?? []).map(
         ({ ownerId, amount }) => `${nameOf(ownerId)} ${formatCurrency(amount)}`
@@ -205,7 +219,7 @@ export function summarizeTurn(turn, nameOf) {
   const trainEvents = events.filter(({ type }) => type !== 'build' && type !== 'upgrade')
   const lastMove = trainEvents.at(-1)?.type === 'move' ? trainEvents.at(-1) : null
   if (lastMove) {
-    parts.push(lastMove.arrived ? `ran to ${lastMove.town}` : `headed for ${lastMove.town}`)
+    parts.push(lastMove.arrived ? `ran to ${movePlace(lastMove)}` : `headed for ${lastMove.town}`)
   }
 
   const fees = feesPaid(events)

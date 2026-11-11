@@ -69,8 +69,11 @@ export const useMapStore = defineStore('map', () => {
 
   /**
    * While the player is choosing a town on the map — where to place or send
-   * their train — what to do with the town they click: { prompt, onPick },
-   * where `prompt` says what clicking does and `onPick` is handed the town.
+   * their train — what to do with the town they click: { prompt, onPick,
+   * onPickPoint }, where `prompt` says what clicking does and `onPick` is
+   * handed the town. `onPickPoint`, when there is one, is handed the node key
+   * of a point on the track clicked instead, and the points the train can
+   * stop at are marked while it is set (see trackStopMarkers.js).
    * Null the rest of the time, when clicking a town opens its popup.
    * Held shallowly: it carries a function, which has nothing to watch inside.
    */
@@ -123,8 +126,9 @@ export const useMapStore = defineStore('map', () => {
 
   /**
    * Starts or stops choosing a town on the map (see `townPicker`).
-   * @param {{prompt: string, onPick: Function}|null} picker - What a click
-   *   on a town does, or null to go back to opening its popup
+   * @param {{prompt: string, onPick: Function, onPickPoint?: Function}|null}
+   *   picker - What a click on a town (or a point on the track) does, or null
+   *   to go back to opening a town's popup
    */
   const setTownPicker = (picker) => {
     townPicker.value = picker

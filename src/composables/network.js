@@ -234,6 +234,58 @@ export function shortestRoutes(network, position, { owners = null } = {}) {
 }
 
 /**
+ * The town nearest a train by track, to say where a train stopped out on
+ * the line is ("3 spaces away from Pueblo").
+ *
+ * Measured along the track, on anyone's, in either direction: the
+ * no-reversing rule is ignored, since this describes where the train is, not
+ * where it can go. A train waiting at the end of its track, with no town
+ * ahead, is still near the town behind it.
+ *
+ * @param {Object} network - From `buildNetwork`
+ * @param {Object} position - Where the train is (see the module notes)
+ * @returns {{town: Object, km: number}|null} The town and how far it is by
+ *   track (0 for a train standing in it), or null if no track leads to one
+ */
+export function nearestTown(network, position) {
+  // Where the search starts: the node the train is on, or, part way along a
+  // stretch, the nodes at either end of it, each as far as the train is from
+  // it. A node no longer on the network (say, a save whose towns have since
+  // changed) is no place to start from.
+  const starts = (
+    position.nodeKey
+      ? [{ key: position.nodeKey, km: 0 }]
+      : [position.cameFrom, position.ahead].map((key) => ({
+          key,
+          km: network.nodes.has(key) ? kmBetween(position, network.nodes.get(key)) : 0
+        }))
+  ).filter(({ key }) => network.nodes.has(key))
+
+  // The shortest way found to each node so far
+  const best = new Map()
+  const frontier = new MinHeap()
+  const offer = (key, km) => {
+    if (best.has(key) && best.get(key) <= km) return
+    best.set(key, km)
+    frontier.push(km, key)
+  }
+  starts.forEach(({ key, km }) => offer(key, km))
+
+  const settled = new Set()
+  while (frontier.size) {
+    const key = frontier.pop()
+    if (settled.has(key)) continue
+    settled.add(key)
+    const km = best.get(key)
+    // Nodes come out nearest first, so the first town out is the nearest
+    const town = network.nodes.get(key).town
+    if (town) return { town, km }
+    network.adjacency.get(key).forEach((edge) => offer(edge.to, km + edge.km))
+  }
+  return null
+}
+
+/**
  * A binary min-heap of keys by distance, for the route search: the nearest
  * waiting arrival comes out first. A key may be pushed again with a shorter
  * distance; the search skips the longer copy when it comes out later.

@@ -11,6 +11,8 @@
  * @module composables/trainStatus
  */
 
+import { formatDistance } from '@/composables/boardScale'
+
 /**
  * How long a run takes, in words.
  * @param {{turns: number, runsNow: boolean}} timing - From the trains store's
@@ -24,6 +26,18 @@ export function turnsText({ turns, runsNow }) {
 }
 
 /**
+ * A distance in spaces, in words, as the player is shown every distance
+ * (see formatDistance): rounded up, as a distance still to cover.
+ * @param {number} km - The distance
+ * @param {number} speedUnitKm - The board's speed unit
+ * @returns {string} e.g. "1 space", "2.4 spaces"
+ */
+export function spacesText(km, speedUnitKm) {
+  const spaces = formatDistance(km, speedUnitKm, 'up')
+  return `${spaces} ${spaces === '1' ? 'space' : 'spaces'}`
+}
+
+/**
  * Where a train is and where it is heading, in a sentence.
  *
  * @param {Object} status
@@ -31,12 +45,23 @@ export function turnsText({ turns, runsNow }) {
  * @param {Object|null} status.town - The town it stands in, or null
  * @param {{town: Object, route: Object|null}|null} status.heading - From
  *   the trains store's `headingOf`
+ * @param {{town: Object, km: number}|null} [status.nearest] - The town
+ *   nearest the train by track, and how far (the trains store's
+ *   `nearestTownOf`), for a train stopped out on the line; null if no track
+ *   leads to a town
+ * @param {number} [status.speedUnitKm] - The board's speed unit, to give
+ *   that distance in spaces as every distance is shown (see formatDistance)
  * @returns {string} e.g. "In Omaha", "Heading toward Denver, expected to
- *   arrive in 2 turns", or "In Omaha, heading toward Denver (this turn)"
+ *   arrive in 2 turns", "In Omaha, heading toward Denver (this turn)", or
+ *   "Stopped on the track 2.4 spaces away from Pueblo"
  */
-export function whereabouts({ placed, town, heading }) {
+export function whereabouts({ placed, town, heading, nearest = null, speedUnitKm }) {
   if (!placed) return 'Not on the board yet'
-  if (!heading) return town ? `In ${town.name}` : 'Between towns'
+  if (!heading) {
+    if (town) return `In ${town.name}`
+    if (!nearest) return 'Stopped on the track'
+    return `Stopped on the track ${spacesText(nearest.km, speedUnitKm)} away from ${nearest.town.name}`
+  }
 
   const name = heading.town.name
   if (!heading.route) {

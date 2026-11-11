@@ -59,7 +59,7 @@ const modeHint = computed(() => {
     }
   }
   if (props.pickPrompt) {
-    return { name: HELP_SCREENS.choosingTown, title: 'Choosing a town', body: props.pickPrompt }
+    return { name: HELP_SCREENS.choosingTown, title: 'Choosing a stop', body: props.pickPrompt }
   }
   if (props.isRemoving) {
     return {

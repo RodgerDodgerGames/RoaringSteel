@@ -34,6 +34,15 @@ describe('turnHistory', () => {
       )
     })
 
+    it('should end with the train stopped on the track, near a town', () => {
+      const text = summarizeTurn(
+        turn([{ type: 'move', town: 'Pueblo', onTrack: true, arrived: true, paid: [] }]),
+        nameOf
+      )
+
+      expect(text).toBe('Ann ran to the track near Pueblo.')
+    })
+
     it('should leave out a run whose last stop already names the town', () => {
       const text = summarizeTurn(
         turn([
@@ -128,6 +137,18 @@ describe('turnHistory', () => {
         'Built $5,000 of track, reaching Golden',
         'Built $3,000 of track'
       ])
+    })
+
+    it('should name a run to a point on the track by the town nearest it', () => {
+      const lines = turnLines(
+        turn([
+          { type: 'move', town: 'Pueblo', onTrack: true, arrived: true, paid: [] },
+          { type: 'move', town: null, onTrack: true, arrived: true, paid: [] }
+        ]),
+        nameOf
+      )
+
+      expect(lines).toEqual(['Ran to the track near Pueblo', 'Ran to a point on the track'])
     })
 
     it('should end with the win, for a winning turn', () => {

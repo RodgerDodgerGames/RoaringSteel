@@ -9,6 +9,8 @@
   - Each town's commodity icons, in the Plan view
   - Interactive popups for town information
   - Every player's train, where it stands (trainMarkers.js)
+  - While the player chooses on the map where to run their train, the points
+    on the track it can stop at (trackStopMarkers.js)
   - A Credits link in the corner, opening the About dialog, in place of
     Leaflet's credit line (every credit is listed there)
 
@@ -39,6 +41,7 @@ import { useMapStore } from '@/stores/map'
 import { useRegionMask } from '@/composables/map/regionMask'
 import { useWaterLayer } from '@/composables/map/waterLayer'
 import { useTrainMarkers } from '@/composables/map/trainMarkers'
+import { useTrackStopMarkers } from '@/composables/map/trackStopMarkers'
 import MapCreditsLink from '@/components/map/MapCreditsLink.vue'
 
 const townsStore = useTownsStore()
@@ -53,6 +56,7 @@ const mapView = useMapView()
 const regionMask = useRegionMask()
 const waterLayer = useWaterLayer()
 const trainMarkers = useTrainMarkers()
+const trackStopMarkers = useTrackStopMarkers()
 
 onMounted(() => {
   // No starting view: useMapView gives the map its view below. No credit
@@ -86,6 +90,8 @@ onMounted(() => {
     mapStore.setTownsLayer(townsLayer.value)
     // the trains, over the towns they stand in
     trainMarkers.attach(map.value)
+    // the points on the track a train can stop at, while they are chosen from
+    trackStopMarkers.attach(map.value)
   }
 })
 

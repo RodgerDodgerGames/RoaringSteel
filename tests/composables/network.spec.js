@@ -3,7 +3,8 @@
  *
  * The track seen as a railway: sections join where they share a point (not
  * where they merely cross), trains find the shortest way along it, stop part
- * way when they run out of distance, may only reverse in towns, and a
+ * way when they run out of distance, may only reverse in towns, are placed
+ * by the town nearest them along the track, and a
  * player's major cities count as joined only on one connected piece of their
  * own track.
  */
@@ -16,6 +17,7 @@ import {
   positionAtNode,
   shortestRoutes,
   runRoute,
+  nearestTown,
   majorCitiesJoined
 } from '@/composables/network'
 import { kmBetween } from '@/composables/map/trackCost'
@@ -246,6 +248,72 @@ describe('network', () => {
       expect(result.km).toBeCloseTo(0.5 * LEG_KM)
       // Arrived along the stretch from Middle
       expect(result.position.cameFrom).toBe(townKey(middle))
+    })
+  })
+
+  describe('nearestTown', () => {
+    it('should be the town a train stands in, no distance away', () => {
+      const network = buildNetwork([segment(1, p(west), p(middle))], towns)
+
+      expect(nearestTown(network, positionAtNode(network, townKey(middle)))).toEqual({
+        town: middle,
+        km: 0
+      })
+    })
+
+    it('should measure along the track, not in a straight line', () => {
+      // A spur from West that ends just north of East: East is far nearer as
+      // the crow flies, but the track only leads back to West
+      const end = { lat: 0.05, lng: 0.2 }
+      const network = buildNetwork(
+        [segment(1, p(west), end), segment(2, p(middle), p(east))],
+        towns
+      )
+
+      const nearest = nearestTown(network, positionAtNode(network, pointKey(end), townKey(west)))
+
+      expect(nearest.town).toBe(west)
+      expect(nearest.km).toBeCloseTo(kmBetween(p(west), end))
+    })
+
+    it('should look back the way the train came, as a train waiting at the end of its track', () => {
+      // East, then a stub beyond it with no town ahead
+      const end = { lat: 0, lng: 0.25 }
+      const network = buildNetwork([segment(1, p(west), p(middle), p(east), end)], towns)
+
+      const nearest = nearestTown(network, positionAtNode(network, pointKey(end), townKey(east)))
+
+      expect(nearest.town).toBe(east)
+      expect(nearest.km).toBeCloseTo(0.5 * LEG_KM)
+    })
+
+    it('should measure both ways from part way along a stretch', () => {
+      const network = buildNetwork([segment(1, p(west), p(middle), p(east))], towns)
+      const start = positionAtNode(network, townKey(west))
+      const { steps } = shortestRoutes(network, start).get(townKey(east))
+      // Stopped a quarter of the way from Middle toward East: Middle is behind
+      // the train but nearer than East ahead
+      const stopped = runRoute(network, start, steps, 1.25 * LEG_KM).position
+
+      const nearest = nearestTown(network, stopped)
+
+      expect(nearest.town).toBe(middle)
+      expect(nearest.km).toBeCloseTo(0.25 * LEG_KM)
+    })
+
+    it('should be null for a train on a point no longer on the network', () => {
+      const network = buildNetwork([segment(1, p(west), p(middle))], towns)
+      const gone = { lat: 5, lng: 5, nodeKey: pointKey({ lat: 5, lng: 5 }), cameFrom: null }
+
+      expect(nearestTown(network, gone)).toBeNull()
+    })
+
+    it('should be null when no track leads to a town', () => {
+      const a = { lat: 1, lng: 1 }
+      const b = { lat: 1, lng: 1.1 }
+      const network = buildNetwork([segment(1, a, b)], towns)
+
+      expect(nearestTown(network, positionAtNode(network, pointKey(a)))).toBeNull()
     })
   })
 

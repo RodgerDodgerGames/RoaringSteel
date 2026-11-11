@@ -34,7 +34,7 @@
 -->
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, inject } from 'vue'
 import { storeToRefs } from 'pinia'
 import PlayerCard from '@/components/panel/PlayerCard.vue'
 import TrainPanel from '@/components/panel/TrainPanel.vue'
@@ -46,6 +46,7 @@ import TurnHistory from '@/components/panel/TurnHistory.vue'
 import { useGameStore } from '@/stores/game'
 import { usePlayerStore } from '@/stores/players'
 import { useTurn } from '@/composables/useTurn'
+import { buildTrackKey } from '@/composables/map/useBuildTrack'
 import { gameRules } from '@/config/game'
 
 const emit = defineEmits(['show-results'])
@@ -54,6 +55,24 @@ const gameStore = useGameStore()
 const { isBuildingRound, isOver, winnerId } = storeToRefs(gameStore)
 const playerStore = usePlayerStore()
 const { nextPlayer, playsAgain, endTurn, canDiscardHand, discardHand } = useTurn()
+
+// The game view's build-track instance (see BuildControls); null with no map
+const buildTrack = inject(buildTrackKey, null)
+
+/**
+ * End turn: a line still being drawn is built first, as far as it can be,
+ * as Stop building would. It has to be built before the turn ends, while
+ * the turn is still the drawing player's; after, it would be thrown away.
+ *
+ * If the line could not be built whole, the turn stays open: the notice
+ * saying why would otherwise be cleared as the turn passed, and the player
+ * would never learn part of their line is missing. They click End turn
+ * again once they have read it.
+ */
+function finishTurn() {
+  if (buildTrack?.stopDrawing() === false) return
+  endTurn()
+}
 
 /** Whether the turn is a computer player's, which plays itself */
 const isBotTurn = computed(() => playerStore.activePlayer?.isBot === true)
@@ -165,7 +184,7 @@ function confirmDiscardHand() {
     </div>
 
     <footer v-if="!isOver && !isBotTurn" class="player-dock__footer">
-      <button class="button is-primary is-medium is-fullwidth" @click="endTurn">End turn</button>
+      <button class="button is-primary is-medium is-fullwidth" @click="finishTurn">End turn</button>
       <p v-if="nextPlayer" class="player-dock__next">
         Next up: {{ nextPlayer.name }}{{ playsAgain ? ' again' : '' }}
       </p>

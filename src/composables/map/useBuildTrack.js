@@ -24,6 +24,7 @@ import {
   BRIDGE_POST_STYLE
 } from '@/composables/map/trackStyles'
 import { bridgeSpans } from '@/composables/map/bridges'
+import { gameRules } from '@/config/game'
 
 /**
  * Injection key for the one build-track instance a game view runs.
@@ -61,6 +62,7 @@ export default function useBuildTrack(formatCurrency) {
   const restoredLineLayers = ref([]) // Leaflet layers redrawn from a saved game
   const isFirstVertexAdded = ref(false) // Flag to track if the first vertex has been added
   const buildError = ref('') // Why the last section could not be built, if it could not
+  const budgetNotice = ref('') // That the last line was cut short for money, and why
   const isRemoving = ref(false) // True while Geoman's removal mode is on
 
   /**
@@ -119,14 +121,22 @@ export default function useBuildTrack(formatCurrency) {
   )
 
   /**
-   * True while the line in progress costs more than the player can pay for.
-   * Only meaningful mid-draw: once a section is built its cost has already come
-   * out of `availableToSpend`, and comparing the two would flag every build
-   * that spent the last of the allowance.
+   * How many dollars short the player is of the line in progress, out to the
+   * cursor; 0 while they can pay for it. Only meaningful mid-draw: once a
+   * section is built its cost has already come out of `availableToSpend`,
+   * and comparing the two would flag every build that spent the last of the
+   * allowance.
+   *
+   * The vertices already placed are always affordable (a click that goes
+   * over ends the line — see `setupDrawingEvents`), so this is only ever
+   * above 0 while the leg out to the cursor is what costs too much.
    */
-  const isOverBudget = computed(
-    () => isDrawingActive.value && pendingCost.value > availableToSpend.value
+  const overBudgetBy = computed(() =>
+    isDrawingActive.value ? Math.max(0, pendingCost.value - availableToSpend.value) : 0
   )
+
+  /** True while the line in progress costs more than the player can pay for */
+  const isOverBudget = computed(() => overBudgetBy.value > 0)
 
   /**
    * True while the player is choosing where a line starts: drawing is on and
@@ -142,6 +152,12 @@ export default function useBuildTrack(formatCurrency) {
    * pending cost or build error from the last player's turn is left showing.
    * Any drawing or removal left in progress is ended first: neither may carry
    * over into someone else's turn.
+   *
+   * A line still being drawn is thrown away here, not built: by now the turn
+   * is someone else's, and the track builder would refuse it. The End turn
+   * button builds it first, while the turn is still the drawing player's
+   * (see `stopDrawing`), so this only catches a turn that ended some other
+   * way.
    *
    * Completed track layers are deliberately left on the map; the segments
    * behind them are already recorded in the track store.
@@ -189,9 +205,24 @@ export default function useBuildTrack(formatCurrency) {
   })
 
   /**
+   * Turns the cursor into a red X while the leg out to it costs more than
+   * the player can spend, so they can see before clicking that the line will
+   * end at the last point (see `.is-over-budget` in map.css). A class rather
+   * than an inline cursor: Geoman puts a crosshair on every clickable layer
+   * while drawing, and only a style sheet rule can reach those too.
+   *
+   * Goes off by itself when drawing stops, however it stops, since
+   * `isOverBudget` is only ever true mid-draw.
+   */
+  watch(isOverBudget, (over) => {
+    if (isAttached) mapStore.map.getContainer().classList.toggle(OVER_BUDGET_CLASS, over)
+  })
+
+  /**
    * Track is only built in the Build view. The Plan view shows the whole
    * region fixed in place, too far out to place track accurately, so
-   * switching to it ends any drawing or removal in progress, as Escape does.
+   * switching to it ends any drawing or removal in progress. A line being
+   * drawn is built as far as it has been drawn, as Stop building does.
    *
    * Synchronous, so it runs on every switch: a deferred watcher sees only
    * where the view ends up once the tick is over, and would miss a switch to
@@ -201,7 +232,7 @@ export default function useBuildTrack(formatCurrency) {
     () => mapStore.viewMode,
     (view) => {
       if (view !== PLAN_VIEW) return
-      if (isDrawingActive.value) cancelDrawing()
+      stopDrawing()
       stopRemoving()
     },
     { flush: 'sync' }
@@ -252,8 +283,11 @@ export default function useBuildTrack(formatCurrency) {
     // the map with nothing listening to take them out of the store or refund
     // them — the drift between map and save that #83 fixed
     stopRemoving()
-    // The start-point check may have left a "not allowed" cursor on the map
+    // The start-point check may have left a "not allowed" cursor on the map,
+    // and an over-budget leg a red X: the watchers that clear them have
+    // already stopped
     mapStore.map.getContainer().style.cursor = ''
+    mapStore.map.getContainer().classList.remove(OVER_BUDGET_CLASS)
 
     mapStore.map.off(mapEvents)
     removeTownMarkerEvents()
@@ -293,6 +327,9 @@ export default function useBuildTrack(formatCurrency) {
    * Escape backs out of whichever map mode the player is in, the way it does in
    * most drawing tools. Registered through VueUse so the key listener is taken
    * off the window when the host unmounts.
+   *
+   * Unlike Stop building, Escape throws a line being drawn away rather than
+   * building it, so there is still a way to give up on a line.
    */
   onKeyStroke('Escape', () => {
     if (isDrawingActive.value) cancelDrawing()
@@ -311,8 +348,9 @@ export default function useBuildTrack(formatCurrency) {
    */
   function toggleRemoveMode() {
     // Drawing, removing and choosing a town for the train all act on map
-    // clicks, so only one may be live
-    if (isDrawingActive.value) cancelDrawing()
+    // clicks, so only one may be live. A line being drawn is built first,
+    // as Stop building would.
+    stopDrawing()
     mapStore.setTownPicker(null)
     // Track is torn up in the Build view. Removal mode is only ever on in that
     // view, so when this switches it off the view stays as it is.
@@ -388,7 +426,36 @@ export default function useBuildTrack(formatCurrency) {
   }
 
   /**
-   * Cancels line drawing mode and resets state.
+   * Ends line drawing mode, building the line drawn so far: what Stop
+   * building, End turn, Remove a section and switching to the Plan view do.
+   * Only Escape throws a line away (and choosing a town for the train, which
+   * would otherwise end the train's movement by building).
+   *
+   * A line with at least two vertices is finished the way Geoman finishes one
+   * on a double-click, so it is built by `finalizeDrawing` like any other
+   * finished line — checked, cut back to what can be built, and charged. A
+   * line with only its start placed has nothing to build, and is simply
+   * dropped; so is one Geoman refuses to finish.
+   *
+   * @returns {boolean} False when the line was cut short or not built at
+   *   all, so there is a notice or an error the player needs to see; true
+   *   otherwise. End turn uses it to keep the turn open for them to read it.
+   */
+  function stopDrawing() {
+    if (!isDrawingActive.value) return true
+    const hasLine = (workingLayer.value?.getLatLngs().length ?? 0) >= 2
+    if (hasLine) mapStore.map.pm.Draw.Line._finishShape()
+    // Finishing ends drawing; if it did not happen, drawing is still on
+    if (isDrawingActive.value) {
+      cancelDrawing()
+      return true
+    }
+    return !budgetNotice.value && !buildError.value
+  }
+
+  /**
+   * Cancels line drawing mode and resets state, throwing away any line drawn
+   * so far (Escape, or the turn passing on).
    */
   function cancelDrawing() {
     mapStore.map.pm.disableDraw('Line')
@@ -598,6 +665,14 @@ export default function useBuildTrack(formatCurrency) {
         // that one is throttled, so it can still be a step behind the click
         repriceLine()
 
+        // A vertex the player cannot pay for ends the line: it is built as
+        // far back as the money goes (see `finalizeDrawing`, which makes the
+        // cut), and the player is told why it stops short
+        if (isOverBudget.value) {
+          mapStore.map.pm.Draw.Line._finishShape()
+          return
+        }
+
         // Check if the added vertex is on a town marker
         const isOnTown = townMarkerPositions.value.some((townPos) => townPos.equals(addedVertex))
         // if so, then finish the drawing
@@ -615,27 +690,81 @@ export default function useBuildTrack(formatCurrency) {
   function finalizeDrawing(e) {
     mapStore.setIsDrawingActive(false)
     if (e.layer?.pm?._shape === 'Line') {
+      const playerId = playerStore.activePlayer?.id
+
+      // A line that costs more than the player has left, or that ends out on
+      // water, is cut back to what can be built rather than thrown away whole
+      const fit = builder.fitLine(playerId, e.layer.getLatLngs())
+      if (!fit.points) {
+        // `discardDrawnLayer` resets the drawing state, the notice included,
+        // so the explanation is written after it rather than before
+        discardDrawnLayer(e.layer)
+        budgetNotice.value = budgetCutMessage(fit)
+        return
+      }
+      if (fit.isCut) e.layer.setLatLngs(fit.points)
+
       // Built through the track builder, which checks the finished line as a
       // whole — where it starts, the build rules, and whether the player can
       // pay — and prices it by the same rule as the live cost, so the charge
-      // matches what was shown however the drawing ended (town, double-click
-      // or the Finish tooltip)
-      const result = builder.buildSection(playerStore.activePlayer?.id, e.layer.getLatLngs())
+      // matches what was shown however the drawing ended (town, double-click,
+      // the Finish tooltip, Stop building or a click over budget)
+      const result = builder.buildSection(playerId, e.layer.getLatLngs())
       if (!result.ok) {
-        // `discardDrawnLayer` resets the drawing state, `buildError` included,
-        // so the explanation is written after it rather than before
+        // As above: written after `discardDrawnLayer` clears it
         discardDrawnLayer(e.layer)
         buildError.value = `${result.error} That section was not built.`
         return
       }
 
       buildError.value = ''
+      if (fit.isCut) budgetNotice.value = budgetCutMessage(fit, result.cost)
       attachSegment(e.layer, result.segment)
       existingLineLayers.value.push(markRaw(e.layer))
       styleTracks(e.layer, result.segment.ownerId)
     }
     resetHintMarkerMoveHandler()
     workingLayer.value = null
+  }
+
+  /**
+   * What the player is told when a line is cut short: how much of it was
+   * built, and what stopped it — the turn's building allowance, their cash,
+   * or a bridge left short of land (see `fitLine` in trackBuilder.js).
+   * @param {Object} fit - What `fitLine` returned for the line
+   * @param {number} [builtCost] - What the part built cost; left out when
+   *   none of the line was built
+   * @returns {string} The message
+   */
+  function budgetCutMessage(fit, builtCost) {
+    const isNoneBuilt = builtCost === undefined
+    const built = isNoneBuilt
+      ? 'None of this line was built'
+      : `Only ${formatCurrency(builtCost)} of this line was built`
+
+    // Water alone: the player could have paid for it all
+    if (!fit.limit) {
+      return isNoneBuilt
+        ? `${built} — it ends out on the water, and a bridge has to reach land.`
+        : `${built}, back to the last point on land — a bridge has to reach land.`
+    }
+
+    // What ran out, as the player would see it: the allowance is quoted as
+    // what was left of it, once some of it has been spent
+    const fullAllowance = formatCurrency(gameRules.trackBudgetPerTurn)
+    const limit =
+      fit.limit === 'cash'
+        ? `the ${formatCurrency(fit.available)} cash you had`
+        : fit.available < gameRules.trackBudgetPerTurn
+          ? `the ${formatCurrency(fit.available)} left of your ${fullAllowance} turn allowance`
+          : `your ${fullAllowance} turn allowance`
+    if (isNoneBuilt) {
+      return fit.toLand
+        ? `${built} — the only part of it you could pay for ends on water, and a bridge has to reach land.`
+        : `${built} — its first leg would have gone over ${limit}.`
+    }
+    const where = fit.toLand ? ', back to the last point on land' : ''
+    return `${built}${where} — the rest would have gone over ${limit}.`
   }
 
   /**
@@ -867,15 +996,28 @@ export default function useBuildTrack(formatCurrency) {
     const endsOnWater = block?.reason === 'endsOnWater'
     const message = block && !endsOnWater ? builder.describeBlock(block) : null
     const leg = repriceLine(message ? undefined : latlng)
+
+    // A leg the player cannot pay for says by how much, in red, in place of
+    // its price, and the leg and the cursor turn red too (see the watcher on
+    // `isOverBudget`): clicking there would end the line at the last point.
+    // A broken rule is told first, since that leg could not be built at all.
+    const short = message ? 0 : overBudgetBy.value
     hintMarker.setTooltipContent(
       message ??
-        `${legTooltip(leg)}${endsOnWater ? ': keep going, a bridge has to reach land' : ''}`
+        (short > 0
+          ? `Insufficient funds: -${formatCurrency(short)}`
+          : `${legTooltip(leg)}${endsOnWater ? ': keep going, a bridge has to reach land' : ''}`)
     )
+    hintMarker
+      .getTooltip()
+      ?.getElement()
+      ?.classList.toggle(OVER_BUDGET_CLASS, short > 0)
     const hintLine = mapStore.map.pm.Draw.Line._hintline
     hintLine?.setStyle({
-      color: message
-        ? BLOCKED_LEG_COLOR
-        : drawingLineStyles(playerStore.activePlayer?.id).hintlineStyle.color
+      color:
+        message || short > 0
+          ? BLOCKED_LEG_COLOR
+          : drawingLineStyles(playerStore.activePlayer?.id).hintlineStyle.color
     })
   }
 
@@ -900,10 +1042,20 @@ export default function useBuildTrack(formatCurrency) {
   /**
    * Resets variables tracking the state of the current line drawing.
    * Used when beginning or canceling a new drawing.
+   *
+   * The notice that the last line was cut short goes too, so it stays up
+   * until the player starts their next line (or closes it — see
+   * `dismissBudgetNotice`).
    */
   function resetLineTracking() {
     pendingCost.value = 0
     buildError.value = ''
+    budgetNotice.value = ''
+  }
+
+  /** Closes the notice that the last line was cut short for money */
+  function dismissBudgetNotice() {
+    budgetNotice.value = ''
   }
 
   /**
@@ -1001,6 +1153,13 @@ export default function useBuildTrack(formatCurrency) {
    * Bulma's danger red, darker than the red a player can pick.
    */
   const BLOCKED_LEG_COLOR = '#cc0f35'
+
+  /**
+   * The class that turns the map's cursor into a red X, and the cursor's
+   * tooltip red, while the leg out to the cursor costs more than the player
+   * can spend (see map.css). The X is drawn in `BLOCKED_LEG_COLOR`.
+   */
+  const OVER_BUDGET_CLASS = 'is-over-budget'
 
   /** Leaflet's own line blue, for a line drawn by a player with no color */
   const UNOWNED_DRAWING_COLOR = '#3388ff'
@@ -1131,12 +1290,15 @@ export default function useBuildTrack(formatCurrency) {
   return {
     pendingCost,
     availableToSpend,
-    isOverBudget,
+    overBudgetBy,
     buildError,
+    budgetNotice,
+    dismissBudgetNotice,
     isDrawingActive,
     isRemoving,
     startDrawingLine,
     toggleRemoveMode,
+    stopDrawing,
     cancelDrawing
   }
 }

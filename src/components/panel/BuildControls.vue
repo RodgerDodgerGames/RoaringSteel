@@ -5,8 +5,10 @@
 
   - what the player can still spend, and how much of this turn's building
     allowance is used
-  - the button that starts or stops drawing a line on the map
+  - the button that starts drawing a line on the map, or stops and builds it
   - what the line being drawn would cost, warning before it goes over budget
+  - a notice when a line was cut short because the player could not pay for
+    all of it
   - the sections built this turn, and a mode for tearing them back up
 
   These are only the controls. The drawing itself, and the track layers on the
@@ -30,13 +32,15 @@ import { useRevealOnChange } from '@/composables/useRevealOnChange'
 const {
   pendingCost,
   availableToSpend,
-  isOverBudget,
+  overBudgetBy,
   buildError,
+  budgetNotice,
+  dismissBudgetNotice,
   isDrawingActive,
   isRemoving,
   startDrawingLine,
   toggleRemoveMode,
-  cancelDrawing
+  stopDrawing
 } = inject(buildTrackKey)
 
 const playerStore = usePlayerStore()
@@ -70,8 +74,17 @@ const sectionsTotal = computed(() =>
 
 /** The running cost, as drawing starts */
 useRevealOnChange(useTemplateRef('pending'), [isDrawingActive])
-/** A warning that the line is over budget, or why it could not be built */
-useRevealOnChange(useTemplateRef('notice'), [isOverBudget, buildError])
+/**
+ * A warning that the line is over budget, that the last one was cut short,
+ * or why it could not be built
+ */
+// Whether the line is over budget, not by how much: the amount changes with
+// every move of the cursor, and the warning only needs bringing into view once
+useRevealOnChange(useTemplateRef('notice'), [
+  () => overBudgetBy.value > 0,
+  budgetNotice,
+  buildError
+])
 /** The total under the sections built this turn, as one more is added above it */
 useRevealOnChange(useTemplateRef('sectionsTotalRow'), [() => sectionsThisTurn.value.length])
 </script>
@@ -97,7 +110,8 @@ useRevealOnChange(useTemplateRef('sectionsTotalRow'), [() => sectionsThisTurn.va
       </p>
     </div>
 
-    <!-- Start / stop drawing -->
+    <!-- Start drawing, or stop and build the line drawn so far (Escape
+         throws it away instead) -->
     <button
       v-if="!isDrawingActive"
       class="button is-primary is-fullwidth"
@@ -107,8 +121,8 @@ useRevealOnChange(useTemplateRef('sectionsTotalRow'), [() => sectionsThisTurn.va
       <span class="icon"><i class="fas fa-pencil" aria-hidden="true"></i></span>
       <span>Start building</span>
     </button>
-    <button v-else class="button is-danger is-light is-fullwidth" @click="cancelDrawing">
-      <span class="icon"><i class="fas fa-xmark" aria-hidden="true"></i></span>
+    <button v-else class="button is-primary is-light is-fullwidth" @click="stopDrawing">
+      <span class="icon"><i class="fas fa-check" aria-hidden="true"></i></span>
       <span>Stop building</span>
     </button>
 
@@ -118,11 +132,17 @@ useRevealOnChange(useTemplateRef('sectionsTotalRow'), [() => sectionsThisTurn.va
       <span class="has-text-weight-bold">{{ formatCurrency(pendingCost) }}</span>
     </div>
 
-    <!-- Both share one ref: at most one of them is shown -->
-    <p v-if="isOverBudget" ref="notice" class="notification is-warning is-light p-2 mt-2 mb-0">
-      This line costs {{ formatCurrency(pendingCost) }} — more than the
-      {{ formatCurrency(availableToSpend) }} you have to spend. It cannot be built.
+    <!-- These share one ref: at most one of them is shown -->
+    <p v-if="overBudgetBy > 0" ref="notice" class="has-text-danger has-text-weight-bold mb-0">
+      Insufficient funds: -{{ formatCurrency(overBudgetBy) }}. Clicking there ends the line at the
+      last point.
     </p>
+    <!-- Bright rather than light, so it is not missed: part of what the
+         player drew is not on the map -->
+    <div v-else-if="budgetNotice" ref="notice" class="notification is-warning p-2 pr-6 mt-2 mb-0">
+      <button class="delete" aria-label="Close" @click="dismissBudgetNotice"></button>
+      {{ budgetNotice }}
+    </div>
     <p v-else-if="buildError" ref="notice" class="notification is-danger is-light p-2 mt-2 mb-0">
       {{ buildError }}
     </p>

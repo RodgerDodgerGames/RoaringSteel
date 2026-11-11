@@ -15,6 +15,7 @@ $brass: #c48a2c; // warning: warnings, and the meters
 $signal-vermilion: #b8401f; // danger: errors, throwing in a hand
 $coal: #2a211b; // dark, and the text
 $timetable-paper: #f1e6cf; // the panels, and light (drawn a shade deeper)
+$timetable-accent: #e8d19f; // a shade deeper than the paper, for light buttons
 
 /////////////////////////////////////////////////////////////
 /// 2. Import Bulma and Override Variables
@@ -46,8 +47,8 @@ $timetable-paper: #f1e6cf; // the panels, and light (drawn a shade deeper)
   // Override Bulma's fonts. Oswald is both the "secondary" and the sans
   // serif font, so `is-family-secondary` and `is-family-sans-serif` match.
   $family-primary: '"Averia Serif Libre", serif',
-  $family-secondary: '"Oswald", sans-serif',
-  $family-sans-serif: '"Oswald", sans-serif',
+  $family-secondary: '"Asul", sans-serif',
+  $family-sans-serif: '"Asul", sans-serif',
   // Override font sizes
   $size-1: 3.25rem,
   $size-2: 2.5rem,
@@ -165,7 +166,7 @@ $timetable-paper: #f1e6cf; // the panels, and light (drawn a shade deeper)
 // - Oswald: labels and buttons
 // - Rye: the game's name in the top bar
 // - Libre Baskerville: town names on the map, in capitals
-@import url('https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Libre+Baskerville:wght@400;700&family=Oswald:wght@400..700&family=Rye&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Libre+Baskerville:wght@400;700&family=Oswald:wght@400..700&family=Rye...&family=Rye&family=Asul:wght@400;700&display=swap');
 
 // From 1001 Fonts, downloaded into ./fonts (each folder keeps its license).
 // They're loaded so any font slot below, or an is-family-* class, can use
@@ -196,7 +197,7 @@ $timetable-paper: #f1e6cf; // the panels, and light (drawn a shade deeper)
   // Town names on the map
   --font-town-name: 'Libre Baskerville', serif;
   // Buttons and small capitals labels
-  --font-label: 'Oswald', sans-serif;
+  --font-label: 'Asul', sans-serif;
 }
 
 // One class per font, to try a font on any element straight from the

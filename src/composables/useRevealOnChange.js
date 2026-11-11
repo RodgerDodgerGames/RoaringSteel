@@ -93,9 +93,13 @@ export function revealDistance(element, panel, margin = REVEAL_MARGIN_PX) {
  * it into sight (see `revealDistance`). An element not on screen at all — in
  * a collapsed section, or on the hidden side of a switch — is left alone.
  *
+ * Also used on its own, by a caller that has to unfold the element's section
+ * and wait for that to show before revealing it (the player dock, pointing
+ * at the step of the turn the player is on).
+ *
  * @param {HTMLElement|null} element - The element to show
  */
-function reveal(element) {
+export function reveal(element) {
   if (!element || element.getClientRects().length === 0) return
   const panel = scrollingPanel(element)
   if (!panel) return

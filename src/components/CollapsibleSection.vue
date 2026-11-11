@@ -21,6 +21,8 @@
   @slot actions - Optional controls shown at the right of the header, e.g.
                   buttons that pick what the section shows. Kept outside the
                   fold toggle, because a button may not sit inside another.
+
+  @expose expand - Unfolds the section, for whatever places it
 -->
 
 <script setup>
@@ -44,6 +46,17 @@ const props = defineProps({
 // Remembered per browser. useStorage falls back to plain in-memory state when
 // storage is unavailable (private windows, blocked site data).
 const isCollapsed = useStorage(`roaringsteel_${props.storageKey}_collapsed`, false)
+
+/**
+ * Unfolds the section, for whatever places it when something inside needs
+ * to be seen — the dock opens "This turn" as a turn moves on to its next
+ * step, to show the player where they are.
+ */
+function expand() {
+  isCollapsed.value = false
+}
+
+defineExpose({ expand })
 </script>
 
 <template>

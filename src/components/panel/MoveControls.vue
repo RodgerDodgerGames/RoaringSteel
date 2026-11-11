@@ -5,7 +5,10 @@
 
   - on the player's first running turn, placing the train in a town
   - running the train to a town, picked from a list (nearest first, with the
-    distance and any fee for another player's track) or clicked on the map
+    distance, how many turns it takes, a dot for each other player whose
+    track the way uses, and any fee for their track) or clicked on the map
+  - carrying on toward a town a run of more than one turn is still heading
+    for: it is chosen in the list already, with Confirm in place of Go
   - in a town: picking up what it produces, delivering loads the player's
     demand cards want there, and dropping loads
 
@@ -15,8 +18,10 @@
 -->
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
+import DestinationSelect from './DestinationSelect.vue'
 import { useTrainControls } from '@/composables/useTrainControls'
+import { turnsText } from '@/composables/trainStatus'
 import { formatCurrency } from '@/composables/utils'
 
 const {
@@ -28,11 +33,14 @@ const {
   moveBlock,
   loadBlock,
   destinations,
+  heading,
+  status,
   pickups,
   deliveries,
   towns,
   notice,
   nameOf,
+  colorOf,
   place,
   move,
   pickUp,
@@ -46,22 +54,82 @@ const {
 /** The town picked in the list, to place the train in or run it to */
 const chosenTownId = ref('')
 
-// The list changes as the train moves, so a choice from before may be gone
-watch(destinations, () => {
-  chosenTownId.value = ''
-})
+/** The town the train is still heading for, if track leads there, or null */
+const headingTownId = computed(() => (heading.value?.route ? heading.value.town.msa : null))
 
 /**
- * How a destination reads in the list: its name, how far, and what it costs.
- * @param {Object} destination - From the trains store's `destinations`
- * @returns {string} The option's text
+ * What the list starts on: the town the train is heading for, so carrying on
+ * is one Confirm, or nothing.
+ * @param {Array<Object>} list - The destinations
+ * @returns {string} The town's id, or ''
  */
-function destinationLabel({ town: destination, km, reachable, payTo, fee }) {
-  const parts = [`${destination.name} — distance ${distance(km)}`]
-  if (!reachable) parts.push('(stops on the way)')
-  if (fee) parts.push(`· ${formatCurrency(fee)} to ${payTo.map(nameOf).join(', ')}`)
-  return parts.join(' ')
+function startingChoice(list) {
+  return list.some((option) => option.town.msa === headingTownId.value) ? headingTownId.value : ''
 }
+
+// The list is worked out again whenever anything it depends on changes. A
+// choice still in it stays; one the train has run to (or past) is gone.
+watch(destinations, (list) => {
+  if (!list.some((option) => option.town.msa === chosenTownId.value)) {
+    chosenTownId.value = startingChoice(list)
+  }
+})
+
+// Another player's train, or the same one as a new turn starts: start over
+// from its heading. Run first, so the list is filled before the first turn.
+watch(
+  [train, () => train.value.kmThisTurn === 0],
+  () => {
+    chosenTownId.value = startingChoice(destinations.value)
+  },
+  { immediate: true }
+)
+
+/** Whether the town chosen is the one the train is already heading for */
+const isCarryingOn = computed(
+  () => Boolean(chosenTownId.value) && chosenTownId.value === headingTownId.value
+)
+
+/**
+ * How a destination reads in the list: its name, how far, how many turns it
+ * takes, and what this turn's part of the way costs.
+ * @param {Object} destination - From the trains store's `destinations`
+ * @returns {string} The option's text, e.g. "Denver — 14 (2 turns) · $4M to Ann"
+ */
+function destinationLabel(destination) {
+  const { town: place, km, payTo, fee } = destination
+  const label = `${place.name} — ${distance(km)} (${turnsText(destination)})`
+  return fee ? `${label} · ${feeText(fee, payTo)}` : label
+}
+
+/**
+ * A fee and whom it goes to.
+ * @param {number} fee - The total
+ * @param {Array<number>} payTo - The players paid
+ * @returns {string} e.g. "$4M to Ann"
+ */
+function feeText(fee, payTo) {
+  return `${formatCurrency(fee)} to ${payTo.map(nameOf).join(', ')}`
+}
+
+/** The towns as the dropdown shows them, with a dot per other track owner */
+const destinationOptions = computed(() =>
+  destinations.value.map((destination) => ({
+    id: destination.town.msa,
+    label: destinationLabel(destination),
+    owners: destination.owners.map((id) => ({ id, name: nameOf(id), color: colorOf(id) }))
+  }))
+)
+
+/**
+ * What the run button says: Go for a new run, Confirm for carrying on toward
+ * the town the train is heading for, with what this turn of it costs.
+ */
+const runButtonText = computed(() => {
+  if (!isCarryingOn.value) return 'Go'
+  const { fee, payTo } = heading.value.route
+  return fee ? `Confirm · ${feeText(fee, payTo)}` : 'Confirm'
+})
 </script>
 
 <template>
@@ -95,39 +163,29 @@ function destinationLabel({ town: destination, km, reachable, payTo, fee }) {
     <!-- On the board: where it is and how far it can still go -->
     <template v-else>
       <div class="move-controls__status">
-        <span>{{ town ? `In ${town.name}` : 'Between towns' }}</span>
+        <span>{{ status }}</span>
         <!-- Only while it can still go: once it is done, the note below says why -->
-        <span v-if="!moveBlock">Distance left: {{ distanceLeft }} of {{ trainType.speed }}</span>
+        <span v-if="!moveBlock" class="move-controls__left"
+          >Distance left: {{ distanceLeft }} of {{ trainType.speed }}</span
+        >
       </div>
 
       <p v-if="moveBlock" class="move-controls__note">{{ moveBlock }}</p>
-      <div v-else class="field has-addons">
-        <div class="control is-expanded">
-          <div class="select is-small is-fullwidth">
-            <select v-model="chosenTownId" aria-label="Town to run your train to">
-              <option value="" disabled>
-                {{ destinations.length ? 'Run to…' : 'No track leads anywhere from here' }}
-              </option>
-              <option
-                v-for="option in destinations"
-                :key="option.town.msa"
-                :value="option.town.msa"
-              >
-                {{ destinationLabel(option) }}
-              </option>
-            </select>
-          </div>
-        </div>
-        <div class="control">
-          <button
-            class="button is-small is-primary"
-            :disabled="!chosenTownId"
-            @click="move(chosenTownId)"
-          >
-            Go
-          </button>
-        </div>
-      </div>
+      <template v-else>
+        <DestinationSelect
+          v-model="chosenTownId"
+          :options="destinationOptions"
+          :placeholder="destinations.length ? 'Run to…' : 'No track leads anywhere from here'"
+          aria-label="Town to run your train to"
+        />
+        <button
+          class="button is-primary is-fullwidth"
+          :disabled="!chosenTownId"
+          @click="move(chosenTownId)"
+        >
+          {{ runButtonText }}
+        </button>
+      </template>
     </template>
 
     <!-- Or click towns on the map instead of using the lists -->
@@ -218,8 +276,15 @@ function destinationLabel({ town: destination, km, reachable, payTo, fee }) {
 .move-controls__status {
   display: flex;
   justify-content: space-between;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0 0.5rem;
+  align-items: baseline;
   font-variant-numeric: tabular-nums;
+}
+
+.move-controls__left {
+  flex: none;
+  white-space: nowrap;
 }
 
 .move-controls__group .buttons {

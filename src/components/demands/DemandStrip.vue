@@ -22,14 +22,23 @@
 
   How many cards are left in the deck shows in the header only when the
   player has turned that on in Settings; it is off by default.
+
+  The header also holds the way out of a hand that is no good: throwing it in
+  for three new cards, which costs the whole turn (see useTurn's
+  discardHand). It sits in the header so it is there even with the strip
+  folded, and shows only when it can be used — on a person's turn, before
+  they have done anything — and only while the strip shows their own hand,
+  since it is their hand it throws in, not one being peeked at.
 -->
 
 <script setup>
+import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDemandCardsStore } from '@/stores/demandCards'
 import { usePlayerStore } from '@/stores/players'
 import { useSettingsStore } from '@/stores/settings'
 import { useShownHand } from '@/composables/useShownHand'
+import { useTurn } from '@/composables/useTurn'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import DemandCard from '@/components/demands/DemandCard.vue'
 
@@ -40,6 +49,28 @@ const { settings } = storeToRefs(useSettingsStore())
 
 // Whose hand is on screen, whether it can be pinned from, and switching between hands
 const { shownPlayer, cards, isOwnHand, showHandOf } = useShownHand()
+
+const { canDiscardHand, discardHand } = useTurn()
+
+/**
+ * Whether to offer throwing in the hand: the rules must allow it now
+ * (canDiscardHand), the turn must be a person's — a computer player decides
+ * for itself, and there is nothing for a person to click on its turn — and
+ * the hand on screen must be the one that would be thrown in.
+ */
+const canThrowInHand = computed(
+  () => canDiscardHand.value && !activePlayer.value?.isBot && isOwnHand.value
+)
+
+/**
+ * Throws in the hand for a new one, after making sure: it costs the whole
+ * turn and cannot be undone.
+ */
+function confirmDiscardHand() {
+  if (window.confirm('Throw in all your demand cards for three new ones? This ends your turn.')) {
+    discardHand()
+  }
+}
 
 /**
  * The color each of a card's lines is pinned in, or null where it is not.
@@ -62,19 +93,30 @@ function pinColorsOf(card) {
     :badge="settings.showDeckCount ? `Deck: ${drawPile.length} left` : ''"
   >
     <template #actions>
-      <div class="buttons are-small has-addons mb-0" role="group" aria-label="Show the hand of">
+      <div class="demand-strip__actions">
         <button
-          v-for="player in players"
-          :key="player.id"
-          class="button"
-          :class="{ 'is-selected is-primary': player.id === shownPlayer?.id }"
-          :aria-pressed="player.id === shownPlayer?.id"
-          :title="player.id === activePlayer?.id ? `${player.name} (their turn)` : player.name"
-          @click="showHandOf(player.id)"
+          v-if="canThrowInHand"
+          class="button is-small is-primary is-outlined"
+          title="Instead of taking a turn, swap all your demand cards for three new ones. This ends your turn."
+          @click="confirmDiscardHand"
         >
-          <span class="demand-strip__swatch" :style="{ background: player.color }"></span>
-          <span>{{ player.name }}</span>
+          Throw in hand
         </button>
+
+        <div class="buttons are-small has-addons mb-0" role="group" aria-label="Show the hand of">
+          <button
+            v-for="player in players"
+            :key="player.id"
+            class="button"
+            :class="{ 'is-selected is-primary': player.id === shownPlayer?.id }"
+            :aria-pressed="player.id === shownPlayer?.id"
+            :title="player.id === activePlayer?.id ? `${player.name} (their turn)` : player.name"
+            @click="showHandOf(player.id)"
+          >
+            <span class="demand-strip__swatch" :style="{ background: player.color }"></span>
+            <span>{{ player.name }}</span>
+          </button>
+        </div>
       </div>
     </template>
 
@@ -103,6 +145,13 @@ function pinColorsOf(card) {
   flex: none;
   border-top: 1px solid var(--bulma-border);
   background: var(--bulma-scheme-main-bis);
+}
+
+/* Throw in hand, then the player chips, in a row */
+.demand-strip__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 /* The player's color, as on their chip in the top bar */

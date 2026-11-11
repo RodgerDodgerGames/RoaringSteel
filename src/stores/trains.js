@@ -47,6 +47,13 @@
  * else instead). The route is worked out afresh each turn, so track built or
  * torn up in between is taken into account.
  *
+ * A train may also be run to a point on the track — an end, a bend or a
+ * junction of a drawn section — to stop short of any town: to wait at the
+ * end of its owner's track for more to be built, or to stand next to another
+ * player's track ready to use all of next turn's run on it. Only points
+ * within this turn's reach are offered, so such a run always gets there and
+ * leaves no heading.
+ *
  * @module stores/trains
  */
 
@@ -54,7 +61,13 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { gameRules } from '@/config/game'
 import { TRAIN_TYPES, TRAIN_CHANGES, STARTING_TRAIN, trainRangeKm } from '@/config/trains'
-import { townKey, positionAtNode, shortestRoutes, runRoute } from '@/composables/network'
+import {
+  townKey,
+  positionAtNode,
+  shortestRoutes,
+  runRoute,
+  nearestTown
+} from '@/composables/network'
 import { formatCurrency } from '@/composables/utils'
 import { useVictory } from '@/composables/victory'
 import { useGameStore } from './game'
@@ -340,6 +353,55 @@ export const useTrainsStore = defineStore('trains', () => {
   }
 
   /**
+   * The points on the track a player's train can run to and stop at this
+   * turn: every end, bend and junction of a drawn section (a network node
+   * with no town) within what is left of this turn's run. Towns are left
+   * out; they are chosen as towns (see `destinations`).
+   * @param {number} playerId - The player
+   * @returns {Array<{key: string, lat: number, lng: number, km: number,
+   *   payTo: Array<number>, fee: number}>} Each point: its node key and
+   *   spot, how far it is, and whom the run there pays and how much; empty
+   *   when the train cannot run now
+   */
+  function trackStops(playerId) {
+    if (whyCannotMove(playerId)) return []
+    const left = kmLeft(playerId)
+    const stops = []
+    routesFor(playerId).forEach((route, key) => {
+      const node = networkStore.network.nodes.get(key)
+      // A hair's leeway, as in runRoute, so a point exactly at the end of the
+      // run is still in reach
+      if (node.town || route.km > left + 1e-9) return
+      const payTo = ownersToPay(
+        playerId,
+        route.steps.map((step) => step.ownerId)
+      )
+      stops.push({
+        key,
+        lat: node.lat,
+        lng: node.lng,
+        km: route.km,
+        payTo,
+        fee: payTo.length * gameRules.trackUseFee
+      })
+    })
+    return stops
+  }
+
+  /**
+   * The town nearest a player's train by track, in either direction (see
+   * network.js's `nearestTown`): what a train stopped out on the line is
+   * described by.
+   * @param {number} playerId - The player
+   * @returns {{town: Object, km: number}|null} The town and how far, or null
+   *   when the train is not placed or no track leads to a town
+   */
+  function nearestTownOf(playerId) {
+    const position = trainOf(playerId).position
+    return position ? nearestTown(networkStore.network, position) : null
+  }
+
+  /**
    * What the train could pick up in the town it is in: each commodity the
    * town produces, and whether there is room for it.
    * @param {number} playerId - The player
@@ -463,6 +525,71 @@ export const useTrainsStore = defineStore('trains', () => {
     const route = routesFor(playerId).get(townKey(town))
     if (!route) return refuse(`No track joins your train to ${town.name}.`)
 
+    const result = runAlong(playerId, route)
+    if (!result.ok) return result
+    storedTrain(playerId).heading = result.arrived ? null : townId
+    historyStore.record(playerId, {
+      type: 'move',
+      town: town.name,
+      arrived: result.arrived,
+      paid: result.paid
+    })
+    return result
+  }
+
+  /**
+   * Runs a player's train to a point on the track and stops it there, short
+   * of any town (see the notes at the top). The point must be one of
+   * `trackStops`: within this turn's reach, so the train always gets there.
+   * Fees are paid as for a run to a town. Any heading is dropped: stopping
+   * here is the new plan.
+   *
+   * @param {number} playerId - The player
+   * @param {string} nodeKey - The point's node key (see network.js)
+   * @returns {{ok: boolean, error?: string, km?: number,
+   *   paid?: Array<{ownerId: number, amount: number}>, near?: Object|null}}
+   *   Whether it moved, how far it went, the fees paid, and the town nearest
+   *   where it stopped (see `nearestTownOf`)
+   */
+  function moveTrainToTrack(playerId, nodeKey) {
+    const blocked = whyCannotMove(playerId)
+    if (blocked) return refuse(blocked)
+    const node = networkStore.network.nodes.get(nodeKey)
+    if (!node || node.town) return refuse('There is no such point on the track.')
+    if (trainOf(playerId).position.nodeKey === nodeKey) {
+      return refuse("You're already there.")
+    }
+    const route = routesFor(playerId).get(nodeKey)
+    if (!route) return refuse('No track joins your train to that point.')
+    if (route.km > kmLeft(playerId) + 1e-9) {
+      return refuse('That point is further than your train can run this turn.')
+    }
+
+    const result = runAlong(playerId, route)
+    if (!result.ok) return result
+    storedTrain(playerId).heading = null
+    const near = nearestTownOf(playerId)?.town ?? null
+    historyStore.record(playerId, {
+      type: 'move',
+      town: near?.name ?? null,
+      onTrack: true,
+      arrived: true,
+      paid: result.paid
+    })
+    return { ok: true, km: result.km, paid: result.paid, near }
+  }
+
+  /**
+   * Runs a player's train along a route as far as this turn allows, charging
+   * the fees for other players' track on the way: the part of a move that is
+   * the same wherever the train is going.
+   * @param {number} playerId - The player
+   * @param {{steps: Array}} route - The way (see `routesFor`)
+   * @returns {{ok: boolean, error?: string, arrived?: boolean, km?: number,
+   *   paid?: Array<{ownerId: number, amount: number}>}} Whether it moved,
+   *   whether it got to the end of the route, how far it went, and the fees
+   */
+  function runAlong(playerId, route) {
     const train = storedTrain(playerId)
     const run = runRoute(networkStore.network, train.position, route.steps, kmLeft(playerId))
     const payTo = ownersToPay(playerId, run.ownersUsed)
@@ -479,9 +606,7 @@ export const useTrainsStore = defineStore('trains', () => {
     train.position = run.position
     train.kmThisTurn += run.km
     train.hasActed = true
-    train.heading = run.arrived ? null : townId
     const paid = payTo.map((ownerId) => ({ ownerId, amount: gameRules.trackUseFee }))
-    historyStore.record(playerId, { type: 'move', town: town.name, arrived: run.arrived, paid })
     return { ok: true, arrived: run.arrived, km: run.km, paid }
   }
 
@@ -616,12 +741,15 @@ export const useTrainsStore = defineStore('trains', () => {
     whyCannotLoad,
     destinations,
     headingOf,
+    trackStops,
+    nearestTownOf,
     pickupOptions,
     deliveryOptions,
     changeOptions,
     // actions
     placeTrain,
     moveTrain,
+    moveTrainToTrack,
     pickUp,
     deliver,
     dropLoad,

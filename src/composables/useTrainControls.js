@@ -11,8 +11,9 @@
  * action went, are shared with the map's stop card and commodity icons
  * through the train stop store. This also runs choosing a town on the map:
  * while that is on, clicking a town places the train there, or runs it
- * there. Placing the train in a town, or running it into one, opens the
- * town's stop card when it has anything for the train.
+ * there, and clicking a marked point on the track runs it there and stops.
+ * Placing the train in a town, or running it into one, opens the town's stop
+ * card when it has anything for the train.
  *
  * Must be called from a component's setup: it stops choosing a town when
  * that component goes, and listens for Escape.
@@ -47,7 +48,7 @@ export function useTrainControls() {
   /** The player whose turn it is */
   const playerId = computed(() => playerStore.activePlayer?.id)
 
-  /** Their train, its kind, and the town it is in (null between towns) */
+  /** Their train, its kind, and the town it is in (null off a town) */
   const train = computed(() => trainsStore.trainOf(playerId.value))
   const trainType = computed(() => trainsStore.trainTypeOf(playerId.value))
   const town = computed(() => trainsStore.townOf(playerId.value))
@@ -89,7 +90,13 @@ export function useTrainControls() {
 
   /** Where the train is and where it is heading, in a sentence */
   const status = computed(() =>
-    whereabouts({ placed: Boolean(train.value.position), town: town.value, heading: heading.value })
+    whereabouts({
+      placed: Boolean(train.value.position),
+      town: town.value,
+      heading: heading.value,
+      nearest: trainsStore.nearestTownOf(playerId.value),
+      speedUnitKm: gameStore.boardScale.speedUnitKm
+    })
   )
 
   /**
@@ -157,6 +164,26 @@ export function useTrainControls() {
     if (result.ok) trainStopStore.arrive()
   }
 
+  /**
+   * Runs the train to a point on the track and stops it there.
+   * @param {string} nodeKey - The point (see the trains store's `trackStops`)
+   */
+  function moveToTrack(nodeKey) {
+    const result = trainStopStore.report(
+      trainsStore.moveTrainToTrack(playerId.value, nodeKey),
+      ({ km, paid, near }) => {
+        const where = near ? `the track near ${near.name}` : 'a point on the track'
+        const run = `Ran ${Math.round(km)} km to ${where} and stopped there.`
+        const fees = paid.map(
+          ({ ownerId, amount }) => `${formatCurrency(amount)} to ${nameOf(ownerId)}`
+        )
+        return fees.length ? `${run} Paid ${fees.join(' and ')} to use their track.` : run
+      }
+    )
+    // Out on the line, the train is in no town, and any stop card closes
+    if (result.ok) trainStopStore.arrive()
+  }
+
   // Loading and unloading go through the train stop store, which the map's
   // stop card and commodity icons use too
   const { pickUp, deliver, drop } = trainStopStore
@@ -168,24 +195,37 @@ export function useTrainControls() {
 
   /**
    * Starts choosing a town on the map: each click places the train there,
-   * or, once it is placed, runs it there. Any drawing or removal is ended
-   * first. Choosing stays on, for a run through several towns, until Escape,
-   * the Stop button, or the train has nowhere left to go this turn.
+   * or, once it is placed, runs it there. Once it is placed, the points on
+   * the track it can stop at this turn are marked too (see trackStopMarkers),
+   * and clicking one runs it there. Any drawing or removal is ended first.
+   * Choosing stays on, for a run through several stops, until Escape, the
+   * Stop button, or the train has nowhere left to go this turn.
    */
   function startPicking() {
     if (buildTrack?.isDrawingActive.value) buildTrack.cancelDrawing()
     if (buildTrack?.isRemoving.value) buildTrack.toggleRemoveMode()
+    // The prompt changes once the train is placed, and there is nothing
+    // more to choose once it can go no further
+    const carryOn = () => (moveBlock.value ? stopPicking() : startPicking())
+    if (!train.value.position) {
+      mapStore.setTownPicker({
+        prompt: 'Click a town to place your train there.',
+        onPick: ({ msa }) => {
+          place(msa)
+          carryOn()
+        }
+      })
+      return
+    }
     mapStore.setTownPicker({
-      prompt: train.value.position
-        ? 'Click a town to run your train there.'
-        : 'Click a town to place your train there.',
+      prompt: 'Click a town, or a marked point on the track, to run your train there.',
       onPick: ({ msa }) => {
-        if (train.value.position) move(msa)
-        else place(msa)
-        // The prompt changes once the train is placed, and there is nothing
-        // more to choose once it can go no further
-        if (moveBlock.value) stopPicking()
-        else startPicking()
+        move(msa)
+        carryOn()
+      },
+      onPickPoint: (nodeKey) => {
+        moveToTrack(nodeKey)
+        carryOn()
       }
     })
   }

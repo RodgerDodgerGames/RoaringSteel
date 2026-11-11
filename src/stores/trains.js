@@ -233,6 +233,50 @@ export const useTrainsStore = defineStore('trains', () => {
   }
 
   /**
+   * Whether a player's train still has something to do this turn — whether
+   * the turn is still on its first step, moving, rather than its second,
+   * building. The dock uses this to point the player at the step they are on.
+   *
+   * A turn is always moved first and built after; either may be skipped.
+   * The train is still moving until there is nothing more it can do:
+   * - it has not been placed yet (placing it is its first move), or
+   * - it can still run somewhere this turn, or
+   * - it is in a town where it can deliver a load. A train often reaches the
+   *   town it was going to deliver to with no distance left, and the
+   *   delivery is still to be made. Picking up does not count: nearly every
+   *   town produces something, so the train would never be done.
+   *
+   * It is done the moment its owner starts building or upgrading, whatever
+   * else is true, because spending ends the train's part of the turn (see
+   * `whyTrainIdle`). It is never moving in the building rounds, or outside
+   * its owner's turn.
+   *
+   * @param {number} playerId - The player
+   * @returns {boolean} True while the train still has something to do
+   */
+  function isStillMoving(playerId) {
+    if (whyTrainIdle(playerId)) return false
+    if (!trainOf(playerId).position) return true
+    if (deliveryOptions(playerId).length > 0) return true
+    return kmLeft(playerId) > 0 && canRunAnywhere(playerId)
+  }
+
+  /**
+   * Whether any track leads from a player's train to another town. Checked
+   * on its own, without the distances and fees `destinations` works out,
+   * because only whether there is one matters — and over everyone's track at
+   * once, since a town the player's own track reaches is reached over
+   * everyone's too (`routesFor` also searches their own track alone, to
+   * prefer it, which does not matter here).
+   * @param {number} playerId - The player
+   * @returns {boolean} True if the train has a town to run to
+   */
+  function canRunAnywhere(playerId) {
+    const routes = shortestRoutes(networkStore.network, trainOf(playerId).position)
+    return [...routes.keys()].some((key) => networkStore.network.nodes.get(key).town)
+  }
+
+  /**
    * The best way for a player's train to every place it can reach: on its
    * owner's own track where possible, otherwise on anyone's.
    * @param {number} playerId - The player
@@ -739,6 +783,7 @@ export const useTrainsStore = defineStore('trains', () => {
     townOf,
     whyCannotMove,
     whyCannotLoad,
+    isStillMoving,
     destinations,
     headingOf,
     trackStops,

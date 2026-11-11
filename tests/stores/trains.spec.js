@@ -304,6 +304,94 @@ describe('trains store', () => {
     })
   })
 
+  // Whether the turn is still on its first step, moving, or on to building
+  describe('isStillMoving', () => {
+    /** Uses up the rest of the train's distance for the turn, where it stands */
+    function runOutOfDistance(playerId) {
+      store.setTrains({
+        ...store.trains,
+        [playerId]: { ...store.trainOf(playerId), kmThisTurn: 1e6 }
+      })
+    }
+
+    it('should be moving before the train is placed', () => {
+      expect(store.isStillMoving(ANN)).toBe(true)
+    })
+
+    it('should be moving while the train can still run somewhere', () => {
+      store.placeTrain(ANN, 'West')
+      store.moveTrain(ANN, 'Middle')
+
+      expect(store.isStillMoving(ANN)).toBe(true)
+    })
+
+    it('should be done once the train has run its distance', () => {
+      store.placeTrain(ANN, 'West')
+      // Far is beyond a turn's run: the train stops between East and Far
+      store.moveTrain(ANN, 'Far')
+
+      expect(store.isStillMoving(ANN)).toBe(false)
+    })
+
+    it('should be done once the player has started building, with distance left', () => {
+      store.placeTrain(ANN, 'West')
+      playerStore.spendOnTrack(ANN, 1000)
+
+      expect(store.isStillMoving(ANN)).toBe(false)
+    })
+
+    it('should be done in a town no track leads out of', () => {
+      useTownsStore().setTowns([...towns, town('Nowhere', 5, 'small', [])])
+      store.placeTrain(ANN, 'Nowhere')
+
+      expect(store.isStillMoving(ANN)).toBe(false)
+    })
+
+    it('should never be moving in the building rounds', () => {
+      gameStore.setGameState({ turn: 1 })
+
+      expect(store.isStillMoving(ANN)).toBe(false)
+    })
+
+    describe('in a town at the end of its run', () => {
+      beforeEach(() => {
+        demandCardsStore.setDeck({
+          drawPile: [{ id: 8, demands: [] }],
+          hands: {
+            [ANN]: [
+              { id: 7, demands: [{ destination: 'East', industry: 'Beef', payoff: 9000 }] },
+              { id: 20, demands: [] },
+              { id: 21, demands: [] }
+            ]
+          }
+        })
+        store.placeTrain(ANN, 'Middle')
+        store.pickUp(ANN, 'Beef')
+        store.moveTrain(ANN, 'East')
+        runOutOfDistance(ANN)
+      })
+
+      it('should stay moving while there is a load to deliver there', () => {
+        expect(store.isStillMoving(ANN)).toBe(true)
+      })
+
+      it('should be done once the load is delivered', () => {
+        store.deliver(ANN, 7, 0)
+
+        expect(store.isStillMoving(ANN)).toBe(false)
+      })
+
+      // East produces Steel, but something to pick up does not keep the
+      // train going, or it never would be done
+      it('should be done with only something to pick up there', () => {
+        store.dropLoad(ANN, 'Beef')
+
+        expect(store.pickupOptions(ANN)).not.toEqual([])
+        expect(store.isStillMoving(ANN)).toBe(false)
+      })
+    })
+  })
+
   describe('heading', () => {
     beforeEach(() => store.placeTrain(ANN, 'West'))
 

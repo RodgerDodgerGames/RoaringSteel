@@ -13,6 +13,13 @@
           with), chosen with the switch     (BuildControls, UpgradeControls)
      In the two opening building rounds trains do not run, so step 1 gives
      way to a note saying so, and building is the whole turn.
+
+     The step the player is on is highlighted: moving while the train still
+     has something to do (see the trains store's isStillMoving), then
+     building. Both stay usable — either may be skipped — the highlight only
+     shows the order. As the turn moves on to building, step 1 folds down to
+     where the train is; the player can unfold it again. Each new turn, and
+     each new step, unfolds "This turn" and scrolls the step into sight.
   4. End Turn, pinned to the bottom so it is always in the same place, with
      the option of throwing in the hand of demand cards instead of a turn
 
@@ -34,7 +41,7 @@
 -->
 
 <script setup>
-import { ref, computed, watch, inject } from 'vue'
+import { ref, computed, watch, inject, nextTick, useTemplateRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import PlayerCard from '@/components/panel/PlayerCard.vue'
 import TrainPanel from '@/components/panel/TrainPanel.vue'
@@ -45,15 +52,18 @@ import UpgradeControls from '@/components/panel/UpgradeControls.vue'
 import TurnHistory from '@/components/panel/TurnHistory.vue'
 import { useGameStore } from '@/stores/game'
 import { usePlayerStore } from '@/stores/players'
+import { useTrainsStore } from '@/stores/trains'
 import { useTurn } from '@/composables/useTurn'
+import { reveal } from '@/composables/useRevealOnChange'
 import { buildTrackKey } from '@/composables/map/useBuildTrack'
 import { gameRules } from '@/config/game'
 
 const emit = defineEmits(['show-results'])
 
 const gameStore = useGameStore()
-const { isBuildingRound, isOver, winnerId } = storeToRefs(gameStore)
+const { turn, isBuildingRound, isOver, winnerId } = storeToRefs(gameStore)
 const playerStore = usePlayerStore()
+const trainsStore = useTrainsStore()
 const { nextPlayer, playsAgain, endTurn, canDiscardHand, discardHand } = useTurn()
 
 // The game view's build-track instance (see BuildControls); null with no map
@@ -91,6 +101,52 @@ watch(
   }
 )
 
+// THE STEP THE PLAYER IS ON
+
+/**
+ * The step of the turn the player is on: 'move' while their train still has
+ * something to do, then 'build'. Always 'build' in the building rounds, where
+ * there is no moving (the trains store answers false there).
+ */
+const activeStep = computed(() =>
+  trainsStore.isStillMoving(playerStore.activePlayer?.id) ? 'move' : 'build'
+)
+
+/**
+ * The step together with whose turn it is and the round, so it changes with
+ * each new turn as well as each new step — including a player who plays
+ * twice running, and a turn that starts on the step the last one ended on.
+ */
+const turnStep = computed(() => `${turn.value}:${playerStore.activePlayer?.id}:${activeStep.value}`)
+
+/**
+ * Whether step 1 is unfolded. It is set afresh with each change of
+ * `turnStep` — open while moving, folded once on to building — and the
+ * player may fold or unfold it in between.
+ */
+const isMoveStepOpen = ref(activeStep.value === 'move')
+
+const turnSection = useTemplateRef('turnSection')
+const moveStep = useTemplateRef('moveStep')
+const buildStep = useTemplateRef('buildStep')
+
+// With each new turn or step: fold or unfold step 1, unfold "This turn" if
+// the player had folded it, then bring the step now on into sight. After the
+// page has updated, so the section is there to unfold on the first turn
+// after a computer player's (whose turn shows no steps); and the scroll
+// waits one more update, for the unfolding to show — an element that is
+// folded away cannot be scrolled to.
+watch(
+  turnStep,
+  async () => {
+    isMoveStepOpen.value = activeStep.value === 'move'
+    turnSection.value?.expand()
+    await nextTick()
+    reveal(activeStep.value === 'move' ? moveStep.value : buildStep.value)
+  },
+  { flush: 'post' }
+)
+
 /**
  * Throws in the hand for a new one, after making sure: it costs the whole
  * turn and cannot be undone.
@@ -124,7 +180,7 @@ function confirmDiscardHand() {
       <template v-else>
         <TrainPanel />
 
-        <CollapsibleSection title="This turn" storage-key="dock_turn">
+        <CollapsibleSection ref="turnSection" title="This turn" storage-key="dock_turn">
           <!-- Opening rounds: no train movement, so no step 1 -->
           <p v-if="isBuildingRound" class="turn-steps__opening">
             Building round: lay track to get started. Trains start running in round
@@ -132,21 +188,44 @@ function confirmDiscardHand() {
           </p>
 
           <ol class="turn-steps">
-            <!-- Step 1: move the train -->
-            <li v-if="!isBuildingRound" class="turn-step">
-              <div class="turn-step__heading">
-                <span class="turn-step__number">1</span>
+            <!-- Step 1: move the train. Its heading folds it; once the turn is
+                 on to building, a tick stands in for its number. -->
+            <li
+              v-if="!isBuildingRound"
+              ref="moveStep"
+              class="turn-step"
+              :class="{ 'turn-step--active': activeStep === 'move' }"
+            >
+              <button
+                class="turn-step__heading turn-step__toggle"
+                :aria-expanded="isMoveStepOpen"
+                @click="isMoveStepOpen = !isMoveStepOpen"
+              >
+                <span class="turn-step__number">
+                  <template v-if="activeStep === 'move'">1</template>
+                  <template v-else>
+                    <i class="fas fa-check" aria-hidden="true"></i>
+                    <span class="is-sr-only">1, done:</span>
+                  </template>
+                </span>
                 <span>Move your train</span>
-              </div>
-              <p class="turn-step__note">
+                <span class="icon turn-step__chevron" aria-hidden="true">
+                  <i class="fas" :class="isMoveStepOpen ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                </span>
+              </button>
+              <p v-if="isMoveStepOpen" class="turn-step__note">
                 Run it along the track, stopping in towns to pick up and deliver. Do this before you
                 build.
               </p>
-              <MoveControls />
+              <MoveControls :collapsed="!isMoveStepOpen" />
             </li>
 
             <!-- Step 2: build or upgrade -->
-            <li class="turn-step">
+            <li
+              ref="buildStep"
+              class="turn-step"
+              :class="{ 'turn-step--active': activeStep === 'build' }"
+            >
               <div class="turn-step__heading">
                 <span class="turn-step__number">{{ isBuildingRound ? 1 : 2 }}</span>
                 <span>Build track <em>or</em> upgrade your train</span>
@@ -232,8 +311,26 @@ function confirmDiscardHand() {
 .turn-steps {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.25rem;
   list-style: none;
+}
+
+/* Each step reaches out to the dock's edges, so the bar marking the step the
+   player is on sits at the very edge. Every step carries the bar's room, in
+   a clear color, so nothing shifts as the highlight moves from one to the
+   next. */
+.turn-step {
+  margin: 0 -1rem;
+  padding: 0.6rem 1rem 0.75rem calc(1rem - 4px);
+  border-left: 4px solid transparent;
+}
+
+/* The step the player is on: a bar down its side, and a light wash of the
+   same color. Mixed with transparent, so the wash suits light and dark mode
+   alike. */
+.turn-step--active {
+  border-left-color: var(--bulma-primary);
+  background: color-mix(in srgb, var(--bulma-primary) 10%, transparent);
 }
 
 .turn-step__heading {
@@ -241,6 +338,25 @@ function confirmDiscardHand() {
   align-items: center;
   gap: 0.5rem;
   font-weight: 700;
+}
+
+/* Step 1's heading folds the step: a plain heading that happens to be a
+   button, across the whole width so it is an easy target */
+.turn-step__toggle {
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.turn-step__chevron {
+  margin-left: auto;
+  color: var(--bulma-text-weak);
 }
 
 .turn-step__heading em {

@@ -12,10 +12,12 @@
 import { computed } from 'vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import { usePlayerStore } from '@/stores/players'
+import { useGameStore } from '@/stores/game'
 import { useTrainsStore } from '@/stores/trains'
 import { whereabouts as describeWhereabouts } from '@/composables/trainStatus'
 
 const playerStore = usePlayerStore()
+const gameStore = useGameStore()
 const trainsStore = useTrainsStore()
 
 const playerId = computed(() => playerStore.activePlayer?.id)
@@ -27,7 +29,9 @@ const whereabouts = computed(() =>
   describeWhereabouts({
     placed: Boolean(train.value.position),
     town: trainsStore.townOf(playerId.value),
-    heading: trainsStore.headingOf(playerId.value)
+    heading: trainsStore.headingOf(playerId.value),
+    nearest: trainsStore.nearestTownOf(playerId.value),
+    speedUnitKm: gameStore.boardScale.speedUnitKm
   })
 )
 

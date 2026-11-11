@@ -3,12 +3,12 @@
  *
  * The words the dock uses for where a train is and where it is heading: how
  * long a run takes ("this turn", "2 turns"), and the whereabouts sentence,
- * in a town or between towns, with or without a heading, and with a heading
- * no track leads to any more.
+ * in a town or stopped on the track, with or without a heading, and with a
+ * heading no track leads to any more.
  */
 
 import { describe, it, expect } from 'vitest'
-import { turnsText, whereabouts } from '@/composables/trainStatus'
+import { turnsText, spacesText, whereabouts } from '@/composables/trainStatus'
 
 const omaha = { name: 'Omaha' }
 const denver = { name: 'Denver' }
@@ -31,6 +31,16 @@ describe('trainStatus', () => {
     })
   })
 
+  describe('spacesText', () => {
+    it('should give a distance in spaces, rounded up to a tenth', () => {
+      expect(spacesText(23.01, 10)).toBe('2.4 spaces')
+    })
+
+    it('should say "1 space", not "1 spaces"', () => {
+      expect(spacesText(10, 10)).toBe('1 space')
+    })
+  })
+
   describe('whereabouts', () => {
     it('should say a train not placed is not on the board', () => {
       expect(whereabouts({ placed: false, town: null, heading: null })).toBe('Not on the board yet')
@@ -40,8 +50,35 @@ describe('trainStatus', () => {
       expect(whereabouts({ placed: true, town: omaha, heading: null })).toBe('In Omaha')
     })
 
-    it('should fall back to "Between towns" with no heading off a town', () => {
-      expect(whereabouts({ placed: true, town: null, heading: null })).toBe('Between towns')
+    it('should say how far by track a train stopped on the line is from the nearest town', () => {
+      const nearest = { town: omaha, km: 24 }
+      expect(
+        whereabouts({ placed: true, town: null, heading: null, nearest, speedUnitKm: 10 })
+      ).toBe('Stopped on the track 2.4 spaces away from Omaha')
+    })
+
+    it('should say "1 space", not "1 spaces"', () => {
+      const nearest = { town: omaha, km: 10 }
+      expect(
+        whereabouts({ placed: true, town: null, heading: null, nearest, speedUnitKm: 10 })
+      ).toBe('Stopped on the track 1 space away from Omaha')
+    })
+
+    it('should say only "Stopped on the track" when no track leads to a town', () => {
+      expect(whereabouts({ placed: true, town: null, heading: null })).toBe('Stopped on the track')
+    })
+
+    it('should give the heading, not the nearest town, for a train on its way', () => {
+      const nearest = { town: omaha, km: 24 }
+      expect(
+        whereabouts({
+          placed: true,
+          town: null,
+          heading: toDenver(2, true),
+          nearest,
+          speedUnitKm: 10
+        })
+      ).toBe('Heading toward Denver, expected to arrive in 2 turns')
     })
 
     it('should say where a train between towns is heading, and when it gets there', () => {

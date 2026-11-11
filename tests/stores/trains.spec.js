@@ -20,6 +20,7 @@ import { useHistoryStore } from '@/stores/history'
 import { gameRules } from '@/config/game'
 import { trainRangeKm } from '@/config/trains'
 import { kmBetween } from '@/composables/map/trackCost'
+import { pointKey, townKey } from '@/composables/network'
 import { pinSpeedUnit } from '../utils/boardScale'
 
 // The board's speed unit, pinned so a Freight (speed 9) runs 90 km a turn
@@ -367,6 +368,133 @@ describe('trains store', () => {
       store.setTrains({ [ANN]: { ...store.trainOf(ANN), heading: undefined } })
 
       expect(store.headingOf(ANN)).toBeNull()
+    })
+  })
+
+  describe('stopping on the track', () => {
+    // Points off the towns: Ann's spur north from Middle, about 11 km to a
+    // bend and on to an end 100 km beyond it; and Bo's, 11 km south of East
+    const NEAR = { lat: 0.1, lng: 0.3 }
+    const BEYOND = { lat: 1, lng: 0.3 }
+    const BOS_POINT = { lat: -0.1, lng: 0.6 }
+    const SPUR_KM = kmBetween(at('Middle'), NEAR)
+
+    beforeEach(() => {
+      trackStore.addSegment({ ownerId: ANN, coordinates: [at('Middle'), NEAR, BEYOND] })
+      trackStore.addSegment({ ownerId: BO, coordinates: [at('East'), BOS_POINT] })
+      store.placeTrain(ANN, 'West')
+    })
+
+    describe('trackStops', () => {
+      it("should list the points within this turn's reach, and no towns", () => {
+        const stops = store.trackStops(ANN)
+
+        expect(stops.map((stop) => stop.key).sort()).toEqual(
+          [pointKey(NEAR), pointKey(BOS_POINT)].sort()
+        )
+        expect(stops.find((stop) => stop.key === pointKey(NEAR)).km).toBeCloseTo(LEG_KM + SPUR_KM)
+      })
+
+      it("should name the fee for a point on another player's track", () => {
+        const stop = store.trackStops(ANN).find((s) => s.key === pointKey(BOS_POINT))
+
+        expect(stop).toMatchObject({ payTo: [BO], fee: gameRules.trackUseFee })
+      })
+
+      it('should be empty once the player has started building', () => {
+        playerStore.spendOnTrack(ANN, 1000)
+
+        expect(store.trackStops(ANN)).toEqual([])
+      })
+    })
+
+    describe('moveTrainToTrack', () => {
+      it('should run the train to the point and stop it there', () => {
+        const result = store.moveTrainToTrack(ANN, pointKey(NEAR))
+
+        expect(result).toMatchObject({ ok: true, paid: [], near: { name: 'Middle' } })
+        expect(result.km).toBeCloseTo(LEG_KM + SPUR_KM)
+        expect(store.trainOf(ANN).position.nodeKey).toBe(pointKey(NEAR))
+        expect(store.townOf(ANN)).toBeNull()
+        expect(store.kmLeft(ANN)).toBeCloseTo(
+          trainRangeKm('freight', SPEED_UNIT_KM) - LEG_KM - SPUR_KM
+        )
+      })
+
+      it('should drop any heading: stopping there is the new plan', () => {
+        store.setTrains({ [ANN]: { ...store.trainOf(ANN), heading: 'Far' } })
+
+        store.moveTrainToTrack(ANN, pointKey(NEAR))
+
+        expect(store.trainOf(ANN).heading).toBeNull()
+      })
+
+      it('should pay the owner for running on their track', () => {
+        const result = store.moveTrainToTrack(ANN, pointKey(BOS_POINT))
+
+        expect(result.paid).toEqual([{ ownerId: BO, amount: gameRules.trackUseFee }])
+        expect(cashOf(ANN)).toBe(40000 - gameRules.trackUseFee)
+        expect(cashOf(BO)).toBe(40000 + gameRules.trackUseFee)
+      })
+
+      it("should refuse a point beyond this turn's reach, leaving the train where it is", () => {
+        expect(store.moveTrainToTrack(ANN, pointKey(BEYOND))).toEqual({
+          ok: false,
+          error: 'That point is further than your train can run this turn.'
+        })
+        expect(store.townOf(ANN).name).toBe('West')
+      })
+
+      it('should refuse a town, which is run to as a town', () => {
+        const middle = towns.find((t) => t.name === 'Middle')
+
+        expect(store.moveTrainToTrack(ANN, townKey(middle)).ok).toBe(false)
+      })
+
+      it('should refuse once the player has started building', () => {
+        playerStore.spendOnTrack(ANN, 1000)
+
+        expect(store.moveTrainToTrack(ANN, pointKey(NEAR)).error).toBe(
+          'Your train is done for this turn: you have started building.'
+        )
+      })
+
+      it('should record the run as one to the track near the nearest town', () => {
+        store.moveTrainToTrack(ANN, pointKey(NEAR))
+
+        expect(useHistoryStore().current.events.at(-1)).toEqual({
+          type: 'move',
+          town: 'Middle',
+          onTrack: true,
+          arrived: true,
+          paid: []
+        })
+      })
+    })
+
+    describe('nearestTownOf', () => {
+      it('should be the town nearest by track to a train stopped on it', () => {
+        store.moveTrainToTrack(ANN, pointKey(NEAR))
+
+        const nearest = store.nearestTownOf(ANN)
+
+        expect(nearest.town.name).toBe('Middle')
+        expect(nearest.km).toBeCloseTo(SPUR_KM)
+      })
+
+      it('should measure from part way along a stretch, where a long run stopped', () => {
+        // Stops 90 km out, on Bo's line past East, nearer Far than East
+        store.moveTrain(ANN, 'Far')
+
+        const nearest = store.nearestTownOf(ANN)
+
+        expect(nearest.town.name).toBe('Far')
+        expect(nearest.km).toBeCloseTo(3 * LEG_KM - trainRangeKm('freight', SPEED_UNIT_KM))
+      })
+
+      it('should be null for a train not yet placed', () => {
+        expect(store.nearestTownOf(BO)).toBeNull()
+      })
     })
   })
 

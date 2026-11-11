@@ -216,3 +216,29 @@
   color: #cc0f35;
   font-weight: 700;
 }
+
+/* A point on the track the train can stop at, while the player chooses on
+   the map where to run it (see trackStopMarkers.js): a small hollow ring with
+   a dark edge, in the middle of a larger clickable box, that grows a little
+   under the pointer (or keyboard focus) so it reads as a button. */
+.track-stop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.track-stop__ring {
+  width: 10px;
+  height: 10px;
+  border: 2px solid #222;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9);
+  transition: transform 0.1s ease-out;
+}
+
+.track-stop:hover .track-stop__ring,
+.track-stop:focus-visible .track-stop__ring {
+  transform: scale(1.5);
+}

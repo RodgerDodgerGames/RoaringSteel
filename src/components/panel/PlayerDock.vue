@@ -20,8 +20,9 @@
      shows the order. As the turn moves on to building, step 1 folds down to
      where the train is; the player can unfold it again. Each new turn, and
      each new step, unfolds "This turn" and scrolls the step into sight.
-  4. End Turn, pinned to the bottom so it is always in the same place, with
-     the option of throwing in the hand of demand cards instead of a turn
+  4. End Turn, pinned to the bottom so it is always in the same place
+     (throwing in the hand of demand cards instead of a turn is offered on
+     the demand strip, beside the cards — see DemandStrip)
 
   Once someone has won, the steps give way to who won, and a button to see
   the final standings again.
@@ -64,7 +65,7 @@ const gameStore = useGameStore()
 const { turn, isBuildingRound, isOver, winnerId } = storeToRefs(gameStore)
 const playerStore = usePlayerStore()
 const trainsStore = useTrainsStore()
-const { nextPlayer, playsAgain, endTurn, canDiscardHand, discardHand } = useTurn()
+const { nextPlayer, playsAgain, endTurn } = useTurn()
 
 // The game view's build-track instance (see BuildControls); null with no map
 const buildTrack = inject(buildTrackKey, null)
@@ -146,16 +147,6 @@ watch(
   },
   { flush: 'post' }
 )
-
-/**
- * Throws in the hand for a new one, after making sure: it costs the whole
- * turn and cannot be undone.
- */
-function confirmDiscardHand() {
-  if (window.confirm('Throw in all your demand cards for three new ones? This ends your turn.')) {
-    discardHand()
-  }
-}
 </script>
 
 <template>
@@ -267,14 +258,6 @@ function confirmDiscardHand() {
       <p v-if="nextPlayer" class="player-dock__next">
         Next up: {{ nextPlayer.name }}{{ playsAgain ? ' again' : '' }}
       </p>
-      <button
-        v-if="canDiscardHand"
-        class="button is-text is-small is-fullwidth mt-1"
-        title="Instead of taking a turn, swap all your demand cards for new ones"
-        @click="confirmDiscardHand"
-      >
-        Throw in my demand cards (ends my turn)
-      </button>
     </footer>
   </aside>
 </template>

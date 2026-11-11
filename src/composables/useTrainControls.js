@@ -31,6 +31,7 @@ import { useTrainStopStore } from '@/stores/trainStop'
 import { buildTrackKey } from '@/composables/map/useBuildTrack'
 import { formatCurrency } from '@/composables/utils'
 import { formatDistance } from '@/composables/boardScale'
+import { whereabouts } from '@/composables/trainStatus'
 
 export function useTrainControls() {
   const playerStore = usePlayerStore()
@@ -81,6 +82,17 @@ export function useTrainControls() {
   )
 
   /**
+   * The town a run of more than one turn is still on its way to, and how it
+   * stands now, or null (see the trains store's `headingOf`)
+   */
+  const heading = computed(() => trainsStore.headingOf(playerId.value))
+
+  /** Where the train is and where it is heading, in a sentence */
+  const status = computed(() =>
+    whereabouts({ placed: Boolean(train.value.position), town: town.value, heading: heading.value })
+  )
+
+  /**
    * What the train can pick up and deliver where it stands: the same lists
    * the map's stop card shows (see the train stop store)
    */
@@ -100,6 +112,15 @@ export function useTrainControls() {
    */
   function nameOf(id) {
     return playerStore.players.find((p) => p.id === id)?.name ?? 'another player'
+  }
+
+  /**
+   * A player's color, for marking whose track a run uses.
+   * @param {number} id - The player's id
+   * @returns {string|null} Their color
+   */
+  function colorOf(id) {
+    return playerStore.colorOf(id)
   }
 
   /**
@@ -189,11 +210,14 @@ export function useTrainControls() {
     moveBlock,
     loadBlock,
     destinations,
+    heading,
+    status,
     pickups,
     deliveries,
     towns,
     notice,
     nameOf,
+    colorOf,
     place,
     move,
     pickUp,

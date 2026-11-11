@@ -13,6 +13,7 @@ import { computed } from 'vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import { usePlayerStore } from '@/stores/players'
 import { useTrainsStore } from '@/stores/trains'
+import { whereabouts as describeWhereabouts } from '@/composables/trainStatus'
 
 const playerStore = usePlayerStore()
 const trainsStore = useTrainsStore()
@@ -21,12 +22,14 @@ const playerId = computed(() => playerStore.activePlayer?.id)
 const train = computed(() => trainsStore.trainOf(playerId.value))
 const trainType = computed(() => trainsStore.trainTypeOf(playerId.value))
 
-/** Where the train is, in words */
-const whereabouts = computed(() => {
-  if (!train.value.position) return 'Not on the board yet'
-  const town = trainsStore.townOf(playerId.value)
-  return town ? `In ${town.name}` : 'Between towns'
-})
+/** Where the train is and where it is heading, in words (see trainStatus.js) */
+const whereabouts = computed(() =>
+  describeWhereabouts({
+    placed: Boolean(train.value.position),
+    town: trainsStore.townOf(playerId.value),
+    heading: trainsStore.headingOf(playerId.value)
+  })
+)
 
 /** One entry per bay: the load in it, or null when it is empty */
 const bays = computed(() =>

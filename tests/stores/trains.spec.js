@@ -258,7 +258,6 @@ describe('trains store', () => {
       const list = store.destinations(ANN)
 
       expect(list.map((d) => d.town.name)).toEqual(['Middle', 'East', 'Far'])
-      expect(list.map((d) => d.reachable)).toEqual([true, true, false])
     })
 
     it("should name the fees for running on another player's track", () => {
@@ -271,6 +270,103 @@ describe('trains store', () => {
 
     it('should be empty for a train not yet placed', () => {
       expect(store.destinations(ANN)).toEqual([])
+    })
+
+    // A Freight runs 90 km a turn; Far is three legs (about 100 km) from West
+    it('should count the turns each town takes, this turn included', () => {
+      store.placeTrain(ANN, 'West')
+
+      const timing = store.destinations(ANN).map(({ turns, runsNow }) => ({ turns, runsNow }))
+
+      expect(timing).toEqual([
+        { turns: 1, runsNow: true },
+        { turns: 1, runsNow: true },
+        { turns: 2, runsNow: true }
+      ])
+    })
+
+    it('should count from what is left of this turn after a short run', () => {
+      store.placeTrain(ANN, 'West')
+      store.moveTrain(ANN, 'Middle')
+
+      // About 57 km left this turn; Far is about 66 km on: into next turn
+      expect(store.destinations(ANN).find((d) => d.town.name === 'Far').turns).toBe(2)
+    })
+
+    it('should name the other players whose track the whole way runs on', () => {
+      store.placeTrain(ANN, 'West')
+
+      const owners = Object.fromEntries(store.destinations(ANN).map((d) => [d.town.name, d.owners]))
+
+      // Ann's own track is not counted; Bo's is, even on the part run next turn
+      expect(owners).toEqual({ Middle: [], East: [], Far: [BO] })
+    })
+  })
+
+  describe('heading', () => {
+    beforeEach(() => store.placeTrain(ANN, 'West'))
+
+    it('should keep a town too far for this turn as the heading', () => {
+      store.moveTrain(ANN, 'Far')
+
+      expect(store.trainOf(ANN).heading).toBe('Far')
+      expect(store.headingOf(ANN).town.name).toBe('Far')
+    })
+
+    it('should be expected in one more turn once this turn is run', () => {
+      store.moveTrain(ANN, 'Far')
+
+      expect(store.headingOf(ANN).route).toMatchObject({ turns: 1, runsNow: false })
+    })
+
+    it('should arrive this turn when the next turn starts', () => {
+      store.moveTrain(ANN, 'Far')
+      store.endTurn(ANN)
+
+      expect(store.headingOf(ANN).route).toMatchObject({ turns: 1, runsNow: true })
+      // The new turn's part of the way, on Bo's track, pays Bo again
+      expect(store.headingOf(ANN).route).toMatchObject({ payTo: [BO], fee: gameRules.trackUseFee })
+    })
+
+    it('should start counting next turn once the player has started building', () => {
+      playerStore.spendOnTrack(ANN, 1000)
+
+      // About 100 km at 90 a turn, none of it this turn
+      expect(store.destinations(ANN).find((d) => d.town.name === 'Far')).toMatchObject({
+        turns: 2,
+        runsNow: false
+      })
+    })
+
+    it('should be cleared on arrival', () => {
+      store.moveTrain(ANN, 'Far')
+      store.endTurn(ANN)
+      store.moveTrain(ANN, 'Far')
+
+      expect(store.trainOf(ANN).heading).toBeNull()
+      expect(store.headingOf(ANN)).toBeNull()
+    })
+
+    it('should be replaced by a run somewhere else', () => {
+      store.setTrains({ [ANN]: { ...store.trainOf(ANN), heading: 'Far' } })
+
+      store.moveTrain(ANN, 'Middle')
+
+      expect(store.trainOf(ANN).heading).toBeNull()
+    })
+
+    it('should stay, with no route, once no track leads there', () => {
+      store.setTrains({ [ANN]: { ...store.trainOf(ANN), heading: 'Far' } })
+      const bosLine = trackStore.segments.find((segment) => segment.ownerId === BO)
+      trackStore.removeSegment(bosLine.id)
+
+      expect(store.headingOf(ANN)).toMatchObject({ town: { name: 'Far' }, route: null })
+    })
+
+    it('should be nothing for a train from a save without headings', () => {
+      store.setTrains({ [ANN]: { ...store.trainOf(ANN), heading: undefined } })
+
+      expect(store.headingOf(ANN)).toBeNull()
     })
   })
 

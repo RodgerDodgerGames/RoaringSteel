@@ -77,11 +77,11 @@ let stateLinesLayer = null
 onMounted(() => {
   map = L.map(mapContainer.value, { attributionControl: false })
   map.fitBounds(LOWER_48)
-  L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_terrain_background/{z}/{x}/{y}{r}.{ext}', {
-    minZoom: 0,
-    maxZoom: 18,
-    ext: 'png'
-  }).addTo(map)
+  // L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_terrain_background/{z}/{x}/{y}{r}.{ext}', {
+  //   minZoom: 0,
+  //   maxZoom: 18,
+  //   ext: 'png'
+  // }).addTo(map)
   // The state lines go in a pane of their own, above the boards, so they
   // show over a chosen board's fill
   map.createPane('stateLines').style.zIndex = 450

@@ -15,7 +15,7 @@
  */
 
 import { ref, shallowRef, watch } from 'vue'
-import { boardGroupings, boardsFor, STATES_GROUPING } from '@/composables/setup/boards'
+import { boardGroupings, boardsFor } from '@/composables/setup/boards'
 
 /** Where the state outlines are */
 const STATES_FILE = '/data/us-states.geojson'
@@ -32,7 +32,7 @@ export function useBoardChoices() {
   const stateFeatures = shallowRef([])
 
   /** The grouping shown on the map */
-  const grouping = ref(STATES_GROUPING)
+  const grouping = ref('regions')
 
   /** Why the outlines could not be fetched, for the screen; null if they were */
   const error = ref(null)

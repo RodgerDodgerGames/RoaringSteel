@@ -39,8 +39,8 @@ export const STATES_GROUPING = 'states'
  */
 export function boardGroupings() {
   return [
-    { id: STATES_GROUPING, label: 'States' },
-    ...REGION_GROUPINGS.map(({ id, label }) => ({ id, label }))
+    ...REGION_GROUPINGS.map(({ id, label }) => ({ id, label })),
+    { id: STATES_GROUPING, label: 'States' }
   ]
 }
 

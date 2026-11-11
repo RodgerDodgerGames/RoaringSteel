@@ -8,9 +8,8 @@
 
 /*
   A town's icon (see townIcons.js): its shape, in the town color with a
-  white rim, and the building standing on it, placed from the shape's
-  top-left corner and overflowing above it. The fill is set in townIcons.js,
-  where the player colors are checked against it.
+  white rim. The fill is set in townIcons.js, where the player colors are
+  checked against it.
 */
 .town-shape {
   display: block;
@@ -18,19 +17,6 @@
 
 .town-shape__fill {
   stroke: #fff;
-}
-
-.town-building {
-  position: absolute;
-  /* Pressing on a building must not start the browser's own image drag */
-  -webkit-user-drag: none;
-  user-select: none;
-}
-
-/* The Plan view shows the towns as bare shapes, leaving room for the
-   commodity icons round them */
-.is-plan-view .town-building {
-  display: none;
 }
 
 /* town tooltip (town display names under the icon), in small bold
@@ -212,4 +198,21 @@
 .water-label--area {
   font-size: 0.8rem;
   letter-spacing: 0.08em;
+}
+
+/* While the leg out to the cursor costs more than the player can spend (see
+   useBuildTrack.js), the cursor is a red X: clicking there ends the line at
+   the last point. Geoman puts a crosshair on the map and on every clickable
+   layer while drawing, so both are covered, and !important outranks it. The
+   X is the blocked leg's red, outlined in white to show over any terrain. */
+.leaflet-container.is-over-budget,
+.leaflet-container.is-over-budget .leaflet-interactive {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M5 5L19 19M19 5L5 19' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Cpath d='M5 5L19 19M19 5L5 19' stroke='%23cc0f35' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, not-allowed !important;
+}
+
+/* The cursor's tooltip at the same time, saying by how much the player is
+   short, in the same red */
+.leaflet-tooltip.is-over-budget {
+  color: #cc0f35;
+  font-weight: 700;
 }

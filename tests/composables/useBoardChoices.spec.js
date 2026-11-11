@@ -1,8 +1,8 @@
 /**
  * Board Choices Tests
  *
- * The Area Select screen offers boards by grouping: single states, or
- * regions. Switching grouping must show that grouping's boards, and a
+ * The Area Select screen offers boards by grouping: regions, or single
+ * states. Switching grouping must show that grouping's boards, and a
  * missing or broken outlines file must say so rather than break the screen.
  */
 
@@ -43,7 +43,7 @@ describe('useBoardChoices', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
   })
 
-  it('should offer each state once the outlines are in', async () => {
+  it('should open on the first grouping once the outlines are in', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({ ok: true, json: async () => ({ features: STATES }) }))
@@ -53,27 +53,27 @@ describe('useBoardChoices', () => {
     await choices.load()
     await settle()
 
-    expect(choices.grouping.value).toBe(STATES_GROUPING)
+    // Sub-regions come first; both these states are in BosWash
+    expect(choices.grouping.value).toBe('sub-regions')
+    expect(choices.boards.value.map((b) => b.properties.NAME)).toEqual(['BosWash'])
+  })
+
+  it("should show a grouping's boards when it is chosen", async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => ({ features: STATES }) }))
+    )
+    const choices = useBoardChoices()
+    await choices.load()
+    await settle()
+
+    choices.grouping.value = STATES_GROUPING
+    await settle()
+
     expect(choices.boards.value.map((b) => b.properties.NAME)).toEqual([
       'Connecticut',
       'Rhode Island'
     ])
-  })
-
-  it("should show a grouping's regions when it is chosen", async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({ ok: true, json: async () => ({ features: STATES }) }))
-    )
-    const choices = useBoardChoices()
-    await choices.load()
-    await settle()
-
-    choices.grouping.value = 'regions'
-    await settle()
-
-    // Only New England has states among these two
-    expect(choices.boards.value.map((b) => b.properties.NAME)).toEqual(['New England'])
   })
 
   it('should say so when the outlines cannot be had', async () => {

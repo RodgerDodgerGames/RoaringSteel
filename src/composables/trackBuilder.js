@@ -48,6 +48,7 @@ import { riversFor } from '@/composables/map/waterData'
 import { pointKey } from '@/composables/network'
 import { formatCurrency } from '@/composables/utils'
 import { startTowns, startRuleMessage } from '@/composables/startRule'
+import { affordableSection } from '@/composables/bot/botPathfinder'
 
 export function useTrackBuilder() {
   const gameStore = useGameStore()
@@ -178,6 +179,69 @@ export function useTrackBuilder() {
   }
 
   /**
+   * Cuts a finished line back to the longest start of it that can be built,
+   * so a line is built as far as it can go instead of not at all. Two things
+   * cut a line short:
+   * - money: the player cannot pay for all of it, so it stops at the last
+   *   vertex they can pay for;
+   * - water: it ends out on the water, where a bridge has to reach land, so
+   *   it stops at the last vertex on land (or in a town).
+   * Both can apply at once: if the last vertex the money reaches is out on
+   * water, the cut goes back further, to one on land.
+   *
+   * The cut falls on one of the line's own vertices, never between two: a
+   * vertex is a point the player chose. It is made by `affordableSection`,
+   * which a computer player's lines are cut by too, so both are held to the
+   * same limits the same way.
+   *
+   * Only money and the water at the end are judged here. The line is assumed
+   * to keep to the build rules otherwise — the drawing tool takes back any
+   * leg that breaks one — and every start of such a line keeps to them too.
+   * A line that breaks some other rule, or that cannot be priced at all, is
+   * handed back whole, so building refuses it and says why.
+   *
+   * @param {number} playerId - The player who would build it
+   * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
+   * @returns {{points: Array<Object>|null, isCut: boolean,
+   *   limit: ('allowance'|'cash'|null), available: number, toLand: boolean}}
+   *   - `points`: what to build — the whole line, the start of it that can
+   *     be built, or null when none of it can;
+   *   - `isCut`: whether `points` is less than the whole line;
+   *   - `limit`: what money ran out, if it did: 'allowance' for this turn's
+   *     building allowance, 'cash' for the player's cash, whichever is
+   *     smaller (the allowance when they are equal, since the allowance is
+   *     the rule that is always there); null when money was not the problem;
+   *   - `available`: what the player had to spend, before building;
+   *   - `toLand`: true when the cut went back past a vertex that could be
+   *     paid for, to reach land.
+   */
+  function fitLine(playerId, latlngs) {
+    const available = playerStore.availableForTrack(playerId)
+    const price = (points) => priceSection(playerId, points).total
+    const whole = price(latlngs)
+    const uncut = { points: latlngs, isCut: false, limit: null, available, toLand: false }
+    // Not a money problem, and cutting it would only hide the real one
+    if (!Number.isFinite(whole)) return uncut
+
+    const isAffordable = whole <= available
+    const endsOnWater =
+      lineBlock(latlngs, buildRules.value, { isFinished: true })?.reason === 'endsOnWater'
+    if (isAffordable && !endsOnWater) return uncut
+
+    const points = affordableSection(latlngs, available, buildRules.value, price)
+    if (isAffordable) return { points, isCut: true, limit: null, available, toLand: true }
+
+    const allowance = playerStore.trackBudgetRemaining(playerId)
+    const limit = allowance <= available ? 'allowance' : 'cash'
+    // Cut short of a vertex that could be paid for only if the vertex after
+    // the cut could still have been: then it was water, not money, that
+    // stopped it there
+    const kept = points?.length ?? 1
+    const toLand = price(latlngs.slice(0, kept + 1)) <= available
+    return { points, isCut: true, limit, available, toLand }
+  }
+
+  /**
    * What tearing up a section built this turn gives back: what it cost, less
    * any entry fee it paid for a town the player's other track still reaches
    * (see `entryFeesKept`). Asked before the section is taken out of the store.
@@ -293,6 +357,7 @@ export function useTrackBuilder() {
     canStartAt,
     reachedKeys,
     priceSection,
+    fitLine,
     refundFor,
     whyNotBuildable,
     describeBlock,

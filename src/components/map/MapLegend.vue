@@ -43,8 +43,8 @@ const isOpen = useStorage('roaringsteel_map_legend_open', false)
 
 /**
  * The town sizes, largest first, with the names the legend gives them. Each
- * is drawn with the map's own markup, shape and building, as the Build view
- * shows it; the Plan view's bare shapes are the same shapes.
+ * is drawn with the map's own markup, at the Build view's size; the Plan
+ * view draws the same shapes smaller.
  */
 const townRows = [
   { size: 'large', label: 'Large town' },
@@ -118,7 +118,7 @@ const riverText = `Rivers: bridged at ${formatCurrency(riverCrossing)} a crossin
       <ul>
         <li v-for="row in townRows" :key="row.size" class="map-legend__row">
           <span class="map-legend__symbol">
-            <!-- v-html is safe: the markup is built from fixed shapes and image URLs -->
+            <!-- v-html is safe: the markup is built from fixed shapes -->
             <span
               class="map-legend__town"
               :style="{ width: `${row.icon.size}px`, height: `${row.icon.size}px` }"
@@ -206,7 +206,7 @@ const riverText = `Rivers: bridged at ${formatCurrency(riverCrossing)} a crossin
         </li>
         <li class="map-legend__row">
           <span class="map-legend__symbol">
-            <!-- v-html is safe: the markup is built from fixed shapes and image URLs -->
+            <!-- v-html is safe: the markup is built from fixed shapes -->
             <span
               class="map-legend__town map-legend__halo"
               :style="{
@@ -301,15 +301,9 @@ const riverText = `Rivers: bridged at ${formatCurrency(riverCrossing)} a crossin
   width: 36px;
 }
 
-/*
-  A town drawn as the map draws it: the box is its shape, and its building
-  is placed from the box's corner and rises above it, so the box is lowered
-  to leave room for the building inside the row
-*/
+/* A town drawn as the map draws it: the box is its shape */
 .map-legend__town {
-  position: relative;
   flex: none;
-  margin-top: 10px;
 }
 
 .map-legend__halo {

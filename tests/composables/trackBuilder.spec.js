@@ -232,4 +232,82 @@ describe('useTrackBuilder', () => {
       expect(builder.startPoints(ANN)).toEqual([centerOf(0), centerOf(2), centerOf(3)])
     })
   })
+
+  describe('fitLine', () => {
+    /** A line out along the row from the major city, one vertex per cell: $5000 */
+    const line = [centerOf(0), centerOf(1), centerOf(2), centerOf(3), centerOf(4)]
+
+    it('should leave a line the player can pay for whole', () => {
+      expect(builder.fitLine(ANN, line)).toEqual({
+        points: line,
+        isCut: false,
+        limit: null,
+        available: 20000,
+        toLand: false
+      })
+    })
+
+    it('should cut a line back to the last vertex the cash covers, and blame the cash', () => {
+      // Two cells cost 2000, three cost 3000
+      playerStore.updatePlayer(ANN, { cash: 2500 })
+
+      expect(builder.fitLine(ANN, line)).toEqual({
+        points: [centerOf(0), centerOf(1)],
+        isCut: true,
+        limit: 'cash',
+        available: 2500,
+        toLand: false
+      })
+    })
+
+    it('should blame the allowance when that runs out before the cash', () => {
+      playerStore.spendOnTrack(ANN, gameRules.trackBudgetPerTurn - 2500)
+
+      expect(builder.fitLine(ANN, line)).toMatchObject({
+        points: [centerOf(0), centerOf(1)],
+        limit: 'allowance'
+      })
+    })
+
+    it('should give nothing to build when not even the first leg is affordable', () => {
+      playerStore.updatePlayer(ANN, { cash: 1500 })
+
+      expect(builder.fitLine(ANN, line)).toMatchObject({ points: null, limit: 'cash' })
+    })
+
+    /** Land, land, water, land: a line may not end out on the water */
+    const setWaterGrid = () =>
+      useGridStore().setGrid(
+        makeTestGrid({
+          rows: 1,
+          cols: 4,
+          south: -CELL / 2,
+          cell: (row, col) => (col === 2 ? { water: true } : { landCover: 1000 })
+        })
+      )
+
+    it('should cut a line that ends on the water back to land, though it is affordable', () => {
+      setWaterGrid()
+
+      expect(builder.fitLine(ANN, [centerOf(0), centerOf(1), centerOf(2)])).toMatchObject({
+        points: [centerOf(0), centerOf(1)],
+        isCut: true,
+        limit: null,
+        toLand: true
+      })
+    })
+
+    it('should cut back past an affordable vertex on water to the last one on land', () => {
+      setWaterGrid()
+      const overWater = [centerOf(0), centerOf(1), centerOf(2), centerOf(3)]
+      const bridge = gameRules.bridges.perSpeedUnit
+      // Enough to reach the water, not to cross it
+      playerStore.updatePlayer(ANN, { cash: 2500 + bridge })
+
+      expect(builder.fitLine(ANN, overWater)).toMatchObject({
+        points: [centerOf(0), centerOf(1)],
+        toLand: true
+      })
+    })
+  })
 })

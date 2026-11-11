@@ -24,6 +24,10 @@
  * crossing too long to bridge is refused like a leg out of the region.
  *
  * Track already built: a new line may cross it but not run alongside it.
+ *
+ * Stopping: Stop building, End turn and switching to the Plan view build the
+ * line drawn so far; Escape throws it away. A click the player cannot pay for
+ * ends the line, built back to the last vertex they can, and says why.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -57,7 +61,8 @@ import { pinPlainScale } from '../utils/boardScale'
 function createFakeMap() {
   const map = new L.Evented()
   const layers = new Set()
-  const container = { style: {} }
+  // A real element, so the cursor's style and classes behave as in the game
+  const container = document.createElement('div')
   const panes = {}
 
   // Panes are only ever styled by the composable, so a bare style object will do
@@ -1061,6 +1066,202 @@ describe('useBuildTrack', () => {
       pressEscape()
 
       expect(api.isRemoving.value).toBe(false)
+    })
+  })
+
+  describe('stopping a line, and running out of money', () => {
+    /** A row of five cells along the equator, each costing 1000 */
+    const dearGrid = makeTestGrid({
+      rows: 1,
+      cols: 5,
+      south: -CELL / 2,
+      cell: () => ({ landCover: 1000 })
+    })
+    const playerId = () => playerStore.activePlayer.id
+    const centerOf = (i) => L.latLng(0, (i + 0.5) * CELL)
+
+    /**
+     * Starts a line at a town in the first cell, with a stand-in for
+     * Geoman's `_finishShape` that does what the real one does: hands the
+     * line over in `pm:create`, unless it has only one point.
+     * @returns {Object} The composable's API, the line being drawn, and the
+     *   hint marker that follows the cursor
+     */
+    function startLineAtTown() {
+      const hintMarker = L.marker(centerOf(0)).bindTooltip('')
+      const workingLayer = L.polyline([])
+      map.pm.Draw.Line._hintMarker = hintMarker
+      map.pm.Draw.Line._finishShape = () => {
+        const coords = workingLayer.getLatLngs()
+        if (coords.length <= 1) return
+        const line = L.polyline(coords)
+        line.pm = { _shape: 'Line' }
+        map.fire('pm:create', { layer: line })
+      }
+      const { api } = mountBuildTrack(map, L.layerGroup([L.marker(centerOf(0))]), dearGrid)
+      api.startDrawingLine()
+      map.fire('pm:drawstart', { workingLayer })
+      place(workingLayer, centerOf(0))
+      return { api, workingLayer, hintMarker }
+    }
+
+    /** Places a vertex the way Geoman does: on the line, then announced */
+    function place(workingLayer, latlng) {
+      workingLayer.addLatLng(latlng)
+      workingLayer.fire('pm:vertexadded', { latlng })
+    }
+
+    /** The points of the one section built, as plain numbers */
+    const builtPoints = () => trackStore.segments[0].coordinates.map(({ lng }) => lng)
+
+    beforeEach(() => vi.useFakeTimers())
+    afterEach(() => vi.useRealTimers())
+
+    it('should build the line drawn so far when building is stopped', () => {
+      const { api, workingLayer } = startLineAtTown()
+      place(workingLayer, centerOf(1))
+      place(workingLayer, centerOf(2))
+
+      api.stopDrawing()
+
+      expect(builtPoints()).toEqual([centerOf(0).lng, centerOf(1).lng, centerOf(2).lng])
+      expect(api.isDrawingActive.value).toBe(false)
+    })
+
+    it('should build nothing, and stop, when only the start has been placed', () => {
+      const { api } = startLineAtTown()
+
+      api.stopDrawing()
+
+      expect(trackStore.segments).toEqual([])
+      expect(api.isDrawingActive.value).toBe(false)
+    })
+
+    it('should build the line drawn so far when switched to the Plan view', () => {
+      const { workingLayer } = startLineAtTown()
+      place(workingLayer, centerOf(1))
+
+      useMapStore().setViewMode(PLAN_VIEW)
+
+      expect(trackStore.segments).toHaveLength(1)
+    })
+
+    it('should throw the line away on Escape', () => {
+      const { workingLayer } = startLineAtTown()
+      place(workingLayer, centerOf(1))
+
+      pressEscape()
+
+      expect(trackStore.segments).toEqual([])
+    })
+
+    // The bug: a line that went over the allowance vanished whole, the
+    // affordable part of it with it
+    it('should build back to the last vertex within the allowance when a click goes over it', () => {
+      // All but 3500 of the allowance already spent, leaving the cash just as
+      // much: the allowance is what is said to run out
+      playerStore.spendOnTrack(playerId(), gameRules.trackBudgetPerTurn - 3500)
+      const { api, workingLayer } = startLineAtTown()
+      place(workingLayer, centerOf(1)) // 2000
+      place(workingLayer, centerOf(2)) // 3000
+      place(workingLayer, centerOf(3)) // 4000: over the 3500 left
+
+      expect(builtPoints()).toEqual([centerOf(0).lng, centerOf(1).lng, centerOf(2).lng])
+      expect(trackStore.segments[0].cost).toBe(3000)
+      expect(api.isDrawingActive.value).toBe(false)
+      expect(api.budgetNotice.value).toBe(
+        `Only ${formatCurrency(3000)} of this line was built — the rest would have gone over the ${formatCurrency(3500)} left of your ${formatCurrency(gameRules.trackBudgetPerTurn)} turn allowance.`
+      )
+    })
+
+    it('should say a stopped line was built whole, so the turn can end', () => {
+      const { api, workingLayer } = startLineAtTown()
+      place(workingLayer, centerOf(1))
+
+      expect(api.stopDrawing()).toBe(true)
+    })
+
+    it('should say a stopped line was cut short, so the turn stays open for the notice', () => {
+      // Enough for the line as placed, not once the new leg is added; the
+      // leg is pushed on without announcing it, as if Stop building came
+      // straight after a click Geoman had not yet reported
+      playerStore.updatePlayer(playerId(), { cash: 2500 })
+      const { api, workingLayer } = startLineAtTown()
+      place(workingLayer, centerOf(1))
+      workingLayer.addLatLng(centerOf(2))
+
+      expect(api.stopDrawing()).toBe(false)
+      expect(api.budgetNotice.value).toMatch(/^Only/)
+    })
+
+    it('should build the line drawn so far when Remove a section is switched on', () => {
+      const { api, workingLayer } = startLineAtTown()
+      place(workingLayer, centerOf(1))
+
+      api.toggleRemoveMode()
+
+      expect(trackStore.segments).toHaveLength(1)
+    })
+
+    it('should blame the cash when that runs out before the allowance', () => {
+      playerStore.updatePlayer(playerId(), { cash: 2500 })
+      const { api, workingLayer } = startLineAtTown()
+      place(workingLayer, centerOf(1)) // 2000
+      place(workingLayer, centerOf(2)) // 3000: over the 2500 cash
+
+      expect(trackStore.segments[0].cost).toBe(2000)
+      expect(api.budgetNotice.value).toMatch(`the ${formatCurrency(2500)} cash you had`)
+    })
+
+    it('should build nothing, and say so, when the first leg is already too dear', () => {
+      playerStore.updatePlayer(playerId(), { cash: 1500 })
+      const { api, workingLayer } = startLineAtTown()
+      place(workingLayer, centerOf(1)) // 2000
+
+      expect(trackStore.segments).toEqual([])
+      expect(api.budgetNotice.value).toMatch(/^None of this line was built/)
+    })
+
+    it('should keep the notice up until the next line starts', () => {
+      playerStore.updatePlayer(playerId(), { cash: 2500 })
+      const { api, workingLayer } = startLineAtTown()
+      place(workingLayer, centerOf(1)) // 2000
+      place(workingLayer, centerOf(2)) // 3000: over the 2500 cash, so the line ends
+
+      expect(api.budgetNotice.value).not.toBe('')
+      api.startDrawingLine()
+      expect(api.budgetNotice.value).toBe('')
+    })
+
+    it('should warn on the cursor, in red, when the leg out to it is more than is left', async () => {
+      playerStore.updatePlayer(playerId(), { cash: 2500 })
+      const { api, hintMarker } = startLineAtTown()
+
+      hintMarker.setLatLng(centerOf(3)) // 4000: 1500 over
+      vi.advanceTimersByTime(200)
+      await nextTick()
+
+      expect(api.overBudgetBy.value).toBe(1500)
+      expect(hintMarker.getTooltip().getContent()).toBe(
+        `Insufficient funds: -${formatCurrency(1500)}`
+      )
+      expect(map.getContainer().classList.contains('is-over-budget')).toBe(true)
+    })
+
+    it('should take the warning down once the cursor comes back within budget', async () => {
+      playerStore.updatePlayer(playerId(), { cash: 2500 })
+      const { api, hintMarker } = startLineAtTown()
+      hintMarker.setLatLng(centerOf(3))
+      vi.advanceTimersByTime(200)
+      await nextTick()
+
+      hintMarker.setLatLng(centerOf(1))
+      vi.advanceTimersByTime(200)
+      await nextTick()
+
+      expect(api.overBudgetBy.value).toBe(0)
+      expect(hintMarker.getTooltip().getContent()).toMatch(/^Cost:/)
+      expect(map.getContainer().classList.contains('is-over-budget')).toBe(false)
     })
   })
 })

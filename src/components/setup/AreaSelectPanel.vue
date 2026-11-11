@@ -1,8 +1,8 @@
 <!--
   AreaSelectPanel.vue
   Control panel for the area selection screen, above the map:
-  - buttons for the ways of choosing a board — single states, or a grouping
-    of regions — which change what the map offers;
+  - buttons for the ways of choosing a board — a grouping of regions, or
+    single states — which change what the map offers;
   - the board chosen, and how many states it covers;
   - a Settings button, an About button, and "Play Game", which is disabled
     until a board is chosen.

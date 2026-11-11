@@ -8,25 +8,18 @@
  * Each view draws the shapes at its own size. The Plan view shows the whole
  * board at once, so its shapes are smaller, leaving room for the commodity
  * icons round them. The Build view is zoomed in, and its shapes are bigger,
- * so a town stands out from the terrain and is easy to aim track at.
+ * so a town stands out from the terrain and is easy to aim track at. In both
+ * views a town is the bare shape, with nothing drawn on it, and its
+ * commodity icons fan out just clear of it.
  *
- * In the Build view a building stands on each shape, its base a little below
- * the shape's middle and the rest rising above it: one house on a small town,
- * a cluster of houses on a medium one, a city skyline on a large one. In the
- * Plan view the buildings are hidden (see `.is-plan-view` in map.css), so the
- * map stays clear for the commodity icons fanned round each town.
- *
- * Shapes and buildings are solid, so the track running into a town passes
- * under it rather than showing through it. The shapes are filled with
+ * Shapes are solid, so the track running into a town passes under it rather
+ * than showing through it. The shapes are filled with
  * TOWN_COLOR, drawn as inline SVG so the color can be set here rather than
  * baked into image files.
  *
  * @module composables/map/townIcons
  */
 
-import houseUrl from '@/assets/icons/towns/house.svg'
-import housesUrl from '@/assets/icons/towns/houses.png'
-import cityUrl from '@/assets/icons/towns/city.png'
 import { PLAN_VIEW } from '@/composables/map/mapViews'
 
 /**
@@ -51,26 +44,18 @@ const SHAPE_MARKUP = {
 }
 
 /**
- * Each town size's icon: its shape; the shape's width and height on the map
- * in px in the Build view (`size`) and in the Plan view (`planSize`); and
- * the building that stands on it in the Build view, with that image's width
- * and height in px. The shapes are small enough to leave the terrain
- * readable round a town and large enough to click and draw track to; the
- * buildings are about as large, so their detail can be made out. A Build
- * view shape is a quarter bigger than its Plan view one.
+ * Each town size's icon: its shape, and the shape's width and height on the
+ * map in px in the Build view (`size`) and in the Plan view (`planSize`).
+ * The shapes are small enough to leave the terrain readable round a town and
+ * large enough to click and draw track to. The Build view's shapes step up
+ * by 6px a size, a little more than the Plan view's 4px, so the three sizes
+ * are easy to tell apart when zoomed in.
  */
 export const TOWN_ICONS = {
-  small: { shape: 'circle', size: 20, planSize: 16, buildingUrl: houseUrl, buildingSize: 21 },
-  medium: { shape: 'square', size: 25, planSize: 20, buildingUrl: housesUrl, buildingSize: 25 },
-  large: { shape: 'hexagon', size: 30, planSize: 24, buildingUrl: cityUrl, buildingSize: 29 }
+  small: { shape: 'circle', size: 20, planSize: 16 },
+  medium: { shape: 'square', size: 26, planSize: 20 },
+  large: { shape: 'hexagon', size: 32, planSize: 24 }
 }
-
-/**
- * How far below the middle of its shape a building's base sits, as a share
- * of the shape's height. A little below the middle, so the building looks
- * planted in the shape while most of the shape still shows round it.
- */
-const BUILDING_BASE_DROP = 0.1
 
 /**
  * Space between a town's shape and its name, in px. The Plan view's name
@@ -110,55 +95,16 @@ export function shapeSize(size, view) {
 }
 
 /**
- * Where a town's building goes: its top-left corner, in px from the top-left
- * corner of the town's shape as the Build view draws it (the only view that
- * shows buildings). Centered across the shape, with its base a
- * little below the shape's middle. The building is taller than the half of
- * the shape it stands in, so `top` comes out negative: it rises above.
- * @param {string} size - The town's size
- * @returns {{left: number, top: number}} The building's position in px
- */
-export function buildingPosition(size) {
-  const { size: shapeSize, buildingSize } = townIcon(size)
-  const base = shapeSize / 2 + shapeSize * BUILDING_BASE_DROP
-  return { left: (shapeSize - buildingSize) / 2, top: base - buildingSize }
-}
-
-/**
- * How wide a circle round a town's center its commodity icons have to stay
- * clear of (see `iconRingRadius`): the shape in the Plan view; in the Build
- * view the building too, which rises above the shape, where the icons fan
- * out. Clear of it, an icon shown in the Build view (a demand line's, or one
- * the train can load) is neither hidden behind the building nor covered by
- * it for clicks.
- * @param {string} size - The town's size
- * @param {string} view - The map's view
- * @returns {number} The circle's width, in px
- */
-export function iconClearance(size, view) {
-  const shape = shapeSize(size, view)
-  if (view === PLAN_VIEW) return shape
-  const rise = shape / 2 - buildingPosition(size).top
-  return Math.max(shape, 2 * rise)
-}
-
-/**
  * The markup for a town's icon on the map: its shape, filled with
- * TOWN_COLOR, with its building standing on it. The building is always
- * there; the Plan view hides it with CSS.
+ * TOWN_COLOR.
  * @param {string} size - The town's size
  * @param {string} [view] - The view the shape is sized for (see `shapeSize`);
  *   the Build view if left out
  * @returns {string} HTML for the inside of the town's marker
  */
 export function townIconHtml(size, view) {
-  const icon = townIcon(size)
   const width = shapeSize(size, view)
-  const { left, top } = buildingPosition(size)
-  const shape = `<svg class="town-shape" viewBox="0 0 24 24" width="${width}" height="${width}" aria-hidden="true"><g class="town-shape__fill" fill="${TOWN_COLOR}">${SHAPE_MARKUP[icon.shape]}</g></svg>`
-  const buildingStyle = `left:${left}px;top:${top}px;width:${icon.buildingSize}px;height:${icon.buildingSize}px`
-  const building = `<img class="town-building" src="${icon.buildingUrl}" alt="" style="${buildingStyle}" draggable="false">`
-  return shape + building
+  return `<svg class="town-shape" viewBox="0 0 24 24" width="${width}" height="${width}" aria-hidden="true"><g class="town-shape__fill" fill="${TOWN_COLOR}">${SHAPE_MARKUP[townIcon(size).shape]}</g></svg>`
 }
 
 /**

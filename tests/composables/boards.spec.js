@@ -6,8 +6,8 @@
  * setting up their towns, and has its own key for keeping its grid. A
  * state's board keeps its FIPS code as its key, so grids kept before regions
  * existed are still found. The regions file is edited by hand, so it is
- * checked too: every state on the mainland in exactly one region of each
- * grouping.
+ * checked too: every state on the mainland in some region of each grouping,
+ * and in two regions only where the grouping means it to be.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -110,10 +110,10 @@ describe('boardsFor', () => {
     expect(boardsFor('nonsense', STATES)).toEqual([])
   })
 
-  it('should offer states first, then every grouping of regions', () => {
+  it('should offer every grouping of regions first, then states', () => {
     expect(boardGroupings().map(({ id }) => id)).toEqual([
-      STATES_GROUPING,
-      ...REGION_GROUPINGS.map(({ id }) => id)
+      ...REGION_GROUPINGS.map(({ id }) => id),
+      STATES_GROUPING
     ])
   })
 })
@@ -122,13 +122,73 @@ describe('the regions file', () => {
   /** Every state on the mainland, and DC: all but Alaska and Hawaii */
   const MAINLAND = usStates.map(({ abbr }) => abbr).filter((abbr) => !['AK', 'HI'].includes(abbr))
 
+  /**
+   * The states a grouping deliberately puts in two of its regions. Objective
+   * Lists splits Pennsylvania and Missouri between two sub-regions, and so
+   * between two regions; a board takes whole states, so both get the state.
+   * Any other state listed twice is a slip.
+   */
+  const SHARED_STATES = {
+    'sub-regions': ['MO', 'PA'],
+    regions: ['MO', 'PA']
+  }
+
   it.each(REGION_GROUPINGS.map((grouping) => [grouping.label, grouping]))(
-    'should put every mainland state in exactly one of the %s',
+    'should put every mainland state in the %s',
     (label, grouping) => {
-      const listed = grouping.regions.flatMap(({ states }) => states)
+      const listed = new Set(grouping.regions.flatMap(({ states }) => states))
       expect([...listed].sort()).toEqual([...MAINLAND].sort())
     }
   )
+
+  it.each(REGION_GROUPINGS.map((grouping) => [grouping.label, grouping]))(
+    'should put a state in two of the %s only where meant to',
+    (label, grouping) => {
+      const listed = grouping.regions.flatMap(({ states }) => states)
+      const repeated = new Set(listed.filter((abbr, i) => listed.indexOf(abbr) !== i))
+      expect([...repeated].sort()).toEqual(SHARED_STATES[grouping.id] ?? [])
+    }
+  )
+
+  it('should list each state once within a region', () => {
+    REGION_GROUPINGS.forEach(({ regions }) => {
+      regions.forEach(({ states }) => expect(new Set(states).size).toBe(states.length))
+    })
+  })
+
+  it('should make each Objective Lists region of its sub-regions', () => {
+    const regions = REGION_GROUPINGS.find(({ id }) => id === 'regions').regions
+    const statesOf = (id) => [...regions.find((region) => region.id === id).states].sort()
+    expect(regions.map(({ id }) => id)).toEqual(['northeast', 'midwest', 'south', 'west'])
+    expect(statesOf('northeast')).toEqual(
+      ['CT', 'DC', 'DE', 'MA', 'MD', 'ME', 'NH', 'NJ', 'NY', 'PA', 'RI', 'VT'].sort()
+    )
+    expect(statesOf('midwest')).toEqual(
+      ['IA', 'IL', 'IN', 'KS', 'MI', 'MN', 'MO', 'ND', 'NE', 'OH', 'PA', 'SD', 'WI'].sort()
+    )
+    expect(statesOf('south')).toEqual(
+      [
+        'AL',
+        'AR',
+        'FL',
+        'GA',
+        'KY',
+        'LA',
+        'MO',
+        'MS',
+        'NC',
+        'OK',
+        'SC',
+        'TN',
+        'TX',
+        'VA',
+        'WV'
+      ].sort()
+    )
+    expect(statesOf('west')).toEqual(
+      ['AZ', 'CA', 'CO', 'ID', 'MT', 'NM', 'NV', 'OR', 'UT', 'WA', 'WY'].sort()
+    )
+  })
 
   it('should give each region in a grouping its own id', () => {
     REGION_GROUPINGS.forEach(({ regions }) => {

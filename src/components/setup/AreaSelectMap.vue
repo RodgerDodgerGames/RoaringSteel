@@ -2,11 +2,17 @@
   AreaSelectMap.vue
   The map of the United States the board is chosen on, during game setup.
 
-  It shows the boards of the grouping being offered — single states, or
-  regions of several (see useBoardChoices.js) — each a shape to click, named
-  on hover. The board chosen is filled in the game's red. The state lines
-  are drawn faintly over every grouping, so a region's states can be made
-  out, and they take no clicks.
+  It shows the boards of the grouping being offered — regions of several
+  states, or single states (see useBoardChoices.js) — each a shape to click,
+  named on hover. The board chosen is filled in the game's red. The state
+  lines are drawn faintly over every grouping, so a region's states can be
+  made out, and they take no clicks.
+
+  Some groupings have boards that overlap (see config/regions.js), where a
+  state is in two regions. The board under the cursor is brought to the top,
+  so it shows whole and takes the click; moving into the shared state from
+  either board's side picks that board. When the cursor leaves, the chosen
+  board goes back on top, so it is never shown partly covered.
 
   The basemap is the same terrain background the game is played on, without
   place names, so the boards' outlines are the clearest thing on it.
@@ -120,12 +126,29 @@ function drawBoards() {
           direction: 'top',
           className: 'board-tooltip'
         })
-        layer.on('mouseover', () => layer.setStyle({ ...styleFor(feature), ...HOVER_STYLE }))
-        layer.on('mouseout', () => layer.setStyle(styleFor(feature)))
+        layer.on('mouseover', () => {
+          layer.bringToFront()
+          layer.setStyle({ ...styleFor(feature), ...HOVER_STYLE })
+        })
+        layer.on('mouseout', () => {
+          layer.setStyle(styleFor(feature))
+          raiseSelected()
+        })
         layer.on('click', () => emit('select', feature))
       }
     }
   ).addTo(map)
+}
+
+/**
+ * Brings the chosen board to the top of the boards, so where it overlaps
+ * another board it is the one seen. Does nothing when no board on offer is
+ * chosen.
+ */
+function raiseSelected() {
+  boardsLayer?.eachLayer((layer) => {
+    if (boardKey(layer.feature) === props.selectedKey) layer.bringToFront()
+  })
 }
 
 /** Draws the state lines, once the outlines are in */
@@ -138,11 +161,20 @@ function drawStateLines() {
 }
 
 // A new grouping redraws the boards; a new choice only restyles them
-watch(() => props.boards, drawBoards)
+watch(
+  () => props.boards,
+  () => {
+    drawBoards()
+    raiseSelected()
+  }
+)
 watch(() => props.stateFeatures, drawStateLines)
 watch(
   () => props.selectedKey,
-  () => boardsLayer?.setStyle(styleFor)
+  () => {
+    boardsLayer?.setStyle(styleFor)
+    raiseSelected()
+  }
 )
 </script>
 

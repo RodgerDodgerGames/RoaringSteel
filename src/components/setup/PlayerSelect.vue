@@ -20,6 +20,7 @@
   - Notification system for validation errors
   - A Settings button, so settings can be chosen before the game starts
 
+  @emits back - User wants to go back to the welcome screen's New Game / Load Game buttons
   @emits done - The roster, people then computer players, when validation passes
 -->
 
@@ -152,7 +153,7 @@ const onBotCountInput = (event) => {
 }
 
 // Emit events
-const emit = defineEmits(['done'])
+const emit = defineEmits(['done', 'back'])
 
 // Handle done button - validate before proceeding
 const handleDone = () => {
@@ -183,6 +184,16 @@ const handleDone = () => {
   // All validations passed - drop the blank rows and hand over the roster
   playerStore.pruneEmptyDraftPlayers()
   emit('done', playerStore.draftRoster)
+}
+
+/**
+ * Takes the player back to the welcome screen's New Game / Load Game
+ * buttons. The draft roster lives in the player store, so the names they
+ * typed are still there if they come back.
+ */
+const handleBack = () => {
+  showNotification.value = false
+  emit('back')
 }
 </script>
 
@@ -327,7 +338,7 @@ const handleDone = () => {
 
       <!-- Back button -->
       <p class="control">
-        <button @click="handleBack" class="button is-light">Back</button>
+        <button @click="handleBack" class="button is-danger">Back</button>
       </p>
     </div>
   </div>

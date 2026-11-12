@@ -66,6 +66,11 @@ function handlePlayerSelectDone(players) {
   activePane.value = 'playerConfirm'
 }
 
+// Handle going back from player select to the New Game / Load Game buttons
+function handlePlayerSelectBack() {
+  activePane.value = 'gameButtons'
+}
+
 // Handle going back from confirmation to player select
 function handleGoBack() {
   activePane.value = 'playerSelect'
@@ -99,7 +104,11 @@ function handleConfirmed() {
 
         <!-- Add player form -->
         <keep-alive>
-          <PlayerSelect v-if="activePane === 'playerSelect'" @done="handlePlayerSelectDone" />
+          <PlayerSelect
+            v-if="activePane === 'playerSelect'"
+            @done="handlePlayerSelectDone"
+            @back="handlePlayerSelectBack"
+          />
         </keep-alive>
 
         <!-- Player confirmation -->

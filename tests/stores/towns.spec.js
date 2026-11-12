@@ -117,6 +117,22 @@ describe('Towns Store', () => {
     })
   })
 
+  describe('industryCodes', () => {
+    it("should give each commodity's code by name, from the towns that make it", () => {
+      townsStore.setTowns([
+        { name: 'Alpha', industries: [{ name: 'Steel', industry: 3311 }] },
+        { name: 'Beta', industries: [{ name: 'Wheat', industry: 1111 }] },
+        { name: 'Gamma', industries: [{ name: 'Steel', industry: 3311 }] }
+      ])
+
+      expect(Object.fromEntries(townsStore.industryCodes)).toEqual({ Steel: 3311, Wheat: 1111 })
+    })
+
+    it('should know no commodity with no towns', () => {
+      expect(townsStore.industryCodes.size).toBe(0)
+    })
+  })
+
   /** Sets the stubbed lookups up to build one town, Duluth */
   function oneTownToBuild() {
     mockPopulationData.value = [

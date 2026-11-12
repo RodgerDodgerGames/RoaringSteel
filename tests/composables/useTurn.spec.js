@@ -9,6 +9,7 @@
  * - Auto-saving after each turn
  * - Clearing the finishing player's track building allowance
  * - Closing the finished turn into the turn history
+ * - Holding the End turn button until the player has used the turn
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -21,6 +22,7 @@ import { useTrainsStore } from '@/stores/trains'
 import { useDemandCardsStore } from '@/stores/demandCards'
 import { useTrainStopStore } from '@/stores/trainStop'
 import { useHistoryStore } from '@/stores/history'
+import { ref } from 'vue'
 import { gameRules } from '@/config/game'
 
 // autoSave is stubbed so these tests exercise turn logic, not persistence
@@ -381,6 +383,153 @@ describe('useTurn', () => {
 
       expect(trainStopStore.stopTown).toBeNull()
       expect(trainStopStore.notice).toBeNull()
+    })
+  })
+
+  /**
+   * A stand-in for the game view's build-track instance: a line in progress
+   * (or not), which stopping builds — spending `cost` of the allowance — or
+   * leaves the turn open by answering false.
+   */
+  function fakeBuildTrack({ hasLine = false, cost = 0, builtWhole = true } = {}) {
+    const hasLineToBuild = ref(hasLine)
+    return {
+      hasLineToBuild,
+      stopDrawing: vi.fn(() => {
+        if (hasLineToBuild.value && cost) playerStore.spendOnTrack(1, cost)
+        hasLineToBuild.value = false
+        return builtWhole
+      })
+    }
+  }
+
+  describe('canEndTurn', () => {
+    beforeEach(() => seedPlayers(['Alice', 'Bob']))
+
+    it('should be false until the player has done something with the turn', () => {
+      const { canEndTurn } = useTurn()
+
+      expect(canEndTurn.value).toBe(false)
+    })
+
+    it('should be true once the player has built', () => {
+      playerStore.updatePlayer(1, { cash: 5000 })
+      playerStore.spendOnTrack(1, 1000)
+      const { canEndTurn } = useTurn()
+
+      expect(canEndTurn.value).toBe(true)
+    })
+
+    it('should stay true after the building is torn up and refunded', () => {
+      playerStore.updatePlayer(1, { cash: 5000 })
+      playerStore.spendOnTrack(1, 1000)
+      playerStore.refundTrackSpend(1, 1000)
+      const { canEndTurn } = useTurn()
+
+      expect(canEndTurn.value).toBe(true)
+    })
+
+    it('should be true once the player has used their train', () => {
+      useTownsStore().setTowns([
+        { name: 'Alpha', msa: 'A', lat: 0, lon: 0, size: 'small', industries: [] }
+      ])
+      gameStore.setGameState({ turn: 2 })
+      useTrainsStore().placeTrain(1, 'A')
+      const { canEndTurn } = useTurn()
+
+      expect(canEndTurn.value).toBe(true)
+    })
+
+    it('should be true while a line with something to build is being drawn', () => {
+      const { canEndTurn } = useTurn({ buildTrack: fakeBuildTrack({ hasLine: true }) })
+
+      expect(canEndTurn.value).toBe(true)
+    })
+
+    it('should stay false while drawing has only placed the start', () => {
+      const { canEndTurn } = useTurn({ buildTrack: fakeBuildTrack({ hasLine: false }) })
+
+      expect(canEndTurn.value).toBe(false)
+    })
+
+    it('should be false again for the next player, whose turn is fresh', () => {
+      playerStore.updatePlayer(1, { cash: 5000 })
+      playerStore.spendOnTrack(1, 1000)
+      const { canEndTurn, endTurn } = useTurn()
+
+      endTurn()
+
+      expect(playerStore.activePlayer.name).toBe('Bob')
+      expect(canEndTurn.value).toBe(false)
+    })
+
+    it('should be false once the game is over', () => {
+      playerStore.updatePlayer(1, { cash: 5000 })
+      playerStore.spendOnTrack(1, 1000)
+      gameStore.declareWinner(1)
+      const { canEndTurn } = useTurn()
+
+      expect(canEndTurn.value).toBe(false)
+    })
+
+    it('should not stop endTurn itself, which computer players call', () => {
+      const { canEndTurn, endTurn } = useTurn()
+      expect(canEndTurn.value).toBe(false)
+
+      expect(endTurn()).toBe(true)
+
+      expect(playerStore.activePlayer.name).toBe('Bob')
+    })
+  })
+
+  describe('finishTurn', () => {
+    beforeEach(() => {
+      seedPlayers(['Alice', 'Bob'])
+      playerStore.updatePlayer(1, { cash: 5000 })
+    })
+
+    it('should build the line being drawn, then end the turn', () => {
+      const buildTrack = fakeBuildTrack({ hasLine: true, cost: 1000 })
+      const { finishTurn } = useTurn({ buildTrack })
+
+      expect(finishTurn()).toBe(true)
+
+      expect(buildTrack.stopDrawing).toHaveBeenCalled()
+      expect(playerStore.activePlayer.name).toBe('Bob')
+    })
+
+    it('should keep the turn open when the line could not be built whole', () => {
+      const buildTrack = fakeBuildTrack({ hasLine: true, cost: 1000, builtWhole: false })
+      const { finishTurn } = useTurn({ buildTrack })
+
+      expect(finishTurn()).toBe(false)
+
+      expect(playerStore.activePlayer.name).toBe('Alice')
+    })
+
+    it('should keep the turn open when stopping built nothing and the turn is unused', () => {
+      const { finishTurn } = useTurn({ buildTrack: fakeBuildTrack({ hasLine: true, cost: 0 }) })
+
+      expect(finishTurn()).toBe(false)
+
+      expect(playerStore.activePlayer.name).toBe('Alice')
+    })
+
+    it('should refuse an unused turn with no map at all', () => {
+      const { finishTurn } = useTurn()
+
+      expect(finishTurn()).toBe(false)
+
+      expect(playerStore.activePlayer.name).toBe('Alice')
+    })
+
+    it('should end a used turn', () => {
+      playerStore.spendOnTrack(1, 1000)
+      const { finishTurn } = useTurn({ buildTrack: fakeBuildTrack() })
+
+      expect(finishTurn()).toBe(true)
+
+      expect(playerStore.activePlayer.name).toBe('Bob')
     })
   })
 

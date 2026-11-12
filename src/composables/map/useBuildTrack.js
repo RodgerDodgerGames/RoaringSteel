@@ -73,6 +73,13 @@ export default function useBuildTrack(formatCurrency) {
    */
   const pendingCost = ref(0)
 
+  /**
+   * How many points of the line being drawn are placed. Kept in step by
+   * `repriceLine`, which every change to the line goes through, because
+   * Geoman's working layer is not reactive itself.
+   */
+  const placedPoints = ref(0)
+
   // Where the town markers are, so a vertex placed on one finishes the line
   const townMarkerPositions = ref([])
 
@@ -144,6 +151,15 @@ export default function useBuildTrack(formatCurrency) {
    * where a line may begin (see `debouncedCursorValidation`).
    */
   const isChoosingStart = computed(() => isDrawingActive.value && !isFirstVertexAdded.value)
+
+  /**
+   * True while a line is being drawn that stopping would build: it has its
+   * start and at least one more point. Clicking Build track and placing
+   * only the start leaves nothing to build — stopping just drops it. End
+   * turn reads this (see useTurn's `canEndTurn`), as a line about to be
+   * built is a use of the turn.
+   */
+  const hasLineToBuild = computed(() => isDrawingActive.value && placedPoints.value >= 2)
 
   // ================== TURN HANDLING ==================
 
@@ -955,6 +971,7 @@ export default function useBuildTrack(formatCurrency) {
   function repriceLine(cursorLatLng) {
     const playerId = playerStore.activePlayer?.id
     const placed = workingLayer.value.getLatLngs()
+    placedPoints.value = placed.length
     const without = builder.priceSection(playerId, placed)
     const withLeg = cursorLatLng
       ? builder.priceSection(playerId, [...placed, cursorLatLng])
@@ -1049,6 +1066,7 @@ export default function useBuildTrack(formatCurrency) {
    */
   function resetLineTracking() {
     pendingCost.value = 0
+    placedPoints.value = 0
     buildError.value = ''
     budgetNotice.value = ''
   }
@@ -1295,6 +1313,7 @@ export default function useBuildTrack(formatCurrency) {
     budgetNotice,
     dismissBudgetNotice,
     isDrawingActive,
+    hasLineToBuild,
     isRemoving,
     startDrawingLine,
     toggleRemoveMode,

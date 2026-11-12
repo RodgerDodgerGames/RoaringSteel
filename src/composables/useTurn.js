@@ -14,6 +14,11 @@
  * cards for a new one (`discardHand`), as long as they have not yet done
  * anything else with the turn.
  *
+ * A person cannot end a turn they have done nothing with (`canEndTurn`): they
+ * move or build first, or throw in their hand. Computer players are not held
+ * to it — they end their turns through `endTurn` directly, and one with
+ * nothing worth doing must still pass play on rather than stall the game.
+ *
  * Who plays next follows the switchback start (see turnOrder.js): the two
  * opening building rounds run first-to-last and then back, and every round
  * after runs first-to-last. The game turn counter advances when a round
@@ -33,7 +38,15 @@ import { useVictory } from '@/composables/victory'
 import { useGamePersistence } from '@/composables/useGamePersistence'
 import { turnAfter } from '@/composables/turnOrder'
 
-export function useTurn() {
+/**
+ * @param {Object} [options]
+ * @param {Object} [options.buildTrack] - The game view's build-track
+ *   instance (see useBuildTrack), for a caller that ends a person's turn:
+ *   its line in progress counts as a use of the turn and is built before
+ *   the turn ends (see `canEndTurn` and `finishTurn`). Left out by computer
+ *   players and anything else that has no map.
+ */
+export function useTurn({ buildTrack = null } = {}) {
   const gameStore = useGameStore()
   const playerStore = usePlayerStore()
   const trainsStore = useTrainsStore()
@@ -125,15 +138,74 @@ export function useTurn() {
   }
 
   /**
-   * Whether the active player may throw in their hand: only as the whole of
-   * their turn, so not once they have placed or run their train, loaded or
-   * delivered anything, or spent any of the turn's allowance.
+   * Whether there is a turn to play at all: someone holds it and the game
+   * is not over. Both ways of spending a turn (ending it, throwing in the
+   * hand) need this.
    */
-  const canDiscardHand = computed(() => {
+  const canPlayTurn = computed(
+    () => playerStore.hasPlayers && !!playerStore.activePlayer && !gameStore.isOver
+  )
+
+  /**
+   * Whether the active player has done anything with their turn yet: placed
+   * or run their train, loaded, delivered or dropped anything (the train's
+   * `hasActed`), or spent any of the turn's allowance on track or an upgrade.
+   * Spending counts even if torn-up track has since refunded it — the turn
+   * was used. False with nobody holding the turn.
+   *
+   * Throwing in the hand needs this to be false; ending the turn needs it
+   * true.
+   */
+  const hasUsedTurn = computed(() => {
     const id = playerStore.activePlayer?.id
-    if (id === undefined || gameStore.isOver) return false
-    return !trainsStore.trainOf(id).hasActed && !playerStore.hasSpentThisTurn(id)
+    if (id === undefined) return false
+    return trainsStore.trainOf(id).hasActed || playerStore.hasSpentThisTurn(id)
   })
+
+  /**
+   * Whether the active player may throw in their hand: only as the whole of
+   * their turn, so not once they have used it (see `hasUsedTurn`).
+   */
+  const canDiscardHand = computed(() => canPlayTurn.value && !hasUsedTurn.value)
+
+  /**
+   * Whether a person may end the turn (the End turn button): only once they
+   * have used it (see `hasUsedTurn`), so a turn is not passed by an idle
+   * click. The other way to spend a turn, throwing in the hand, ends it by
+   * itself.
+   *
+   * A line being drawn with something to build counts too (the build
+   * track's `hasLineToBuild`): ending the turn builds it first (see
+   * `finishTurn`), which is a use of the turn.
+   *
+   * Not checked by `endTurn`, which computer players call directly.
+   */
+  const canEndTurn = computed(
+    () => canPlayTurn.value && (hasUsedTurn.value || !!buildTrack?.hasLineToBuild.value)
+  )
+
+  /**
+   * Ends a person's turn, from the End turn button.
+   *
+   * A line still being drawn is built first, as far as it can be, as Stop
+   * building would. It has to be built before the turn ends, while the turn
+   * is still the drawing player's; after, it would be thrown away. If it
+   * could not be built whole, the turn stays open: the notice saying why
+   * would otherwise be cleared as the turn passed, and the player would
+   * never learn part of their line is missing. They end the turn again once
+   * they have read it.
+   *
+   * Then the turn ends only if it has been used (see `canEndTurn`), checked
+   * after the line is built: a line Geoman drops instead of building leaves
+   * the turn as unused as it was.
+   *
+   * @returns {boolean} True if the turn ended
+   */
+  function finishTurn() {
+    if (buildTrack?.stopDrawing() === false) return false
+    if (!canEndTurn.value) return false
+    return endTurn()
+  }
 
   /**
    * Throws in the active player's hand of demand cards for a new one, and
@@ -149,5 +221,13 @@ export function useTurn() {
     return endTurn()
   }
 
-  return { nextPlayer, playsAgain, endTurn, canDiscardHand, discardHand }
+  return {
+    nextPlayer,
+    playsAgain,
+    endTurn,
+    canEndTurn,
+    finishTurn,
+    canDiscardHand,
+    discardHand
+  }
 }

@@ -130,7 +130,9 @@ function handleConfirmed() {
 }
 .roaring-title {
   font-family: var(--font-welcome-title);
-  font-size: 4rem;
+  font-size: 5rem;
+  color: transparent;
+  -webkit-text-stroke: hsl(41, 55%, 88%) 0.4px;
 }
 /* The night-sky picture is dark in light and dark mode alike, so the
    title and subtitle are always timetable paper */

@@ -187,7 +187,7 @@ const handleDone = () => {
 </script>
 
 <template>
-  <div class="welcome-modal-container container has-background-info-dark p-5 mt-4">
+  <div class="welcome-modal-container container has-text-grey-lighter p-5 mt-4">
     <h3 class="is-size-3 mb-2">Who is playing?</h3>
 
     <!-- Notification -->
@@ -202,7 +202,7 @@ const handleDone = () => {
         <!-- Player Name and Color Picker Row -->
         <div class="field">
           <div class="field is-grouped is-flex is-align-items-center">
-            <label class="label">Player {{ index + 1 }}</label>
+            <label class="label has-text-grey-lighter">Player {{ index + 1 }}</label>
             <!-- Player Name Input -->
             <div class="control is-expanded">
               <input
@@ -261,7 +261,9 @@ const handleDone = () => {
     </div>
 
     <!-- Computer players -->
-    <div class="field is-grouped is-align-items-center is-justify-content-center bot-count">
+    <div
+      class="field is-grouped is-align-items-center is-justify-content-center bot-count has-text-grey-lighter"
+    >
       <label class="label mb-0 mr-3" for="bot-count">
         <span class="icon"><i class="fas fa-robot" aria-hidden="true"></i></span>
         Computer players
@@ -322,6 +324,11 @@ const handleDone = () => {
       <p class="control">
         <button @click="handleDone" class="button is-info">Done</button>
       </p>
+
+      <!-- Back button -->
+      <p class="control">
+        <button @click="handleBack" class="button is-light">Back</button>
+      </p>
     </div>
   </div>
 </template>
@@ -373,5 +380,10 @@ const handleDone = () => {
     #fff calc(50% + 2px),
     transparent calc(50% + 2px)
   );
+}
+/* make welcome modal container's background opaque */
+.welcome-modal-container {
+  /* hex code for steel-blue (bulma info): 4a6f86 */
+  background-color: rgba(74, 111, 134, 0.15);
 }
 </style>

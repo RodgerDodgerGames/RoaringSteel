@@ -16,7 +16,7 @@ const isDialogOpen = ref(false)
 </script>
 
 <template>
-  <button class="button" @click="isDialogOpen = true">
+  <button class="button" @click="isDialogOpen = true" v-bind="$attrs">
     <span class="icon"><i class="fas fa-circle-info" aria-hidden="true"></i></span>
     <span>About</span>
   </button>

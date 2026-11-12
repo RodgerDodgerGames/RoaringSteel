@@ -21,6 +21,7 @@ import { ref } from 'vue'
 import PlayerSelect from '@/components/setup/PlayerSelect.vue'
 import PlayerConfirm from '@/components/setup/PlayerConfirm.vue'
 import LoadGameDialog from '@/components/dialogs/LoadGameDialog.vue'
+import AboutButton from '@/components/AboutButton.vue'
 import { debug } from '@/composables/debug'
 
 const props = defineProps({
@@ -89,7 +90,7 @@ function handleConfirmed() {
     <div class="hero-body">
       <div id="welcomeContainer" class="container has-text-centered">
         <h1 class="title roaring-title">Welcome to Roaring Steel</h1>
-        <h2 class="subtitle is-3 roaring-subtitle">Your adventure begins here</h2>
+        <h2 class="subtitle is-3 mb-6 roaring-subtitle">Your adventure begins here</h2>
 
         <!-- conditionally show user interactioncontent here -->
 
@@ -99,7 +100,9 @@ function handleConfirmed() {
           class="buttons are-large mt-6 is-flex is-justify-content-center"
         >
           <button class="button is-info is-outlined mr-6" @click="newGame">New Game</button>
-          <button class="button is-link is-outlined" @click="loadGame">Load Game</button>
+          <button class="button is-link is-outlined mr-6" @click="loadGame">Load Game</button>
+          <!-- About button: what the game is, and its credits -->
+          <AboutButton class="is-outlined is-light" />
         </div>
 
         <!-- Add player form -->
@@ -145,7 +148,6 @@ function handleConfirmed() {
 }
 /* The night-sky picture is dark in light and dark mode alike, so the
    title and subtitle are always timetable paper */
-.roaring-title,
 .roaring-subtitle {
   color: var(--timetable-paper);
 }

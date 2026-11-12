@@ -44,11 +44,12 @@ $timetable-accent: #e8d19f; // a shade deeper than the paper, for light buttons
   // set here to the timetable paper's. Section 4 sets how light each is.
   $scheme-h: 41,
   $scheme-s: 55%,
-  // Override Bulma's fonts. Oswald is both the "secondary" and the sans
-  // serif font, so `is-family-secondary` and `is-family-sans-serif` match.
+  // Override Bulma's fonts. Barlow Semi Condensed, the label font, is both
+  // the "secondary" and the sans serif font, so `is-family-secondary` and
+  // `is-family-sans-serif` match.
   $family-primary: '"Averia Serif Libre", serif',
-  $family-secondary: '"Asul", sans-serif',
-  $family-sans-serif: '"Asul", sans-serif',
+  $family-secondary: '"Barlow Semi Condensed", sans-serif',
+  $family-sans-serif: '"Barlow Semi Condensed", sans-serif',
   // Override font sizes
   $size-1: 3.25rem,
   $size-2: 2.5rem,
@@ -163,10 +164,17 @@ $timetable-accent: #e8d19f; // a shade deeper than the paper, for light buttons
 // From Google Fonts:
 // - Averia Serif Libre: the body text and the side panel (Bulma's
 //   $family-primary, section 2)
-// - Oswald: labels and buttons
+// - Barlow Semi Condensed: labels and buttons
+// - Oswald: not in use; kept for its is-family-oswald class below
 // - Rye: the game's name in the top bar
 // - Libre Baskerville: town names on the map, in capitals
-@import url('https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Libre+Baskerville:wght@400;700&family=Oswald:wght@400..700&family=Rye&family=Asul:wght@400..700&display=swap');
+//
+// How each font's weights are asked for depends on the font. A variable
+// font, such as Oswald, takes a range (`wght@400..700`). A static font takes
+// a list of the weights it has (`wght@400;500;600;700`): asked for a range,
+// Google leaves a static font out of the stylesheet without any error, and
+// the text falls back to the browser's default font.
+@import url('https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Libre+Baskerville:wght@400;700&family=Oswald:wght@400..700&family=Rye&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap');
 
 // From 1001 Fonts, downloaded into ./fonts (each folder keeps its license).
 // They're loaded so any font slot below, or an is-family-* class, can use
@@ -197,7 +205,7 @@ $timetable-accent: #e8d19f; // a shade deeper than the paper, for light buttons
   // Town names on the map
   --font-town-name: 'Libre Baskerville', serif;
   // Buttons and small capitals labels
-  --font-label: 'Asul', sans-serif;
+  --font-label: 'Barlow Semi Condensed', sans-serif;
 }
 
 // One class per font, to try a font on any element straight from the
@@ -209,6 +217,10 @@ $timetable-accent: #e8d19f; // a shade deeper than the paper, for light buttons
 
 .is-family-oswald {
   font-family: 'Oswald', sans-serif !important;
+}
+
+.is-family-barlow {
+  font-family: 'Barlow Semi Condensed', sans-serif !important;
 }
 
 .is-family-rye {
@@ -231,8 +243,9 @@ $timetable-accent: #e8d19f; // a shade deeper than the paper, for light buttons
 /// 6. Shared Custom Styles
 /////////////////////////////////////////////////////////////
 
-// Every button is set in the label font. Oswald is narrow and tall, so a
-// touch of letter spacing keeps short words like "Plan" from looking cramped.
+// Every button is set in the label font. Barlow Semi Condensed is narrow, so
+// a touch of letter spacing keeps short words like "Plan" from looking
+// cramped.
 .button {
   font-family: var(--font-label);
   letter-spacing: 0.03em;

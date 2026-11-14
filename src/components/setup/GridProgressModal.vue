@@ -4,6 +4,11 @@
   Modal overlay shown during grid generation.
 
   While the fetch is running it reports the current phase and a progress bar.
+  The bar fills as a percentage of the step running: the industries fetched
+  or the towns placed (see the towns store's setupPercent), then the terrain
+  downloads (the grid store's progressPercent). Each counted step starts the
+  bar again from 0. A step with nothing to count shows the bar sliding, with
+  no percentage.
   If setup fails — the towns or the grid — it swaps to that store's error
   message with a retry, so a failed setup explains itself instead of leaving a
   stalled bar on screen.
@@ -17,8 +22,7 @@
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useGridStore } from '@/stores/grid'
-import { useTownsStore, SETUP_STEPS } from '@/stores/towns'
-import { useIndustryStore } from '@/stores/industry'
+import { useTownsStore } from '@/stores/towns'
 
 defineProps({
   isActive: {
@@ -30,14 +34,12 @@ defineProps({
 defineEmits(['retry', 'cancel'])
 
 const gridStore = useGridStore()
-const { currentPhase, progressPercent, elevationProgress, landCoverProgress } =
-  storeToRefs(gridStore)
+const { currentPhase, progressPercent } = storeToRefs(gridStore)
 const {
   error: townsError,
-  setupStep: townsStep,
-  setupMessage: townsMessage
+  setupMessage: townsMessage,
+  setupPercent: townsPercent
 } = storeToRefs(useTownsStore())
-const { progress: industryProgress } = storeToRefs(useIndustryStore())
 
 // Towns are set up first, so at most one of the two has failed
 const error = computed(() => townsError.value || gridStore.error)
@@ -53,43 +55,26 @@ const phaseLabel = computed(() => {
     case 'calculating':
       return 'Calculating terrain costs…'
     default:
-      return townsStepLabel.value
+      // What the town setup is doing; between steps, a general word
+      return townsMessage.value || 'Preparing game…'
   }
 })
 
 /**
- * What the town setup is doing, before the grid starts: the towns store's
- * message, with a count of the industries while the jobs data comes in (the
- * industry store counts them; none are counted when they come from the
- * cache). Between steps, a general word.
+ * How full the bar is: the grid's percentage once it has a phase, the town
+ * setup's before that. Null while the step has nothing to count — the
+ * grid's 'initializing' among them, which works out the downloads before
+ * there is anything to count them against.
  */
-const townsStepLabel = computed(() => {
-  const message = townsMessage.value
-  if (!message) return 'Preparing game…'
-  const { done, total } = industryProgress.value
-  // "Fetching jobs by industry in Maine…" becomes "… in Maine (3 of 13)…"
-  if (townsStep.value === SETUP_STEPS.industry && total > 0) {
-    return message.replace(/…$/, ` (${done} of ${total})…`)
-  }
-  return message
+const percent = computed(() => {
+  if (currentPhase.value === 'initializing') return null
+  return currentPhase.value ? progressPercent.value : townsPercent.value
 })
 
-// Town and demand card setup runs before the grid store reports any phase.
-// There is no download count to show yet, so the bar runs indeterminate
-// rather than sitting at a misleading 0%.
-const isIndeterminate = computed(() => currentPhase.value === '')
-
-// Terrain comes down as images: elevation as map tiles, land cover as larger
-// pictures of the land cover map
-const progressDetail = computed(() => {
-  if (currentPhase.value === 'elevation') {
-    return `${elevationProgress.value.completed} / ${elevationProgress.value.total} tiles`
-  }
-  if (currentPhase.value === 'landcover') {
-    return `${landCoverProgress.value.completed} / ${landCoverProgress.value.total} images`
-  }
-  return ''
-})
+// A step with nothing to count (looking up the data window, a cached fetch,
+// assigning industries, setting up the grid) runs the bar indeterminate
+// rather than sitting at a misleading 0%
+const isIndeterminate = computed(() => percent.value === null)
 </script>
 
 <template>
@@ -112,14 +97,13 @@ const progressDetail = computed(() => {
 
         <progress
           class="progress is-warning is-medium"
-          :value="isIndeterminate ? undefined : progressPercent"
+          :value="isIndeterminate ? undefined : percent"
           max="100"
         >
-          {{ progressPercent }}%
+          <template v-if="!isIndeterminate">{{ percent }}%</template>
         </progress>
 
-        <p v-if="!isIndeterminate" class="has-text-grey">{{ progressPercent }}% complete</p>
-        <p v-if="progressDetail" class="has-text-grey-light is-size-7">{{ progressDetail }}</p>
+        <p v-if="!isIndeterminate" class="has-text-grey">{{ percent }}% complete</p>
       </div>
     </div>
   </div>

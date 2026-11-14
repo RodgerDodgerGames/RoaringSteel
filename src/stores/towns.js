@@ -56,10 +56,25 @@ import { debug } from '@/composables/debug'
 export const SETUP_STEPS = Object.freeze({
   dataWindow: 'dataWindow',
   industry: 'industry',
+  // Jobs by county, for the towns QWI has no numbers for as areas: a step
+  // of its own, as it has no count to show (see `setupPercent`)
+  counties: 'counties',
   population: 'population',
   placing: 'placing',
   assigning: 'assigning'
 })
+
+/**
+ * How far a counted step has got, as a whole percentage for the setup
+ * screen. Rounded down, so only a finished step shows 100 (as the grid's
+ * progress does — see the grid store's `progressPercent`).
+ * @param {{done: number, total: number}} count - Done so far, out of how many
+ * @returns {number|null} 0–100, or null when there is nothing to count
+ */
+export function percentOf({ done, total }) {
+  if (!(total > 0)) return null
+  return Math.min(100, Math.floor((done / total) * 100))
+}
 
 /** Shown when no town on the board could be found */
 const NO_TOWNS_ON_BOARD_MESSAGE = 'None of the towns found are on this board.'
@@ -162,9 +177,26 @@ export const useTownsStore = defineStore('towns', () => {
 
   /**
    * What the setup screen says the town setup is doing, such as "Placing
-   * towns (3 of 12)…"; empty when it is doing nothing
+   * towns in Maine…"; empty when it is doing nothing
    */
   const setupMessage = ref('')
+
+  /** How many towns have been placed so far, out of how many to place */
+  const placingCount = ref({ done: 0, total: 0 })
+
+  /**
+   * How far the step running has got, as a percentage, for the setup
+   * screen's bar: the industries fetched while jobs by industry come in
+   * (the industry store counts them), or the towns placed while they are
+   * placed. Null for a step with nothing to count, which the screen shows
+   * as a bar with no fill level — so is jobs by industry coming from the
+   * cache, which fetches nothing.
+   */
+  const setupPercent = computed(() => {
+    if (setupStep.value === SETUP_STEPS.industry) return percentOf(industryStore.progress)
+    if (setupStep.value === SETUP_STEPS.placing) return percentOf(placingCount.value)
+    return null
+  })
 
   /**
    * Moves the setup on to a step, with what the setup screen says for it.
@@ -322,11 +354,10 @@ export const useTownsStore = defineStore('towns', () => {
     const sites = []
     // Whether any town was left out because its lookup failed
     let missedTowns = false
+    setStep(SETUP_STEPS.placing, `Placing towns${where}…`)
     for (const [index, popData] of populationData.value.entries()) {
-      setStep(
-        SETUP_STEPS.placing,
-        `Placing towns${where} (${index + 1} of ${populationData.value.length})…`
-      )
+      // Counted before the lookup: `index` towns are placed so far
+      placingCount.value = { done: index, total: populationData.value.length }
       const msaCode = popData.msa_code
 
       let place
@@ -408,7 +439,7 @@ export const useTownsStore = defineStore('towns', () => {
   async function fillAreas(state, window, sites, where) {
     const msaCodes = sites.map(({ msa }) => msa)
     if (industryStore.areasToFill(msaCodes).length === 0) return
-    setStep(SETUP_STEPS.industry, `Fetching jobs by county${where}…`)
+    setStep(SETUP_STEPS.counties, `Fetching jobs by county${where}…`)
     if (!(await industryStore.fillAreas(state, window, msaCodes))) {
       console.warn(`Some towns in state ${state} have no jobs data this game`)
     }
@@ -609,6 +640,7 @@ export const useTownsStore = defineStore('towns', () => {
     isLoadingPopulation.value = false
     isLoadingCoordinates.value = false
     setStep('')
+    placingCount.value = { done: 0, total: 0 }
   }
 
   /**
@@ -631,6 +663,7 @@ export const useTownsStore = defineStore('towns', () => {
     isLoadingCoordinates,
     setupStep,
     setupMessage,
+    setupPercent,
     setupTowns,
     clearError,
     reset,

@@ -150,6 +150,9 @@ export const useIndustryStore = defineStore('qwiStore', () => {
     employmentData.value = []
     totalJobs.value = {}
     checkedAreas.value = []
+    // Nothing fetched yet: a state whose data comes from the cache fetches
+    // nothing, and must not show the last state's finished count
+    progress.value = { done: 0, total: 0 }
 
     // load the industry data from the CSV file
     isLoadingCSV.value = true

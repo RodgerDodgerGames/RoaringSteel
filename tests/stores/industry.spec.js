@@ -165,6 +165,18 @@ describe('Industry Store', () => {
       expect(mockUseQWI).not.toHaveBeenCalled()
     })
 
+    // A board of several states: one state fetched, the next from the cache.
+    // The setup screen must not show the first state's finished count.
+    it('should count nothing fetched when the data comes from the cache', async () => {
+      await cacheFrom({ start: 2021, end: 2025 })
+      mockFetch.mockResolvedValue(GRAIN)
+      industryStore.progress = { done: 13, total: 13 }
+
+      await industryStore.useIndustryData('27', WINDOW)
+
+      expect(industryStore.progress).toEqual({ done: 0, total: 0 })
+    })
+
     it("should take the industries' labels from the file, not the cache", async () => {
       await cacheFrom({ start: 2021, end: 2025 })
       mockFetch.mockResolvedValue(industriesFile([[111, 'Wheat', 'Farm']]))

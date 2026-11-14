@@ -39,7 +39,7 @@ vi.mock('@/composables/setup/useTigerWeb', () => ({
   findPrincipalCity: mockFindPrincipalCity
 }))
 
-import { useTownsStore, mergeSites } from '@/stores/towns'
+import { useTownsStore, mergeSites, percentOf, SETUP_STEPS } from '@/stores/towns'
 import { useIndustryStore } from '@/stores/industry'
 import { RequestError } from '@/composables/utils'
 import { readCache, writeCache } from '@/composables/database'
@@ -130,6 +130,74 @@ describe('Towns Store', () => {
 
     it('should know no commodity with no towns', () => {
       expect(townsStore.industryCodes.size).toBe(0)
+    })
+  })
+
+  describe('percentOf', () => {
+    it('should give the share done as a whole percentage, rounded down', () => {
+      expect(percentOf({ done: 1, total: 3 })).toBe(33)
+      expect(percentOf({ done: 2, total: 3 })).toBe(66)
+    })
+
+    it('should show 100 only when the step is finished', () => {
+      expect(percentOf({ done: 397, total: 399 })).toBe(99)
+      expect(percentOf({ done: 399, total: 399 })).toBe(100)
+    })
+
+    it('should give null when there is nothing to count', () => {
+      expect(percentOf({ done: 0, total: 0 })).toBeNull()
+    })
+  })
+
+  describe('setupPercent', () => {
+    it('should be null with no setup running', () => {
+      expect(townsStore.setupPercent).toBeNull()
+    })
+
+    it('should follow the industries fetched while jobs by industry come in', async () => {
+      oneTownToBuild()
+      let seen
+      industryStore.useIndustryData = vi.fn(async () => {
+        industryStore.progress = { done: 3, total: 12 }
+        seen = { step: townsStore.setupStep, percent: townsStore.setupPercent }
+      })
+
+      await townsStore.setupTowns('27')
+
+      expect(seen).toEqual({ step: SETUP_STEPS.industry, percent: 25 })
+    })
+
+    it('should be null for jobs by county, which has no count', async () => {
+      oneTownToBuild()
+      industryStore.progress = { done: 12, total: 12 }
+      let seen
+      industryStore.fillAreas = vi.fn(async () => {
+        seen = { step: townsStore.setupStep, percent: townsStore.setupPercent }
+        return true
+      })
+
+      await townsStore.setupTowns('27')
+
+      expect(seen).toEqual({ step: SETUP_STEPS.counties, percent: null })
+    })
+
+    it('should follow the towns placed while they are placed', async () => {
+      mockPopulationData.value = [
+        { msa_code: '20260', name: 'Duluth, MN-WI', population: '280000', state_code: '27' },
+        { msa_code: '33460', name: 'Minneapolis, MN-WI', population: '3600000', state_code: '27' },
+        { msa_code: '40340', name: 'Rochester, MN', population: '220000', state_code: '27' },
+        { msa_code: '41060', name: 'St. Cloud, MN', population: '200000', state_code: '27' }
+      ]
+      const seen = []
+      mockGetMSALatLon.mockImplementation(async () => {
+        seen.push(townsStore.setupPercent)
+        return { centroidLongitude: '-93.2650', centroidLatitude: '44.9778' }
+      })
+
+      await townsStore.setupTowns('27')
+
+      expect(seen).toEqual([0, 25, 50, 75])
+      expect(townsStore.setupMessage).toBe('')
     })
   })
 

@@ -96,11 +96,11 @@ function pinColorsOf(card) {
       <div class="demand-strip__actions">
         <button
           v-if="canThrowInHand"
-          class="button is-small is-primary is-outlined"
+          class="button is-small is-primary is-outlined mr-6"
           title="Instead of taking a turn, swap all your demand cards for three new ones. This ends your turn."
           @click="confirmDiscardHand"
         >
-          Throw in hand
+          Discard Hand
         </button>
 
         <div class="buttons are-small has-addons mb-0" role="group" aria-label="Show the hand of">

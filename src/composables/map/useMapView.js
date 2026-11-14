@@ -14,6 +14,9 @@
  *   to whole levels again, so tiles stay sharp. Every move is recorded in
  *   the map store, which saves it with the game.
  *
+ * While the Plan view is showing, the map's container carries the class
+ * `is-plan-view`, for styles that differ between the views.
+ *
  * The town commodity icons shown in the Plan view are drawn by useTowns.
  *
  * @module composables/map/useMapView
@@ -49,6 +52,14 @@ const MOVE_HANDLERS = [
   'boxZoom',
   'keyboard'
 ]
+
+/**
+ * The class on the map's container while the Plan view is showing, so the
+ * stylesheets can draw things differently there (`.is-plan-view
+ * .town-tooltip` for the town names, say). The Build view is the map
+ * without it.
+ */
+const PLAN_VIEW_CLASS = 'is-plan-view'
 
 /**
  * @returns {Object} { attach, refit }: `attach` hands over the Leaflet map once
@@ -87,9 +98,19 @@ export function useMapView() {
    * is reset before the save's contents go back in): the map is left where it
    * is rather than sent somewhere arbitrary, and is put into the view when
    * the region comes back.
+   *
+   * The view's class goes on the container first, and even without a
+   * region, so it always matches the view the store holds. It has to be in
+   * place before anything lays the map out for the new view: the Plan view
+   * measures the town names as they are drawn to place them (see useTowns),
+   * so a style that changes the names' size must already apply by then.
+   * This runs synchronously on the change (see the watcher below), ahead of
+   * useTowns' own watcher, and `attach` runs before the towns are added.
    */
   function showView() {
-    if (!map || !bounds.value) return
+    if (!map) return
+    map.getContainer().classList.toggle(PLAN_VIEW_CLASS, mapStore.viewMode === PLAN_VIEW)
+    if (!bounds.value) return
     if (mapStore.viewMode === PLAN_VIEW) showPlan()
     else if (mapStore.viewMode === BUILD_VIEW) showBuild()
   }

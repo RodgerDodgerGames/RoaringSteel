@@ -128,6 +128,19 @@ describe('useMapView', () => {
       expect(map.getBounds().contains(coloradoBounds)).toBe(true)
     })
 
+    it('should mark the map as in the Plan view, for its styles', () => {
+      expect(container.classList.contains('is-plan-view')).toBe(true)
+    })
+
+    it('should be marked as soon as the view switches back, before the towns redraw', () => {
+      // No await: the towns lay their names out for the new view on the
+      // change's own tick, so the mark has to be there already
+      mapStore.setViewMode(BUILD_VIEW)
+      mapStore.setViewMode(PLAN_VIEW)
+
+      expect(container.classList.contains('is-plan-view')).toBe(true)
+    })
+
     it('should not record its fitting as where the Build view was', () => {
       mapView.refit()
 
@@ -150,6 +163,10 @@ describe('useMapView', () => {
       expect(map.getZoom()).toBeGreaterThan(planZoom)
       expect(map.getCenter().lat).toBeCloseTo(39, 5)
       expect(map.getCenter().lng).toBeCloseTo(-105.5, 5)
+    })
+
+    it('should not be marked as the Plan view', () => {
+      expect(container.classList.contains('is-plan-view')).toBe(false)
     })
 
     it('should let the player drag and zoom the map', () => {

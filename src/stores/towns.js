@@ -35,7 +35,7 @@
  * @module stores/towns
  */
 
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useIndustryStore } from './industry'
 import useCensus from '../composables/setup/useCensus'
@@ -117,6 +117,23 @@ export const useTownsStore = defineStore('towns', () => {
 
   // STATE
   const towns = ref([])
+
+  // GETTERS
+
+  /**
+   * Each commodity's industry code (its NAICS code, or Tourism's), by name,
+   * from the towns that make it. Demands and loads name their commodity
+   * only, and its icon is looked up by code (see commodityIcons.js). Every
+   * commodity on a demand card is made somewhere on the board, so it is
+   * here.
+   */
+  const industryCodes = computed(() => {
+    const codes = new Map()
+    towns.value.forEach((town) =>
+      town.industries.forEach(({ name, industry }) => codes.set(name, industry))
+    )
+    return codes
+  })
 
   /**
    * The years this game's data comes from, {start, end, middle}, once setup
@@ -606,6 +623,7 @@ export const useTownsStore = defineStore('towns', () => {
 
   return {
     towns,
+    industryCodes,
     dataWindow,
     error,
     isLoadingIndustry,

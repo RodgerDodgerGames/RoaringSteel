@@ -77,18 +77,6 @@ export const useTrainStopStore = defineStore('trainStop', () => {
     return trainsStore.townOf(player.id)
   })
 
-  /**
-   * Each commodity's industry code (its NAICS code, or Tourism's), by name,
-   * from the towns that make it: what its icon is looked up by.
-   */
-  const industryCodes = computed(() => {
-    const codes = new Map()
-    townsStore.towns.forEach((town) =>
-      town.industries.forEach(({ name, industry }) => codes.set(name, industry))
-    )
-    return codes
-  })
-
   /** The train's loads, and how many it can carry */
   const cargo = computed(() => ({
     loads: trainsStore.trainOf(playerId.value).loads,
@@ -107,7 +95,7 @@ export const useTrainStopStore = defineStore('trainStop', () => {
     const demands = demandCardsStore.handOf(playerId.value).flatMap((card) => card.demands)
     return trainsStore.pickupOptions(playerId.value).map((option) => ({
       ...option,
-      code: industryCodes.value.get(option.industry),
+      code: townsStore.industryCodes.get(option.industry),
       wantedIn: demands
         .filter((demand) => demand.industry === option.industry)
         .map(({ destination, payoff }) => ({ destination, payoff }))
@@ -122,9 +110,10 @@ export const useTrainStopStore = defineStore('trainStop', () => {
    */
   const deliveries = computed(() =>
     loadingTown.value
-      ? trainsStore
-          .deliveryOptions(playerId.value)
-          .map((option) => ({ ...option, code: industryCodes.value.get(option.demand.industry) }))
+      ? trainsStore.deliveryOptions(playerId.value).map((option) => ({
+          ...option,
+          code: townsStore.industryCodes.get(option.demand.industry)
+        }))
       : []
   )
 

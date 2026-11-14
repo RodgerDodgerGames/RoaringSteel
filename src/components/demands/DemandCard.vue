@@ -11,9 +11,11 @@
   long one on a narrow card is cut short, so the payoff never is). The commodity
   takes whatever width is left, and is cut short (mid-word, with an ellipsis)
   only when it runs out of room, never to fewer than 15 characters; its full
-  name shows on hover. As the window narrows, the card first shortens the
-  payoff ($20.3k for $20,300), then moves the commodity onto a line of its own
-  under the town, where it has the card's whole width.
+  name shows on hover. The commodity's icon, the one the map shows round the
+  towns that make it, goes before its name. As the window narrows, the card
+  first shortens the payoff ($20.3k for $20,300), then moves the commodity
+  (icon and all) onto a line of its own under the town, where it has the
+  card's whole width.
 
   In the hand of the player whose turn it is, each line is a button: pointing
   at it marks its towns on the map, and clicking it pins it there in its own
@@ -34,6 +36,10 @@
 
 <script setup>
 import { formatCurrency, formatShortCurrency } from '@/composables/utils'
+import { commodityIconUrl } from '@/composables/map/commodityIcons'
+import { useTownsStore } from '@/stores/towns'
+
+const townsStore = useTownsStore()
 
 defineProps({
   demands: {
@@ -98,7 +104,15 @@ function lineEvents(index) {
           <span class="demand-card__destination" :title="demand.destination">
             {{ demand.destination }}
           </span>
-          <span class="demand-card__commodity" :title="demand.industry">{{ demand.industry }}</span>
+          <span class="demand-card__commodity" :title="demand.industry">
+            <img
+              class="demand-card__icon"
+              :src="commodityIconUrl(townsStore.industryCodes.get(demand.industry))"
+              alt=""
+              draggable="false"
+            />
+            {{ demand.industry }}
+          </span>
           <span class="demand-card__payoff">
             <span class="demand-card__payoff-full">{{ formatCurrency(demand.payoff) }}</span>
             <span class="demand-card__payoff-short">{{ formatShortCurrency(demand.payoff) }}</span>
@@ -122,13 +136,14 @@ function lineEvents(index) {
 
 /*
   Destination | commodity | payoff. The town and payoff take the width they
-  need; the commodity gets the rest, but never less than 15 characters. If
+  need; the commodity gets the rest, but never less than 15 characters
+  (plus its icon and the space after it, about 1.5em). If
   even that does not fit, the town name gives way rather than the payoff.
   The left edge is kept clear for a pinned line's color.
 */
 .demand-card__row {
   display: grid;
-  grid-template-columns: minmax(0, max-content) minmax(15ch, 1fr) max-content;
+  grid-template-columns: minmax(0, max-content) minmax(calc(15ch + 1.5em), 1fr) max-content;
   align-items: baseline;
   gap: 0.5rem;
   width: 100%;
@@ -180,6 +195,19 @@ li + li .demand-card__row {
   color: var(--bulma-text-weak);
 }
 
+/*
+  Sized to the text and sat on its baseline, so the line keeps its height.
+  The space before the name in the markup is the gap between them. Not
+  draggable, so a click that wobbles still pins the line rather than
+  starting an image drag (as the map's icons — see map.css).
+*/
+.demand-card__icon {
+  width: 1.1em;
+  height: 1.1em;
+  vertical-align: -0.2em;
+  -webkit-user-drag: none;
+}
+
 .demand-card__payoff {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
@@ -202,10 +230,11 @@ li + li .demand-card__row {
 }
 
 /*
-  Narrower still, a long town name, 15 characters of commodity and the
-  payoff no longer fit side by side, so the commodity goes under the town
+  Narrower still, a long town name, 15 characters of commodity with its
+  icon, and the payoff no longer fit side by side, so the commodity goes
+  under the town (the icon's room is why this comes in at 320px, not 300px)
 */
-@container (max-width: 300px) {
+@container (max-width: 320px) {
   .demand-card__row {
     grid-template-columns: minmax(0, 1fr) max-content;
     grid-template-areas:

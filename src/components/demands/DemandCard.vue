@@ -193,12 +193,13 @@ li + li .demand-card__row {
 }
 
 /*
-  Cut mid-word as the room runs out, rather than at the last whole word,
-  but never to fewer than 5 characters: the card wraps (see the bottom of
-  this file) before it would get that short
+  Cut mid-word as the room runs out, rather than at the last whole word.
+  The card wraps (see the bottom of this file) before a name gets cut very
+  short. There is deliberately no minimum width: a name narrower than the
+  minimum would be padded with blank space, pushing its icon further away
+  than on other cards.
 */
 .demand-card__commodity {
-  min-width: 5ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

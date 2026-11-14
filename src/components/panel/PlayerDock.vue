@@ -20,9 +20,11 @@
      shows the order. As the turn moves on to building, step 1 folds down to
      where the train is; the player can unfold it again. Each new turn, and
      each new step, unfolds "This turn" and scrolls the step into sight.
-  4. End Turn, pinned to the bottom so it is always in the same place
-     (throwing in the hand of demand cards instead of a turn is offered on
-     the demand strip, beside the cards — see DemandStrip)
+  4. End Turn, pinned to the bottom so it is always in the same place. It
+     stays disabled until the player has moved or built something (see
+     useTurn's canEndTurn); throwing in the hand of demand cards instead of
+     a turn is offered on the demand strip, beside the cards — see
+     DemandStrip — and ends the turn by itself.
 
   Once someone has won, the steps give way to who won, and a button to see
   the final standings again.
@@ -65,25 +67,11 @@ const gameStore = useGameStore()
 const { turn, isBuildingRound, isOver, winnerId } = storeToRefs(gameStore)
 const playerStore = usePlayerStore()
 const trainsStore = useTrainsStore()
-const { nextPlayer, playsAgain, endTurn } = useTurn()
-
-// The game view's build-track instance (see BuildControls); null with no map
+// The game view's build-track instance (see BuildControls); null with no
+// map. Handed to the turn, which builds a line still being drawn before the
+// turn ends.
 const buildTrack = inject(buildTrackKey, null)
-
-/**
- * End turn: a line still being drawn is built first, as far as it can be,
- * as Stop building would. It has to be built before the turn ends, while
- * the turn is still the drawing player's; after, it would be thrown away.
- *
- * If the line could not be built whole, the turn stays open: the notice
- * saying why would otherwise be cleared as the turn passed, and the player
- * would never learn part of their line is missing. They click End turn
- * again once they have read it.
- */
-function finishTurn() {
-  if (buildTrack?.stopDrawing() === false) return
-  endTurn()
-}
+const { nextPlayer, playsAgain, canEndTurn, finishTurn } = useTurn({ buildTrack })
 
 /** Whether the turn is a computer player's, which plays itself */
 const isBotTurn = computed(() => playerStore.activePlayer?.isBot === true)
@@ -254,7 +242,13 @@ watch(
     </div>
 
     <footer v-if="!isOver && !isBotTurn" class="player-dock__footer">
-      <button class="button is-primary is-medium is-fullwidth" @click="finishTurn">End turn</button>
+      <button
+        class="button is-primary is-medium is-fullwidth"
+        :disabled="!canEndTurn"
+        @click="finishTurn"
+      >
+        End turn
+      </button>
       <p v-if="nextPlayer" class="player-dock__next">
         Next up: {{ nextPlayer.name }}{{ playsAgain ? ' again' : '' }}
       </p>

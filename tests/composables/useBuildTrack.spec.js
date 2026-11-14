@@ -1137,6 +1137,17 @@ describe('useBuildTrack', () => {
       expect(api.isDrawingActive.value).toBe(false)
     })
 
+    it('should have a line to build only once a second point is placed', () => {
+      const { api, workingLayer } = startLineAtTown()
+      expect(api.hasLineToBuild.value).toBe(false)
+
+      place(workingLayer, centerOf(1))
+      expect(api.hasLineToBuild.value).toBe(true)
+
+      api.stopDrawing()
+      expect(api.hasLineToBuild.value).toBe(false)
+    })
+
     it('should build the line drawn so far when switched to the Plan view', () => {
       const { workingLayer } = startLineAtTown()
       place(workingLayer, centerOf(1))

@@ -104,6 +104,8 @@ $timetable-accent: #e8d19f; // a shade deeper than the paper, for light buttons
   // The paper color itself, for text set on a picture or on the map, which
   // look the same in both modes (the welcome title, town-name glows)
   --timetable-paper: #{$timetable-paper};
+  // dark color
+  --coal: #{$coal};
 }
 
 // Dark mode. Bulma already has a dark theme; these lines give it the

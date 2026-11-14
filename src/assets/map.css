@@ -31,7 +31,7 @@
      readable on dark forest and lifts it off any track running under it,
      without the box a solid backing would draw over the terrain. The map
      is the same in light and dark mode, so these colors do not change. */
-  color: var(--timetable-paper);
+  color: #fff;
   /* A blurred shadow alone is too faint round letters this small, so a
      2px paper stroke, painted under the letters (paint-order) so only its
      outer 1px shows, lays a solid rim first; the two blurred shadows then

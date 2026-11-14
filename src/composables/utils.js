@@ -287,8 +287,8 @@ const shortCurrencyFormat = new Intl.NumberFormat('en-US', {
  * "$20.3k" for 20,300, "$8k" for 8,000, "$1.3M" for 1,250,000. An amount
  * under a thousand is given in full.
  *
- * The demand cards switch to this when the window leaves them too little
- * room for the full amount.
+ * The demand cards show every payoff this way: payoffs are rounded to
+ * whole thousands, so nothing is lost.
  *
  * @param {number} value - An amount of money
  * @returns {string} Short currency string

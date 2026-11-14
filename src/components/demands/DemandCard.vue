@@ -5,17 +5,24 @@
   commodity to a destination town for a payoff. A player fulfills at most one
   contract per card, so the three are listed together as alternatives.
 
-  Each contract is one line — destination, commodity, payoff — so a whole card
-  reads at a glance, and the strip of cards stays short enough to leave the
-  map most of the screen. Town names are shown in full (only an unusually
-  long one on a narrow card is cut short, so the payoff never is). The commodity
-  takes whatever width is left, and is cut short (mid-word, with an ellipsis)
-  only when it runs out of room, never to fewer than 15 characters; its full
-  name shows on hover. The commodity's icon, the one the map shows round the
-  towns that make it, goes before its name. As the window narrows, the card
-  first shortens the payoff ($20.3k for $20,300), then moves the commodity
-  (icon and all) onto a line of its own under the town, where it has the
-  card's whole width.
+  Each contract is one line, read the way it is played — the load, then
+  where it goes, then what it pays:
+
+    Lumber [icon] → Cheyenne      $28k
+
+  so a whole card reads at a glance, and the strip of cards stays short
+  enough to leave the map most of the screen. The load's icon is the one the
+  map shows round the towns that make it. The payoff is always in the short
+  form: payoffs are rounded to whole thousands (see payoffs.js), so it loses
+  nothing.
+
+  The town name and payoff are shown in full. When the line runs out of
+  room, the commodity name gives way, cut short mid-word with an ellipsis
+  (its icon stays, and its full name shows on hover). On a narrow card the
+  line wraps instead, the load on a line of its own and the town under it:
+
+    Lumber [icon]
+      → Cheyenne                 $28k
 
   In the hand of the player whose turn it is, each line is a button: pointing
   at it marks its towns on the map, and clicking it pins it there in its own
@@ -35,7 +42,7 @@
 -->
 
 <script setup>
-import { formatCurrency, formatShortCurrency } from '@/composables/utils'
+import { formatShortCurrency } from '@/composables/utils'
 import { commodityIconUrl } from '@/composables/map/commodityIcons'
 import { useTownsStore } from '@/stores/towns'
 
@@ -101,22 +108,24 @@ function lineEvents(index) {
           :aria-pressed="isPlayable ? Boolean(pinColors[index]) : undefined"
           v-on="isPlayable ? lineEvents(index) : {}"
         >
-          <span class="demand-card__destination" :title="demand.destination">
-            {{ demand.destination }}
-          </span>
-          <span class="demand-card__commodity" :title="demand.industry">
+          <span class="demand-card__load" :title="demand.industry">
+            <span class="demand-card__commodity">{{ demand.industry }}</span>
             <img
               class="demand-card__icon"
               :src="commodityIconUrl(townsStore.industryCodes.get(demand.industry))"
               alt=""
               draggable="false"
             />
-            {{ demand.industry }}
           </span>
-          <span class="demand-card__payoff">
-            <span class="demand-card__payoff-full">{{ formatCurrency(demand.payoff) }}</span>
-            <span class="demand-card__payoff-short">{{ formatShortCurrency(demand.payoff) }}</span>
+          <span class="demand-card__route">
+            <!-- Read out as "to" rather than as an arrow -->
+            <span class="demand-card__arrow" aria-hidden="true">→</span>
+            <span class="is-sr-only">to</span>
+            <span class="demand-card__destination" :title="demand.destination">
+              {{ demand.destination }}
+            </span>
           </span>
+          <span class="demand-card__payoff">{{ formatShortCurrency(demand.payoff) }}</span>
         </component>
       </li>
     </ul>
@@ -135,17 +144,15 @@ function lineEvents(index) {
 }
 
 /*
-  Destination | commodity | payoff. The town and payoff take the width they
-  need; the commodity gets the rest, but never less than 15 characters
-  (plus its icon and the space after it, about 1.5em). If
-  even that does not fit, the town name gives way rather than the payoff.
-  The left edge is kept clear for a pinned line's color.
+  Load | → town | payoff, with the payoff pushed to the right edge. Only
+  the load shrinks: the town and payoff keep the width they need, and the
+  commodity name is cut short to fit what is left. The left edge is kept
+  clear for a pinned line's color.
 */
 .demand-card__row {
-  display: grid;
-  grid-template-columns: minmax(0, max-content) minmax(calc(15ch + 1.5em), 1fr) max-content;
+  display: flex;
   align-items: baseline;
-  gap: 0.5rem;
+  column-gap: 0.4rem;
   width: 100%;
   padding: 0.4rem 0.75rem 0.4rem 0.6rem;
   border: none;
@@ -178,16 +185,20 @@ li + li .demand-card__row {
   background: color-mix(in srgb, var(--line-color) 10%, transparent);
 }
 
-.demand-card__destination {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 700;
-  color: var(--bulma-text-strong);
+.demand-card__load {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25em;
+  min-width: 0;
 }
 
-/* Cut mid-word as the room runs out, rather than at the last whole word */
+/*
+  Cut mid-word as the room runs out, rather than at the last whole word,
+  but never to fewer than 5 characters: the card wraps (see the bottom of
+  this file) before it would get that short
+*/
 .demand-card__commodity {
+  min-width: 5ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -196,64 +207,67 @@ li + li .demand-card__row {
 }
 
 /*
-  Sized to the text and sat on its baseline, so the line keeps its height.
-  The space before the name in the markup is the gap between them. Not
-  draggable, so a click that wobbles still pins the line rather than
-  starting an image drag (as the map's icons — see map.css).
+  Sized to the text and centered on it. Never shrinks, so it is still there
+  when the name is cut short. Not draggable, so a click that wobbles still
+  pins the line rather than starting an image drag (as the map's icons —
+  see map.css).
 */
 .demand-card__icon {
+  flex: none;
+  align-self: center;
   width: 1.1em;
   height: 1.1em;
-  vertical-align: -0.2em;
   -webkit-user-drag: none;
 }
 
+.demand-card__route {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  flex: none;
+  min-width: 0;
+}
+
+.demand-card__arrow {
+  color: var(--bulma-text-weak);
+}
+
+.demand-card__destination {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  color: var(--bulma-text-strong);
+}
+
 .demand-card__payoff {
+  flex: none;
+  margin-left: auto;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   color: var(--bulma-success-on-scheme);
 }
 
-.demand-card__payoff-short {
-  display: none;
-}
-
-/* A narrow card gives the commodity more room by shortening the payoff */
-@container (max-width: 340px) {
-  .demand-card__payoff-full {
-    display: none;
-  }
-
-  .demand-card__payoff-short {
-    display: inline;
-  }
-}
-
 /*
-  Narrower still, a long town name, 15 characters of commodity with its
-  icon, and the payoff no longer fit side by side, so the commodity goes
-  under the town (the icon's room is why this comes in at 320px, not 300px)
+  A narrow card has too little room for the commodity beside the town, so
+  the line wraps: the load takes the whole first line, and the route and
+  payoff share the second, the route set in under the load. The route
+  starts from no width and takes what the payoff leaves, so the two always
+  share the line; only an unusually long town name is cut short there, so
+  the payoff never is.
 */
 @container (max-width: 320px) {
   .demand-card__row {
-    grid-template-columns: minmax(0, 1fr) max-content;
-    grid-template-areas:
-      'destination payoff'
-      'commodity commodity';
-    row-gap: 0;
+    flex-wrap: wrap;
   }
 
-  .demand-card__destination {
-    grid-area: destination;
+  .demand-card__load {
+    flex-basis: 100%;
   }
 
-  .demand-card__commodity {
-    grid-area: commodity;
-    font-size: 0.8rem;
-  }
-
-  .demand-card__payoff {
-    grid-area: payoff;
+  .demand-card__route {
+    flex: 1 1 0;
+    padding-left: 0.75rem;
   }
 }
 </style>

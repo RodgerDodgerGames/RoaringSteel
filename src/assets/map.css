@@ -51,6 +51,13 @@
   line-height: 1.5;
 }
 
+/* Town names in the Plan view */
+.is-plan-view .town-tooltip {
+  font-size: 0.65rem;
+  letter-spacing: 0.03em;
+}
+
+
 /* A town name the Plan view found no clear spot for (see townNames.js) is
    hidden, and shows again below its dot while the town is hovered, marked
    by a demand line, or has a train in it. Hidden with visibility, not

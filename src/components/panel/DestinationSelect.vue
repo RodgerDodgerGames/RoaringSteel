@@ -186,7 +186,7 @@ function moveFocus(index, step) {
 }
 
 .destination-select__list {
-  max-height: 16rem;
+  max-height: 12rem;
   margin-top: 0.25rem;
   overflow-y: auto;
   border: 1px solid var(--bulma-border);
@@ -201,8 +201,8 @@ function moveFocus(index, step) {
   border: 0;
   background: none;
   color: var(--bulma-text);
-  font: inherit;
-  font-size: 0.85rem;
+  font-family: var(--bulma-family-secondary);
+  font-size: 0.9rem;
   text-align: left;
   cursor: pointer;
 }
@@ -222,5 +222,6 @@ function moveFocus(index, step) {
    where a character stays with the word before it. */
 .destination-select__dot {
   margin-left: 0.25rem;
+  font-size: 1rem;
 }
 </style>

@@ -55,7 +55,7 @@ const WATER_COLOR = '#43b2e6'
 const AREA_STYLE = {
   stroke: false,
   fillColor: WATER_COLOR,
-  fillOpacity: 0.65
+  fillOpacity: 0.45
 }
 
 /**

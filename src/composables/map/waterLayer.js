@@ -45,7 +45,7 @@ const LABEL_PANE_Z_INDEX = 370
  * The water's color: the palette's Denim (#2F5D73), deeper than the
  * basemap's pale blue so the two are told apart at a glance.
  */
-const WATER_COLOR = '#2f5d73'
+const WATER_COLOR = '#24a8e5'
 
 /**
  * How lakes and the sea are drawn: filled, with no outline. They are cut to
@@ -55,7 +55,7 @@ const WATER_COLOR = '#2f5d73'
 const AREA_STYLE = {
   stroke: false,
   fillColor: WATER_COLOR,
-  fillOpacity: 0.45
+  fillOpacity: 0.65
 }
 
 /**

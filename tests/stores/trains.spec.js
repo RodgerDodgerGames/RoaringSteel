@@ -538,6 +538,46 @@ describe('trains store', () => {
       })
     })
 
+    describe('isRidingOthersTrack', () => {
+      it("should be false in a town on the player's own track, even where others' track joins", () => {
+        expect(store.isRidingOthersTrack(ANN)).toBe(false)
+
+        store.setTrains({})
+        store.placeTrain(ANN, 'East')
+
+        expect(store.isRidingOthersTrack(ANN)).toBe(false)
+      })
+
+      it("should be true in a town only other players' track reaches", () => {
+        store.setTrains({})
+        store.placeTrain(ANN, 'Far')
+
+        expect(store.isRidingOthersTrack(ANN)).toBe(true)
+      })
+
+      it("should be true out on another player's line", () => {
+        store.setTrains({})
+        store.placeTrain(ANN, 'East')
+        store.moveTrainToTrack(ANN, pointKey(BOS_END))
+
+        expect(store.trainOf(ANN).position).toMatchObject({ nodeKey: null, ownerId: BO })
+        expect(store.isRidingOthersTrack(ANN)).toBe(true)
+      })
+
+      it('should be false for a train not yet placed', () => {
+        store.setTrains({})
+
+        expect(store.isRidingOthersTrack(ANN)).toBe(false)
+      })
+
+      it('should be false where no track at all is left', () => {
+        trackStore.reset()
+
+        expect(store.trainOf(ANN).position).toMatchObject({ nodeKey: townKey(towns[0]) })
+        expect(store.isRidingOthersTrack(ANN)).toBe(false)
+      })
+    })
+
     describe('lineEnds', () => {
       it("should list the ends of the player's own line at any distance, and not other players'", () => {
         const ends = store.lineEnds(ANN)

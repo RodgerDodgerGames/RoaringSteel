@@ -30,10 +30,44 @@ import { useTrainsStore } from '@/stores/trains'
 import { useTownsStore } from '@/stores/towns'
 import { useMapStore } from '@/stores/map'
 import { useTrainStopStore } from '@/stores/trainStop'
+import { useRunListStore } from '@/stores/runList'
 import { buildTrackKey } from '@/composables/map/useBuildTrack'
 import { formatCurrency } from '@/composables/utils'
 import { formatDistance } from '@/composables/boardScale'
 import { whereabouts, trackPointName, trackPointTitle } from '@/composables/trainStatus'
+
+/**
+ * Whether the way to a place in the "Run to" list runs on other players'
+ * track. The trains store routes a train on its owner's own track wherever
+ * that reaches, so a place with no other owners on its way is one the
+ * player's own track leads to.
+ * @param {{entry: {owners: Array<number>}}} choice - A place in the list
+ * @returns {boolean} True if the way there uses other players' track
+ */
+const isViaOthers = (choice) => choice.entry.owners.length > 0
+
+/**
+ * Orders and filters the "Run to" list. The places the player's own track
+ * leads to come first, in the order given (towns nearest first, then the
+ * ends of the line), so they stand out. Those whose way runs on other
+ * players' track follow as a second group, in the same order — only when
+ * the player has them shown, as most of the time players stick to their own
+ * track. The place the train is already heading for stays either way, so
+ * carrying on toward it is still one Confirm.
+ * @param {Array<Object>} choices - Every place the train can get to, each
+ *   { id, entry, … }
+ * @param {{showOthers: boolean, keepId: string|null}} options - Whether to
+ *   show the places on other players' track, and the id of a place to keep
+ *   regardless (the heading)
+ * @returns {Array<Object>} The places to list
+ */
+export function listedRunChoices(choices, { showOthers, keepId }) {
+  const own = choices.filter((choice) => !isViaOthers(choice))
+  const others = choices.filter(
+    (choice) => isViaOthers(choice) && (showOthers || choice.id === keepId)
+  )
+  return [...own, ...others]
+}
 
 export function useTrainControls() {
   const playerStore = usePlayerStore()
@@ -42,6 +76,7 @@ export function useTrainControls() {
   const townsStore = useTownsStore()
   const mapStore = useMapStore()
   const trainStopStore = useTrainStopStore()
+  const runListStore = useRunListStore()
   // The game view's build-track instance, so choosing a town can end any
   // drawing or removal first: all three act on map clicks
   const buildTrack = inject(buildTrackKey, null)
@@ -86,18 +121,20 @@ export function useTrainControls() {
   const heading = computed(() => trainsStore.headingOf(playerId.value))
 
   /**
-   * Everywhere the "Run to" list offers, each { id, kind, key, name, entry }:
-   * the towns
-   * the train can get to, nearest first, then the ends of its owner's line
-   * (see the trains store's `destinations` and `lineEnds`). A point on the
-   * track the train is heading for, chosen on the map, joins the second
-   * group, so carrying on toward it is one Confirm like carrying on toward a
-   * town. `kind` is 'town' or 'point', and `key` the town's id or the
-   * point's node key; `id` puts the two together, as one list can hold a
+   * Everywhere the "Run to" list can offer, each { id, kind, key, name,
+   * entry }: the towns the train can get to, nearest first, then the ends of
+   * its owner's line (see the trains store's `destinations` and `lineEnds`).
+   * A point on the track the train is heading for, chosen on the map, joins
+   * the second group, so carrying on toward it is one Confirm like carrying
+   * on toward a town. `kind` is 'town' or 'point', and `key` the town's id or
+   * the point's node key; `id` puts the two together, as one list can hold a
    * town and a point. `entry` is the store's entry for the place (how far,
    * how long, whose track, what fees).
+   *
+   * The list itself shows `runChoices`: these, less any the player has
+   * hidden.
    */
-  const runChoices = computed(() => {
+  const allRunChoices = computed(() => {
     if (moveBlock.value) return []
     const towns = trainsStore.destinations(playerId.value).map((entry) => ({
       id: `town:${entry.town.msa}`,
@@ -130,6 +167,27 @@ export function useTrainControls() {
     const { town: headingTown, point } = heading.value
     return headingTown ? `town:${headingTown.msa}` : `point:${point.key}`
   })
+
+  /**
+   * What the "Run to" list shows: the places on the player's own track
+   * first, then, if the player has them shown, those whose way runs on
+   * other players' track (see `listedRunChoices` and the run list store)
+   */
+  const runChoices = computed(() =>
+    listedRunChoices(allRunChoices.value, {
+      showOthers: runListStore.showsOthersTrack,
+      keepId: headingChoiceId.value
+    })
+  )
+
+  /**
+   * Whether any place the train can get to needs other players' track: only
+   * then is there anything for the show/hide toggle to do
+   */
+  const hasOthersTrackChoices = computed(() => allRunChoices.value.some(isViaOthers))
+
+  /** Whether the list is showing the places on other players' track */
+  const othersTrackShown = computed(() => runListStore.showsOthersTrack)
 
   /** Where the train is and where it is heading, in a sentence */
   const status = computed(() =>
@@ -306,6 +364,8 @@ export function useTrainControls() {
     moveBlock,
     loadBlock,
     runChoices,
+    hasOthersTrackChoices,
+    othersTrackShown,
     headingChoiceId,
     heading,
     status,
@@ -322,6 +382,7 @@ export function useTrainControls() {
     drop,
     isPicking,
     startPicking,
-    stopPicking
+    stopPicking,
+    toggleOthersTrack: runListStore.toggleOthersTrack
   }
 }

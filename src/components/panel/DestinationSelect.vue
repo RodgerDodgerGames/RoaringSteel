@@ -2,8 +2,9 @@
   DestinationSelect.vue
 
   The "Run to…" list of the move step: a dropdown of places — towns, and the
-  ends of the player's line — each marked with a colored dot for every other
-  player whose track the way there runs on.
+  ends of the player's line. A place whose way runs on other players' track
+  is set in italics and marked with a colored dot for each of them, so the
+  places on the player's own track stand out.
 
   A browser's own <select> cannot color its options reliably (macOS mostly
   ignores it), so this is a button that opens a list of its own. The list
@@ -112,7 +113,9 @@ function moveFocus(index, step) {
         <!-- Read out before the place chosen, which is the button's own text -->
         <span v-if="ariaLabel" class="is-sr-only">{{ ariaLabel }}: </span>
         <template v-if="chosen">
-          <span>{{ chosen.label }}</span>
+          <span :class="{ 'destination-select__via-others': chosen.owners.length }">{{
+            chosen.label
+          }}</span>
           <span
             v-for="owner in chosen.owners"
             :key="owner.id"
@@ -149,7 +152,9 @@ function moveFocus(index, step) {
         @keydown.up.prevent="moveFocus(index, -1)"
         @keydown.tab="close()"
       >
-        <span>{{ option.label }}</span>
+        <span :class="{ 'destination-select__via-others': option.owners.length }">{{
+          option.label
+        }}</span>
         <span
           v-for="owner in option.owners"
           :key="owner.id"
@@ -215,6 +220,11 @@ function moveFocus(index, step) {
 
 .destination-select__option.is-active {
   font-weight: 700;
+}
+
+/* A place only other players' track leads to: set apart from the player's own */
+.destination-select__via-others {
+  font-style: italic;
 }
 
 /* One per other player whose track the way uses, in their color. A text

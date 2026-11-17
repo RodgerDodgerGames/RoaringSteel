@@ -480,11 +480,45 @@ export const useTrainsStore = defineStore('trains', () => {
    * @returns {boolean} True if other players' track is at hand
    */
   function isAtOthersTrack(playerId) {
+    return ownersAtTrain(playerId).some((owner) => owner !== playerId)
+  }
+
+  /**
+   * Whether a player's train is riding someone else's track: out on another
+   * player's line, or standing in a town or at a point that other players'
+   * track touches and none of its owner's own does. Narrower than
+   * `isAtOthersTrack`, which is also true in a town of the player's own that
+   * other track merely joins. A train where no track at all is left (torn up
+   * under it) is riding nobody's.
+   *
+   * While it is, the way on almost surely runs on other players' track, so
+   * the dock's "Run to" list shows the places on their track without being
+   * asked (see the run list store's `showsOthersTrack`).
+   *
+   * @param {number} playerId - The player
+   * @returns {boolean} True if the train is riding other players' track; false
+   *   on its own, or not yet placed
+   */
+  function isRidingOthersTrack(playerId) {
+    const owners = ownersAtTrain(playerId)
+    return owners.some((owner) => owner !== playerId) && !owners.includes(playerId)
+  }
+
+  /**
+   * Whose track is right where a player's train is: the owner of the line
+   * it is out on, or the owners of every piece of track that meets where it
+   * stands. Shared by `isAtOthersTrack` and `isRidingOthersTrack`, so both
+   * read the train's position the same way.
+   * @param {number} playerId - The player
+   * @returns {Array<number>} The owners, with repeats; empty if the train is
+   *   not placed, or no track is left where it stands
+   */
+  function ownersAtTrain(playerId) {
     const position = trainOf(playerId).position
-    if (!position) return false
-    if (!position.nodeKey) return position.ownerId !== playerId
+    if (!position) return []
+    if (!position.nodeKey) return [position.ownerId]
     const edges = networkStore.network.adjacency.get(position.nodeKey) ?? []
-    return edges.some((edge) => edge.ownerId !== playerId)
+    return edges.map((edge) => edge.ownerId)
   }
 
   /**
@@ -877,6 +911,7 @@ export const useTrainsStore = defineStore('trains', () => {
     destinations,
     lineEnds,
     headingOf,
+    isRidingOthersTrack,
     trackStops,
     nearestTownOf,
     pickupOptions,

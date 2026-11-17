@@ -1,8 +1,9 @@
 <!--
   DestinationSelect.vue
 
-  The "Run to…" list of the move step: a dropdown of towns, each marked with
-  a colored dot for every other player whose track the way there runs on.
+  The "Run to…" list of the move step: a dropdown of places — towns, and the
+  ends of the player's line — each marked with a colored dot for every other
+  player whose track the way there runs on.
 
   A browser's own <select> cannot color its options reliably (macOS mostly
   ignores it), so this is a button that opens a list of its own. The list
@@ -10,7 +11,7 @@
   floating over it: the dock scrolls, and a floating menu would be clipped.
 
   Keyboard: the button opens the list on Enter, Space or the down arrow; the
-  arrows move between towns, Enter or Space picks one, and Escape or Tab
+  arrows move between places, Enter or Space picks one, and Escape or Tab
   closes it.
 -->
 
@@ -20,14 +21,14 @@ import { onClickOutside } from '@vueuse/core'
 
 const props = defineProps({
   /**
-   * The towns to choose from, in order: each { id, label, owners }, where
+   * The places to choose from, in order: each { id, label, owners }, where
    * `owners` is [{ id, name, color }] for the other players whose track the
    * way there uses
    */
   options: { type: Array, required: true },
-  /** The id of the town chosen, or '' for none */
+  /** The id of the place chosen, or '' for none */
   modelValue: { type: String, default: '' },
-  /** What the button says while no town is chosen */
+  /** What the button says while nothing is chosen */
   placeholder: { type: String, default: 'Choose…' },
   /** Names the list for screen readers */
   ariaLabel: { type: String, default: '' }
@@ -54,7 +55,7 @@ onClickOutside(rootRef, () => {
 })
 
 /**
- * Opens the list with the chosen town (or the first) focused, so the arrow
+ * Opens the list with the chosen place (or the first) focused, so the arrow
  * keys carry on from there.
  */
 async function open() {
@@ -78,7 +79,7 @@ function close(refocus = false) {
   if (refocus) triggerRef.value?.focus()
 }
 
-/** @param {string} id - The town picked */
+/** @param {string} id - The place picked */
 function pick(id) {
   emit('update:modelValue', id)
   close(true)
@@ -108,7 +109,7 @@ function moveFocus(index, step) {
       @keydown.down.prevent="open"
     >
       <span class="destination-select__text">
-        <!-- Read out before the town chosen, which is the button's own text -->
+        <!-- Read out before the place chosen, which is the button's own text -->
         <span v-if="ariaLabel" class="is-sr-only">{{ ariaLabel }}: </span>
         <template v-if="chosen">
           <span>{{ chosen.label }}</span>

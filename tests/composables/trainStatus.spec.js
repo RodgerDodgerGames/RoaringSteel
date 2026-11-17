@@ -3,12 +3,18 @@
  *
  * The words the dock uses for where a train is and where it is heading: how
  * long a run takes ("this turn", "2 turns"), and the whereabouts sentence,
- * in a town or stopped on the track, with or without a heading, and with a
- * heading no track leads to any more.
+ * in a town or stopped on the track, with or without a heading (a town or a
+ * point on the track), and with a heading no track leads to any more.
  */
 
 import { describe, it, expect } from 'vitest'
-import { turnsText, spacesText, whereabouts } from '@/composables/trainStatus'
+import {
+  turnsText,
+  spacesText,
+  whereabouts,
+  trackPointName,
+  trackPointTitle
+} from '@/composables/trainStatus'
 
 const omaha = { name: 'Omaha' }
 const denver = { name: 'Denver' }
@@ -38,6 +44,29 @@ describe('trainStatus', () => {
 
     it('should say "1 space", not "1 spaces"', () => {
       expect(spacesText(10, 10)).toBe('1 space')
+    })
+  })
+
+  describe('trackPointName', () => {
+    it('should name a point by the town nearest it', () => {
+      expect(trackPointName({ near: omaha, isEnd: false })).toBe('the track near Omaha')
+    })
+
+    it('should call an end of the line one', () => {
+      expect(trackPointName({ near: omaha, isEnd: true })).toBe('the end of the line near Omaha')
+    })
+
+    it('should do without a town when no track leads to one', () => {
+      expect(trackPointName({ near: null, isEnd: false })).toBe('a point on the track')
+      expect(trackPointName({ near: null, isEnd: true })).toBe('the end of the line')
+    })
+  })
+
+  describe('trackPointTitle', () => {
+    it('should name a point on its own, without "the" or "a"', () => {
+      expect(trackPointTitle({ near: omaha, isEnd: true })).toBe('End of the line near Omaha')
+      expect(trackPointTitle({ near: omaha, isEnd: false })).toBe('Track near Omaha')
+      expect(trackPointTitle({ near: null, isEnd: false })).toBe('Point on the track')
     })
   })
 
@@ -93,6 +122,18 @@ describe('trainStatus', () => {
     it('should name both the town a train is in and the one it is heading for', () => {
       expect(whereabouts({ placed: true, town: omaha, heading: toDenver(1, false) })).toBe(
         'In Omaha, heading toward Denver (1 turn)'
+      )
+    })
+
+    it('should name a point on the track a train is heading for by its nearest town', () => {
+      const heading = {
+        town: null,
+        point: { near: denver, isEnd: true },
+        route: { turns: 2, runsNow: true }
+      }
+
+      expect(whereabouts({ placed: true, town: null, heading })).toBe(
+        'Heading toward the end of the line near Denver, expected to arrive in 2 turns'
       )
     })
 

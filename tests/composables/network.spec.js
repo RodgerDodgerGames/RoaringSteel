@@ -1,8 +1,9 @@
 /**
  * Rail Network Tests
  *
- * The track seen as a railway: sections join where they share a point (not
- * where they merely cross), trains find the shortest way along it, stop part
+ * The track seen as a railway: sections join wherever they meet — a shared
+ * point, a point part way along another's leg, or a crossing, whoever owns
+ * the track — trains find the shortest way along it, stop part
  * way when they run out of distance, may only reverse in towns, are placed
  * by the town nearest them along the track, and a
  * player's major cities count as joined only on one connected piece of their
@@ -18,7 +19,9 @@ import {
   shortestRoutes,
   runRoute,
   nearestTown,
-  majorCitiesJoined
+  majorCitiesJoined,
+  stretchAt,
+  liesOnTrack
 } from '@/composables/network'
 import { kmBetween } from '@/composables/map/trackCost'
 
@@ -50,19 +53,101 @@ describe('network', () => {
       expect(routes.get(townKey(east)).km).toBeCloseTo(2 * LEG_KM)
     })
 
-    it('should not join lines that only cross', () => {
-      // A north-south line crossing the east-west one between its points
+    it('should join lines that cross, whoever owns them', () => {
+      // A north-south line of player 2's crossing player 1's east-west one
+      // half way between West and Middle
+      const north = { lat: 0.05, lng: 0.05 }
+      const network = buildNetwork(
+        [segment(1, p(west), p(middle)), segment(2, { lat: -0.05, lng: 0.05 }, north)],
+        towns
+      )
+
+      const routes = shortestRoutes(network, positionAtNode(network, townKey(west)))
+
+      // Half a leg east to the crossing, then half a leg north
+      expect(routes.get(pointKey(north)).km).toBeCloseTo(LEG_KM, 1)
+      // Player 1's own line still runs on through the crossing to Middle
+      expect(routes.get(townKey(middle)).km).toBeCloseTo(LEG_KM)
+    })
+
+    it('should join a section that ends part way along a leg', () => {
+      // West to East in one leg, with a line drawn down onto the middle of it
+      const north = { lat: 0.05, lng: 0.15 }
+      const network = buildNetwork(
+        [segment(1, p(west), p(east)), segment(1, north, { lat: 0, lng: 0.15 })],
+        towns
+      )
+
+      const routes = shortestRoutes(network, positionAtNode(network, townKey(west)))
+
+      expect(routes.get(pointKey(north)).km).toBeCloseTo(1.5 * LEG_KM + LEG_KM / 2, 1)
+      // The leg split at the junction is still the whole way to East
+      expect(routes.get(townKey(east)).km).toBeCloseTo(2 * LEG_KM)
+    })
+
+    it('should split a leg at every junction along it, in order', () => {
+      // Two lines crossing the West–Far leg, the farther one listed first
+      const nearEnd = { lat: 0.05, lng: 0.05 }
+      const farEnd = { lat: 0.05, lng: 0.25 }
       const network = buildNetwork(
         [
-          segment(1, p(west), p(middle)),
-          segment(2, { lat: -0.05, lng: 0.05 }, { lat: 0.05, lng: 0.05 })
+          segment(1, p(west), p(far)),
+          segment(2, { lat: -0.05, lng: 0.25 }, farEnd),
+          segment(2, { lat: -0.05, lng: 0.05 }, nearEnd)
         ],
         towns
       )
 
       const routes = shortestRoutes(network, positionAtNode(network, townKey(west)))
 
-      expect(routes.has(pointKey({ lat: 0.05, lng: 0.05 }))).toBe(false)
+      expect(routes.get(pointKey(nearEnd)).km).toBeCloseTo(LEG_KM, 1)
+      expect(routes.get(pointKey(farEnd)).km).toBeCloseTo(3 * LEG_KM, 1)
+      expect(routes.get(townKey(far)).km).toBeCloseTo(3 * LEG_KM)
+    })
+
+    it('should not join lines that only pass close to each other', () => {
+      // A point 50 m north of the West–Middle leg, and a line running
+      // alongside it 50 m south
+      const network = buildNetwork(
+        [
+          segment(1, p(west), p(middle)),
+          segment(2, { lat: 0.00045, lng: 0.05 }, { lat: 0.05, lng: 0.05 }),
+          segment(3, { lat: -0.00045, lng: 0.01 }, { lat: -0.00045, lng: 0.09 })
+        ],
+        towns
+      )
+
+      const routes = shortestRoutes(network, positionAtNode(network, townKey(west)))
+
+      expect([...routes.keys()]).toEqual([townKey(middle)])
+    })
+
+    it('should join the bend of a section drawn onto a leg on screen', () => {
+      // From a playtest save: the Willmar–Hutchinson section's middle bend was
+      // snapped onto the St. Cloud line's first leg (kept here alone), part
+      // way along it. Off by
+      // 12 m measured as the crow flies, it is on the leg as the map draws it.
+      const willmar = { name: 'Willmar', msa: 'W', lat: 45.1210292, lon: -95.0587343 }
+      const hutchinson = { name: 'Hutchinson', msa: 'H', lat: 44.885358, lon: -94.3768758 }
+      const lineStart = { lat: 44.99661707591089, lng: -94.36569213867189 }
+      const network = buildNetwork(
+        [
+          segment(1, lineStart, { lat: 44.742526567065525, lng: -94.78729248046876 }),
+          segment(
+            1,
+            p(willmar),
+            { lat: 45.021428413573524, lng: -94.8394775390625 },
+            { lat: 44.88126104636463, lng: -94.55732765868329 },
+            p(hutchinson)
+          )
+        ],
+        [willmar, hutchinson]
+      )
+
+      const routes = shortestRoutes(network, positionAtNode(network, pointKey(lineStart)))
+
+      expect(routes.has(townKey(willmar))).toBe(true)
+      expect(routes.has(townKey(hutchinson))).toBe(true)
     })
 
     it('should give every town a node, with or without track', () => {
@@ -230,6 +315,18 @@ describe('network', () => {
       expect(result.position.ownerId).toBe(2)
     })
 
+    it('should stop on the line as the map draws it, on a slanting leg far from the equator', () => {
+      const north = { lat: 46, lng: -94 }
+      const south = { lat: 44, lng: -96 }
+      const slanting = buildNetwork([segment(1, north, south)], [])
+      const from = positionAtNode(slanting, pointKey(north))
+      const [step] = shortestRoutes(slanting, from).get(pointKey(south)).steps
+
+      const { position } = runRoute(slanting, from, [step], step.km / 3)
+
+      expect(liesOnTrack(position, [segment(1, north, south)])).toBe(true)
+    })
+
     it('should count the track it stopped part way along as used', () => {
       expect([...runRoute(network, start, steps, 1.5 * LEG_KM).ownersUsed]).toEqual([1, 2])
     })
@@ -248,6 +345,81 @@ describe('network', () => {
       expect(result.km).toBeCloseTo(0.5 * LEG_KM)
       // Arrived along the stretch from Middle
       expect(result.position.cameFrom).toBe(townKey(middle))
+    })
+  })
+
+  describe('stretchAt', () => {
+    // A train stopped a quarter of the way from West to East, heading east
+    const stopped = {
+      lat: 0,
+      lng: 0.05,
+      nodeKey: null,
+      townId: null,
+      cameFrom: townKey(west),
+      ahead: townKey(east),
+      ownerId: 1
+    }
+
+    it('should be the stretch the train stopped on when nothing has been built since', () => {
+      const network = buildNetwork([segment(1, p(west), p(east))], towns)
+
+      expect(stretchAt(network, stopped)).toEqual({
+        behind: townKey(west),
+        ahead: townKey(east)
+      })
+    })
+
+    it('should end at a junction built ahead of the train since it stopped', () => {
+      const junction = { lat: 0, lng: 0.15 }
+      const north = { lat: 0.05, lng: 0.15 }
+      const network = buildNetwork(
+        [segment(1, p(west), p(east)), segment(2, { lat: -0.05, lng: 0.15 }, north)],
+        towns
+      )
+
+      expect(stretchAt(network, stopped)).toEqual({
+        behind: townKey(west),
+        ahead: pointKey(junction)
+      })
+      // So the train may turn there: a leg on to the junction, half a leg north
+      expect(shortestRoutes(network, stopped).get(pointKey(north)).km).toBeCloseTo(1.5 * LEG_KM, 1)
+    })
+
+    it('should start at a junction built behind the train since it stopped', () => {
+      const network = buildNetwork(
+        [
+          segment(1, p(west), p(east)),
+          segment(2, { lat: -0.05, lng: 0.02 }, { lat: 0.05, lng: 0.02 })
+        ],
+        towns
+      )
+
+      expect(stretchAt(network, stopped)).toEqual({
+        behind: pointKey({ lat: 0, lng: 0.02 }),
+        ahead: townKey(east)
+      })
+    })
+  })
+
+  describe('liesOnTrack', () => {
+    const track = [segment(1, p(west), p(middle), { lat: 0.1, lng: 0.1 })]
+
+    it('should be true on a point of the track', () => {
+      expect(liesOnTrack(p(middle), track)).toBe(true)
+    })
+
+    it('should be true part way along a leg', () => {
+      expect(liesOnTrack({ lat: 0.05, lng: 0.1 }, track)).toBe(true)
+    })
+
+    it('should be false a hair off a bend, where a section would not join', () => {
+      // About 1 m north of the bend at Middle
+      expect(liesOnTrack({ lat: 0.000009, lng: 0.1 }, track)).toBe(false)
+    })
+
+    it('should be false off the track, even close by', () => {
+      // About 50 m north of the first leg
+      expect(liesOnTrack({ lat: 0.00045, lng: 0.05 }, track)).toBe(false)
     })
   })
 
@@ -335,6 +507,30 @@ describe('network', () => {
 
       // West alone on one piece; East and Far on the other
       expect(majorCitiesJoined(network, 1)).toBe(2)
+    })
+
+    it('should join pieces of own track where they cross', () => {
+      // West to the north-east and East to the north-west, crossing between
+      const network = buildNetwork(
+        [segment(1, p(west), { lat: 0.1, lng: 0.2 }), segment(1, p(east), { lat: 0.1, lng: 0 })],
+        towns
+      )
+
+      expect(majorCitiesJoined(network, 1)).toBe(2)
+    })
+
+    it("should not join pieces of own track across another player's line", () => {
+      // Each piece crosses player 2's line, not the other piece
+      const network = buildNetwork(
+        [
+          segment(1, p(west), { lat: 0.1, lng: 0 }),
+          segment(1, p(east), { lat: 0.1, lng: 0.2 }),
+          segment(2, { lat: 0.05, lng: -0.05 }, { lat: 0.05, lng: 0.25 })
+        ],
+        towns
+      )
+
+      expect(majorCitiesJoined(network, 1)).toBe(1)
     })
 
     it('should not count other players track', () => {

@@ -1078,7 +1078,7 @@ export default function useBuildTrack(formatCurrency) {
 
   /**
    * Whether the active player may start a line here: in a town the start
-   * rule allows (see startRule.js) or at an end or bend of their own track
+   * rule allows (see startRule.js) or anywhere on their own track
    * (see the track builder).
    * @param {Object} latlng - Where the line would start
    * @returns {boolean} True if it may start here

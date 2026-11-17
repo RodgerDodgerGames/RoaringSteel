@@ -461,32 +461,74 @@ describe('trains store', () => {
 
   describe('stopping on the track', () => {
     // Points off the towns: Ann's spur north from Middle, about 11 km to a
-    // bend and on to an end 100 km beyond it; and Bo's, 11 km south of East
+    // bend and on to an end 100 km beyond it; and Bo's line south from East,
+    // 11 km to a bend, 100 km on to another and 111 km on to its end
     const NEAR = { lat: 0.1, lng: 0.3 }
     const BEYOND = { lat: 1, lng: 0.3 }
     const BOS_POINT = { lat: -0.1, lng: 0.6 }
+    const BOS_BEND = { lat: -1, lng: 0.6 }
+    const BOS_END = { lat: -2, lng: 0.6 }
     const SPUR_KM = kmBetween(at('Middle'), NEAR)
+    const RANGE_KM = trainRangeKm('freight', SPEED_UNIT_KM)
 
     beforeEach(() => {
       trackStore.addSegment({ ownerId: ANN, coordinates: [at('Middle'), NEAR, BEYOND] })
-      trackStore.addSegment({ ownerId: BO, coordinates: [at('East'), BOS_POINT] })
+      trackStore.addSegment({
+        ownerId: BO,
+        coordinates: [at('East'), BOS_POINT, BOS_BEND, BOS_END]
+      })
       store.placeTrain(ANN, 'West')
     })
 
+    /** The keys of the points marked for Ann that are on Bo's southern line */
+    const bosStops = () =>
+      store
+        .trackStops(ANN)
+        .map((stop) => stop.key)
+        .filter((key) => [BOS_POINT, BOS_BEND, BOS_END].map(pointKey).includes(key))
+
     describe('trackStops', () => {
-      it("should list the points within this turn's reach, and no towns", () => {
+      it("should list every point on the player's own track, at any distance, and no towns", () => {
         const stops = store.trackStops(ANN)
 
         expect(stops.map((stop) => stop.key).sort()).toEqual(
-          [pointKey(NEAR), pointKey(BOS_POINT)].sort()
+          [pointKey(NEAR), pointKey(BEYOND)].sort()
         )
+        expect(stops.find((stop) => stop.key === pointKey(NEAR))).toMatchObject({
+          inReach: true,
+          turns: 1
+        })
         expect(stops.find((stop) => stop.key === pointKey(NEAR)).km).toBeCloseTo(LEG_KM + SPUR_KM)
+        expect(stops.find((stop) => stop.key === pointKey(BEYOND))).toMatchObject({
+          inReach: false,
+          turns: 2
+        })
       })
 
-      it("should name the fee for a point on another player's track", () => {
-        const stop = store.trackStops(ANN).find((s) => s.key === pointKey(BOS_POINT))
+      it("should leave out other players' points while the train is away from their track", () => {
+        expect(bosStops()).toEqual([])
+      })
 
-        expect(stop).toMatchObject({ payTo: [BO], fee: gameRules.trackUseFee })
+      it("should list other players' points within reach once the train is in a town their track leaves", () => {
+        store.setTrains({})
+        store.placeTrain(ANN, 'East')
+
+        expect(bosStops()).toEqual([pointKey(BOS_POINT)])
+        expect(store.trackStops(ANN).find((s) => s.key === pointKey(BOS_POINT))).toMatchObject({
+          payTo: [BO],
+          fee: gameRules.trackUseFee
+        })
+      })
+
+      it("should keep listing them while the train is out on the other player's track", () => {
+        store.setTrains({})
+        store.placeTrain(ANN, 'East')
+        // A turn's run south stops part way between Bo's two bends
+        store.moveTrainToTrack(ANN, pointKey(BOS_END))
+        store.endTurn(ANN)
+
+        expect(store.trainOf(ANN).position).toMatchObject({ nodeKey: null, ownerId: BO })
+        expect(bosStops()).toEqual([pointKey(BOS_BEND)])
       })
 
       it('should be empty once the player has started building', () => {
@@ -496,28 +538,52 @@ describe('trains store', () => {
       })
     })
 
+    describe('lineEnds', () => {
+      it("should list the ends of the player's own line at any distance, and not other players'", () => {
+        const ends = store.lineEnds(ANN)
+
+        expect(ends.map(({ point }) => point.key)).toEqual([pointKey(BEYOND)])
+        expect(ends[0]).toMatchObject({
+          point: { isEnd: true, near: { name: 'Middle' } },
+          turns: 2
+        })
+      })
+
+      it('should not count a point another line carries on from', () => {
+        trackStore.addSegment({ ownerId: BO, coordinates: [BEYOND, { lat: 1.1, lng: 0.3 }] })
+
+        expect(store.lineEnds(ANN)).toEqual([])
+      })
+    })
+
     describe('moveTrainToTrack', () => {
       it('should run the train to the point and stop it there', () => {
         const result = store.moveTrainToTrack(ANN, pointKey(NEAR))
 
-        expect(result).toMatchObject({ ok: true, paid: [], near: { name: 'Middle' } })
+        expect(result).toMatchObject({
+          ok: true,
+          arrived: true,
+          paid: [],
+          point: { near: { name: 'Middle' }, isEnd: false }
+        })
         expect(result.km).toBeCloseTo(LEG_KM + SPUR_KM)
         expect(store.trainOf(ANN).position.nodeKey).toBe(pointKey(NEAR))
         expect(store.townOf(ANN)).toBeNull()
-        expect(store.kmLeft(ANN)).toBeCloseTo(
-          trainRangeKm('freight', SPEED_UNIT_KM) - LEG_KM - SPUR_KM
-        )
+        expect(store.kmLeft(ANN)).toBeCloseTo(RANGE_KM - LEG_KM - SPUR_KM)
       })
 
-      it('should drop any heading: stopping there is the new plan', () => {
+      it('should drop any town heading: stopping there is the new plan', () => {
         store.setTrains({ [ANN]: { ...store.trainOf(ANN), heading: 'Far' } })
 
         store.moveTrainToTrack(ANN, pointKey(NEAR))
 
-        expect(store.trainOf(ANN).heading).toBeNull()
+        expect(store.trainOf(ANN)).toMatchObject({ heading: null, headingPoint: null })
       })
 
       it('should pay the owner for running on their track', () => {
+        store.setTrains({})
+        store.placeTrain(ANN, 'East')
+
         const result = store.moveTrainToTrack(ANN, pointKey(BOS_POINT))
 
         expect(result.paid).toEqual([{ ownerId: BO, amount: gameRules.trackUseFee }])
@@ -525,12 +591,34 @@ describe('trains store', () => {
         expect(cashOf(BO)).toBe(40000 + gameRules.trackUseFee)
       })
 
-      it("should refuse a point beyond this turn's reach, leaving the train where it is", () => {
-        expect(store.moveTrainToTrack(ANN, pointKey(BEYOND))).toEqual({
-          ok: false,
-          error: 'That point is further than your train can run this turn.'
+      it("should head for a point beyond this turn's reach, stopping on the way", () => {
+        const result = store.moveTrainToTrack(ANN, pointKey(BEYOND))
+
+        expect(result).toMatchObject({ ok: true, arrived: false })
+        expect(result.km).toBeCloseTo(RANGE_KM)
+        expect(store.trainOf(ANN)).toMatchObject({ heading: null, headingPoint: pointKey(BEYOND) })
+        expect(store.headingOf(ANN)).toMatchObject({
+          town: null,
+          point: { key: pointKey(BEYOND), isEnd: true },
+          route: { turns: 1, runsNow: false }
         })
-        expect(store.townOf(ANN).name).toBe('West')
+      })
+
+      it('should clear the heading once the train gets there', () => {
+        store.moveTrainToTrack(ANN, pointKey(BEYOND))
+        store.endTurn(ANN)
+
+        expect(store.moveTrainToTrack(ANN, pointKey(BEYOND)).arrived).toBe(true)
+        expect(store.trainOf(ANN).headingPoint).toBeNull()
+        expect(store.headingOf(ANN)).toBeNull()
+      })
+
+      it('should drop a point heading for a run to a town', () => {
+        store.setTrains({ [ANN]: { ...store.trainOf(ANN), headingPoint: pointKey(BEYOND) } })
+
+        store.moveTrain(ANN, 'Middle')
+
+        expect(store.trainOf(ANN).headingPoint).toBeNull()
       })
 
       it('should refuse a town, which is run to as a town', () => {
@@ -554,9 +642,60 @@ describe('trains store', () => {
           type: 'move',
           town: 'Middle',
           onTrack: true,
+          isEnd: false,
           arrived: true,
           paid: []
         })
+      })
+    })
+
+    describe('isStillMoving out on the line', () => {
+      it('should stay moving with only an end of the line ahead', () => {
+        // On the spur heading north, where no town lies ahead
+        store.moveTrainToTrack(ANN, pointKey(NEAR))
+
+        expect(store.isStillMoving(ANN)).toBe(true)
+      })
+
+      it("should be done when only another player's spur, out of reach, leads on", () => {
+        // A town only Bo's spur leaves, its one point 11 km out
+        useTownsStore().setTowns([...towns, town('Lonely', 3, 'small', [])])
+        trackStore.addSegment({
+          ownerId: BO,
+          coordinates: [
+            { lat: 0, lng: 3 },
+            { lat: 0.1, lng: 3 }
+          ]
+        })
+        store.setTrains({})
+        store.placeTrain(ANN, 'Lonely')
+
+        // In reach, the point is marked, so there is still a move to make
+        expect(store.isStillMoving(ANN)).toBe(true)
+
+        // With 5 km left it is not, and nothing else is offered
+        store.setTrains({ [ANN]: { ...store.trainOf(ANN), kmThisTurn: RANGE_KM - 5 } })
+        expect(store.trackStops(ANN)).toEqual([])
+        expect(store.isStillMoving(ANN)).toBe(false)
+      })
+
+      it('should be done at the end of the line, where the train may not turn round', () => {
+        store.setTrains({
+          [ANN]: {
+            ...store.trainOf(ANN),
+            position: {
+              lat: BEYOND.lat,
+              lng: BEYOND.lng,
+              nodeKey: pointKey(BEYOND),
+              townId: null,
+              cameFrom: pointKey(NEAR),
+              ahead: null,
+              ownerId: null
+            }
+          }
+        })
+
+        expect(store.isStillMoving(ANN)).toBe(false)
       })
     })
 

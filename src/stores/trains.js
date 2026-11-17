@@ -37,8 +37,10 @@
  *   kmThisTurn: number,     // How far it has run this turn
  *   feesPaidTo: Array<number>, // Owners already paid this turn for their track
  *   hasActed: boolean,      // Whether it has done anything this turn
- *   heading: string|null    // The town (id) a run is still on its way to, or
+ *   heading: string|null,   // The town (id) a run is still on its way to, or
  *                           // null; kept across turns until the train gets there
+ *   headingPoint: string|null // The same for a point on the track (its node
+ *                           // key); at most one of the two is set
  * }
  *
  * A run to a town too far for one turn takes several: the train stops where
@@ -48,11 +50,11 @@
  * torn up in between is taken into account.
  *
  * A train may also be run to a point on the track — an end, a bend or a
- * junction of a drawn section — to stop short of any town: to wait at the
- * end of its owner's track for more to be built, or to stand next to another
- * player's track ready to use all of next turn's run on it. Only points
- * within this turn's reach are offered, so such a run always gets there and
- * leaves no heading.
+ * junction — to stop short of any town: to wait at the end of its owner's
+ * track for more to be built, or to stand next to another player's track
+ * ready to use all of next turn's run on it. A point too far for one turn is
+ * headed for the same way as a town (see `trackStops` for which points are
+ * offered, and `lineEnds` for the ends of the line listed with the towns).
  *
  * @module stores/trains
  */
@@ -89,7 +91,8 @@ function newTrain() {
     kmThisTurn: 0,
     feesPaidTo: [],
     hasActed: false,
-    heading: null
+    heading: null,
+    headingPoint: null
   }
 }
 
@@ -181,6 +184,29 @@ export const useTrainsStore = defineStore('trains', () => {
   }
 
   /**
+   * A point on the track as the controls name it: where it is, the town
+   * nearest it by track (see network.js's `nearestTown`), and whether it is
+   * an end of the line — a point only one stretch of track leaves, with no
+   * town on it.
+   * @param {string} nodeKey - The point's node key (see network.js)
+   * @returns {{key: string, lat: number, lng: number, near: Object|null,
+   *   isEnd: boolean}|null} The point, or null when it is not on the network
+   *   (its track torn up, say)
+   */
+  function trackPoint(nodeKey) {
+    const network = networkStore.network
+    const node = network.nodes.get(nodeKey)
+    if (!node) return null
+    return {
+      key: nodeKey,
+      lat: node.lat,
+      lng: node.lng,
+      near: nearestTown(network, positionAtNode(network, nodeKey))?.town ?? null,
+      isEnd: !node.town && network.adjacency.get(nodeKey).length === 1
+    }
+  }
+
+  /**
    * Why a player may not do anything on their turn right now, or null.
    * @param {number} playerId - The player
    * @returns {string|null} The reason
@@ -262,18 +288,42 @@ export const useTrainsStore = defineStore('trains', () => {
   }
 
   /**
-   * Whether any track leads from a player's train to another town. Checked
-   * on its own, without the distances and fees `destinations` works out,
-   * because only whether there is one matters — and over everyone's track at
-   * once, since a town the player's own track reaches is reached over
-   * everyone's too (`routesFor` also searches their own track alone, to
-   * prefer it, which does not matter here).
+   * Whether the controls offer a player's train anywhere to run to: a town,
+   * or a point on the track they mark (see `isOffered`). Checked without the
+   * fees `destinations` and `trackStops` work out, because only whether
+   * there is one matters. A train at the end of its line, which may not turn
+   * round there, has nowhere to go.
    * @param {number} playerId - The player
-   * @returns {boolean} True if the train has a town to run to
+   * @returns {boolean} True if the train has somewhere to run to
    */
   function canRunAnywhere(playerId) {
-    const routes = shortestRoutes(networkStore.network, trainOf(playerId).position)
-    return [...routes.keys()].some((key) => networkStore.network.nodes.get(key).town)
+    const left = kmLeft(playerId)
+    const showOthers = isAtOthersTrack(playerId)
+    return [...routesFor(playerId)].some(([key, route]) =>
+      isOffered(playerId, key, route, left, showOthers)
+    )
+  }
+
+  /**
+   * Whether the controls offer a place the train can reach: any town, and
+   * the points on the track `trackStops` marks — every one on the player's
+   * own track, and, once the train is at their track, other players' points
+   * within this turn's reach.
+   * @param {number} playerId - The player
+   * @param {string} key - The place's node key
+   * @param {{km: number}} route - The way there (see `routesFor`)
+   * @param {number} left - How far the train can still run this turn
+   * @param {boolean} showOthers - Whether the train is at other players'
+   *   track (see `isAtOthersTrack`)
+   * @returns {boolean} True if it is offered
+   */
+  function isOffered(playerId, key, route, left, showOthers) {
+    const network = networkStore.network
+    if (network.nodes.get(key).town) return true
+    if (network.adjacency.get(key).some((edge) => edge.ownerId === playerId)) return true
+    // A hair's leeway, as in runRoute, so a point exactly at the end of the
+    // run is still in reach
+    return showOthers && route.km <= left + 1e-9
   }
 
   /**
@@ -330,17 +380,16 @@ export const useTrainsStore = defineStore('trains', () => {
   }
 
   /**
-   * Everything the controls show about one town the train can run to.
+   * Everything the controls show about one place the train can run to.
    * @param {number} playerId - The player
-   * @param {Object} town - The town
    * @param {{km: number, steps: Array}} route - The way there (see `routesFor`)
-   * @returns {{town: Object, km: number, turns: number, runsNow: boolean,
+   * @returns {{km: number, turns: number, runsNow: boolean,
    *   owners: Array<number>, payTo: Array<number>, fee: number}} How far it
    *   is, how many turns it takes (see `turnsToRun`), the other players
    *   whose track the whole way runs on, and whom this turn's part of it
-   *   pays
+   *   pays, and how much
    */
-  function destinationEntry(playerId, town, route) {
+  function routeEntry(playerId, route) {
     const left = kmLeft(playerId)
     // Fees are only paid for track the train actually reaches this turn
     const { ownersUsed } = runRoute(
@@ -354,7 +403,6 @@ export const useTrainsStore = defineStore('trains', () => {
       (owner) => owner !== playerId
     )
     return {
-      town,
       km: route.km,
       ...turnsToRun(playerId, route.km),
       owners,
@@ -366,68 +414,105 @@ export const useTrainsStore = defineStore('trains', () => {
   /**
    * Every town a player's train can get to, nearest first: how far it is,
    * how long it takes, whose track the way runs on, and the fees this turn's
-   * part of it costs (see `destinationEntry`). Towns it cannot reach by any
-   * track are left out.
+   * part of it costs (see `routeEntry`). Towns it cannot reach by any track
+   * are left out.
    * @param {number} playerId - The player
-   * @returns {Array<Object>} The destinations, each from `destinationEntry`
+   * @returns {Array<Object>} The destinations, each `routeEntry` with its
+   *   `town`
    */
   function destinations(playerId) {
     const list = []
     routesFor(playerId).forEach((route, key) => {
       const town = networkStore.network.nodes.get(key).town
-      if (town) list.push(destinationEntry(playerId, town, route))
+      if (town) list.push({ town, ...routeEntry(playerId, route) })
     })
     return list.sort((a, b) => a.km - b.km)
   }
 
   /**
-   * Where a player's train is heading: the town a run of more than one turn
-   * is still on its way to, and how it stands now.
+   * Every end of the line on a player's own track that their train can get
+   * to, nearest first: where a train runs to wait for more track to be built
+   * on, or when no town lies ahead. Listed with the towns in the controls,
+   * at any distance. Ends of other players' lines are left out; those are
+   * points on the map like any other (see `trackStops`).
    * @param {number} playerId - The player
-   * @returns {{town: Object, route: Object|null}|null} The town and, while
-   *   track still leads there, its entry as in `destinations`; `route` is null
-   *   once no track does (torn up, say). Null when the train has no heading.
+   * @returns {Array<Object>} Each end: `routeEntry` with its `point` (see
+   *   `trackPoint`)
    */
-  function headingOf(playerId) {
-    const train = trainOf(playerId)
-    const town = train.heading != null ? townById(train.heading) : null
-    if (!town || !train.position) return null
-    const route = routesFor(playerId).get(townKey(town))
-    return { town, route: route ? destinationEntry(playerId, town, route) : null }
+  function lineEnds(playerId) {
+    const list = []
+    routesFor(playerId).forEach((route, key) => {
+      const [edge, ...more] = networkStore.network.adjacency.get(key)
+      if (networkStore.network.nodes.get(key).town || more.length || edge?.ownerId !== playerId) {
+        return
+      }
+      list.push({ point: trackPoint(key), ...routeEntry(playerId, route) })
+    })
+    return list.sort((a, b) => a.km - b.km)
   }
 
   /**
-   * The points on the track a player's train can run to and stop at this
-   * turn: every end, bend and junction of a drawn section (a network node
-   * with no town) within what is left of this turn's run. Towns are left
-   * out; they are chosen as towns (see `destinations`).
+   * Where a player's train is heading: the town, or point on the track, a
+   * run of more than one turn is still on its way to, and how it stands now.
    * @param {number} playerId - The player
-   * @returns {Array<{key: string, lat: number, lng: number, km: number,
-   *   payTo: Array<number>, fee: number}>} Each point: its node key and
-   *   spot, how far it is, and whom the run there pays and how much; empty
-   *   when the train cannot run now
+   * @returns {{town: Object|null, point: Object|null, route: Object|null}|null}
+   *   The town, or the point (see `trackPoint`), and, while track still leads
+   *   there, its `routeEntry`; `route` is null once no track does (torn up,
+   *   say). Null when the train has no heading, or the point it was heading
+   *   for is gone from the track.
+   */
+  function headingOf(playerId) {
+    const train = trainOf(playerId)
+    if (!train.position) return null
+    const town = train.heading != null ? townById(train.heading) : null
+    const point = !town && train.headingPoint ? trackPoint(train.headingPoint) : null
+    if (!town && !point) return null
+    const route = routesFor(playerId).get(town ? townKey(town) : point.key)
+    return { town, point, route: route ? routeEntry(playerId, route) : null }
+  }
+
+  /**
+   * Whether a player's train stands where another player's track joins its
+   * way — in a town or on a point another player's track leaves from — or is
+   * out on another player's track. Only then are the points on other players'
+   * track marked for it (see `trackStops`).
+   * @param {number} playerId - The player
+   * @returns {boolean} True if other players' track is at hand
+   */
+  function isAtOthersTrack(playerId) {
+    const position = trainOf(playerId).position
+    if (!position) return false
+    if (!position.nodeKey) return position.ownerId !== playerId
+    const edges = networkStore.network.adjacency.get(position.nodeKey) ?? []
+    return edges.some((edge) => edge.ownerId !== playerId)
+  }
+
+  /**
+   * The points on the track a player's train can be run to, to mark on the
+   * map: every end, bend and junction (a network node with no town) it can
+   * reach that is
+   * - on its owner's own track, at any distance — a point beyond this turn's
+   *   reach is headed for, like a far town; or
+   * - on other players' track, within what is left of this turn's run, once
+   *   the train is at their track (see `isAtOthersTrack`). Their lines can
+   *   carry a great many points, so only those near at hand are marked.
+   * Towns are left out; they are chosen as towns (see `destinations`).
+   * @param {number} playerId - The player
+   * @returns {Array<Object>} Each point: its node key, `lat` and `lng`,
+   *   `inReach` (whether the train gets there this turn), and its
+   *   `routeEntry`; empty when the train cannot run now
    */
   function trackStops(playerId) {
     if (whyCannotMove(playerId)) return []
     const left = kmLeft(playerId)
+    const showOthers = isAtOthersTrack(playerId)
     const stops = []
     routesFor(playerId).forEach((route, key) => {
       const node = networkStore.network.nodes.get(key)
-      // A hair's leeway, as in runRoute, so a point exactly at the end of the
-      // run is still in reach
-      if (node.town || route.km > left + 1e-9) return
-      const payTo = ownersToPay(
-        playerId,
-        route.steps.map((step) => step.ownerId)
-      )
-      stops.push({
-        key,
-        lat: node.lat,
-        lng: node.lng,
-        km: route.km,
-        payTo,
-        fee: payTo.length * gameRules.trackUseFee
-      })
+      if (node.town || !isOffered(playerId, key, route, left, showOthers)) return
+      // The same leeway as `isOffered`
+      const inReach = route.km <= left + 1e-9
+      stops.push({ key, lat: node.lat, lng: node.lng, inReach, ...routeEntry(playerId, route) })
     })
     return stops
   }
@@ -571,7 +656,10 @@ export const useTrainsStore = defineStore('trains', () => {
 
     const result = runAlong(playerId, route)
     if (!result.ok) return result
-    storedTrain(playerId).heading = result.arrived ? null : townId
+    Object.assign(storedTrain(playerId), {
+      heading: result.arrived ? null : townId,
+      headingPoint: null
+    })
     historyStore.record(playerId, {
       type: 'move',
       town: town.name,
@@ -582,45 +670,47 @@ export const useTrainsStore = defineStore('trains', () => {
   }
 
   /**
-   * Runs a player's train to a point on the track and stops it there, short
-   * of any town (see the notes at the top). The point must be one of
-   * `trackStops`: within this turn's reach, so the train always gets there.
-   * Fees are paid as for a run to a town. Any heading is dropped: stopping
-   * here is the new plan.
+   * Runs a player's train toward a point on the track, to stop there short
+   * of any town (see the notes at the top). Like a run to a town: if the
+   * point is beyond this turn's reach, the train goes as far as it can and
+   * keeps the point as its heading for the turns after; fees are paid the
+   * same way.
    *
    * @param {number} playerId - The player
    * @param {string} nodeKey - The point's node key (see network.js)
-   * @returns {{ok: boolean, error?: string, km?: number,
-   *   paid?: Array<{ownerId: number, amount: number}>, near?: Object|null}}
-   *   Whether it moved, how far it went, the fees paid, and the town nearest
-   *   where it stopped (see `nearestTownOf`)
+   * @returns {{ok: boolean, error?: string, arrived?: boolean, km?: number,
+   *   paid?: Array<{ownerId: number, amount: number}>, point?: Object}}
+   *   Whether it moved, whether it got there, how far it went, the fees
+   *   paid, and the point (see `trackPoint`)
    */
   function moveTrainToTrack(playerId, nodeKey) {
     const blocked = whyCannotMove(playerId)
     if (blocked) return refuse(blocked)
-    const node = networkStore.network.nodes.get(nodeKey)
-    if (!node || node.town) return refuse('There is no such point on the track.')
+    const point = trackPoint(nodeKey)
+    if (!point || networkStore.network.nodes.get(nodeKey).town) {
+      return refuse('There is no such point on the track.')
+    }
     if (trainOf(playerId).position.nodeKey === nodeKey) {
       return refuse("You're already there.")
     }
     const route = routesFor(playerId).get(nodeKey)
     if (!route) return refuse('No track joins your train to that point.')
-    if (route.km > kmLeft(playerId) + 1e-9) {
-      return refuse('That point is further than your train can run this turn.')
-    }
 
     const result = runAlong(playerId, route)
     if (!result.ok) return result
-    storedTrain(playerId).heading = null
-    const near = nearestTownOf(playerId)?.town ?? null
+    Object.assign(storedTrain(playerId), {
+      heading: null,
+      headingPoint: result.arrived ? null : nodeKey
+    })
     historyStore.record(playerId, {
       type: 'move',
-      town: near?.name ?? null,
+      town: point.near?.name ?? null,
       onTrack: true,
-      arrived: true,
+      isEnd: point.isEnd,
+      arrived: result.arrived,
       paid: result.paid
     })
-    return { ok: true, km: result.km, paid: result.paid, near }
+    return { ...result, point }
   }
 
   /**
@@ -785,6 +875,7 @@ export const useTrainsStore = defineStore('trains', () => {
     whyCannotLoad,
     isStillMoving,
     destinations,
+    lineEnds,
     headingOf,
     trackStops,
     nearestTownOf,

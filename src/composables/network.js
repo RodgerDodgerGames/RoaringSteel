@@ -6,13 +6,27 @@
  *
  * Track is stored as sections, each a line of points (see the track store).
  * Here every point becomes a stop on the network (a node), and each straight
- * leg between two points a stretch of track (an edge). Sections join where
- * they share a point: a section is always started in a town or on a point of
- * a section already built (an end or a bend), and a town clicked while
- * drawing puts the point exactly on the town, so shared points are exactly
- * equal. Lines that merely
- * cross do not join — as in Empire Builder, where lines cross at a milepost
- * but a train cannot turn from one onto the other there.
+ * leg between two points a stretch of track (an edge).
+ *
+ * Track joins wherever it meets, whoever owns it:
+ * - where two sections share a point (a section started on an end or bend
+ *   of another, or a town clicked while drawing, which puts the point
+ *   exactly on the town);
+ * - where a point of one section lies on a leg of another, part way along
+ *   it (a line drawn to or from the middle of a leg);
+ * - where two legs cross.
+ * A train may turn from one line onto the other at any of these, as on a
+ * player's own track in Empire Builder; running on someone else's track
+ * still costs the fee (see the trains store). The second and third kinds
+ * are found here, each time the network is built, rather than written into
+ * the saved track, so a game saved before track joined this way joins as
+ * soon as it is loaded.
+ *
+ * "Lies on" and "cross" are judged as the map draws track: a leg is a
+ * straight line on the map's Web Mercator projection, and the drawing tool
+ * snaps a point onto a leg along that line. A point counts as on a leg
+ * within `TOUCH_KM`, which only has to absorb floating-point noise; lines
+ * that merely pass close to each other do not join.
  *
  * Every town is a node too, joined to whatever track has a point on it, so a
  * town with no track still has a place on the network (with nowhere to go).
@@ -23,7 +37,9 @@
  * - part way along a stretch of track, where its last move ran out:
  *   `nodeKey` is null, `cameFrom` and `ahead` are the nodes behind and in
  *   front of it, and `ownerId` whose track it is on.
- * In both cases `lat`/`lng` is the spot itself.
+ * In both cases `lat`/`lng` is the spot itself. Track built since a train
+ * stopped part way along can put a junction between it and `cameFrom` or
+ * `ahead`; the stretch it is on is then found afresh (see `stretchAt`).
  *
  * A train may only reverse in a town (Empire Builder's rule), so a train
  * standing anywhere else must carry on the way it was going: its first step
@@ -38,6 +54,195 @@ import { kmBetween } from '@/composables/map/trackCost'
 
 /** How close, in km, two lengths may be and still count as equal */
 const KM_EPSILON = 1e-9
+
+/**
+ * How close, in km, a point must be to a leg of track to count as on it: 2 m.
+ * A point the drawing tool snapped onto a leg is on it to within a hair, so
+ * this is kept small, and lines a player only drew near each other do not
+ * join.
+ */
+const TOUCH_KM = 0.002
+
+/**
+ * Slack, in degrees, added round each leg's box when looking for legs that
+ * might meet (see `findJunctions`): comfortably more than `TOUCH_KM`, so no
+ * pair within it is missed.
+ */
+const BOX_SLACK = 1e-4
+
+/**
+ * A point on the map's Web Mercator projection, in degrees: longitude as it
+ * is, and latitude stretched as the map stretches it toward the poles. A
+ * straight leg on the map is a straight line here.
+ * @param {{lat: number, lng: number}} point - The point
+ * @returns {{x: number, y: number}} Its place on the projection
+ */
+function toMercator({ lat, lng }) {
+  return { x: lng, y: (Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360)) * 180) / Math.PI }
+}
+
+/**
+ * The point at a place on the Web Mercator projection: `toMercator` undone.
+ * @param {{x: number, y: number}} place - The place, in degrees
+ * @returns {{lat: number, lng: number}} The point
+ */
+function fromMercator({ x, y }) {
+  return { lat: (Math.atan(Math.exp((y * Math.PI) / 180)) * 360) / Math.PI - 90, lng: x }
+}
+
+/**
+ * Where along a leg a point falls, and how far off the leg it is.
+ * @param {{lat: number, lng: number}} point - The point
+ * @param {{a: Object, b: Object, A: Object, B: Object}} leg - The leg: its
+ *   ends `a` and `b`, and the same on the projection as `A` and `B`
+ * @returns {{t: number, km: number}} `t` runs from 0 at `a` to 1 at `b` (the
+ *   nearest place on the leg's line, kept to the leg itself), and `km` is
+ *   how far the point is from that place
+ */
+function placeOnLeg(point, leg) {
+  const P = toMercator(point)
+  const dx = leg.B.x - leg.A.x
+  const dy = leg.B.y - leg.A.y
+  const lengthSquared = dx * dx + dy * dy
+  const t =
+    lengthSquared === 0
+      ? 0
+      : Math.min(1, Math.max(0, ((P.x - leg.A.x) * dx + (P.y - leg.A.y) * dy) / lengthSquared))
+  const nearest = fromMercator({ x: leg.A.x + t * dx, y: leg.A.y + t * dy })
+  return { t, km: kmBetween(point, nearest) }
+}
+
+/**
+ * Whether a point lies on a leg part way along it: on its line, and not at
+ * (or within a hair of) either end, where the leg already has a node.
+ * @param {{lat: number, lng: number}} point - The point
+ * @param {Object} leg - The leg (see `placeOnLeg`)
+ * @returns {number|null} Where along the leg it lies (see `placeOnLeg`), or
+ *   null when it is not part way along it
+ */
+function partWayAlong(point, leg) {
+  const { t, km } = placeOnLeg(point, leg)
+  if (km > TOUCH_KM) return null
+  if (kmBetween(point, leg.a) <= TOUCH_KM || kmBetween(point, leg.b) <= TOUCH_KM) return null
+  return t
+}
+
+/**
+ * Where two legs cross part way along both, if they do.
+ *
+ * Only a true crossing counts: legs that are parallel, or that meet at (or
+ * within a hair of) an end of either, do not cross here. A meeting at an end
+ * is either a shared point or an end lying on the other leg, both of which
+ * are found otherwise.
+ *
+ * @param {Object} first - One leg (see `placeOnLeg`)
+ * @param {Object} second - The other
+ * @returns {{point: Object, s: number, t: number}|null} The crossing, and
+ *   where along each leg it is (see `placeOnLeg`); null if they do not cross
+ */
+function crossing(first, second) {
+  const rx = first.B.x - first.A.x
+  const ry = first.B.y - first.A.y
+  const qx = second.B.x - second.A.x
+  const qy = second.B.y - second.A.y
+  const denominator = rx * qy - ry * qx
+  if (denominator === 0) return null
+  const wx = second.A.x - first.A.x
+  const wy = second.A.y - first.A.y
+  const s = (wx * qy - wy * qx) / denominator
+  const t = (wx * ry - wy * rx) / denominator
+  if (s <= 0 || s >= 1 || t <= 0 || t >= 1) return null
+  const point = fromMercator({ x: first.A.x + s * rx, y: first.A.y + s * ry })
+  const nearAnEnd = [first.a, first.b, second.a, second.b].some(
+    (end) => kmBetween(point, end) <= TOUCH_KM
+  )
+  return nearAnEnd ? null : { point, s, t }
+}
+
+/**
+ * Every leg of every section, ready for finding where they meet: its ends,
+ * their keys, the same ends on the projection, and its box there. A leg that
+ * starts and ends on the same point goes nowhere and is left out.
+ * @param {Array<Object>} segments - Every section of track
+ * @returns {Array<Object>} The legs, each { a, b, aKey, bKey, A, B, ownerId,
+ *   minX, maxX, minY, maxY, splits }, where `splits` is filled with the
+ *   junctions found part way along it (see `findJunctions`)
+ */
+function legsOf(segments) {
+  const legs = []
+  segments.forEach(({ ownerId, coordinates }) => {
+    coordinates.slice(1).forEach((b, i) => {
+      const a = coordinates[i]
+      const aKey = pointKey(a)
+      const bKey = pointKey(b)
+      if (aKey === bKey) return
+      const A = toMercator(a)
+      const B = toMercator(b)
+      legs.push({
+        a,
+        b,
+        aKey,
+        bKey,
+        A,
+        B,
+        ownerId,
+        minX: Math.min(A.x, B.x) - BOX_SLACK,
+        maxX: Math.max(A.x, B.x) + BOX_SLACK,
+        minY: Math.min(A.y, B.y) - BOX_SLACK,
+        maxY: Math.max(A.y, B.y) + BOX_SLACK,
+        splits: []
+      })
+    })
+  })
+  return legs
+}
+
+/**
+ * Finds every junction part way along a leg — where a point of another leg
+ * lies on it, or another leg crosses it — and notes each on the leg it
+ * splits, as { t, point } (see `placeOnLeg`). A crossing splits both legs at
+ * the same point, so both get the same node.
+ *
+ * Every leg is checked against every other whose box overlaps its own,
+ * found by sorting the legs west to east and sweeping across them, so the
+ * many legs of a long network are not all checked against each other.
+ *
+ * @param {Array<Object>} legs - From `legsOf`; their `splits` are filled in
+ */
+function findJunctions(legs) {
+  const sorted = [...legs].sort((first, second) => first.minX - second.minX)
+  sorted.forEach((first, i) => {
+    for (let j = i + 1; j < sorted.length && sorted[j].minX <= first.maxX; j++) {
+      const second = sorted[j]
+      if (second.minY > first.maxY || second.maxY < first.minY) continue
+      const firstKeys = [first.aKey, first.bKey]
+      const secondKeys = [second.aKey, second.bKey]
+
+      // A point of one leg lying part way along the other
+      ;[
+        [first, second, secondKeys],
+        [second, first, firstKeys]
+      ].forEach(([leg, other, otherKeys]) => {
+        ;[
+          [leg.a, leg.aKey],
+          [leg.b, leg.bKey]
+        ].forEach(([point, key]) => {
+          if (otherKeys.includes(key)) return
+          const t = partWayAlong(point, other)
+          if (t !== null) other.splits.push({ t, point })
+        })
+      })
+
+      // Legs that share a point cannot also cross part way along both
+      if (firstKeys.some((key) => secondKeys.includes(key))) continue
+      const crossed = crossing(first, second)
+      if (crossed) {
+        first.splits.push({ t: crossed.s, point: crossed.point })
+        second.splits.push({ t: crossed.t, point: crossed.point })
+      }
+    }
+  })
+}
 
 /**
  * The key a point is filed under. Rounded to six decimal places (about a
@@ -88,20 +293,49 @@ export function buildNetwork(segments, towns) {
 
   towns.forEach((town) => addNode({ lat: town.lat, lng: town.lon }, town))
 
-  segments.forEach(({ ownerId, coordinates }) => {
-    coordinates.slice(1).forEach((to, i) => {
-      const from = coordinates[i]
+  const legs = legsOf(segments)
+  findJunctions(legs)
+
+  // Each leg runs from one end to the other through its junctions in order,
+  // a stretch of track between each stop and the next
+  legs.forEach((leg) => {
+    const stops = [
+      leg.a,
+      ...leg.splits.sort((first, second) => first.t - second.t).map(({ point }) => point),
+      leg.b
+    ]
+    stops.slice(1).forEach((to, i) => {
+      const from = stops[i]
       const a = addNode(from)
       const b = addNode(to)
-      // A leg that starts and ends on the same point goes nowhere
+      // Two junctions at the same point (two legs crossing there) are one
       if (a === b) return
       const km = kmBetween(from, to)
-      adjacency.get(a).push({ to: b, km, ownerId })
-      adjacency.get(b).push({ to: a, km, ownerId })
+      adjacency.get(a).push({ to: b, km, ownerId: leg.ownerId })
+      adjacency.get(b).push({ to: a, km, ownerId: leg.ownerId })
     })
   })
 
   return { nodes, adjacency }
+}
+
+/**
+ * Whether a point lies on a section of track in a way that joins it: exactly
+ * on one of its points (the same key), or part way along one of its legs, as
+ * the map draws them (see the module notes) — the two ways `buildNetwork`
+ * joins a point to track. A point within a hair of an end or bend without
+ * being on it would not join, so it does not count. Where a player may start
+ * a new section: anywhere on their own track, since the new section joins
+ * the network wherever it starts on it.
+ * @param {{lat: number, lng: number}} point - The point
+ * @param {Array<Object>} segments - The sections to look on
+ * @returns {boolean} True if the point is on one of them
+ */
+export function liesOnTrack(point, segments) {
+  const key = pointKey(point)
+  return legsOf(segments).some(
+    (leg) => leg.aKey === key || leg.bKey === key || partWayAlong(point, leg) !== null
+  )
 }
 
 /**
@@ -129,9 +363,10 @@ export function positionAtNode(network, key, cameFrom = null) {
  * track it may set off along, honoring the no-reversing rule.
  * @param {Object} network - From `buildNetwork`
  * @param {Object} position - Where the train is (see the module notes)
- * @returns {Array<{from: string|null, to: string, km: number, ownerId: number}>}
- *   Each first step; `from` is the node set off from, or null when the train
- *   is part way along a stretch
+ * @returns {Array<{from: string|null, behind?: string, to: string, km: number,
+ *   ownerId: number}>} Each first step; `from` is the node set off from, or
+ *   null when the train is part way along a stretch, and then `behind` is
+ *   the node just behind it there (see `stretchAt`)
  */
 function firstSteps(network, position) {
   if (position.nodeKey) {
@@ -146,16 +381,65 @@ function firstSteps(network, position) {
   }
 
   // Part way along a stretch: only onward, to the node ahead
-  const ahead = network.nodes.get(position.ahead)
-  if (!ahead) return []
+  const { behind, ahead } = stretchAt(network, position)
+  const aheadNode = network.nodes.get(ahead)
+  if (!aheadNode) return []
   return [
     {
       from: null,
-      to: position.ahead,
-      km: kmBetween(position, ahead),
+      behind,
+      to: ahead,
+      km: kmBetween(position, aheadNode),
       ownerId: position.ownerId
     }
   ]
+}
+
+/**
+ * The stretch of track a train stopped part way along is on now: the nodes
+ * just behind and just ahead of it.
+ *
+ * Those are `cameFrom` and `ahead` as the train stopped, unless track built
+ * since has put a junction between it and one of them — a line crossing the
+ * leg, or drawn to the middle of it. Such a junction lies on the line from
+ * `cameFrom` to `ahead`, so the stretch is found by walking that line from
+ * `cameFrom`, node by node, until the next node is past the train.
+ *
+ * @param {Object} network - From `buildNetwork`
+ * @param {Object} position - A position part way along a stretch (see the
+ *   module notes)
+ * @returns {{behind: string, ahead: string}} The node keys behind and ahead
+ *   of the train; `cameFrom` and `ahead` as they are when either is no
+ *   longer on the network, or no track joins them any more
+ */
+export function stretchAt(network, position) {
+  const asStopped = { behind: position.cameFrom, ahead: position.ahead }
+  const start = network.nodes.get(position.cameFrom)
+  const end = network.nodes.get(position.ahead)
+  if (!start || !end) return asStopped
+  const leg = { a: start, b: end, A: toMercator(start), B: toMercator(end) }
+  const trainAt = placeOnLeg(position, leg).t
+
+  let behind = position.cameFrom
+  let behindAt = 0
+  for (;;) {
+    // The nearest node further along the line than `behind`, joined to it
+    let next = null
+    network.adjacency.get(behind).forEach(({ to }) => {
+      let at = 1
+      if (to !== position.ahead) {
+        const { t, km } = placeOnLeg(network.nodes.get(to), leg)
+        if (km > TOUCH_KM || t <= behindAt || t >= 1) return
+        at = t
+      }
+      if (!next || at < next.at) next = { key: to, at }
+    })
+    if (!next) return asStopped
+    // A junction exactly where the train stands counts as ahead of it
+    if (next.at >= trainAt) return { behind, ahead: next.key }
+    behind = next.key
+    behindAt = next.at
+  }
 }
 
 /**
@@ -197,8 +481,9 @@ export function shortestRoutes(network, position, { owners = null } = {}) {
 
   firstSteps(network, position)
     .filter(isAllowed)
-    // Set off part way along a stretch, the node behind is the one it came from
-    .forEach((step) => offer(step.from ?? position.cameFrom, step, step.km, null))
+    // Set off part way along a stretch, the node behind is the one just
+    // behind the train on it
+    .forEach((step) => offer(step.from ?? step.behind, step, step.km, null))
 
   // For each node, the arrival that reaches it soonest
   const nearest = new Map()
@@ -249,13 +534,14 @@ export function shortestRoutes(network, position, { owners = null } = {}) {
  */
 export function nearestTown(network, position) {
   // Where the search starts: the node the train is on, or, part way along a
-  // stretch, the nodes at either end of it, each as far as the train is from
-  // it. A node no longer on the network (say, a save whose towns have since
-  // changed) is no place to start from.
+  // stretch, the nodes at either end of it (see `stretchAt`), each as far as
+  // the train is from it. A node no longer on the network (say, a save whose
+  // towns have since changed) is no place to start from.
+  const stretch = position.nodeKey ? null : stretchAt(network, position)
   const starts = (
     position.nodeKey
       ? [{ key: position.nodeKey, km: 0 }]
-      : [position.cameFrom, position.ahead].map((key) => ({
+      : [stretch.behind, stretch.ahead].map((key) => ({
           key,
           km: network.nodes.has(key) ? kmBetween(position, network.nodes.get(key)) : 0
         }))
@@ -371,21 +657,25 @@ export function runRoute(network, position, steps, maxKm) {
       km += step.km
       // The node it came from: the one the step set off from, or, for a step
       // begun part way along a stretch, the node behind it on that stretch
-      current = positionAtNode(network, step.to, step.from ?? current.cameFrom)
+      current = positionAtNode(network, step.to, step.from ?? step.behind)
       continue
     }
 
-    // Runs out part way along this stretch
-    const from = step.from ? network.nodes.get(step.from) : current
-    const to = network.nodes.get(step.to)
+    // Runs out part way along this stretch. The spot is found on the map's
+    // projection, where the stretch is drawn straight, so the train stands on
+    // the line as drawn — and where `stretchAt` measures junctions along it.
+    const from = toMercator(step.from ? network.nodes.get(step.from) : current)
+    const to = toMercator(network.nodes.get(step.to))
     const share = left / step.km
     km += left
     current = {
-      lat: from.lat + (to.lat - from.lat) * share,
-      lng: from.lng + (to.lng - from.lng) * share,
+      ...fromMercator({
+        x: from.x + (to.x - from.x) * share,
+        y: from.y + (to.y - from.y) * share
+      }),
       nodeKey: null,
       townId: null,
-      cameFrom: step.from ?? current.cameFrom,
+      cameFrom: step.from ?? step.behind,
       ahead: step.to,
       ownerId: step.ownerId
     }

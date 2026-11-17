@@ -192,8 +192,8 @@
   white-space: nowrap;
   font-family: var(--bulma-family-primary);
   font-style: italic;
-  font-size: 0.85rem;
-  color: #24a8e5;
+  font-size: 0.9rem;
+  color: #25baff;
   -webkit-text-stroke: 2px var(--coal);
   paint-order: stroke fill;
   text-shadow: 0 0 3px var(--coal);
@@ -206,6 +206,14 @@
   font-size: 0.9rem;
   letter-spacing: 0.09em;
 }
+
+/* water styling while in plan view */
+.is-plan-view .water-label {
+  font-size: 0.75rem;
+} 
+.is-plan-view .water-label--area {
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
 }
 
 /* While the leg out to the cursor costs more than the player can spend (see

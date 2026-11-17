@@ -15,9 +15,11 @@
  * - { type: 'place', town }                 the train put on the board
  * - { type: 'move', town, arrived, paid }   a run toward a town; `paid` is
  *                                           the track fees, [{ ownerId, amount }]
- * - { type: 'move', onTrack: true, town, arrived, paid }   a run to a point on
- *                                           the track; `town` is the one nearest
- *                                           it by track, or null
+ * - { type: 'move', onTrack: true, isEnd, town, arrived, paid }   a run to
+ *                                           a point on the track; `town` is the
+ *                                           one nearest it by track, or null, and
+ *                                           `isEnd` whether it is an end of the
+ *                                           line
  * - { type: 'pickup', industry, town }
  * - { type: 'deliver', industry, town, payoff }
  * - { type: 'drop', industry, town }
@@ -38,6 +40,7 @@
 
 import { formatCurrency } from '@/composables/utils'
 import { pointKey } from '@/composables/network'
+import { trackPointName } from '@/composables/trainStatus'
 
 /**
  * Joins phrases into an English list: "a", "a and b", "a, b, and c".
@@ -106,13 +109,13 @@ function feesPaid(events) {
 
 /**
  * Where a run went, in words: the town, or, for a run to a point on the
- * track, "the track near Pueblo".
+ * track, "the track near Pueblo" or "the end of the line near Willmar".
  * @param {Object} event - A 'move' event
  * @returns {string} The place
  */
-function movePlace({ town, onTrack }) {
+function movePlace({ town, onTrack, isEnd = false }) {
   if (!onTrack) return town
-  return town ? `the track near ${town}` : 'a point on the track'
+  return trackPointName({ near: town ? { name: town } : null, isEnd })
 }
 
 /** A section of track in words: "built $5,000 of track, reaching Denver" */
@@ -135,7 +138,7 @@ export function describeEvent(event, nameOf) {
     case 'move': {
       const run = event.arrived
         ? `Ran to ${movePlace(event)}`
-        : `Headed for ${event.town}, stopping short`
+        : `Headed for ${movePlace(event)}, stopping short`
       const fees = (event.paid ?? []).map(
         ({ ownerId, amount }) => `${nameOf(ownerId)} ${formatCurrency(amount)}`
       )
@@ -219,7 +222,9 @@ export function summarizeTurn(turn, nameOf) {
   const trainEvents = events.filter(({ type }) => type !== 'build' && type !== 'upgrade')
   const lastMove = trainEvents.at(-1)?.type === 'move' ? trainEvents.at(-1) : null
   if (lastMove) {
-    parts.push(lastMove.arrived ? `ran to ${movePlace(lastMove)}` : `headed for ${lastMove.town}`)
+    parts.push(
+      lastMove.arrived ? `ran to ${movePlace(lastMove)}` : `headed for ${movePlace(lastMove)}`
+    )
   }
 
   const fees = feesPaid(events)

@@ -2,7 +2,7 @@
  * Start Rule (startRule.js)
  *
  * Where a player's track may start. A section of track always may start on
- * the player's own track (at an end or bend of it, see trackBuilder.js).
+ * the player's own track (anywhere along it, see trackBuilder.js).
  * Away from it — the very first section, or a new piece of network on its
  * own — it starts in a town:
  * - with the game setting "Require track network to start in Major City"
@@ -42,7 +42,7 @@ export function startPlace(requireMajorCity) {
  * @returns {string} The rule, as a sentence
  */
 export function startRuleMessage(requireMajorCity) {
-  return `Track must start in ${startPlace(requireMajorCity)}, or at an end or bend of your own track.`
+  return `Track must start in ${startPlace(requireMajorCity)}, or anywhere on your own track.`
 }
 
 /**

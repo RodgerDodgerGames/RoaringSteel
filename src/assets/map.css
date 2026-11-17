@@ -258,3 +258,15 @@
 .track-stop:focus-visible .track-stop__ring {
   transform: scale(1.5);
 }
+
+/* A point beyond this turn's run, which the train would head for over
+   several turns: the same ring, faded, so the points it reaches now stand
+   out. Back to full strength under the pointer, as it is still a button. */
+.track-stop.is-later .track-stop__ring {
+  opacity: 0.45;
+}
+
+.track-stop.is-later:hover .track-stop__ring,
+.track-stop.is-later:focus-visible .track-stop__ring {
+  opacity: 1;
+}

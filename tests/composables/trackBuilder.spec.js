@@ -105,6 +105,23 @@ describe('useTrackBuilder', () => {
     )
   })
 
+  it("should branch off part way along a leg of the player's own track", () => {
+    // One straight leg, and a branch from the middle of it, away south
+    builder.buildSection(ANN, [centerOf(0), centerOf(4)])
+    const middle = centerOf(2)
+
+    expect(builder.buildSection(ANN, [middle, { lat: -2 * CELL, lng: middle.lng }]).ok).toBe(true)
+  })
+
+  it("should not start a section part way along another player's leg", () => {
+    trackStore.addSegment({ ownerId: BO, coordinates: [centerOf(1), centerOf(4)] })
+    const middle = centerOf(2)
+
+    expect(builder.buildSection(ANN, [middle, { lat: -2 * CELL, lng: middle.lng }]).error).toBe(
+      startRuleMessage(false)
+    )
+  })
+
   it('should start a section in a town that is not a major city, when the game allows it', () => {
     expect(builder.buildSection(ANN, [centerOf(5), centerOf(3)]).ok).toBe(true)
   })

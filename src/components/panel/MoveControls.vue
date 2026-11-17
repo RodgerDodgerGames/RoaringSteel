@@ -4,11 +4,13 @@
   The "move your train" half of a turn, as it appears in the player dock:
 
   - on the player's first running turn, placing the train in a town
-  - running the train to a town, picked from a list (nearest first, with the
+  - running the train to a town, or to an end of its line, picked from a
+    list (towns nearest first, then the ends of the line, each with the
     distance, how many turns it takes, a dot for each other player whose
     track the way uses, and any fee for their track) or clicked on the map
-  - carrying on toward a town a run of more than one turn is still heading
-    for: it is chosen in the list already, with Confirm in place of Go
+  - carrying on toward a town or point a run of more than one turn is still
+    heading for: it is chosen in the list already, with Confirm in place of
+    Go
   - in a town: picking up what it produces, delivering loads the player's
     demand cards want there, and dropping loads
 
@@ -36,7 +38,8 @@ const {
   trainType,
   moveBlock,
   loadBlock,
-  destinations,
+  runChoices,
+  headingChoiceId,
   heading,
   status,
   pickups,
@@ -46,7 +49,7 @@ const {
   nameOf,
   colorOf,
   place,
-  move,
+  run,
   pickUp,
   deliver,
   drop,
@@ -71,27 +74,27 @@ watch(
   }
 )
 
-/** The town picked in the list, to place the train in or run it to */
-const chosenTownId = ref('')
+/** The town picked to place the train in */
+const placeTownId = ref('')
 
-/** The town the train is still heading for, if track leads there, or null */
-const headingTownId = computed(() => (heading.value?.route ? heading.value.town.msa : null))
+/** The place picked in the "Run to" list, by its id (see `runChoices`) */
+const chosenId = ref('')
 
 /**
- * What the list starts on: the town the train is heading for, so carrying on
- * is one Confirm, or nothing.
- * @param {Array<Object>} list - The destinations
- * @returns {string} The town's id, or ''
+ * What the list starts on: the place the train is heading for, so carrying
+ * on is one Confirm, or nothing.
+ * @param {Array<Object>} list - The choices
+ * @returns {string} The place's id, or ''
  */
 function startingChoice(list) {
-  return list.some((option) => option.town.msa === headingTownId.value) ? headingTownId.value : ''
+  return list.some((option) => option.id === headingChoiceId.value) ? headingChoiceId.value : ''
 }
 
 // The list is worked out again whenever anything it depends on changes. A
 // choice still in it stays; one the train has run to (or past) is gone.
-watch(destinations, (list) => {
-  if (!list.some((option) => option.town.msa === chosenTownId.value)) {
-    chosenTownId.value = startingChoice(list)
+watch(runChoices, (list) => {
+  if (!list.some((option) => option.id === chosenId.value)) {
+    chosenId.value = startingChoice(list)
   }
 })
 
@@ -100,26 +103,26 @@ watch(destinations, (list) => {
 watch(
   [train, () => train.value.kmThisTurn === 0],
   () => {
-    chosenTownId.value = startingChoice(destinations.value)
+    chosenId.value = startingChoice(runChoices.value)
   },
   { immediate: true }
 )
 
-/** Whether the town chosen is the one the train is already heading for */
+/** Whether the place chosen is the one the train is already heading for */
 const isCarryingOn = computed(
-  () => Boolean(chosenTownId.value) && chosenTownId.value === headingTownId.value
+  () => Boolean(chosenId.value) && chosenId.value === headingChoiceId.value
 )
 
 /**
- * How a destination reads in the list: its name, how far, how many turns it
- * takes, and what this turn's part of the way costs.
- * @param {Object} destination - From the trains store's `destinations`
- * @returns {string} The option's text, e.g. "Denver — 14 (2 turns) · $4M to Ann"
+ * How a place reads in the list: its name, how far, how many turns it takes,
+ * and what this turn's part of the way costs.
+ * @param {{name: string, entry: Object}} choice - From `runChoices`
+ * @returns {string} The option's text, e.g. "Denver — 14 (2 turns) · $4M to
+ *   Ann", or "End of the line near Willmar — 3.2 (this turn)"
  */
-function destinationLabel(destination) {
-  const { town: place, km, payTo, fee } = destination
-  const label = `${place.name} — ${distance(km)} (${turnsText(destination)})`
-  return fee ? `${label} · ${feeText(fee, payTo)}` : label
+function choiceLabel({ name, entry }) {
+  const label = `${name} — ${distance(entry.km)} (${turnsText(entry)})`
+  return entry.fee ? `${label} · ${feeText(entry.fee, entry.payTo)}` : label
 }
 
 /**
@@ -132,18 +135,18 @@ function feeText(fee, payTo) {
   return `${formatCurrency(fee)} to ${payTo.map(nameOf).join(', ')}`
 }
 
-/** The towns as the dropdown shows them, with a dot per other track owner */
-const destinationOptions = computed(() =>
-  destinations.value.map((destination) => ({
-    id: destination.town.msa,
-    label: destinationLabel(destination),
-    owners: destination.owners.map((id) => ({ id, name: nameOf(id), color: colorOf(id) }))
+/** The places as the dropdown shows them, with a dot per other track owner */
+const runOptions = computed(() =>
+  runChoices.value.map((choice) => ({
+    id: choice.id,
+    label: choiceLabel(choice),
+    owners: choice.entry.owners.map((id) => ({ id, name: nameOf(id), color: colorOf(id) }))
   }))
 )
 
 /**
  * What the run button says: Go for a new run, Confirm for carrying on toward
- * the town the train is heading for, with what this turn of it costs.
+ * the place the train is heading for, with what this turn of it costs.
  */
 const runButtonText = computed(() => {
   if (!isCarryingOn.value) return 'Go'
@@ -171,7 +174,7 @@ const runButtonText = computed(() => {
         <div class="field has-addons">
           <div class="control is-expanded">
             <div class="select is-small is-fullwidth">
-              <select v-model="chosenTownId" aria-label="Town to place your train in">
+              <select v-model="placeTownId" aria-label="Town to place your train in">
                 <option value="" disabled>Choose a town…</option>
                 <option v-for="option in towns" :key="option.msa" :value="option.msa">
                   {{ option.name }}
@@ -182,8 +185,8 @@ const runButtonText = computed(() => {
           <div class="control">
             <button
               class="button is-small is-primary"
-              :disabled="!chosenTownId"
-              @click="place(chosenTownId)"
+              :disabled="!placeTownId"
+              @click="place(placeTownId)"
             >
               Place
             </button>
@@ -196,15 +199,15 @@ const runButtonText = computed(() => {
         <p v-if="moveBlock" class="move-controls__note">{{ moveBlock }}</p>
         <template v-else>
           <DestinationSelect
-            v-model="chosenTownId"
-            :options="destinationOptions"
-            :placeholder="destinations.length ? 'Run to…' : 'No track leads anywhere from here'"
-            aria-label="Town to run your train to"
+            v-model="chosenId"
+            :options="runOptions"
+            :placeholder="runOptions.length ? 'Run to…' : 'No track leads anywhere from here'"
+            aria-label="Where to run your train"
           />
           <button
             class="button is-primary is-fullwidth"
-            :disabled="!chosenTownId"
-            @click="move(chosenTownId)"
+            :disabled="!chosenId"
+            @click="run(chosenId)"
           >
             {{ runButtonText }}
           </button>

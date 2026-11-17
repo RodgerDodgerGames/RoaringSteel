@@ -151,6 +151,21 @@ describe('turnHistory', () => {
       expect(lines).toEqual(['Ran to the track near Pueblo', 'Ran to a point on the track'])
     })
 
+    it('should name an end of the line, and a run toward a point that stopped short', () => {
+      const lines = turnLines(
+        turn([
+          { type: 'move', town: 'Pueblo', onTrack: true, isEnd: true, arrived: true, paid: [] },
+          { type: 'move', town: 'Pueblo', onTrack: true, isEnd: false, arrived: false, paid: [] }
+        ]),
+        nameOf
+      )
+
+      expect(lines).toEqual([
+        'Ran to the end of the line near Pueblo',
+        'Headed for the track near Pueblo, stopping short'
+      ])
+    })
+
     it('should end with the win, for a winning turn', () => {
       expect(turnLines(turn([], { won: true }), nameOf)).toEqual(['Won the game!'])
     })

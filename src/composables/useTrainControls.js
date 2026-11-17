@@ -11,7 +11,8 @@
  * action went, are shared with the map's stop card and commodity icons
  * through the train stop store. This also runs choosing a town on the map:
  * while that is on, clicking a town places the train there, or runs it
- * there, and clicking a marked point on the track runs it there and stops.
+ * there, and clicking a marked point on the track runs it there (or toward
+ * it, if it is too far for one turn) and stops.
  * Placing the train in a town, or running it into one, opens the town's stop
  * card when it has anything for the train.
  *
@@ -32,7 +33,7 @@ import { useTrainStopStore } from '@/stores/trainStop'
 import { buildTrackKey } from '@/composables/map/useBuildTrack'
 import { formatCurrency } from '@/composables/utils'
 import { formatDistance } from '@/composables/boardScale'
-import { whereabouts } from '@/composables/trainStatus'
+import { whereabouts, trackPointName, trackPointTitle } from '@/composables/trainStatus'
 
 export function useTrainControls() {
   const playerStore = usePlayerStore()
@@ -77,16 +78,58 @@ export function useTrainControls() {
   /** Why nothing can be loaded or unloaded now, or null */
   const loadBlock = computed(() => trainsStore.whyCannotLoad(playerId.value))
 
-  /** Where the train can go, nearest first (see the trains store) */
-  const destinations = computed(() =>
-    moveBlock.value ? [] : trainsStore.destinations(playerId.value)
-  )
-
   /**
-   * The town a run of more than one turn is still on its way to, and how it
-   * stands now, or null (see the trains store's `headingOf`)
+   * The town, or point on the track, a run of more than one turn is still on
+   * its way to, and how it stands now, or null (see the trains store's
+   * `headingOf`)
    */
   const heading = computed(() => trainsStore.headingOf(playerId.value))
+
+  /**
+   * Everywhere the "Run to" list offers, each { id, kind, key, name, entry }:
+   * the towns
+   * the train can get to, nearest first, then the ends of its owner's line
+   * (see the trains store's `destinations` and `lineEnds`). A point on the
+   * track the train is heading for, chosen on the map, joins the second
+   * group, so carrying on toward it is one Confirm like carrying on toward a
+   * town. `kind` is 'town' or 'point', and `key` the town's id or the
+   * point's node key; `id` puts the two together, as one list can hold a
+   * town and a point. `entry` is the store's entry for the place (how far,
+   * how long, whose track, what fees).
+   */
+  const runChoices = computed(() => {
+    if (moveBlock.value) return []
+    const towns = trainsStore.destinations(playerId.value).map((entry) => ({
+      id: `town:${entry.town.msa}`,
+      kind: 'town',
+      key: entry.town.msa,
+      name: entry.town.name,
+      entry
+    }))
+    const points = trainsStore.lineEnds(playerId.value)
+    const headingPoint = heading.value?.route ? heading.value.point : null
+    if (headingPoint && !points.some(({ point }) => point.key === headingPoint.key)) {
+      points.push({ point: headingPoint, ...heading.value.route })
+      points.sort((a, b) => a.km - b.km)
+    }
+    return [
+      ...towns,
+      ...points.map((entry) => ({
+        id: `point:${entry.point.key}`,
+        kind: 'point',
+        key: entry.point.key,
+        name: trackPointTitle(entry.point),
+        entry
+      }))
+    ]
+  })
+
+  /** The id in `runChoices` of where the train is heading, or null */
+  const headingChoiceId = computed(() => {
+    if (!heading.value?.route) return null
+    const { town: headingTown, point } = heading.value
+    return headingTown ? `town:${headingTown.msa}` : `point:${point.key}`
+  })
 
   /** Where the train is and where it is heading, in a sentence */
   const status = computed(() =>
@@ -165,15 +208,18 @@ export function useTrainControls() {
   }
 
   /**
-   * Runs the train to a point on the track and stops it there.
+   * Runs the train to a point on the track and stops it there, or toward it
+   * when it is too far for one turn.
    * @param {string} nodeKey - The point (see the trains store's `trackStops`)
    */
   function moveToTrack(nodeKey) {
     const result = trainStopStore.report(
       trainsStore.moveTrainToTrack(playerId.value, nodeKey),
-      ({ km, paid, near }) => {
-        const where = near ? `the track near ${near.name}` : 'a point on the track'
-        const run = `Ran ${Math.round(km)} km to ${where} and stopped there.`
+      ({ arrived, km, paid, point }) => {
+        const where = trackPointName(point)
+        const run = arrived
+          ? `Ran ${Math.round(km)} km to ${where} and stopped there.`
+          : `Ran ${Math.round(km)} km toward ${where} and stopped on the way.`
         const fees = paid.map(
           ({ ownerId, amount }) => `${formatCurrency(amount)} to ${nameOf(ownerId)}`
         )
@@ -182,6 +228,16 @@ export function useTrainControls() {
     )
     // Out on the line, the train is in no town, and any stop card closes
     if (result.ok) trainStopStore.arrive()
+  }
+
+  /**
+   * Runs the train to a place chosen in the "Run to" list.
+   * @param {string} id - The place's id (see `runChoices`)
+   */
+  function run(id) {
+    const choice = runChoices.value.find((option) => option.id === id)
+    if (choice?.kind === 'town') move(choice.key)
+    else if (choice?.kind === 'point') moveToTrack(choice.key)
   }
 
   // Loading and unloading go through the train stop store, which the map's
@@ -196,8 +252,8 @@ export function useTrainControls() {
   /**
    * Starts choosing a town on the map: each click places the train there,
    * or, once it is placed, runs it there. Once it is placed, the points on
-   * the track it can stop at this turn are marked too (see trackStopMarkers),
-   * and clicking one runs it there. Any drawing or removal is ended first.
+   * the track it can be run to are marked too (see trackStopMarkers), and
+   * clicking one runs it there. Any drawing or removal is ended first.
    * Choosing stays on, for a run through several stops, until Escape, the
    * Stop button, or the train has nowhere left to go this turn.
    */
@@ -249,7 +305,8 @@ export function useTrainControls() {
     distance,
     moveBlock,
     loadBlock,
-    destinations,
+    runChoices,
+    headingChoiceId,
     heading,
     status,
     pickups,
@@ -259,7 +316,7 @@ export function useTrainControls() {
     nameOf,
     colorOf,
     place,
-    move,
+    run,
     pickUp,
     deliver,
     drop,

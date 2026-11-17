@@ -11,9 +11,9 @@
  * - be built by the player whose turn it is, while the game is on;
  * - start in a town or on the player's own track — or, with the game
  *   setting for it on, in a major city, Empire Builder's own rule, so every
- *   network grows out of one (see startRule.js). "On" means at one of the
- *   points the track is drawn through (its ends and bends): that is where a
- *   new section joins the network (see network.js);
+ *   network grows out of one (see startRule.js). "On" means anywhere along
+ *   it: at an end or bend, or part way along a leg, where the new section
+ *   joins the network as a junction (see network.js);
  * - keep to the build rules (inside the region, bridges, spacing — see
  *   buildRules.js);
  * - cost no more than the player has left to spend this turn, in cash and
@@ -45,7 +45,7 @@ import {
 import { isEmptyGrid } from '@/composables/map/cellGrid'
 import { regionTest } from '@/composables/map/region'
 import { riversFor } from '@/composables/map/waterData'
-import { pointKey } from '@/composables/network'
+import { pointKey, liesOnTrack } from '@/composables/network'
 import { formatCurrency } from '@/composables/utils'
 import { startTowns, startRuleMessage } from '@/composables/startRule'
 import { affordableSection } from '@/composables/bot/botPathfinder'
@@ -152,15 +152,19 @@ export function useTrackBuilder() {
   }
 
   /**
-   * Whether a player may start a section at a point.
+   * Whether a player may start a section at a point: in a town they may
+   * start in, or anywhere on their own track — at one of its points, or part
+   * way along a leg (see network.js's `liesOnTrack`). The quick check of the
+   * points comes first; looking along every leg is only needed off them.
    * @param {number} playerId - The player
    * @param {{lat: number, lng: number}} point - Where the section would start
-   * @returns {boolean} True if it is one of their start points
+   * @returns {boolean} True if they may start there
    */
   function canStartAt(playerId, point) {
     const key = pointKey(point)
     const { towns, own } = startKeys.value
-    return towns.has(key) || Boolean(own.get(playerId)?.has(key))
+    if (towns.has(key) || own.get(playerId)?.has(key)) return true
+    return liesOnTrack(point, trackStore.segmentsForOwner(playerId))
   }
 
   /**

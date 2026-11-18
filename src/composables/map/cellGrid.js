@@ -42,8 +42,10 @@ import { latitudeDegreesToMeters } from '@/composables/setup/useMapSupport'
  * @property {Float32Array} elevation - Per cell, height in meters (NaN for a hole)
  * @property {Uint16Array} landCover - Per cell, the land cover's cost
  *   (see config/nlcd.js); 0 for a hole
- * @property {Float32Array} slope - Per cell, how steep its ground is, as a
- *   grade (see composables/map/slope.js); NaN until it is worked out
+ * @property {Float32Array} roughness - Per cell, how broken its ground is:
+ *   the average steepness between neighboring elevation pixels inside it, as
+ *   a grade (see useElevationTiles.js and `terrainCost` in trackCost.js);
+ *   NaN until it is worked out
  * @property {Uint8Array} water - Per cell, 1 if it is water track has to
  *   bridge: a lake or the sea (see composables/map/water.js)
  */
@@ -52,7 +54,7 @@ import { latitudeDegreesToMeters } from '@/composables/setup/useMapSupport'
  * A new grid with every cell a hole, ready to have its cells filled in.
  *
  * The values a cell holds fit their arrays: heights are whole meters, land
- * cover costs whole numbers no more than 9,990, and a slope is a grade that
+ * cover costs whole numbers no more than 9,990, and roughness is a grade that
  * a Float32 holds to about seven significant figures, far finer than any
  * price needs.
  *
@@ -78,7 +80,7 @@ export function createCellGrid({ rows, cols, south, west, latStep, lngStep }) {
     present: new Uint8Array(size),
     elevation: new Float32Array(size).fill(NaN),
     landCover: new Uint16Array(size),
-    slope: new Float32Array(size).fill(NaN),
+    roughness: new Float32Array(size).fill(NaN),
     water: new Uint8Array(size)
   }
 }
@@ -90,17 +92,18 @@ export function createCellGrid({ rows, cols, south, west, latStep, lngStep }) {
  * @param {Object} terrain - What the cell holds
  * @param {number} terrain.elevation - Height in meters
  * @param {number} terrain.landCover - The land cover's cost
- * @param {number} [terrain.slope] - How steep it is, as a grade, if known yet
+ * @param {number} [terrain.roughness] - How broken its ground is, as a grade,
+ *   if known yet
  * @param {boolean} [terrain.water] - Whether it is water track has to bridge
  */
-export function setCell(grid, index, { elevation, landCover, slope = NaN, water = false }) {
+export function setCell(grid, index, { elevation, landCover, roughness = NaN, water = false }) {
   if (!grid.present[index]) grid.count++
   grid.present[index] = 1
   grid.elevation[index] = elevation
   grid.landCover[index] = landCover
-  // A missing slope (null) is held as NaN, which is what `Number.isFinite`
-  // checks for when the slope is read
-  grid.slope[index] = slope ?? NaN
+  // A missing roughness (null) is held as NaN, which is what `Number.isFinite`
+  // checks for when the roughness is read
+  grid.roughness[index] = roughness ?? NaN
   grid.water[index] = water ? 1 : 0
 }
 
@@ -465,8 +468,27 @@ const ARRAYS = {
   present: Uint8Array,
   elevation: Float32Array,
   landCover: Uint16Array,
-  slope: Float32Array,
+  roughness: Float32Array,
   water: Uint8Array
+}
+
+/**
+ * A grid kept or saved before 2026-11-18 (#160), read the way grids are now.
+ *
+ * Such a grid holds `slope`, the steeper of each cell's roughness and its
+ * grade to its neighbors, where grids now hold the roughness alone (climb is
+ * measured along each line instead, see trackCost.js). On real boards the
+ * roughness was the steeper on 99–100% of cells, so the old slope is read as
+ * the roughness, and kept grids and saved games go on loading rather than
+ * being built again or refused.
+ *
+ * @param {Object} grid - A grid, or a packed one (see `packGrid`)
+ * @returns {Object} The same grid, with `roughness` where it had `slope`
+ */
+export function withRoughness(grid) {
+  if (!grid || grid.roughness !== undefined || grid.slope === undefined) return grid
+  const { slope, ...rest } = grid
+  return { ...rest, roughness: slope }
 }
 
 /**
@@ -526,11 +548,13 @@ export function packGrid(grid) {
  * Anything else — a grid saved in the old list-of-cells form, or a damaged
  * one — gives null rather than a grid that would price track wrongly.
  *
- * @param {*} packed - What was saved
+ * @param {*} saved - What was saved (a grid saved before #160 holds `slope`,
+ *   read as its roughness, see `withRoughness`)
  * @returns {CellGrid|null} The grid, or null if the data is not a packed grid
  */
-export function unpackGrid(packed) {
-  if (!packed || typeof packed !== 'object' || Array.isArray(packed)) return null
+export function unpackGrid(saved) {
+  if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return null
+  const packed = withRoughness(saved)
   const { rows, cols, south, west, latStep, lngStep } = packed
   const shape = [rows, cols, south, west, latStep, lngStep]
   if (!shape.every(Number.isFinite) || !Number.isInteger(rows) || !Number.isInteger(cols)) {

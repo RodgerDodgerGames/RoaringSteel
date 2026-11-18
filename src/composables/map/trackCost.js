@@ -6,8 +6,10 @@
  * in included — however many of the line's legs pass through it.
  *
  * A land cell's price comes from its terrain cost: how hard its ground is to
- * build on, which has two parts — its land cover and its slope (see
- * stores/grid.js) — each weighed by its own tuning knob (`terrainCost`).
+ * build on, which has three parts — its land cover, its roughness (see
+ * stores/grid.js), and how steeply the line climbs into it from the cell
+ * before (see climb.js) — each weighed by its own tuning knob
+ * (`terrainCost`).
  * What that comes to in dollars depends on the board, because track is
  * priced per speed unit (see boardScale.js and `gameRules.trackPrice`):
  * `trackPriceScale` works out the dollars per point of terrain cost for a
@@ -32,6 +34,7 @@
 import { gameRules } from '@/config/game'
 import { isWaterCell, bridgeCellPrice, riverCrossings } from '@/composables/map/water'
 import { findCell, cellAt, cellKm, walkCells } from '@/composables/map/cellGrid'
+import { stepGrade } from '@/composables/map/climb'
 import {
   latitudeDegreesToMeters,
   longitudeDegreesToMeters
@@ -61,36 +64,68 @@ export function trackPriceScale(grid, speedUnitKm) {
 }
 
 /**
- * A land cell's terrain cost, in points: its land cover cost plus
- * `slopeCost` times its slope, each part weighed by its tuning knob
- * (`gameRules.trackPrice.knobs`).
+ * What a climb adds to the ground a line enters, in points of terrain cost
+ * (before the knobs).
  *
- * The ground is capped first, at `maxTerrainFactor` times ordinary ground's
- * terrain cost, as Empire Builder's dearest ground (alpine, 5) is five times
- * its clear ground (1). Without the cap the steepest cells cost many times a
- * turn's allowance, a wall no one could ever build across. Ground past the
- * cap is trimmed back with both its parts shrunk alike, so each knob still
- * weighs its own part of what is left — and at equal knobs a capped cell
- * costs the cap times the knob.
+ * A climb no steeper than the ruling grade (`trackPrice.climb.rulingGrade`)
+ * adds nothing: it is the grade a railroad is laid to anyway. A steeper one
+ * is priced as the extra track a railroad lays to hold the ruling grade,
+ * winding and looping to stretch the climb out. Climbing at twice the
+ * ruling grade takes twice the track, so one extra cell's worth; at three
+ * times, two extra. Each extra cell is charged as ordinary ground:
  *
- * @param {number} landCover - The cell's land cover cost (see config/nlcd.js)
- * @param {number} slope - The cell's slope, as a grade (see slope.js)
+ *   points = openGroundCost · (grade − ruling grade) / ruling grade
+ *
+ * @param {number} grade - The climb into the cell (see `stepGrade` in
+ *   climb.js)
  * @returns {number} Points of terrain cost
  */
-export function terrainCost(landCover, slope) {
-  const { openGroundCost, slopeCost, maxTerrainFactor, knobs } = gameRules.trackPrice
-  const slopePoints = slopeCost * slope
-  const ground = landCover + slopePoints
-  const cap = maxTerrainFactor * openGroundCost
-  const trim = ground > cap ? cap / ground : 1
-  return trim * (knobs.landCover * landCover + knobs.elevation * slopePoints)
+export function climbPoints(grade) {
+  const { openGroundCost, climb } = gameRules.trackPrice
+  const { rulingGrade } = climb
+  return grade > rulingGrade ? (openGroundCost * (grade - rulingGrade)) / rulingGrade : 0
 }
 
 /**
- * What track through one land cell costs, in whole dollars: its terrain cost
- * (see `terrainCost`) at the board's price scale.
+ * The terrain cost of the ground a line enters, in points: three parts,
+ * each weighed by its own tuning knob (`gameRules.trackPrice.knobs`):
+ * - the cell's land cover cost (see config/nlcd.js);
+ * - its roughness: `roughnessCost` times how broken its ground is, as a
+ *   grade (see `roughness` in cellGrid.js) — the cuts and fills a line
+ *   needs over hills too small to show from cell to cell;
+ * - the line's climb into it from the cell before (see `climbPoints`).
  *
- * A cell whose slope has not been worked out (its terrain data failed to
+ * The cost is capped at `maxTerrainFactor` times what ordinary ground costs
+ * at the same knobs (level land of `openGroundCost`, weighed by the land
+ * cover knob), as Empire Builder's dearest ground (alpine, 5) is five times
+ * its clear ground (1). Without the cap the steepest cells cost many times a
+ * turn's allowance, a wall no one could ever build across.
+ *
+ * The cap is on the weighed cost, so worse ground never costs less: rougher
+ * or steeper ground costs more until it reaches the cap, and then the same.
+ *
+ * @param {number} landCover - The cell's land cover cost
+ * @param {number} roughness - The cell's roughness, as a grade
+ * @param {number} [grade] - The line's climb into the cell, as a grade (see
+ *   `stepGrade` in climb.js); none for the cell a line starts in
+ * @returns {number} Points of terrain cost
+ */
+export function terrainCost(landCover, roughness, grade = 0) {
+  const { openGroundCost, roughnessCost, maxTerrainFactor, knobs } = gameRules.trackPrice
+  const cost =
+    knobs.landCover * landCover +
+    knobs.roughness * roughnessCost * roughness +
+    knobs.climb * climbPoints(grade)
+  const ordinaryGround = knobs.landCover * openGroundCost
+  return Math.min(cost, maxTerrainFactor * ordinaryGround)
+}
+
+/**
+ * What track into one land cell costs, in whole dollars: its terrain cost
+ * (see `terrainCost`), with the line's climb into it, at the board's price
+ * scale.
+ *
+ * A cell whose roughness has not been worked out (its terrain data failed to
  * load) costs nothing, rather than making every line through it
  * unpriceable.
  *
@@ -101,12 +136,14 @@ export function terrainCost(landCover, slope) {
  * @param {number} cell - The cell
  * @param {number} priceScale - Dollars per point of terrain cost (see
  *   `trackPriceScale`)
+ * @param {number} [grade] - The line's climb into the cell (see `stepGrade`
+ *   in climb.js); none for the cell a line starts in
  * @returns {number} Dollars
  */
-export function landCellPrice(grid, cell, priceScale) {
-  const slope = grid.slope[cell]
-  if (!Number.isFinite(slope)) return 0
-  return Math.round(terrainCost(grid.landCover[cell], slope) * priceScale)
+export function landCellPrice(grid, cell, priceScale, grade = 0) {
+  const roughness = grid.roughness[cell]
+  if (!Number.isFinite(roughness)) return 0
+  return Math.round(terrainCost(grid.landCover[cell], roughness, grade) * priceScale)
 }
 
 /**
@@ -215,7 +252,9 @@ export function cellPath(latlngs, grid) {
  * What a line of track costs to build, and how much of that is bridges.
  *
  * Each land cell the line passes through adds its own price (see
- * `landCellPrice`), once however often the line passes through it. Each lake
+ * `landCellPrice`), once however often the line passes through it, with the
+ * climb by which the line first enters it from the cell before (see
+ * `stepGrade` in climb.js). Each lake
  * or sea cell adds a bridge instead, at the same price for every cell of a
  * crossing (see `bridgeCellPrice`). And each place the line crosses a river
  * adds a river bridge (see `riverCrossings`).
@@ -240,14 +279,17 @@ export function linePrice(latlngs, { grid, priceScale, speedUnitKm, rivers = nul
   // Cells already paid for: each is charged once, however often it is crossed
   const charged = new Set()
 
-  cellPath(latlngs, grid).forEach((cell) => {
+  cellPath(latlngs, grid).forEach((cell, i, path) => {
     if (charged.has(cell)) return
     charged.add(cell)
     if (isWaterCell(grid, cell)) {
       bridges += waterCell
       total += waterCell
     } else {
-      total += landCellPrice(grid, cell, priceScale)
+      // The climb in from the cell before it on the line; the first cell has
+      // none to climb from
+      const grade = i === 0 ? 0 : stepGrade(grid, path[i - 1], cell)
+      total += landCellPrice(grid, cell, priceScale, grade)
     }
   })
 

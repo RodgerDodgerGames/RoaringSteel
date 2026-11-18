@@ -3,13 +3,14 @@
  *
  * Generates and manages the square grid laid over the game map.
  * Each grid cell holds terrain data that affects railroad building costs:
- * - Elevation: the average height of the ground in the cell; steep cells,
- *   and cells on a long climb, cost more
+ * - Elevation: the average height of the ground in the cell, which a line's
+ *   climb from cell to cell is measured by, and its roughness, how broken
+ *   the ground within it is; both make track dearer
  * - Land Cover: the mix of ground in the cell, forest dearer than grassland
  *
  * The grid is used during gameplay to price track cell by cell, from each
- * cell's land cover and slope (see composables/map/trackCost.js). The slope
- * is worked out once, as the grid is built (see composables/map/slope.js).
+ * cell's land cover, its roughness, and the climb into it from the cell
+ * before (see composables/map/trackCost.js and composables/map/climb.js).
  *
  * Each cell also says whether it is water track has to bridge — a lake or
  * the sea — from the game's water data (see composables/map/water.js and
@@ -38,8 +39,7 @@ import {
 import { waterCells } from '@/composables/map/water'
 import { waterPolygons } from '@/composables/map/waterData'
 import { useWaterStore } from '@/stores/water'
-import { createCellGrid, setCell, isEmptyGrid } from '@/composables/map/cellGrid'
-import { fillSlopes } from '@/composables/map/slope'
+import { createCellGrid, setCell, isEmptyGrid, withRoughness } from '@/composables/map/cellGrid'
 import { getGrid, getGridYears, putGrid } from '@/composables/database'
 import { gridApiConfig } from '@/config/grid'
 import { isRefusal, refusalMessage } from '@/composables/utils'
@@ -277,8 +277,8 @@ export const useGridStore = defineStore('gridStore', () => {
   /**
    * Builds a grid of cells covering the specified bounds: fetches elevation
    * and land cover for each cell, marks which are lake or sea, then works out
-   * how steep each is. Reports its progress as it goes, and on failure sets
-   * `error`.
+   * how broken the ground in each is. Reports its progress as it goes, and
+   * on failure sets `error`.
    *
    * @param {Array<number>} bounds - Bounding box [minLng, minLat, maxLng, maxLat]
    * @param {number} cellSize - Grid cell size in meters
@@ -414,10 +414,14 @@ export const useGridStore = defineStore('gridStore', () => {
       console.warn(`Dropped ${dropped} of ${cellCount} grid cells with incomplete terrain data.`)
     }
 
-    // How steep each cell is, from its height, its neighbors' and its
-    // roughness
+    // How broken each cell's ground is, from its pixels (see
+    // useElevationTiles.js). A cell on the board too thin for any pixel's
+    // steepness to be measured in it counts as level
     currentPhase.value = 'calculating'
-    fillSlopes(built, elevations.roughness)
+    built.present.forEach((onBoard, index) => {
+      const roughness = elevations.roughness[index]
+      if (onBoard) built.roughness[index] = Number.isFinite(roughness) ? roughness : 0
+    })
     currentPhase.value = ''
     return built
   }
@@ -501,7 +505,9 @@ export const useGridStore = defineStore('gridStore', () => {
    */
   async function keptGrid(state, cellSize, landCoverYear) {
     try {
-      return await getGrid(state, cellSize, landCoverYear)
+      const record = await getGrid(state, cellSize, landCoverYear)
+      // A grid kept before #160 holds slope, read as its roughness
+      return record && { ...record, grid: withRoughness(record.grid) }
     } catch (e) {
       console.warn('Could not read the kept grid:', e)
       return undefined

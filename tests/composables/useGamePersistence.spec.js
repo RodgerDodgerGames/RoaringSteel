@@ -191,7 +191,7 @@ describe('useGamePersistence', () => {
       cell: (row, col) =>
         row === 1 && col === 2
           ? null
-          : { elevation: col * 100, landCover: row + col, slope: col / 10 }
+          : { elevation: col * 100, landCover: row + col, roughness: col / 10 }
     })
     const SOURCE = {
       state: '08',

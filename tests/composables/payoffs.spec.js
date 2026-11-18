@@ -232,11 +232,26 @@ describe('payoffs', () => {
 
     it('should cost more over rough ground than over ordinary ground the same distance', () => {
       const flat = rowOf([100, 100, 100])
-      // The middle cell is a 10% grade
-      const hilly = rowOf([100, { landCover: 100, slope: 0.1 }, 100])
+      // The middle cell's ground is as broken as a 10% grade
+      const hilly = rowOf([100, { landCover: 100, roughness: 0.1 }, 100])
 
       expect(haulPrice(townAt('A', 0), townAt('B', 2), board(hilly))).toBeGreaterThan(
         haulPrice(townAt('A', 0), townAt('B', 2), board(flat))
+      )
+    })
+
+    it('should charge the climb along the line, as track pricing does', () => {
+      // 600 m over one 10 km cell is a 6% grade, two ordinary cells past the
+      // ruling grade, charged in the cell it climbs into
+      const grid = makeTestGrid({
+        rows: 1,
+        cols: 3,
+        south: -CELL / 2,
+        cell: (row, col) => ({ landCover: 100, elevation: col === 0 ? 0 : 600 })
+      })
+
+      expect(haulPrice(townAt('A', 0), townAt('B', 2), board(grid))).toBe(
+        300 + 2 * gameRules.trackPrice.openGroundCost
       )
     })
 
@@ -280,10 +295,10 @@ describe('payoffs', () => {
     it('should charge ordinary ground for a cell whose terrain did not load', () => {
       const ordinary = gameRules.trackPrice.openGroundCost
       const withHole = rowOf([100, null, 100])
-      const withNoSlope = rowOf([100, { landCover: 300, slope: NaN }, 100])
+      const withNoRoughness = rowOf([100, { landCover: 300, roughness: NaN }, 100])
 
       expect(haulPrice(townAt('A', 0), townAt('B', 2), board(withHole))).toBe(200 + ordinary)
-      expect(haulPrice(townAt('A', 0), townAt('B', 2), board(withNoSlope))).toBe(200 + ordinary)
+      expect(haulPrice(townAt('A', 0), townAt('B', 2), board(withNoRoughness))).toBe(200 + ordinary)
     })
 
     it('should add a river bridge for each river the line crosses', () => {

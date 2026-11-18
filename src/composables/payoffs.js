@@ -46,6 +46,7 @@ import {
   riverCrossings
 } from '@/composables/map/water'
 import { cellAt, walkCells } from '@/composables/map/cellGrid'
+import { stepGrade } from '@/composables/map/climb'
 
 /**
  * The straight-line distance between two towns, in km.
@@ -156,8 +157,8 @@ export function waterStretchPrice(cells, bridgeCell, maxCells) {
  * differences, because this line is only a measure and is never built:
  * - A stretch of water too long to bridge is not a line that cannot be
  *   built; it is charged as a bridge and a detour (see `waterStretchPrice`).
- * - A cell whose terrain did not load (a hole, or a cell whose slope was
- *   never worked out) costs what ordinary ground does. Track pricing charges
+ * - A cell whose terrain did not load (a hole, or a cell whose roughness
+ *   was never worked out) costs what ordinary ground does. Track pricing charges
  *   nothing for it, so a line can still be built there, but a haul over it
  *   priced at nothing would pay too little.
  * - The cells the towns sit in end a stretch of water, as they do when
@@ -211,8 +212,13 @@ export function haulPricer({ grid, priceScale, speedUnitKm, rivers = null, townC
     // A straight leg passes through each cell once, so no cell is charged
     // twice. A cell off the grid is charged as a hole: a line between two
     // towns on the board stays on it, so in practice there are none.
+    // The cell the line was in before this one, for the climb into it (see
+    // `stepGrade` in climb.js, which finds none from water or a hole)
+    let previous = -1
     walkCells(start, end, grid, (row, col) => {
       const cell = cellAt(grid, row, col)
+      const from = previous
+      previous = cell
       const isWater = cell !== -1 && isWaterCell(grid, cell)
       if (isWater && !townCellSet.has(cell)) {
         waterRun++
@@ -220,8 +226,8 @@ export function haulPricer({ grid, priceScale, speedUnitKm, rivers = null, townC
       }
       endWaterRun()
       if (isWater) total += bridgeCell
-      else if (cell === -1 || !Number.isFinite(grid.slope[cell])) total += ordinaryGround
-      else total += landCellPrice(grid, cell, priceScale)
+      else if (cell === -1 || !Number.isFinite(grid.roughness[cell])) total += ordinaryGround
+      else total += landCellPrice(grid, cell, priceScale, stepGrade(grid, from, cell))
     })
     // A stretch of water the line ends in: only possible when the town cells
     // were not given, as the line ends in the destination's cell

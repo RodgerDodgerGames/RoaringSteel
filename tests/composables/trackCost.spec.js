@@ -9,8 +9,9 @@
  * speed unit of its width, whatever the cell's own cost; and each crossing
  * of a river adds a river bridge.
  *
- * A land cell's price is its terrain cost — land cover plus slope, each
- * weighed by its tuning knob — turned into dollars by the board's price
+ * A land cell's price is its terrain cost — land cover, roughness, and the
+ * line's climb into it from the cell before, each weighed by its tuning
+ * knob — turned into dollars by the board's price
  * scale: ordinary ground costs `trackPrice.perSpeedUnit` per speed unit of
  * the cell's width at knobs of 1.
  */
@@ -21,7 +22,8 @@ import {
   cellPath,
   linePrice,
   trackPriceScale,
-  terrainCost
+  terrainCost,
+  climbPoints
 } from '@/composables/map/trackCost'
 import { gameRules } from '@/config/game'
 import { riverIndex } from '@/composables/map/water'
@@ -32,17 +34,17 @@ import { pinKnobs } from '../utils/boardScale'
 /**
  * A single row of square cells running east along latitude 0, where a degree
  * of longitude is as long as a degree of latitude. Cell `i` has the land
- * cover `covers[i]` and the slope `slopes[i]`, level if not given.
+ * cover `covers[i]` and the roughness `roughs[i]`, level if not given.
  * @param {Array<number>} covers - One land cover cost per cell, west to east
- * @param {Array<number>} [slopes] - One slope per cell, as a grade
+ * @param {Array<number>} [roughs] - One roughness per cell, as a grade
  * @returns {Object} The grid
  */
-function rowOfCells(covers, slopes = []) {
+function rowOfCells(covers, roughs = []) {
   return makeTestGrid({
     rows: 1,
     cols: covers.length,
     south: -CELL / 2,
-    cell: (row, col) => ({ landCover: covers[col], slope: slopes[col] })
+    cell: (row, col) => ({ landCover: covers[col], roughness: roughs[col] })
   })
 }
 
@@ -363,61 +365,177 @@ describe('trackCost', () => {
     })
   })
 
-  describe('terrainCost', () => {
-    const { slopeCost } = gameRules.trackPrice
+  describe('climb', () => {
+    /** One water cell's bridge: the speed unit here is one cell wide */
+    const BRIDGE = gameRules.bridges.perSpeedUnit
 
-    it('should add the land cover to the slope cost of the grade', () => {
-      expect(terrainCost(100, 0.05)).toBeCloseTo(100 + slopeCost * 0.05, 9)
+    /**
+     * A row of cells of land cover 100, at the heights given, west to east.
+     * The cells are 10 km apart, so 200 m between neighbors is a 2% grade.
+     * @param {Array<number|string>} heights - Each cell's height in meters,
+     *   or 'W' for lake or sea
+     * @returns {Object} The grid
+     */
+    const rowAtHeights = (heights) =>
+      makeTestGrid({
+        rows: 1,
+        cols: heights.length,
+        south: -CELL / 2,
+        cell: (row, col) =>
+          heights[col] === 'W'
+            ? { water: true, elevation: -50 }
+            : { landCover: 100, elevation: heights[col] }
+      })
+
+    it('should charge a climb past the ruling grade in the cell it climbs into', () => {
+      // 600 m over 10 km is a 6% grade: twice past the 2% ruling grade, so
+      // two extra cells of ordinary ground
+      const grid = rowAtHeights([0, 600, 600])
+      const extra = 2 * gameRules.trackPrice.openGroundCost
+
+      expect(linePrice([centerOf(0), centerOf(2)], board(grid)).total).toBe(300 + extra)
+    })
+
+    it('should charge a climb down as it charges one up', () => {
+      const grid = rowAtHeights([0, 600, 600])
+
+      expect(linePrice([centerOf(2), centerOf(0)], board(grid)).total).toBe(
+        linePrice([centerOf(0), centerOf(2)], board(grid)).total
+      )
+    })
+
+    it('should charge nothing for a climb no steeper than the ruling grade', () => {
+      const grid = rowAtHeights([0, 200, 400])
+
+      expect(linePrice([centerOf(0), centerOf(2)], board(grid)).total).toBe(300)
+    })
+
+    it('should charge no climb for the cell a line starts in', () => {
+      const grid = rowAtHeights([0, 600])
+
+      expect(linePrice([centerOf(1)], board(grid)).total).toBe(100)
+    })
+
+    it('should charge no climb across a hole in the grid', () => {
+      // The middle cell's terrain failed to load: what lies between is unknown
+      const grid = makeTestGrid({
+        rows: 1,
+        cols: 3,
+        south: -CELL / 2,
+        cell: (row, col) => (col === 1 ? null : { landCover: 100, elevation: col * 600 })
+      })
+
+      expect(linePrice([centerOf(0), centerOf(2)], board(grid)).total).toBe(200)
+    })
+
+    it('should charge no climb onto or off a bridge', () => {
+      // The water's height is its floor, far below the land either side
+      const grid = rowAtHeights([600, 'W', 0])
+
+      expect(linePrice([centerOf(0), centerOf(2)], board(grid)).total).toBe(200 + BRIDGE)
+    })
+
+    it('should weigh the climb by the climb knob', () => {
+      const grid = rowAtHeights([0, 600])
+      Object.assign(gameRules.trackPrice.knobs, { landCover: 1, roughness: 0, climb: 0.5 })
+
+      expect(linePrice([centerOf(0), centerOf(1)], board(grid)).total).toBe(
+        200 + 0.5 * 2 * gameRules.trackPrice.openGroundCost
+      )
+    })
+  })
+
+  describe('climbPoints', () => {
+    const { openGroundCost } = gameRules.trackPrice
+    const ruling = gameRules.trackPrice.climb.rulingGrade
+
+    it('should add nothing up to the ruling grade', () => {
+      expect(climbPoints(0)).toBe(0)
+      expect(climbPoints(ruling)).toBe(0)
+    })
+
+    it('should add an ordinary cell for each further ruling grade of climb', () => {
+      // Twice the ruling grade takes twice the track to climb: one extra cell
+      expect(climbPoints(2 * ruling)).toBeCloseTo(openGroundCost, 9)
+      expect(climbPoints(3 * ruling)).toBeCloseTo(2 * openGroundCost, 9)
+    })
+
+    it('should follow the configured ruling grade', () => {
+      const { climb } = gameRules.trackPrice
+      const saved = climb.rulingGrade
+      climb.rulingGrade = 0.01
+      try {
+        expect(climbPoints(0.03)).toBeCloseTo(2 * openGroundCost, 9)
+      } finally {
+        climb.rulingGrade = saved
+      }
+    })
+  })
+
+  describe('terrainCost', () => {
+    const { roughnessCost } = gameRules.trackPrice
+
+    it('should add the land cover, the roughness and the climb', () => {
+      const ruling = gameRules.trackPrice.climb.rulingGrade
+
+      expect(terrainCost(100, 0.05, 2 * ruling)).toBeCloseTo(
+        100 + roughnessCost * 0.05 + climbPoints(2 * ruling),
+        9
+      )
+    })
+
+    it('should weigh each part by its own knob', () => {
+      const ruling = gameRules.trackPrice.climb.rulingGrade
+      Object.assign(gameRules.trackPrice.knobs, { landCover: 2, roughness: 0.5, climb: 0.25 })
+
+      expect(terrainCost(100, 0.1, 2 * ruling)).toBeCloseTo(
+        2 * 100 + 0.5 * roughnessCost * 0.1 + 0.25 * climbPoints(2 * ruling),
+        9
+      )
     })
 
     it('should weigh the land cover by the land cover knob alone', () => {
-      gameRules.trackPrice.knobs.landCover = 2
-      gameRules.trackPrice.knobs.elevation = 3
+      Object.assign(gameRules.trackPrice.knobs, { landCover: 2, roughness: 3, climb: 3 })
 
       expect(terrainCost(300, 0)).toBeCloseTo(600, 9)
     })
 
-    it('should weigh the slope by the elevation knob alone', () => {
-      gameRules.trackPrice.knobs.landCover = 3
-      gameRules.trackPrice.knobs.elevation = 2
+    it('should weigh the roughness by the roughness knob alone', () => {
+      Object.assign(gameRules.trackPrice.knobs, { landCover: 3, roughness: 2, climb: 3 })
 
-      expect(terrainCost(0, 0.1)).toBeCloseTo(2 * slopeCost * 0.1, 9)
-    })
-
-    it('should weigh each part of a cell by its own knob', () => {
-      gameRules.trackPrice.knobs.landCover = 0.5
-      gameRules.trackPrice.knobs.elevation = 2
-
-      expect(terrainCost(100, 0.1)).toBeCloseTo(0.5 * 100 + 2 * slopeCost * 0.1, 9)
+      expect(terrainCost(0, 0.1)).toBeCloseTo(2 * roughnessCost * 0.1, 9)
     })
 
     it('should cost nothing at knobs of 0', () => {
-      gameRules.trackPrice.knobs.landCover = 0
-      gameRules.trackPrice.knobs.elevation = 0
+      Object.assign(gameRules.trackPrice.knobs, { landCover: 0, roughness: 0, climb: 0 })
 
-      expect(terrainCost(800, 0.3)).toBe(0)
+      expect(terrainCost(800, 0.3, 0.1)).toBe(0)
     })
 
-    it('should trim ground past the cap before the knobs weigh it', () => {
+    it('should cap a cell at the dearest ground, priced at the land cover knob', () => {
       const { openGroundCost, maxTerrainFactor } = gameRules.trackPrice
-      const cap = maxTerrainFactor * openGroundCost
-      // Ground twice the cap, half of it land cover and half slope
-      const landCover = cap
-      const slope = cap / slopeCost
-      gameRules.trackPrice.knobs.landCover = 1
-      gameRules.trackPrice.knobs.elevation = 0
+      Object.assign(gameRules.trackPrice.knobs, { landCover: 0.5, roughness: 0.15, climb: 0.5 })
 
-      // Trimmed to the cap, both parts alike: the land cover's half is left
-      expect(terrainCost(landCover, slope)).toBeCloseTo(cap / 2, 9)
+      expect(terrainCost(450, 2, 0.2)).toBeCloseTo(maxTerrainFactor * 0.5 * openGroundCost, 9)
+    })
+
+    it('should never price worse ground below better, whatever the knobs', () => {
+      // Regression: the cap once trimmed every part alike before the knobs
+      // weighed them, so at unequal knobs adding roughness to a capped cell
+      // shrank its dearer parts and lowered its price
+      Object.assign(gameRules.trackPrice.knobs, { landCover: 0.5, roughness: 0.15, climb: 0.5 })
+      const ruling = gameRules.trackPrice.climb.rulingGrade
+      const costs = [0, 0.2, 0.5, 1, 2].map((roughness) => terrainCost(450, roughness, 5 * ruling))
+
+      costs.slice(1).forEach((cost, i) => expect(cost).toBeGreaterThanOrEqual(costs[i]))
     })
 
     it('should price capped ground at the cap times the knob when the knobs match', () => {
       const { openGroundCost, maxTerrainFactor } = gameRules.trackPrice
       const cap = maxTerrainFactor * openGroundCost
-      gameRules.trackPrice.knobs.landCover = 0.5
-      gameRules.trackPrice.knobs.elevation = 0.5
+      Object.assign(gameRules.trackPrice.knobs, { landCover: 0.5, roughness: 0.5, climb: 0.5 })
 
-      expect(terrainCost(800, 1)).toBeCloseTo(0.5 * cap, 9)
+      expect(terrainCost(800, 1, 0.5)).toBeCloseTo(0.5 * cap, 9)
     })
   })
 })

@@ -156,6 +156,30 @@ describe('botPathfinder', () => {
       expect(places.some(({ row, col }) => row === 3 && col === 12)).toBe(true)
     })
 
+    it('should go round a steep climb rather than straight over it', () => {
+      // Level ground, but a hill 1,000 m high in the middle of the middle
+      // row: a 10% climb in and out of it, far past the ruling grade
+      const grid = makeTestGrid({
+        rows: 3,
+        cols: 5,
+        cell: (row, col) => ({ landCover: 100, elevation: row === 1 && col === 2 ? 1000 : 0 })
+      })
+      const hillRules = {
+        grid,
+        priceScale: 1,
+        speedUnitKm: SPEED_UNIT_KM,
+        rivers: null,
+        isInRegion: regionTest(null),
+        townCells: []
+      }
+      const at = (row, col) => ({ lat: (row + 0.5) * CELL, lng: (col + 0.5) * CELL })
+
+      const line = planLine(searchBoard(hillRules, []), [at(1, 0)], at(1, 4))
+
+      const places = cellPath(line, grid).map((cell) => placeOf(cell, grid))
+      expect(places.some(({ row, col }) => row === 1 && col === 2)).toBe(false)
+    })
+
     it('should stay inside the region', () => {
       const line = planLine(board, [pointOf(townNamed('Fir'))], pointOf(townNamed('Cedar')))
 

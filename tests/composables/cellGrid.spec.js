@@ -57,7 +57,7 @@ function holeyGrid(seed = 1) {
     west: -78,
     lngStep: CELL * 1.3,
     cell: (row, col) =>
-      random() < 0.25 ? null : { landCover: row * 10 + col, slope: (row * 10 + col) / 100 }
+      random() < 0.25 ? null : { landCover: row * 10 + col, roughness: (row * 10 + col) / 100 }
   })
 }
 
@@ -215,10 +215,19 @@ describe('cellGrid', () => {
       expect(unpackGrid(undefined)).toBeNull()
     })
 
+    it('should read the slope of a grid saved before roughness and climb were split as its roughness', () => {
+      // Saves from before #160 hold `slope`, which was the roughness on
+      // nearly every cell
+      const grid = holeyGrid()
+      const { roughness, ...rest } = packGrid(grid)
+
+      expect(cellsOf(unpackGrid({ ...rest, slope: roughness }))).toEqual(cellsOf(grid))
+    })
+
     it('should not read a damaged grid', () => {
       const packed = packGrid(holeyGrid())
 
-      expect(unpackGrid({ ...packed, slope: 'not base64!' })).toBeNull()
+      expect(unpackGrid({ ...packed, roughness: 'not base64!' })).toBeNull()
       expect(unpackGrid({ ...packed, rows: packed.rows + 1 })).toBeNull()
       expect(unpackGrid({ ...packed, present: undefined })).toBeNull()
       expect(unpackGrid({ ...packed, latStep: 0 })).toBeNull()

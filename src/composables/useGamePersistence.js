@@ -34,6 +34,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useTrainsStore } from '@/stores/trains'
 import { useHistoryStore } from '@/stores/history'
 import { useTrainStopStore } from '@/stores/trainStop'
+import { useRunListStore } from '@/stores/runList'
 import { turnAfter } from '@/composables/turnOrder'
 import { packGrid, unpackGrid } from '@/composables/map/cellGrid'
 import { addAutoSave, getAutoSave, getAutoSaves as readAutoSaves, plain } from './database'
@@ -60,6 +61,7 @@ export function useGamePersistence() {
   const trainsStore = useTrainsStore()
   const historyStore = useHistoryStore()
   const trainStopStore = useTrainStopStore()
+  const runListStore = useRunListStore()
 
   /**
    * Serializes the current game state into a JSON-safe object.
@@ -186,9 +188,9 @@ export function useGamePersistence() {
 
   /**
    * Clears away every part of the game: region, turn, players, towns, grid,
-   * demand cards, map view, track, trains, the train's open stop card, and
-   * the turn history. Used before a save is restored, and
-   * when the game is given up for a new one.
+   * demand cards, map view, track, trains, the train's open stop card, the
+   * "Run to" list's settings, and the turn history. Used before a save is
+   * restored, and when the game is given up for a new one.
    *
    * The player's settings are not part of this: they belong to the person at
    * the browser rather than to any one game, so they carry over.
@@ -203,6 +205,7 @@ export function useGamePersistence() {
     trackStore.reset()
     trainsStore.reset()
     trainStopStore.reset()
+    runListStore.reset()
     historyStore.reset()
   }
 

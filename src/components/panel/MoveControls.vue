@@ -6,8 +6,11 @@
   - on the player's first running turn, placing the train in a town
   - running the train to a town, or to an end of its line, picked from a
     list (towns nearest first, then the ends of the line, each with the
-    distance, how many turns it takes, a dot for each other player whose
-    track the way uses, and any fee for their track) or clicked on the map
+    distance and how many turns it takes) or clicked on the map. The places
+    on the player's own track come first; those whose way runs on other
+    players' track follow in italics, with a dot for each such player, but
+    only while the toggle under "Choose on the map" shows them (see the run
+    list store)
   - carrying on toward a town or point a run of more than one turn is still
     heading for: it is chosen in the list already, with Confirm in place of
     Go
@@ -39,8 +42,10 @@ const {
   moveBlock,
   loadBlock,
   runChoices,
+  hasOthersTrackChoices,
+  othersTrackShown,
+  toggleOthersTrack,
   headingChoiceId,
-  heading,
   status,
   pickups,
   deliveries,
@@ -114,15 +119,16 @@ const isCarryingOn = computed(
 )
 
 /**
- * How a place reads in the list: its name, how far, how many turns it takes,
- * and what this turn's part of the way costs.
+ * How a place reads in the list: its name, how far, and how many turns it
+ * takes. No fees: a place may run on more than one other player's track, and
+ * what riding it costs is for the player to weigh when they set off, not
+ * while scanning the list.
  * @param {{name: string, entry: Object}} choice - From `runChoices`
- * @returns {string} The option's text, e.g. "Denver — 14 (2 turns) · $4M to
- *   Ann", or "End of the line near Willmar — 3.2 (this turn)"
+ * @returns {string} The option's text, e.g. "Denver — 14 (2 turns)", or
+ *   "End of the line near Willmar — 3.2 (this turn)"
  */
 function choiceLabel({ name, entry }) {
-  const label = `${name} — ${distance(entry.km)} (${turnsText(entry)})`
-  return entry.fee ? `${label} · ${feeText(entry.fee, entry.payTo)}` : label
+  return `${name} — ${distance(entry.km)} (${turnsText(entry)})`
 }
 
 /**
@@ -145,13 +151,26 @@ const runOptions = computed(() =>
 )
 
 /**
+ * What the dropdown says when it has nothing to list: whether the places on
+ * other players' track are only hidden, or no track leads anywhere at all.
+ */
+const emptyListText = computed(() =>
+  hasOthersTrackChoices.value
+    ? "Nothing on your own track — show towns on others' track below"
+    : 'No track leads anywhere from here'
+)
+
+/**
  * What the run button says: Go for a new run, Confirm for carrying on toward
- * the place the train is heading for, with what this turn of it costs.
+ * the place the train is heading for, with what this turn of it costs. The
+ * list leaves fees out, so this is where the player sees them before setting
+ * off.
  */
 const runButtonText = computed(() => {
-  if (!isCarryingOn.value) return 'Go'
-  const { fee, payTo } = heading.value.route
-  return fee ? `Confirm · ${feeText(fee, payTo)}` : 'Confirm'
+  const choice = runChoices.value.find((option) => option.id === chosenId.value)
+  const verb = isCarryingOn.value ? 'Confirm' : 'Go'
+  if (!choice?.entry.fee) return verb
+  return `${verb} · ${feeText(choice.entry.fee, choice.entry.payTo)}`
 })
 </script>
 
@@ -201,7 +220,7 @@ const runButtonText = computed(() => {
           <DestinationSelect
             v-model="chosenId"
             :options="runOptions"
-            :placeholder="runOptions.length ? 'Run to…' : 'No track leads anywhere from here'"
+            :placeholder="runOptions.length ? 'Run to…' : emptyListText"
             aria-label="Where to run your train"
           />
           <button
@@ -223,6 +242,27 @@ const runButtonText = computed(() => {
       >
         <span class="icon"><i class="fas fa-location-dot" aria-hidden="true"></i></span>
         <span>{{ isPicking ? 'Stop choosing on the map' : 'Choose on the map' }}</span>
+      </button>
+
+      <!-- Show or hide the places in the list that only other players'
+           track leads to; offered only when there are any -->
+      <button
+        v-if="train.position && !moveBlock && hasOthersTrackChoices"
+        class="button is-small is-fullwidth"
+        :class="{ 'is-info': othersTrackShown }"
+        :aria-pressed="othersTrackShown"
+        @click="toggleOthersTrack"
+      >
+        <span class="icon">
+          <i
+            class="fas"
+            :class="othersTrackShown ? 'fa-eye-slash' : 'fa-eye'"
+            aria-hidden="true"
+          ></i>
+        </span>
+        <span>{{
+          othersTrackShown ? "Hide towns on others' track" : "Show towns on others' track"
+        }}</span>
       </button>
 
       <!-- In a town: load and unload -->

@@ -216,9 +216,10 @@ li + li .demand-card__row {
 .demand-card__icon {
   flex: none;
   align-self: center;
-  width: 1.1em;
-  height: 1.1em;
+  width: 1.3em;
+  height: 1.3em;
   -webkit-user-drag: none;
+  margin-left: 0.25em;
 }
 
 .demand-card__route {

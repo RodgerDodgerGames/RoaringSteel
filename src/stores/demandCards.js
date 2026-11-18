@@ -38,8 +38,7 @@ import { useGameStore } from './game'
 import { useGridStore } from './grid'
 import { useWaterStore } from './water'
 import { PIN_COLORS } from '@/config/demands'
-import { demandPayoff, mapSpanKm, haulPricer } from '@/composables/payoffs'
-import { pricingBoard } from '@/composables/map/buildRules'
+import { demandPayoff, mapSpanKm, deckPricer } from '@/composables/payoffs'
 import { isEmptyGrid } from '@/composables/map/cellGrid'
 import { buildDemandDeck } from '@/composables/demandDeck'
 import { debug } from '@/composables/debug'
@@ -236,9 +235,16 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
       `Board scale: ${Math.round(sizeKm)} km across, crossed by a Freight in ` +
         `${turnsToCross.toFixed(1)} turns; speed unit ${speedUnitKm.toFixed(2)} km`
     )
-    // Hauls are priced over the grid as track building prices lines (see
-    // `pricingBoard` in buildRules.js), each worked out once for the deck
-    const priceOf = haulPricer(pricingBoard(grid, speedUnitKm, useWaterStore().data, townsData))
+    // Hauls are priced over the grid as track building prices lines, brought
+    // part of the way toward the cheapest route (see `deckPricer` in
+    // payoffs.js), each worked out once for the deck
+    const priceOf = deckPricer({
+      grid,
+      speedUnitKm,
+      waterData: useWaterStore().data,
+      towns: townsData,
+      region: useGameStore().region
+    })
 
     // Every town-and-commodity pair at most once, three to a card (see
     // demandDeck.js). Each pays by what the track to bring the commodity in

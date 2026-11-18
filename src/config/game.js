@@ -223,6 +223,19 @@ export const gameRules = {
    * bridge could span: a stand-in for the detour round it (see
    * `waterStretchPrice` in payoffs.js). At 0.5 each adds half a bridge.
    *
+   * `route` brings the straight line's price part of the way toward the
+   * cheapest route a computer player's search would find (see
+   * `blendedPricer` in payoffs.js): price = straight · (route / straight) ^
+   * `weight`. Players build fairly straight, but go round the worst of a
+   * mountain range. At 0 payoffs follow the straight line, at 1 the route.
+   * On a bench of three boards (2026-11-18) a route cost about a third of
+   * the straight line in the Rocky Mountains and about two thirds in
+   * Minnesota, so at 0.5 mountain hauls pay about 0.6 of the straight line
+   * and Minnesota's about 0.8. The routes are searched on a coarse copy of
+   * the grid of no more than `searchCells` cells (see coarseGrid.js): at
+   * 20,000, about 1.5 seconds of setup for 60 towns. A coarser grid smooths
+   * the ground, so its routes save a little less than the full grid's.
+   *
    * `minimum` keeps a delivery between neighbors worth making.
    *
    * `longHaul` rewards the risk of reaching for distant towns: the
@@ -241,6 +254,10 @@ export const gameRules = {
   payoffs: {
     trackCostMultiple: 2,
     unbridgeableWater: 0.5,
+    route: {
+      weight: 0.5,
+      searchCells: 20000
+    },
     roundTo: 1000,
     minimum: 3000,
     longHaul: {

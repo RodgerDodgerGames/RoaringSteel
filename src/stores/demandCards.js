@@ -35,8 +35,12 @@ import { useTownsStore } from './towns'
 import { usePlayerStore } from './players'
 import { useSettingsStore } from './settings'
 import { useGameStore } from './game'
+import { useGridStore } from './grid'
+import { useWaterStore } from './water'
 import { PIN_COLORS } from '@/config/demands'
-import { demandPayoff, mapSpanKm } from '@/composables/payoffs'
+import { demandPayoff, mapSpanKm, haulPricer } from '@/composables/payoffs'
+import { pricingBoard } from '@/composables/map/buildRules'
+import { isEmptyGrid } from '@/composables/map/cellGrid'
 import { buildDemandDeck } from '@/composables/demandDeck'
 import { debug } from '@/composables/debug'
 
@@ -198,6 +202,10 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
   /**
    * Builds a fresh deck from the towns in play and clears every hand.
    * Deals nothing — `dealHands` does that once the deck exists.
+   *
+   * Payoffs are priced by the track their hauls would need over the board's
+   * grid (see payoffs.js), so the grid must be in place first; with none,
+   * no deck is built.
    */
   const generateDemandCards = () => {
     debug.log('Generating demand cards...')
@@ -211,23 +219,32 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
       console.warn('No towns available for demand card generation.')
       return
     }
+    const grid = useGridStore().grid
+    if (isEmptyGrid(grid)) {
+      console.warn('No grid to price demand card payoffs on.')
+      return
+    }
 
     // The distance between the map's two furthest-apart towns, which the
     // long-haul bonus is measured against. Worked out once here because it
     // compares every pair of towns (see payoffs.js)
     const spanKm = mapSpanKm(townsData)
-    // Payoffs are per speed unit, the board's yardstick (see boardScale.js)
+    // Track, and so payoffs, are priced per speed unit, the board's
+    // yardstick (see boardScale.js)
     const { sizeKm, turnsToCross, speedUnitKm } = useGameStore().boardScale
     debug.log(
       `Board scale: ${Math.round(sizeKm)} km across, crossed by a Freight in ` +
         `${turnsToCross.toFixed(1)} turns; speed unit ${speedUnitKm.toFixed(2)} km`
     )
+    // Hauls are priced over the grid as track building prices lines (see
+    // `pricingBoard` in buildRules.js), each worked out once for the deck
+    const priceOf = haulPricer(pricingBoard(grid, speedUnitKm, useWaterStore().data, townsData))
 
     // Every town-and-commodity pair at most once, three to a card (see
-    // demandDeck.js). Each pays by how far the commodity has to come, with a
-    // bonus for long hauls (see payoffs.js).
+    // demandDeck.js). Each pays by what the track to bring the commodity in
+    // would cost, with a bonus for long hauls (see payoffs.js).
     const options = buildDemandDeck(townsData, (destination, industry) =>
-      demandPayoff(destination, industry, townsData, spanKm, speedUnitKm)
+      demandPayoff(destination, industry, townsData, { spanKm, priceOf })
     )
     drawPile.value = options
 

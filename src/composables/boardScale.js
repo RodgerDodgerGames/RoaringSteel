@@ -11,11 +11,11 @@
  * of its size: about 6 turns on a small board, 10 on one Colorado's size, 15
  * on a big one.
  *
- * The speed unit is the game's yardstick for money too. Track is priced, and
- * deliveries pay, per speed unit (see trackCost.js and payoffs.js), so a
- * turn's building allowance buys about the same share of a turn's travel on
- * every board, as in Empire Builder, whatever the board's size or the size of
- * its grid cells.
+ * The speed unit is the game's yardstick for money too. Track is priced per
+ * speed unit (see trackCost.js), and deliveries pay by what the track for
+ * them would cost (see payoffs.js), so a turn's building allowance buys
+ * about the same share of a turn's travel on every board, as in Empire
+ * Builder, whatever the board's size or the size of its grid cells.
  *
  * Pure functions over plain data, so the rules can be tested without stores.
  *

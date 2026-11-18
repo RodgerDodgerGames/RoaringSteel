@@ -24,5 +24,14 @@ export const PIN_COLORS = Object.freeze([
  */
 export const demandDeckConfig = {
   /** Cards per town on the board, at most */
-  cardsPerTown: 6
+  cardsPerTown: 6,
+  /**
+   * Every demand paying less than this share of a player's starting cash
+   * (see `gameRules.startingCash`) goes into the deck, whatever the draw, as
+   * far as the deck has room: the short, cheap deliveries a player can
+   * afford early on. As a share,
+   * so it follows the starting cash when that is retuned. At 0.7 of
+   * $50,000, demands under $35,000.
+   */
+  cheapShareOfStartingCash: 0.7
 }

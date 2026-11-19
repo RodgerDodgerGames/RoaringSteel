@@ -158,7 +158,7 @@ export const gameRules = {
    */
   bridges: {
     perSpeedUnit: 2000,
-    maxSpeedUnits: 3,
+    maxSpeedUnits: 2,
     riverCrossing: 2000
   },
 

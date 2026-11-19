@@ -17,21 +17,29 @@ export const PIN_COLORS = Object.freeze([
 ])
 
 /**
- * How big the demand deck is (see demandDeck.js). Every card's three demands
- * go to three different towns, and no pair of town and commodity is on two
- * cards, so the deck is also never bigger than a third of the pairs the
- * board has.
+ * How the demand deck is made up (see demandDeck.js). Every card's three
+ * demands go to three different towns, and no pair of town and commodity is
+ * on two cards, so the deck is also never bigger than a third of the pairs
+ * the board has.
  */
 export const demandDeckConfig = {
   /** Cards per town on the board, at most */
   cardsPerTown: 6,
   /**
-   * Every demand paying less than this share of a player's starting cash
-   * (see `gameRules.startingCash`) goes into the deck, whatever the draw, as
-   * far as the deck has room: the short, cheap deliveries a player can
-   * afford early on. As a share,
-   * so it follows the starting cash when that is retuned. At 0.7 of
-   * $50,000, demands under $35,000.
+   * The pools of payoffs a card's three demands are drawn from, one demand
+   * from each (see demandDeck.js), so every card offers a cheap, short haul
+   * to start on, one in the middle, and one from the dear end.
+   *
+   * Each pool is a band of every demand the board has, ranked by payoff:
+   * `from` and `to` are shares of the demands ranked below, so the bottom
+   * pool, from 0 to 0.4, is the 40% that pay least. The bands overlap, so a
+   * demand near a boundary may be drawn as either pool's. Ranked on each
+   * board's own payoffs, so a mountain board's bottom pool pays more than a
+   * flat board's.
    */
-  cheapShareOfStartingCash: 0.7
+  pools: [
+    { from: 0, to: 0.4 },
+    { from: 0.3, to: 0.7 },
+    { from: 0.6, to: 1 }
+  ]
 }

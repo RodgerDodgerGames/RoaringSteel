@@ -28,8 +28,20 @@ const TOWNS = [
   town('Boise', 'Fruit')
 ]
 
-/** A payoff that names its demand, so tests can see which pair it was for */
-const payoffOf = (destination, industry) => `${destination.name}:${industry}`
+/**
+ * Every demand on the board of six towns with a payoff of its own: $1,000
+ * to $34,000, shuffled among the towns (each pair's place in the list,
+ * times 7, wrapped round the 34 of them)
+ */
+const PAYOFFS = new Map(
+  demandPairs(TOWNS).map(({ town, industry }, i) => [
+    `${town.name}:${industry}`,
+    (((i * 7) % 34) + 1) * 1000
+  ])
+)
+
+/** What a demand pays: its own payoff on the six towns, $1,000 elsewhere */
+const payoffOf = (destination, industry) => PAYOFFS.get(`${destination.name}:${industry}`) ?? 1000
 
 /**
  * A fixed stand-in for Math.random, so a test's deck is the same every run.
@@ -132,7 +144,7 @@ describe('buildDemandDeck', () => {
     deck
       .flatMap((card) => card.demands)
       .forEach(({ destination, industry, payoff }) =>
-        expect(payoff).toBe(`${destination}:${industry}`)
+        expect(payoff).toBe(PAYOFFS.get(`${destination}:${industry}`))
       )
   })
 
@@ -143,98 +155,80 @@ describe('buildDemandDeck', () => {
   })
 })
 
-describe('buildDemandDeck with cheap demands', () => {
-  // One card per town: 6 cards, 18 of the board's 34 demands
-  const small = { cardsPerTown: 1 }
-  /** Fruit is cheap to bring anywhere; everything else dear */
-  const fruitCheap = (destination, industry) => (industry === 'Fruit' ? 10000 : 90000)
-  const seeds = Array.from({ length: 20 }, (_, i) => i + 1)
+describe('buildDemandDeck pools', () => {
+  const seeds = Array.from({ length: 50 }, (_, i) => i + 1)
+  /** Where a payoff stands among the board's 34: the share ranked below it */
+  const standing = (payoff) => (payoff / 1000 - 1) / 34
 
-  it('should put every demand paying under the threshold in the deck, whatever the draw', () => {
-    // Five towns want Fruit, which only Boise makes
+  /**
+   * Whether a card's demands could be one from each pool: lowest first,
+   * one in each band in turn
+   */
+  const onePerPool = (card, pools) =>
+    card.demands
+      .map(({ payoff }) => standing(payoff))
+      .sort((a, b) => a - b)
+      .every((place, i) => place >= pools[i].from && place < pools[i].to)
+
+  it('should deal every card one demand from each of the bottom, middle and upper pools', () => {
+    const pools = [
+      { from: 0, to: 0.4 },
+      { from: 0.3, to: 0.7 },
+      { from: 0.6, to: 1 }
+    ]
     seeds.forEach((seed) => {
-      const deck = buildDemandDeck(TOWNS, fruitCheap, {
-        ...small,
-        random: seeded(seed),
-        cheapUnder: 35000
-      })
-      const fruit = demandsOf(deck).filter((demand) => demand.endsWith(':Fruit'))
+      const deck = buildDemandDeck(TOWNS, payoffOf, { random: seeded(seed), pools })
 
-      expect(fruit).toHaveLength(5)
+      expect(deck.length).toBeGreaterThan(0)
+      deck.forEach((card) => expect(onePerPool(card, pools)).toBe(true))
     })
   })
 
-  it('should leave the cheap demands to the draw without a threshold', () => {
-    const counts = seeds.map(
-      (seed) =>
-        demandsOf(buildDemandDeck(TOWNS, fruitCheap, { ...small, random: seeded(seed) })).filter(
-          (demand) => demand.endsWith(':Fruit')
-        ).length
-    )
-
-    // Fruit is made in one town only, so the draw weighs it light: most
-    // decks leave some out
-    expect(counts.filter((count) => count < 5).length).toBeGreaterThan(seeds.length / 2)
-  })
-
-  it('should deal the cheap demands out across the cards, not bunch them', () => {
-    // Five demands to five towns, dealt one to a card: five cards, where
-    // bunched they would fill two
+  it('should deal from the pools it is given', () => {
+    const pools = [
+      { from: 0, to: 0.2 },
+      { from: 0.4, to: 0.6 },
+      { from: 0.8, to: 1 }
+    ]
     seeds.forEach((seed) => {
-      const deck = buildDemandDeck(TOWNS, fruitCheap, {
-        ...small,
+      const deck = buildDemandDeck(TOWNS, payoffOf, {
         random: seeded(seed),
-        cheapUnder: 35000
+        cardsPerTown: 1,
+        pools
       })
 
-      expect(deck.filter((card) => card.demands.some((d) => d.industry === 'Fruit'))).toHaveLength(
-        5
-      )
+      expect(deck.length).toBeGreaterThan(0)
+      deck.forEach((card) => expect(onePerPool(card, pools)).toBe(true))
     })
   })
 
-  it('should keep every cheap demand in a full-size deck, whatever the draw', () => {
-    // Regression: the deck stopped at the first card it could not fill,
-    // dropping the cheap demands already dealt to the cards after it
-    const threeCheap = (destination, industry) =>
-      ['Fruit', 'Coal', 'Cattle'].includes(industry) ? 10000 : 90000
-    const cheapCount = demandPairs(TOWNS).filter(({ industry }) =>
-      ['Fruit', 'Coal', 'Cattle'].includes(industry)
-    ).length
-
-    Array.from({ length: 200 }, (_, i) => i + 1).forEach((seed) => {
-      const deck = buildDemandDeck(TOWNS, threeCheap, { random: seeded(seed), cheapUnder: 35000 })
-
-      expect(deck.flatMap((card) => card.demands).filter((d) => d.payoff < 35000)).toHaveLength(
-        cheapCount
-      )
-    })
-  })
-
-  it('should fill the deck with cheap demands alone when there are more than it holds', () => {
-    // Everything but Fruit is cheap: 29 cheap demands for 18 places
-    const fruitDear = (destination, industry) => (industry === 'Fruit' ? 90000 : 10000)
-
+  it('should stop at the cards its pools can fill, each still one demand from each', () => {
+    // Three narrow pools of three or four demands each: room for three
+    // cards at most, under the six asked for
+    const pools = [
+      { from: 0, to: 0.1 },
+      { from: 0.1, to: 0.2 },
+      { from: 0.2, to: 0.3 }
+    ]
     seeds.forEach((seed) => {
-      const deck = buildDemandDeck(TOWNS, fruitDear, {
-        ...small,
+      const deck = buildDemandDeck(TOWNS, payoffOf, {
         random: seeded(seed),
-        cheapUnder: 35000
+        cardsPerTown: 1,
+        pools
       })
 
-      expect(demandsOf(deck).some((demand) => demand.endsWith(':Fruit'))).toBe(false)
+      expect(deck.length).toBeGreaterThanOrEqual(2)
+      expect(deck.length).toBeLessThanOrEqual(3)
+      deck.forEach((card) => expect(onePerPool(card, pools)).toBe(true))
     })
   })
 
-  it('should give each demand the payoff it was priced at', () => {
-    const deck = buildDemandDeck(TOWNS, fruitCheap, {
-      ...small,
-      random: seeded(3),
-      cheapUnder: 35000
-    })
+  it('should still fill the deck when every demand pays the same', () => {
+    // Ranked in the draw's order, so each pool still holds its share
+    const full = buildDemandDeck(TOWNS, payoffOf, { random: seeded(7), cardsPerTown: 1 })
+    const same = buildDemandDeck(TOWNS, () => 3000, { random: seeded(7), cardsPerTown: 1 })
 
-    deck
-      .flatMap((card) => card.demands)
-      .forEach((d) => expect(d.payoff).toBe(d.industry === 'Fruit' ? 10000 : 90000))
+    expect(full).toHaveLength(TOWNS.length)
+    expect(same).toHaveLength(TOWNS.length)
   })
 })

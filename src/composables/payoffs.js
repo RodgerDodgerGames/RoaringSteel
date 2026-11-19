@@ -10,11 +10,15 @@
  * the haul is, so a delivery that needs dear track pays enough to be worth
  * building it.
  *
- * A haul is priced as a straight line of track from the producing town to
+ * A haul is priced from a straight line of track from the producing town to
  * the destination, cell by cell over the board's grid, at the same prices
- * track is built at (see `haulPrice`). A player's real line may bend round
- * the worst ground, but the straight line is a fair measure of what lies
- * between the two towns.
+ * track is built at (see `haulPricer`). Players build fairly straight lines:
+ * nobody searches every cell for the cheapest way, and straight track gets
+ * trains there sooner. But nor do they build straight over a mountain range
+ * when a pass is a little way off. So the straight line's price is brought
+ * part of the way toward the cheapest route a computer player would find
+ * (see `routeRatios` and `blendedPricer`): in the mountains a route can cost
+ * a third of the straight line, on the plains nearly the same.
  *
  * The producer that counts is the one whose haul is cheapest to build, as
  * that is where a sensible player fetches the commodity from. A commodity
@@ -38,7 +42,7 @@
 
 import * as turf from '@turf/turf'
 import { gameRules } from '@/config/game'
-import { terrainCost, landCellPrice } from '@/composables/map/trackCost'
+import { terrainCost, landCellPrice, linePrice } from '@/composables/map/trackCost'
 import {
   isWaterCell,
   bridgeCellPrice,
@@ -47,6 +51,10 @@ import {
 } from '@/composables/map/water'
 import { cellAt, walkCells } from '@/composables/map/cellGrid'
 import { stepGrade } from '@/composables/map/climb'
+import { coarsenGrid, coarseFactor } from '@/composables/map/coarseGrid'
+import { pricingBoard } from '@/composables/map/buildRules'
+import { regionTest } from '@/composables/map/region'
+import { searchBoard, costField } from '@/composables/bot/botPathfinder'
 
 /**
  * The straight-line distance between two towns, in km.
@@ -247,14 +255,138 @@ export function haulPricer({ grid, priceScale, speedUnitKm, rivers = null, townC
 }
 
 /**
+ * How much cheaper than the straight line the cheapest route between two
+ * towns is: a function giving, for a haul, the cheapest buildable route's
+ * price over the straight line's (see `haulPricer`), both on the same grid.
+ *
+ * The route is found by the search computer players use (see `costField`
+ * in botPathfinder.js), with no track built and no town entry fees, and
+ * priced as track is (see `linePrice`): over the cheapest ground, round
+ * water too wide to bridge, inside the region. On a coarse grid the region
+ * is judged at the coarse cells' centers, so a strip of the region
+ * narrower than a coarse cell can close up; a town beyond it then has no
+ * route, and its hauls keep the straight line's price.
+ *
+ * A route should never cost more than the straight line, but it can: it
+ * must stay inside the region and bridge no further than the rules allow,
+ * where the straight line is only priced, never built. So the ratio is held
+ * to 1 at most, and is 1 where no route can be found.
+ *
+ * Meant for a coarse grid (see coarseGrid.js), since every town needs a
+ * search over the board. A town is searched from the first time a haul to
+ * it is asked about that is not known yet, and every haul to it read off
+ * that search.
+ *
+ * @param {Object} board - What routes are searched and priced on: the
+ *   pricing parts (see `pricingBoard` in buildRules.js) and `isInRegion`
+ * @param {Array<Object>} towns - Every town, each with lat and lon
+ * @returns {Function} (from, to) => ratio, from 0 up to 1
+ */
+export function routeRatios(board, towns) {
+  const straightOf = haulPricer(board)
+  // No towns: a route here is only track, without entry fees or the detours
+  // through towns that a computer player's search makes
+  const search = searchBoard(board, [])
+  const pointOf = (town) => ({ lat: town.lat, lng: town.lon })
+  // The ratios worked out so far, by one town of the pair, then the other
+  const known = new Map(towns.map((town) => [town, new Map()]))
+  // The towns searched out from so far
+  const searched = new Set()
+
+  /**
+   * Works out the ratio between a town and every other town whose ratio
+   * with it is not known yet, from one search out from it. A route and the
+   * straight line cost the same either way (a climb is charged downhill as
+   * uphill, see climb.js), so each ratio is kept for both ways, and a later
+   * search only goes as far as the towns still unknown.
+   */
+  function searchFrom(town) {
+    searched.add(town)
+    const ratios = known.get(town)
+    const others = towns.filter((other) => other !== town && !ratios.has(other))
+    if (others.length === 0) return
+    const field = costField(search, [pointOf(town)], { targets: others.map(pointOf) })
+    others.forEach((other) => {
+      const line = field.lineTo(pointOf(other))
+      const straight = straightOf(other, town)
+      const ratio = line && straight > 0 ? Math.min(1, linePrice(line, board).total / straight) : 1
+      ratios.set(other, ratio)
+      known.get(other).set(town, ratio)
+    })
+  }
+
+  return (from, to) => {
+    // A town not among those given has no routes worked out
+    if (!known.has(to)) return 1
+    if (!known.get(to).has(from) && !searched.has(to)) searchFrom(to)
+    return known.get(to).get(from) ?? 1
+  }
+}
+
+/**
+ * A pricer for hauls that brings the straight line's price part of the way
+ * toward the cheapest route's:
+ *
+ *   price = straight price · (route price / straight price) ^ weight
+ *
+ * At a weight of 0 that is the straight line; at 1, the route; in between,
+ * part of the way, the same share of the way on every board whatever the
+ * size of the gap: at 0.5, a route a quarter of the straight line's price
+ * brings it to half.
+ *
+ * @param {Function} straightOf - What the straight line costs: (from, to) =>
+ *   dollars (see `haulPricer`)
+ * @param {Function} ratioOf - The route's price over the straight line's:
+ *   (from, to) => ratio (see `routeRatios`)
+ * @param {number} weight - How far toward the route, from 0 to 1
+ * @returns {Function} (from, to) => dollars, whole
+ */
+export function blendedPricer(straightOf, ratioOf, weight) {
+  // At 0 the route does not count, so it is not worked out at all
+  if (weight <= 0) return straightOf
+  return (from, to) => Math.round(straightOf(from, to) * ratioOf(from, to) ** weight)
+}
+
+/**
+ * The pricer a demand deck's payoffs are set by (see `blendedPricer`): the
+ * straight line over the board's grid, brought toward the cheapest route,
+ * which is searched on a coarser copy of the grid of no more than
+ * `gameRules.payoffs.route.searchCells` cells, so a search from every town
+ * stays quick (see coarseGrid.js). How far toward it is
+ * `gameRules.payoffs.route.weight`.
+ *
+ * @param {Object} board
+ * @param {Object} board.grid - The grid (see cellGrid.js)
+ * @param {number} board.speedUnitKm - The board's speed unit (see
+ *   boardScale.js)
+ * @param {Object|null} board.waterData - The water data (see stores/water.js)
+ * @param {Array<Object>} board.towns - Every town, each with lat and lon
+ * @param {Object|null} board.region - The region being played (GeoJSON)
+ * @returns {Function} (from, to) => dollars (see `blendedPricer`)
+ */
+export function deckPricer({ grid, speedUnitKm, waterData, towns, region }) {
+  const { weight, searchCells } = gameRules.payoffs.route
+  const straightOf = haulPricer(pricingBoard(grid, speedUnitKm, waterData, towns))
+  // At a weight of 0 the route does not count, so no route is looked for
+  if (weight <= 0) return straightOf
+  const coarse = coarsenGrid(grid, coarseFactor(grid, searchCells))
+  const coarseBoard = {
+    ...pricingBoard(coarse, speedUnitKm, waterData, towns),
+    isInRegion: regionTest(region)
+  }
+  return blendedPricer(straightOf, routeRatios(coarseBoard, towns), weight)
+}
+
+/**
  * The cheapest haul of a commodity to a town: from whichever other town
- * that produces it has the cheapest straight line of track to it (see
- * `haulPricer`). Where two cost the same, the first in the list is taken.
+ * that produces it is cheapest to bring it from, by the pricer given (for
+ * a deck, the straight line brought toward the route, see `deckPricer`).
+ * Where two cost the same, the first in the list is taken.
  * @param {Object} destination - The town it is wanted in, with lat and lon
  * @param {string} industry - The commodity's name
  * @param {Array<Object>} towns - Every town, each with lat, lon and industries
  * @param {Function} priceOf - What a haul costs: (from, to) => dollars (see
- *   `haulPricer`)
+ *   `deckPricer`)
  * @returns {{price: number, km: number}|null} The haul's price in dollars and
  *   its straight-line length, or null when no other town produces it
  */
@@ -280,7 +412,7 @@ export function cheapestHaul(destination, industry, towns, priceOf) {
  * @param {Object} pricing
  * @param {number} pricing.spanKm - The map's span (see `mapSpanKm`)
  * @param {Function} pricing.priceOf - What a haul costs: (from, to) =>
- *   dollars (see `haulPricer`)
+ *   dollars (see `deckPricer`)
  * @returns {number} The payoff, in dollars; the minimum when no other town
  *   produces the commodity
  */

@@ -18,11 +18,16 @@ import {
   longHaulMultiplier,
   waterStretchPrice,
   haulPricer,
+  routeRatios,
+  blendedPricer,
+  deckPricer,
   cheapestHaul,
   demandPayoff
 } from '@/composables/payoffs'
 import { gameRules } from '@/config/game'
 import { riverIndex } from '@/composables/map/water'
+import { regionTest } from '@/composables/map/region'
+import { pricingBoard } from '@/composables/map/buildRules'
 import { makeTestGrid, CELL, CELL_METERS } from '../utils/testGrid'
 import { pinKnobs } from '../utils/boardScale'
 
@@ -314,6 +319,146 @@ describe('payoffs', () => {
       expect(haulPrice(townAt('A', 0), townAt('B', 2), board(grid, { rivers }))).toBe(
         300 + gameRules.bridges.riverCrossing
       )
+    })
+  })
+
+  describe('routeRatios', () => {
+    /** A town in the middle of a cell of a grid whose corner is at 0, 0 */
+    const townIn = (name, row, col) => ({
+      name,
+      lat: (row + 0.5) * CELL,
+      lon: (col + 0.5) * CELL,
+      industries: []
+    })
+    /** A board to search routes on: no region, so everywhere is inside */
+    const searchable = (grid) => ({ ...board(grid), townCells: [], isInRegion: regionTest(null) })
+    const west = townIn('West', 2, 0)
+    const east = townIn('East', 2, 6)
+
+    it('should find a route round a ridge cheaper than the straight line over it', () => {
+      // A ridge 1,500 m high down the middle column, with a pass at its
+      // south end: the straight line between the towns climbs over it
+      const grid = makeTestGrid({
+        rows: 5,
+        cols: 7,
+        cell: (row, col) => ({ landCover: 100, elevation: col === 3 && row > 0 ? 1500 : 0 })
+      })
+
+      const ratio = routeRatios(searchable(grid), [west, east])(west, east)
+
+      expect(ratio).toBeGreaterThan(0)
+      expect(ratio).toBeLessThan(0.5)
+    })
+
+    it('should find no saving on level open ground', () => {
+      const grid = makeTestGrid({ rows: 5, cols: 7, cell: () => ({ landCover: 100 }) })
+
+      expect(routeRatios(searchable(grid), [west, east])(west, east)).toBe(1)
+    })
+
+    it('should never make a route dearer than the straight line', () => {
+      // The region has a hole in its middle the straight line runs across,
+      // so the route has to go round it, the long way
+      const C = CELL
+      const ringAround = {
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [
+            [
+              [0, 0],
+              [7 * C, 0],
+              [7 * C, 5 * C],
+              [0, 5 * C],
+              [0, 0]
+            ],
+            [
+              [1 * C, 1 * C],
+              [6 * C, 1 * C],
+              [6 * C, 4 * C],
+              [1 * C, 4 * C],
+              [1 * C, 1 * C]
+            ]
+          ]
+        }
+      }
+      const grid = makeTestGrid({ rows: 5, cols: 7, cell: () => ({ landCover: 100 }) })
+      const ringBoard = { ...board(grid), townCells: [], isInRegion: regionTest(ringAround) }
+
+      expect(routeRatios(ringBoard, [west, east])(west, east)).toBe(1)
+    })
+
+    it('should find no saving where no route can be built', () => {
+      // A lake too wide to bridge right across the board
+      const grid = makeTestGrid({
+        rows: 5,
+        cols: 7,
+        cell: (row, col) => (col >= 1 && col <= 5 ? { water: true } : { landCover: 100 })
+      })
+
+      expect(routeRatios(searchable(grid), [west, east])(west, east)).toBe(1)
+    })
+  })
+
+  describe('blendedPricer', () => {
+    const straightOf = () => 1000
+    const ratioOf = () => 0.25
+
+    it('should price the straight line at a weight of 0, without looking for a route', () => {
+      let looked = false
+      const priceOf = blendedPricer(straightOf, () => (looked = true), 0)
+
+      expect(priceOf({}, {})).toBe(1000)
+      expect(looked).toBe(false)
+    })
+
+    it('should price the route at a weight of 1', () => {
+      expect(blendedPricer(straightOf, ratioOf, 1)({}, {})).toBe(250)
+    })
+
+    it('should go the same share of the way toward the route in between', () => {
+      // Half way, on a scale of ratios: a quarter becomes a half
+      expect(blendedPricer(straightOf, ratioOf, 0.5)({}, {})).toBe(500)
+    })
+  })
+
+  describe('deckPricer', () => {
+    const townIn = (name, row, col) => ({
+      name,
+      lat: (row + 0.5) * CELL,
+      lon: (col + 0.5) * CELL,
+      industries: []
+    })
+    const west = townIn('West', 2, 0)
+    const east = townIn('East', 2, 6)
+    const towns = [west, east]
+    // A ridge with a pass at its south end, as for `routeRatios`
+    const grid = makeTestGrid({
+      rows: 5,
+      cols: 7,
+      cell: (row, col) => ({ landCover: 100, elevation: col === 3 && row > 0 ? 1500 : 0 })
+    })
+    const setup = { grid, speedUnitKm: CELL_KM, waterData: null, towns, region: null }
+    // Priced in each test, once the knobs are pinned
+    const straightPrice = () => haulPricer(pricingBoard(grid, CELL_KM, null, towns))(west, east)
+    const { route } = gameRules.payoffs
+    const tunedRoute = { ...route }
+    afterEach(() => Object.assign(route, tunedRoute))
+
+    it('should price the straight line at a route weight of 0', () => {
+      route.weight = 0
+
+      expect(deckPricer(setup)(west, east)).toBe(straightPrice())
+    })
+
+    it('should bring the price toward the route round the ridge at a weight above 0', () => {
+      route.weight = 0.5
+      const halfWay = deckPricer(setup)(west, east)
+      route.weight = 1
+      const allTheWay = deckPricer(setup)(west, east)
+
+      expect(halfWay).toBeLessThan(straightPrice())
+      expect(allTheWay).toBeLessThan(halfWay)
     })
   })
 

@@ -129,13 +129,13 @@ async function handlePlayGameClick() {
 
     // Leave off any town track cannot reach, such as one on an island too
     // far out to bridge: the grid says where the water is
-    townsStore.dropUnreachableTowns()
+    await townsStore.dropUnreachableTowns()
 
     // Build the demand deck, then deal every player their opening hand in
     // turn order — the players were confirmed before the region was picked.
     // After the grid, as payoffs are priced by the terrain each haul crosses
     // (see payoffs.js).
-    demandCardsStore.generateDemandCards()
+    await demandCardsStore.generateDemandCards()
     demandCardsStore.dealHands(playerStore.players.map((player) => player.id))
 
     isSettingUpGame.value = false

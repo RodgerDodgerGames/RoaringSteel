@@ -16,6 +16,23 @@ export function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+/**
+ * Lets the browser draw the page before long work carries on: the rest of
+ * the work waits for a fresh turn of the browser's event loop, and the
+ * browser draws in between. Long setup steps call it every so often, so
+ * their progress bar moves rather than freezing until they finish.
+ *
+ * Skipped while the page is hidden: no one is watching the bar then, and a
+ * browser holds a hidden page's timers back to about one a second, which
+ * would stretch a few seconds of work out to minutes.
+ *
+ * @returns {Promise<void>} Resolves once the browser has had its turn
+ */
+export function yieldToBrowser() {
+  if (typeof document !== 'undefined' && document.hidden) return Promise.resolve()
+  return wait(0)
+}
+
 /** Fallback ceiling for any request that does not name its own. */
 export const DEFAULT_REQUEST_TIMEOUT_MS = 30000
 

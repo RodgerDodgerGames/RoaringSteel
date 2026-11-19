@@ -27,8 +27,9 @@ import { pinPlainScale } from '../../utils/boardScale'
 /**
  * Sets up a game on the test board.
  * @param {Array<{name: string, isBot: boolean}>} roster - The players, in turn order
+ * @returns {Promise<void>} Resolves once the deck is built and dealt
  */
-function setUpGame(roster) {
+async function setUpGame(roster) {
   useGameStore().setRegion(makeRegion())
   useGridStore().setGrid(makeGrid())
   useTownsStore().setTowns(makeTowns())
@@ -40,7 +41,7 @@ function setUpGame(roster) {
   playerStore.startGame()
   // The deck is shuffled with Math.random; a fixed sequence makes it the same every run
   vi.spyOn(Math, 'random').mockImplementation(seededRandom(7))
-  useDemandCardsStore().generateDemandCards()
+  await useDemandCardsStore().generateDemandCards()
   useDemandCardsStore().dealHands(playerStore.players.map(({ id }) => id))
 }
 
@@ -102,8 +103,8 @@ describe('useBot', () => {
       gameRules.victory.cash = fullCash
     })
 
-    it('should be played to a win without the rules ever refusing a move', () => {
-      setUpGame([
+    it('should be played to a win without the rules ever refusing a move', async () => {
+      await setUpGame([
         { name: 'Bot 1', isBot: true },
         { name: 'Bot 2', isBot: true },
         { name: 'Bot 3', isBot: true }
@@ -148,8 +149,8 @@ describe('useBot', () => {
   })
 
   describe('alongside a person', () => {
-    beforeEach(() => {
-      setUpGame([
+    beforeEach(async () => {
+      await setUpGame([
         { name: 'Ann', isBot: false },
         { name: 'Bot 1', isBot: true },
         { name: 'Bot 2', isBot: true }
@@ -189,8 +190,8 @@ describe('useBot', () => {
   })
 
   describe('throwing in the hand', () => {
-    beforeEach(() => {
-      setUpGame([{ name: 'Bot 1', isBot: true }])
+    beforeEach(async () => {
+      await setUpGame([{ name: 'Bot 1', isBot: true }])
       // Every demand wants something in Kauri, where no track can go
       const hopeless = (id) => ({
         id,
@@ -311,8 +312,8 @@ describe('useBot', () => {
   })
 
   describe('with the cash to win', () => {
-    beforeEach(() => {
-      setUpGame([{ name: 'Bot 1', isBot: true }])
+    beforeEach(async () => {
+      await setUpGame([{ name: 'Bot 1', isBot: true }])
       useGameStore().setGameState({ turn: gameRules.buildingRounds })
       // A short line out of Alder: one major city joined, three still needed
       const alder = makeTowns().find(({ name }) => name === 'Alder')

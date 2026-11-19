@@ -6,8 +6,9 @@
   While the fetch is running it reports the current phase and a progress bar.
   The bar fills as a percentage of the step running: the industries fetched
   or the towns placed (see the towns store's setupPercent), then the terrain
-  downloads (the grid store's progressPercent). Each counted step starts the
-  bar again from 0. A step with nothing to count shows the bar sliding, with
+  downloads (the grid store's progressPercent), then the towns whose demand
+  payoffs are priced (the demand cards store's setupPercent). Each counted
+  step starts the bar again from 0. A step with nothing to count shows the bar sliding, with
   no percentage.
   If setup fails — the towns or the grid — it swaps to that store's error
   message with a retry, so a failed setup explains itself instead of leaving a
@@ -23,6 +24,7 @@ import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useGridStore } from '@/stores/grid'
 import { useTownsStore } from '@/stores/towns'
+import { useDemandCardsStore } from '@/stores/demandCards'
 
 defineProps({
   isActive: {
@@ -40,6 +42,8 @@ const {
   setupMessage: townsMessage,
   setupPercent: townsPercent
 } = storeToRefs(useTownsStore())
+// The demand deck is built last, once the grid is in place
+const { setupMessage: deckMessage, setupPercent: deckPercent } = storeToRefs(useDemandCardsStore())
 
 // Towns are set up first, so at most one of the two has failed
 const error = computed(() => townsError.value || gridStore.error)
@@ -55,20 +59,22 @@ const phaseLabel = computed(() => {
     case 'calculating':
       return 'Calculating terrain costs…'
     default:
-      // What the town setup is doing; between steps, a general word
-      return townsMessage.value || 'Preparing game…'
+      // What the deck or the town setup is doing; between steps, a general
+      // word
+      return deckMessage.value || townsMessage.value || 'Preparing game…'
   }
 })
 
 /**
- * How full the bar is: the grid's percentage once it has a phase, the town
- * setup's before that. Null while the step has nothing to count — the
- * grid's 'initializing' among them, which works out the downloads before
- * there is anything to count them against.
+ * How full the bar is: the grid's percentage while it has a phase, the
+ * deck's while it is built, and the town setup's otherwise. Null while the
+ * step has nothing to count — the grid's 'initializing' among them, which
+ * works out the downloads before there is anything to count them against.
  */
 const percent = computed(() => {
   if (currentPhase.value === 'initializing') return null
-  return currentPhase.value ? progressPercent.value : townsPercent.value
+  if (currentPhase.value) return progressPercent.value
+  return deckMessage.value ? deckPercent.value : townsPercent.value
 })
 
 // A step with nothing to count (looking up the data window, a cached fetch,

@@ -10,30 +10,37 @@
  * card go to three different towns; they may ask for the same commodity,
  * as the draw falls.
  *
- * Which pairs make it into the deck, and in what order, is drawn at random,
- * weighted two ways, as the deck has always been:
+ * Each card's three demands come from three pools of payoffs, one from
+ * each: the bottom, middle and upper bands of every demand the board has,
+ * ranked by what it pays (see `demandDeckConfig.pools`). So every card
+ * offers a short, cheap haul a player can start on early, one in the
+ * middle, and one from the dear end for later in the game. The bands
+ * overlap, so a demand near a boundary may be dealt as either pool's.
+ *
+ * Which pairs of a pool make it into the deck, and in what order, is drawn
+ * at random, weighted two ways, as the deck has always been:
  * - a town that makes little wants more: a town's weight is
  *   1 / (1 + the number of things it makes);
  * - a commodity made in many towns is wanted more often: a commodity's
  *   weight is how many towns make it.
  * A pair's weight is the two multiplied. The pairs are put in a random order
  * in which heavier pairs tend to come first (each pair's place is drawn as
- * random^(1 / weight), highest first), and the cards are made out of that
- * order. The finished cards are then shuffled: the weights choose which
- * demands make it into the deck, but a heavy demand is no likelier to be
- * near the top than a light one.
+ * random^(1 / weight), highest first); each pool takes its own pairs in
+ * that order, and each card takes the first of each pool's that it can.
+ * The finished cards are then shuffled, and so is each card's three: the
+ * weights choose which demands make it into the deck, but a heavy demand is
+ * no likelier to be near the top than a light one, nor a cheap demand to be
+ * a card's first.
  *
  * The deck has at most `cardsPerTown` cards per town (see config/demands.js),
  * and at most a third as many as there are pairs, so on most boards it
- * leaves some pairs out (a bench of three boards, 2026-11-18, dealt 55–79% of
- * them). The cheap demands are dealt before the rest: every pair that pays
- * under `cheapUnder` goes into the deck as far as it has room (three to a
- * card, never two to one town on a card), and the weighted draw fills the
- * rest. Early in a game those are the only deliveries a player can
- * afford to build for, and a board has few of them. They are dealt out
- * first, one to a card in turn, so they are spread across the deck rather
- * than bunched on cards of their own, and the weighted draw fills each
- * card's other places.
+ * leaves some pairs out (a bench of four boards, 2026-11-18, dealt 29–78%
+ * of them, every deck at full size). On a board with few pairs for its
+ * towns, a pool can run out before the deck is full, or have left only
+ * pairs for towns already on the card being made; the deck then stops
+ * short, at the cards it could fill. The middle pool, which shares pairs
+ * with both the others, is dealt first on each card, so it does not run
+ * out first.
  *
  * Pure functions over plain data, so they are tested without stores.
  *
@@ -41,9 +48,6 @@
  */
 
 import { demandDeckConfig } from '@/config/demands'
-
-/** How many demands a card offers */
-const DEMANDS_PER_CARD = 3
 
 /**
  * Every demand the board has: each town paired with each commodity made in
@@ -102,14 +106,13 @@ function shuffle(items, random) {
  *   industries ([{name}])
  * @param {Function} payoffOf - What delivering a commodity to a town pays:
  *   (town, commodity name) => dollars (see payoffs.js). Asked of every pair,
- *   so the cheap ones can be found.
+ *   so they can be ranked into the pools.
  * @param {Object} [options]
  * @param {Function} [options.random] - Draws a number in [0, 1); Math.random
  *   unless a test needs a fixed deck
  * @param {number} [options.cardsPerTown] - See `demandDeckConfig`
- * @param {number} [options.cheapUnder] - Every pair paying less than this
- *   goes into the deck, as far as it has room; none are sure to unless it is
- *   given
+ * @param {Array<{from: number, to: number}>} [options.pools] - See
+ *   `demandDeckConfig`: one demand on each card from each
  * @returns {Array<{id: number, demands: Array<{destination: string,
  *   industry: string, payoff: number}>}>} The deck, top first, its cards
  *   numbered from 1
@@ -117,77 +120,69 @@ function shuffle(items, random) {
 export function buildDemandDeck(
   towns,
   payoffOf,
-  { random = Math.random, cardsPerTown = demandDeckConfig.cardsPerTown, cheapUnder = 0 } = {}
+  {
+    random = Math.random,
+    cardsPerTown = demandDeckConfig.cardsPerTown,
+    pools = demandDeckConfig.pools
+  } = {}
 ) {
   const pairs = demandPairs(towns).map((pair) => ({
     ...pair,
     payoff: payoffOf(pair.town, pair.industry)
   }))
-  const size = Math.min(towns.length * cardsPerTown, Math.floor(pairs.length / DEMANDS_PER_CARD))
-  const cheap = []
-  const dear = []
-  pairs.forEach((pair) => (pair.payoff < cheapUnder ? cheap : dear).push(pair))
+  const size = Math.min(towns.length * cardsPerTown, Math.floor(pairs.length / pools.length))
 
-  // The cards, and whether a card can take a pair: not full, and not
-  // already sending a demand to the pair's town
-  const cards = Array.from({ length: size }, () => [])
-  const fits = (card, pair) =>
-    card.length < DEMANDS_PER_CARD && !card.some((taken) => taken.town === pair.town)
+  // One weighted order for every pair, so a pair in two pools comes as far
+  // up each; each pool takes its own pairs from it
+  const order = weightedOrder(pairs, random)
+  // Where each pair stands among them all, by payoff: the share of pairs
+  // ranked below it, from 0 for the lowest. Pairs paying the same are
+  // ranked in their weighted order, so each pool always holds its share of
+  // the pairs, even where many pay the same (the minimum, say).
+  const standing = new Map(
+    [...order].sort((a, b) => a.payoff - b.payoff).map((pair, rank) => [pair, rank / pairs.length])
+  )
+  const poolOrders = pools.map(({ from, to }) =>
+    order.filter((pair) => standing.get(pair) >= from && standing.get(pair) < to)
+  )
+  // The pools are dealt from the middle out: a middle pool shares pairs with
+  // the pools on both sides, and has fewest of its own, so it is the first
+  // to run short if the others take what it shares with them first
+  const middle = (pools.length - 1) / 2
+  const dealOrder = poolOrders
+    .map((poolOrder, i) => ({ poolOrder, fromMiddle: Math.abs(i - middle) }))
+    .sort((a, b) => a.fromMiddle - b.fromMiddle)
+    .map(({ poolOrder }) => poolOrder)
 
-  // The cheap pairs are dealt first, in their weighted order, round the
-  // cards in turn, so they are spread one to a card before any card gets a
-  // second. One that no card can take (every card full, or with its town on
-  // it) is left out: there is no room for it.
-  let next = 0
-  weightedOrder(cheap, random).forEach((pair) => {
-    for (let tried = 0; tried < size; tried++) {
-      const card = cards[(next + tried) % size]
-      if (fits(card, pair)) {
-        card.push(pair)
-        next = (next + tried + 1) % size
-        return
-      }
-    }
-  })
-
-  // Then each card is filled from the dear pairs in their weighted order:
-  // the first going to towns not already on it. The ones passed over stay
-  // where they are, for later cards. A card that cannot be filled is left
-  // out, and its pairs go back to the front of the order for the cards
-  // after it, so a cheap pair dealt to it is not lost with it.
-  const order = weightedOrder(dear, random)
-  const filled = []
-  cards.forEach((card) => {
-    for (let i = 0; i < order.length && card.length < DEMANDS_PER_CARD; i++) {
-      if (fits(card, order[i])) {
-        card.push(order[i])
-        order.splice(i, 1)
-        i--
-      }
-    }
-    if (card.length === DEMANDS_PER_CARD) filled.push(card)
-    else order.unshift(...card)
-  })
-
-  // A cheap pair still left over came off a card that could not be filled
-  // at the end of the deck. It takes the place of a dear pair on a card
-  // that has room for its town, and the dear pair is left out instead.
-  order
-    .filter((pair) => pair.payoff < cheapUnder)
-    .forEach((pair) => {
-      for (const card of filled) {
-        const dearAt = card.findIndex((taken) => !(taken.payoff < cheapUnder))
-        const others = card.filter((_, i) => i !== dearAt)
-        if (dearAt !== -1 && !others.some((taken) => taken.town === pair.town)) {
-          card[dearAt] = pair
+  // Each card takes, from each pool in turn, the first pair not already
+  // dealt and not to a town already on it. Each pool's pairs before its
+  // `start` are all dealt, so its search starts there.
+  const dealt = new Set()
+  const starts = dealOrder.map(() => 0)
+  const cards = []
+  while (cards.length < size) {
+    const card = []
+    dealOrder.forEach((poolOrder, p) => {
+      if (card.length < p) return
+      while (starts[p] < poolOrder.length && dealt.has(poolOrder[starts[p]])) starts[p]++
+      for (let i = starts[p]; i < poolOrder.length; i++) {
+        const pair = poolOrder[i]
+        if (!dealt.has(pair) && !card.some((taken) => taken.town === pair.town)) {
+          card.push(pair)
+          dealt.add(pair)
           return
         }
       }
     })
+    // A pool with nothing left for a card has as good as run dry: what it
+    // has left goes only to the towns already on the card. The deck stops
+    // there, at the cards it could fill.
+    if (card.length < pools.length) break
+    cards.push(card)
+  }
 
-  // Each card's demands shuffled, so a card's cheap demand is not always
-  // the first on it
-  const deck = filled.map((card) =>
+  // Each card's demands shuffled, so its cheap demand is not always first
+  const deck = cards.map((card) =>
     shuffle(card, random).map(({ town, industry, payoff }) => ({
       destination: town.name,
       industry,

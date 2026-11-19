@@ -7,29 +7,29 @@ export const nlcdCostMap = {
   // water track has to bridge comes from Natural Earth instead (see
   // composables/map/water.js), so the NLCD's ponds, wide streams and marsh
   // pools are just wet ground to build over.
-  11: 450, // Open Water
+  11: 900, // Open Water
   12: 9990, // Perennial Ice/Snow
   // Developed Areas
-  21: 350, // Developed, Open Space
-  22: 500, // Developed, Low Intensity
-  23: 650, // Developed, Medium Intensity
-  24: 800, // Developed, High Intensity
+  21: 1350, // Developed, Open Space
+  22: 2000, // Developed, Low Intensity
+  23: 2650, // Developed, Medium Intensity
+  24: 3800, // Developed, High Intensity
   // Barren Land
-  31: 30, // Barren Land (Rock/Sand/Clay)
+  31: 50, // Barren Land (Rock/Sand/Clay)
   // Forest
   41: 350, // Deciduous Forest
   42: 350, // Evergreen Forest
   43: 350, // Mixed Forest
   // Shrubland
-  52: 100, // Shrub/Scrub
+  52: 80, // Shrub/Scrub
   // Agriculture
-  81: 150, // Pasture/Hay
-  82: 200, // Cultivated Crops
+  81: 120, // Pasture/Hay
+  82: 150, // Cultivated Crops
   // Grasslands
-  71: 70, // Grassland/Herbaceous
+  71: 60, // Grassland/Herbaceous
   // Wetlands
-  90: 500, // Woody Wetlands
-  95: 450 // Emergent Herbaceous Wetlands
+  90: 1000, // Woody Wetlands
+  95: 900 // Emergent Herbaceous Wetlands
 }
 
 /**

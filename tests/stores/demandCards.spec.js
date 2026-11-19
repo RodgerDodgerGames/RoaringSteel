@@ -15,7 +15,9 @@ import { useDemandCardsStore, HAND_SIZE } from '@/stores/demandCards'
 import { useTownsStore } from '@/stores/towns'
 import { usePlayerStore } from '@/stores/players'
 import { useSettingsStore } from '@/stores/settings'
+import { useGridStore } from '@/stores/grid'
 import { PIN_COLORS } from '@/config/demands'
+import { makeTestGrid } from '../utils/testGrid'
 
 /**
  * A card with an id and placeholder contracts, for tests that only care
@@ -69,6 +71,17 @@ describe('demandCards store', () => {
 
     beforeEach(() => {
       useTownsStore().setTowns(towns)
+      // Payoffs are priced over the grid, so the towns need one under them:
+      // ordinary ground everywhere, about 2.7 degrees each way from 38N, 107W
+      useGridStore().setGrid(
+        makeTestGrid({
+          rows: 30,
+          cols: 30,
+          south: 38,
+          west: -107,
+          cell: () => ({ landCover: 450 })
+        })
+      )
     })
 
     it('should build a deck from the demands the towns have, each card with a unique id', () => {
@@ -97,6 +110,16 @@ describe('demandCards store', () => {
 
     it('should not leave the last deck to be dealt from when there are no towns', () => {
       useTownsStore().setTowns([])
+      store.setDeck({ drawPile: deckOf(5), hands: { 1: [card(99)] } })
+
+      store.generateDemandCards()
+
+      expect(store.drawPile).toEqual([])
+      expect(store.handOf(1)).toEqual([])
+    })
+
+    it('should not build a deck before there is a grid to price its payoffs on', () => {
+      useGridStore().reset()
       store.setDeck({ drawPile: deckOf(5), hands: { 1: [card(99)] } })
 
       store.generateDemandCards()

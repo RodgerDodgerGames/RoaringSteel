@@ -33,18 +33,17 @@ import { usePlayerStore } from '@/stores/players'
 import { useTownsStore } from '@/stores/towns'
 import { useTrackStore } from '@/stores/track'
 import { useWaterStore } from '@/stores/water'
-import { linePrice, trackPriceScale } from '@/composables/map/trackCost'
+import { linePrice } from '@/composables/map/trackCost'
 import { townsByKey, entryFees, entryFeesKept } from '@/composables/townEntry'
 import {
   lineBlock,
   blockMessage,
-  townCells,
+  pricingBoard,
   builtLegs,
   trackIndex
 } from '@/composables/map/buildRules'
 import { isEmptyGrid } from '@/composables/map/cellGrid'
 import { regionTest } from '@/composables/map/region'
-import { riversFor } from '@/composables/map/waterData'
 import { pointKey, liesOnTrack } from '@/composables/network'
 import { formatCurrency } from '@/composables/utils'
 import { startTowns, startRuleMessage } from '@/composables/startRule'
@@ -70,7 +69,8 @@ export function useTrackBuilder() {
    * board (`priceScale`, see `trackPriceScale`), the board's speed unit, which
    * bridges are priced and measured in, the rivers on the board (see
    * water.js), the region being played, the cells the towns sit in, and the
-   * track built so far, indexed by where it is. Worked out once rather than
+   * track built so far, indexed by where it is (the pricing parts come from
+   * `pricingBoard` in buildRules.js, which payoffs share). Worked out once rather than
    * on every move of the cursor; the board parts and the track are kept
    * apart, so building or tearing up track does not work the board out again.
    *
@@ -81,18 +81,15 @@ export function useTrackBuilder() {
    * times slower. The track is still read through the store, so a section
    * added is noticed.
    */
-  const boardRules = computed(() => {
-    const grid = gridStore.grid
-    return {
-      grid,
-      // An empty grid has no cells to price, and no cell size to price them by
-      priceScale: isEmptyGrid(grid) ? 0 : trackPriceScale(grid, gameStore.boardScale.speedUnitKm),
-      speedUnitKm: gameStore.boardScale.speedUnitKm,
-      rivers: isEmptyGrid(grid) ? null : riversFor(grid, waterStore.data),
-      isInRegion: regionTest(gameStore.region),
-      townCells: isEmptyGrid(grid) ? [] : townCells(townsStore.towns, grid)
-    }
-  })
+  const boardRules = computed(() => ({
+    ...pricingBoard(
+      gridStore.grid,
+      gameStore.boardScale.speedUnitKm,
+      waterStore.data,
+      townsStore.towns
+    ),
+    isInRegion: regionTest(gameStore.region)
+  }))
   const buildRules = computed(() => ({
     ...boardRules.value,
     builtTrack: trackIndex(

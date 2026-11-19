@@ -111,10 +111,6 @@ async function handlePlayGameClick() {
     // Leave the modal up on failure, as for the grid below: it shows the
     // error and offers a retry
     if (townsStore.error) return
-    // build the demand deck, then deal every player their opening hand in
-    // turn order — the players were confirmed before the region was picked
-    demandCardsStore.generateDemandCards()
-    demandCardsStore.dealHands(playerStore.players.map((player) => player.id))
     // run cost grid setup
     // generate grid using the selected region bounds
     const bounds = turf.bbox(region.value)
@@ -130,6 +126,13 @@ async function handlePlayGameClick() {
     // Leave the modal up on failure so it can show the error and offer a retry.
     // Entering the game view here would drop the player onto an empty map.
     if (!generated) return
+
+    // Build the demand deck, then deal every player their opening hand in
+    // turn order — the players were confirmed before the region was picked.
+    // After the grid, as payoffs are priced by the terrain each haul crosses
+    // (see payoffs.js).
+    demandCardsStore.generateDemandCards()
+    demandCardsStore.dealHands(playerStore.players.map((player) => player.id))
 
     isSettingUpGame.value = false
     // once grid is generated, set view to game

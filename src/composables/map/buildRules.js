@@ -48,8 +48,9 @@
 
 import { gameRules } from '@/config/game'
 import { boardConfig } from '@/config/board'
-import { pointsAlongLine, cellPath, kmBetween } from '@/composables/map/trackCost'
-import { findCell, cellContaining, cellKm } from '@/composables/map/cellGrid'
+import { pointsAlongLine, cellPath, kmBetween, trackPriceScale } from '@/composables/map/trackCost'
+import { findCell, cellContaining, cellKm, isEmptyGrid } from '@/composables/map/cellGrid'
+import { riversFor } from '@/composables/map/waterData'
 import {
   latitudeDegreesToMeters,
   longitudeDegreesToMeters,
@@ -68,6 +69,37 @@ import { isWaterCell, longestCrossing, maxBridgeCells } from '@/composables/map/
 export function townCells(towns, grid) {
   const cells = towns.map((town) => findCell({ lat: town.lat, lng: town.lon }, grid))
   return [...new Set(cells.filter((cell) => cell !== -1))]
+}
+
+/**
+ * What track on a board is priced against: the grid, what a point of its
+ * terrain cost comes to in dollars (see `trackPriceScale`), the board's
+ * speed unit, which bridges are priced and measured in, the rivers on the
+ * board (see waterData.js), and the cells the towns sit in.
+ *
+ * Shared by the track builder, which prices the lines players build (see
+ * `boardRules` in trackBuilder.js), and the demand deck, which prices the
+ * hauls payoffs are set by (see payoffs.js), so the two always price track
+ * the same way.
+ *
+ * An empty grid has no cells to price, and no cell size to price them by:
+ * it gets a price scale of 0, no rivers and no town cells.
+ * @param {Object|null} grid - The grid (see cellGrid.js)
+ * @param {number} speedUnitKm - The board's speed unit (see boardScale.js)
+ * @param {Object|null} waterData - The water data (see stores/water.js)
+ * @param {Array<Object>} towns - The towns, each with lat and lon
+ * @returns {{grid: Object|null, priceScale: number, speedUnitKm: number,
+ *   rivers: Object|null, townCells: Array<number>}} The board
+ */
+export function pricingBoard(grid, speedUnitKm, waterData, towns) {
+  if (isEmptyGrid(grid)) return { grid, priceScale: 0, speedUnitKm, rivers: null, townCells: [] }
+  return {
+    grid,
+    priceScale: trackPriceScale(grid, speedUnitKm),
+    speedUnitKm,
+    rivers: riversFor(grid, waterData),
+    townCells: townCells(towns, grid)
+  }
 }
 
 /**

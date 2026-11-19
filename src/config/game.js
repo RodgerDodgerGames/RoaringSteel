@@ -181,25 +181,33 @@ export const gameRules = {
 
   /**
    * What a demand pays (see payoffs.js). As in Empire Builder, a delivery
-   * pays more the further the commodity has to travel: here, so much per
-   * speed unit (see composables/boardScale.js) as the crow flies from the
-   * nearest town that produces it to the destination, rounded to the nearest
-   * thousand.
+   * pays more the harder the commodity is to bring in: here, by what a
+   * straight line of track would cost to build from the producing town
+   * whose line is cheapest to the destination — its terrain, bridges and
+   * river crossings priced as track is (see `trackPrice` and `bridges`) —
+   * rounded to the nearest thousand.
    *
-   * $1,000 per speed unit is the board game's rate — roughly a million per
-   * milepost. Ordinary ground costs half that to build over at today's
-   * tuning (see `trackPrice.knobs`), so a first delivery on a new,
-   * straight line over ordinary ground pays for the line about twice over.
-   * Paid per speed unit, not per km, so payoffs keep pace with track prices
-   * on every board.
+   * `trackCostMultiple` is how many times that price a delivery pays. At 2,
+   * a first delivery on a new, straight line pays for the line about twice
+   * over. With today's track knobs (0.5) ordinary ground costs $500 per speed
+   * unit, so a haul over it pays $1,000 per speed unit, the board game's
+   * rate. Because payoffs follow track prices, turning the track knobs up or
+   * down turns payoffs up or down with them.
+   *
+   * `unbridgeableWater` is what each cell of a stretch of lake or sea too
+   * long to bridge adds, as a share of a bridge cell, past the cells a
+   * bridge could span: a stand-in for the detour round it (see
+   * `waterStretchPrice` in payoffs.js). At 0.5 each adds half a bridge.
+   *
    * `minimum` keeps a delivery between neighbors worth making.
    *
    * `longHaul` rewards the risk of reaching for distant towns: the
-   * distance payoff is multiplied by a bonus that grows exponentially with the haul's
+   * payoff is multiplied by a bonus that grows exponentially with the haul's
    * share of the map's span (its two furthest-apart towns), up to
    * 1 + maxBonus for the longest possible haul. At a maxBonus of 1, that haul
    * pays double. Raise it to pull players across the map harder, or set it to
-   * 0 for plain distance payoffs.
+   * 0 for no bonus. It is measured on distance, not on price, as the terrain
+   * is already in the price.
    *
    * `steepness` sets how much of the bonus is held back for the very longest
    * hauls. At 2, a haul a quarter of the way across pays about 1.1× and one
@@ -207,7 +215,8 @@ export const gameRules = {
    * At 0 (or below), the bonus grows in a straight line with distance.
    */
   payoffs: {
-    perSpeedUnit: 1000,
+    trackCostMultiple: 2,
+    unbridgeableWater: 0.5,
     roundTo: 1000,
     minimum: 3000,
     longHaul: {

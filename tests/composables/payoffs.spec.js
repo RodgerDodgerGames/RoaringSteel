@@ -1,74 +1,130 @@
 /**
  * Payoff Tests
  *
- * A demand pays by how far its commodity has to come: the straight-line
- * distance from the nearest town producing it, at gameRules.payoffs.perSpeedUnit
- * for each of the board's speed units,
+ * A demand pays by what the track to bring its commodity in would cost: a
+ * straight line from the producing town whose line is cheapest, priced cell
+ * by cell over the grid as track is, times gameRules.payoffs.trackCostMultiple,
  * times a long-haul bonus that grows exponentially with the haul's share of
  * the map's span, rounded, and never under the minimum.
+ *
+ * Water on the line is bridged where a bridge could span it; a stretch too
+ * long to bridge adds a share of a bridge for each cell past what a bridge
+ * could span, for the detour round it.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { haulKm, mapSpanKm, longHaulMultiplier, demandPayoff } from '@/composables/payoffs'
+import {
+  mapSpanKm,
+  longHaulMultiplier,
+  waterStretchPrice,
+  haulPricer,
+  cheapestHaul,
+  demandPayoff
+} from '@/composables/payoffs'
 import { gameRules } from '@/config/game'
+import { riverIndex } from '@/composables/map/water'
+import { makeTestGrid, CELL, CELL_METERS } from '../utils/testGrid'
+import { pinKnobs } from '../utils/boardScale'
 
 // Along one meridian a degree of latitude is about 111.2 km, so towns placed
 // on it sit a known distance apart
 const KM_PER_DEGREE = 111.19
 
-// The board's speed unit, in km (see boardScale.js)
-const SPEED_UNIT_KM = 10
+/** The test grids' cells' width, in km: also the speed unit priced at here */
+const CELL_KM = CELL_METERS / 1000
 
-const town = (name, lat, industries = []) => ({
+/**
+ * A single row of square cells running east along latitude 0, where a degree
+ * of longitude is as long as a degree of latitude. Each entry says what one
+ * cell is, west to east: a number is level ground of that land cover cost,
+ * 'W' is lake or sea, null is a hole (terrain that did not load), and an
+ * object is given to the cell as it is.
+ * @param {Array<number|string|null|Object>} cells - The cells, west to east
+ * @returns {Object} The grid
+ */
+function rowOf(cells) {
+  return makeTestGrid({
+    rows: 1,
+    cols: cells.length,
+    south: -CELL / 2,
+    cell: (row, col) => {
+      const cell = cells[col]
+      if (cell === null) return null
+      if (cell === 'W') return { water: true }
+      return typeof cell === 'number' ? { landCover: cell } : cell
+    }
+  })
+}
+
+/**
+ * A town in the middle of a cell of `rowOf`.
+ * @param {string} name - Its name
+ * @param {number} i - Which cell it is in, counting from the west
+ * @param {Array<string>} [industries] - What it produces
+ * @returns {Object} The town
+ */
+const townAt = (name, i, industries = []) => ({
   name,
-  lat,
-  lon: -105,
+  lat: 0,
+  lon: (i + 0.5) * CELL,
   industries: industries.map((industryName) => ({ name: industryName }))
 })
 
+/**
+ * What hauls are priced against (see `haulPrice`): a grid, a price scale of
+ * 1 so a level cell costs its land cover (with the knobs pinned at 1), and
+ * a speed unit one cell wide, so a water cell's bridge costs exactly the
+ * bridge rate per speed unit and a bridge may span `maxSpeedUnits` cells.
+ * @param {Object} grid - The grid
+ * @param {Object} [extra] - Rivers or town cells to add
+ * @returns {Object} The board
+ */
+const board = (grid, extra = {}) => ({ grid, priceScale: 1, speedUnitKm: CELL_KM, ...extra })
+
+/**
+ * What one haul costs on a board, priced afresh (see `haulPricer`).
+ * @param {Object} from - The town hauled from
+ * @param {Object} to - The town hauled to
+ * @param {Object} onBoard - The board (see `board`)
+ * @returns {number} Dollars
+ */
+const haulPrice = (from, to, onBoard) => haulPricer(onBoard)(from, to)
+
+/** One water cell's bridge, on the test boards */
+const BRIDGE = gameRules.bridges.perSpeedUnit
+/** The most water cells a bridge may span, on the test boards */
+const MAX_BRIDGE_CELLS = gameRules.bridges.maxSpeedUnits
+
 describe('payoffs', () => {
-  // The bonus and its steepness are tuning knobs, so pin them for these
-  // tests: they check the rule's shape, not whatever the knobs are set to today
-  const tuned = { ...gameRules.payoffs.longHaul }
+  // The bonus, the multiple, the water share and the track knobs are tuning
+  // settings, so pin them for these tests: they check the rule's shape, not
+  // today's tuning
+  const { trackCostMultiple, unbridgeableWater } = gameRules.payoffs
+  const longHaul = { ...gameRules.payoffs.longHaul }
+  let restoreKnobs
   beforeEach(() => {
     Object.assign(gameRules.payoffs.longHaul, { maxBonus: 1, steepness: 2 })
+    Object.assign(gameRules.payoffs, { trackCostMultiple: 2, unbridgeableWater: 0.5 })
+    restoreKnobs = pinKnobs(1)
   })
   afterEach(() => {
-    Object.assign(gameRules.payoffs.longHaul, tuned)
-  })
-
-  const denver = town('Denver', 39.7)
-  const near = town('Greeley', 40.7, ['Beef']) // 1 degree north
-  const far = town('Pueblo', 37.7, ['Beef', 'Steel']) // 2 degrees south
-
-  describe('haulKm', () => {
-    it('should measure from the nearest town producing the commodity', () => {
-      expect(haulKm(denver, 'Beef', [denver, near, far])).toBeCloseTo(KM_PER_DEGREE, 0)
-    })
-
-    it('should use a farther producer when it is the only one', () => {
-      expect(haulKm(denver, 'Steel', [denver, near, far])).toBeCloseTo(2 * KM_PER_DEGREE, 0)
-    })
-
-    it('should not count the destination itself as a producer', () => {
-      const steelTown = town('Steeltown', 39.7, ['Steel'])
-
-      expect(haulKm(steelTown, 'Steel', [steelTown, far])).toBeCloseTo(2 * KM_PER_DEGREE, 0)
-    })
-
-    it('should give null when no other town produces the commodity', () => {
-      expect(haulKm(denver, 'Wine', [denver, near, far])).toBeNull()
-    })
+    Object.assign(gameRules.payoffs.longHaul, longHaul)
+    Object.assign(gameRules.payoffs, { trackCostMultiple, unbridgeableWater })
+    restoreKnobs()
   })
 
   describe('mapSpanKm', () => {
+    const town = (name, lat) => ({ name, lat, lon: -105, industries: [] })
+
     it('should measure between the two towns furthest apart', () => {
       // Greeley is 1 degree north of Denver and Pueblo 2 degrees south
-      expect(mapSpanKm([denver, near, far])).toBeCloseTo(3 * KM_PER_DEGREE, 0)
+      const towns = [town('Denver', 39.7), town('Greeley', 40.7), town('Pueblo', 37.7)]
+
+      expect(mapSpanKm(towns)).toBeCloseTo(3 * KM_PER_DEGREE, 0)
     })
 
     it('should be 0 with fewer than two towns', () => {
-      expect(mapSpanKm([denver])).toBe(0)
+      expect(mapSpanKm([town('Denver', 39.7)])).toBe(0)
       expect(mapSpanKm([])).toBe(0)
     })
   })
@@ -146,58 +202,185 @@ describe('payoffs', () => {
     })
   })
 
-  describe('demandPayoff', () => {
-    const towns = [denver, near, far]
-    const spanKm = mapSpanKm(towns)
+  describe('waterStretchPrice', () => {
+    it('should bridge every cell of a stretch a bridge can span', () => {
+      expect(waterStretchPrice(3, 2000, 3)).toBe(6000)
+    })
 
-    it('should pay the per-km rate times the full bonus for a haul across the whole map', () => {
-      // With only Denver and Pueblo, the Steel haul is the map's whole span
-      const { perSpeedUnit, roundTo } = gameRules.payoffs
-      const km = 2 * KM_PER_DEGREE
-      const expected = Math.round(((km / SPEED_UNIT_KM) * perSpeedUnit * 2) / roundTo) * roundTo
+    it('should add half a bridge for each cell past what a bridge can span', () => {
+      // Three cells bridged, then two more at half a bridge each
+      expect(waterStretchPrice(5, 2000, 3)).toBe(3 * 2000 + 2 * 1000)
+    })
+
+    it('should add the configured share of a bridge past what a bridge can span', () => {
+      gameRules.payoffs.unbridgeableWater = 0.25
+
+      expect(waterStretchPrice(5, 2000, 3)).toBe(3 * 2000 + 2 * 500)
+    })
+
+    it('should add nothing for no water', () => {
+      expect(waterStretchPrice(0, 2000, 3)).toBe(0)
+    })
+  })
+
+  describe('haulPrice', () => {
+    it('should add up every cell the straight line passes through, both towns included', () => {
+      const grid = rowOf([100, 200, 300, 400])
+
+      expect(haulPrice(townAt('A', 0), townAt('B', 3), board(grid))).toBe(1000)
+    })
+
+    it('should cost more over rough ground than over ordinary ground the same distance', () => {
+      const flat = rowOf([100, 100, 100])
+      // The middle cell is a 10% grade
+      const hilly = rowOf([100, { landCover: 100, slope: 0.1 }, 100])
+
+      expect(haulPrice(townAt('A', 0), townAt('B', 2), board(hilly))).toBeGreaterThan(
+        haulPrice(townAt('A', 0), townAt('B', 2), board(flat))
+      )
+    })
+
+    it('should bridge a stretch of water short enough to bridge', () => {
+      const water = Array(MAX_BRIDGE_CELLS).fill('W')
+      const grid = rowOf([100, ...water, 100])
+
+      expect(haulPrice(townAt('A', 0), townAt('B', water.length + 1), board(grid))).toBe(
+        200 + MAX_BRIDGE_CELLS * BRIDGE
+      )
+    })
+
+    it('should add half a bridge for each cell of water past what a bridge can span', () => {
+      const water = Array(MAX_BRIDGE_CELLS + 2).fill('W')
+      const grid = rowOf([100, ...water, 100])
+
+      expect(haulPrice(townAt('A', 0), townAt('B', water.length + 1), board(grid))).toBe(
+        200 + MAX_BRIDGE_CELLS * BRIDGE + 2 * (BRIDGE / 2)
+      )
+    })
+
+    it('should price each stretch of water on its own', () => {
+      // Two short stretches, each bridgeable, together longer than a bridge
+      const grid = rowOf([100, 'W', 'W', 100, 'W', 'W', 100])
+
+      expect(haulPrice(townAt('A', 0), townAt('B', 6), board(grid))).toBe(300 + 4 * BRIDGE)
+    })
+
+    it("should end a stretch of water at a town's cell, still bridging the cell", () => {
+      // Five water cells in a row, a town on the middle one
+      const grid = rowOf([100, 'W', 'W', 'W', 'W', 'W', 100])
+      const from = townAt('A', 0)
+      const to = townAt('B', 6)
+
+      // Without the town: one stretch, two cells past what a bridge spans
+      expect(haulPrice(from, to, board(grid))).toBe(200 + 3 * BRIDGE + 2 * (BRIDGE / 2))
+      // With it: two stretches of two, each bridged, and the town's cell bridged too
+      expect(haulPrice(from, to, board(grid, { townCells: [3] }))).toBe(200 + 5 * BRIDGE)
+    })
+
+    it('should charge ordinary ground for a cell whose terrain did not load', () => {
+      const ordinary = gameRules.trackPrice.openGroundCost
+      const withHole = rowOf([100, null, 100])
+      const withNoSlope = rowOf([100, { landCover: 300, slope: NaN }, 100])
+
+      expect(haulPrice(townAt('A', 0), townAt('B', 2), board(withHole))).toBe(200 + ordinary)
+      expect(haulPrice(townAt('A', 0), townAt('B', 2), board(withNoSlope))).toBe(200 + ordinary)
+    })
+
+    it('should add a river bridge for each river the line crosses', () => {
+      const grid = rowOf([100, 100, 100])
+      // A river running north to south through the middle cell
+      const rivers = riverIndex(grid, [
+        [
+          [1.5 * CELL, -CELL],
+          [1.5 * CELL, CELL]
+        ]
+      ])
+
+      expect(haulPrice(townAt('A', 0), townAt('B', 2), board(grid, { rivers }))).toBe(
+        300 + gameRules.bridges.riverCrossing
+      )
+    })
+  })
+
+  describe('cheapestHaul', () => {
+    // A mountain just west of the destination, and plains to its east
+    const grid = rowOf([100, 100, 100, 5000, 100, 100, 100, 100, 100])
+    const destination = townAt('Destination', 4)
+    const nearOverMountain = townAt('Near', 2, ['Coal'])
+    const farOverPlains = townAt('Far', 8, ['Coal'])
+    const towns = [destination, nearOverMountain, farOverPlains]
+
+    it('should take the producer cheapest to build from, not the nearest', () => {
+      const haul = cheapestHaul(destination, 'Coal', towns, haulPricer(board(grid)))
+
+      // Cells 4 to 8, all plains
+      expect(haul.price).toBe(500)
+      expect(haul.km).toBeCloseTo(4 * CELL_KM, 0)
+    })
+
+    it('should take the nearest producer when the ground is the same', () => {
+      const plains = rowOf(Array(9).fill(100))
+
+      expect(cheapestHaul(destination, 'Coal', towns, haulPricer(board(plains))).price).toBe(300)
+    })
+
+    it('should not count the destination itself as a producer', () => {
+      const coalTown = townAt('Coal Town', 4, ['Coal'])
 
       expect(
-        demandPayoff(denver, 'Steel', [denver, far], mapSpanKm([denver, far]), SPEED_UNIT_KM)
-      ).toBe(expected)
+        cheapestHaul(coalTown, 'Coal', [coalTown, farOverPlains], haulPricer(board(grid))).price
+      ).toBe(500)
     })
 
-    it('should pay by speed units, so a board with a shorter speed unit pays more per km', () => {
-      const onBigBoard = demandPayoff(denver, 'Steel', towns, spanKm, 2 * SPEED_UNIT_KM)
+    it('should give null when no other town produces the commodity', () => {
+      expect(cheapestHaul(destination, 'Wine', towns, haulPricer(board(grid)))).toBeNull()
+    })
+  })
 
-      // Half the speed unit: the same haul is twice as many units
-      expect(demandPayoff(denver, 'Steel', towns, spanKm, SPEED_UNIT_KM)).toBeCloseTo(
-        2 * onBigBoard,
-        -3
-      )
+  describe('demandPayoff', () => {
+    // Ground at 1,000 a cell, so prices come out in whole thousands
+    const flat = rowOf(Array(6).fill(1000))
+    const destination = townAt('Destination', 0)
+    const producer = townAt('Producer', 4, ['Coal'])
+    const towns = [destination, producer]
+    // The one haul is the whole map, so it gets the full bonus: twice over
+    const spanKm = mapSpanKm(towns)
+    const payoffOn = (grid) =>
+      demandPayoff(destination, 'Coal', towns, { spanKm, priceOf: haulPricer(board(grid)) })
+
+    it("should pay the haul's track price times the multiple, with no bonus", () => {
+      gameRules.payoffs.longHaul.maxBonus = 0
+
+      // Five cells at 1,000, paid twice over
+      expect(payoffOn(flat)).toBe(10000)
     })
 
-    it('should pay more for a commodity that has to come further', () => {
-      expect(demandPayoff(denver, 'Steel', towns, spanKm, SPEED_UNIT_KM)).toBeGreaterThan(
-        demandPayoff(denver, 'Beef', towns, spanKm, SPEED_UNIT_KM)
-      )
+    it('should pay the full bonus for a haul across the whole map', () => {
+      // 5,000 of track, times the multiple of 2, times the bonus of 2
+      expect(payoffOn(flat)).toBe(20000)
     })
 
-    it('should pay more per km for a longer haul', () => {
-      // Steel comes twice as far as Beef, so it pays more than twice as much
-      expect(demandPayoff(denver, 'Steel', towns, spanKm, SPEED_UNIT_KM)).toBeGreaterThan(
-        2 * demandPayoff(denver, 'Beef', towns, spanKm, SPEED_UNIT_KM)
-      )
+    it('should pay more for a haul over rough ground than over ordinary ground', () => {
+      // One cell twice as dear (under the terrain cap): 6,000 of track, paid
+      // four times over
+      expect(payoffOn(rowOf([1000, 1000, 2000, 1000, 1000, 1000]))).toBe(24000)
     })
 
-    it('should never pay less than the minimum, however close the producer', () => {
-      const nextDoor = town('Aurora', 39.71, ['Beef'])
+    it('should pay for the bridges a haul over water needs', () => {
+      // Three cells of land and two of water: 3,000 of track and two bridges
+      const bay = rowOf([1000, 'W', 'W', 1000, 1000, 1000])
 
-      const map = [denver, nextDoor]
+      expect(payoffOn(bay)).toBe(4 * (3000 + 2 * BRIDGE))
+    })
 
-      expect(demandPayoff(denver, 'Beef', map, mapSpanKm(map), SPEED_UNIT_KM)).toBe(
-        gameRules.payoffs.minimum
-      )
+    it('should never pay less than the minimum, however cheap the haul', () => {
+      expect(payoffOn(rowOf([1, 1, 1, 1, 1, 1]))).toBe(gameRules.payoffs.minimum)
     })
 
     it('should pay the minimum when nothing else produces the commodity', () => {
-      expect(demandPayoff(denver, 'Wine', [denver], 0, SPEED_UNIT_KM)).toBe(
-        gameRules.payoffs.minimum
-      )
+      expect(
+        demandPayoff(destination, 'Wine', towns, { spanKm, priceOf: haulPricer(board(flat)) })
+      ).toBe(gameRules.payoffs.minimum)
     })
   })
 })

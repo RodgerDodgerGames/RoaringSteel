@@ -42,14 +42,16 @@ export function pinSpeedUnit(speedUnitKm) {
  * or searched, rather than today's tuning, pin them.
  *
  * @param {number} landCover - The land cover knob
- * @param {number} [elevation] - The elevation knob; the same as land cover's
+ * @param {number} [roughness] - The roughness knob; the same as land cover's
  *   if not given
+ * @param {number} [climb] - The climb knob; the same as land cover's if not
+ *   given
  * @returns {Function} Puts the knobs back
  */
-export function pinKnobs(landCover, elevation = landCover) {
+export function pinKnobs(landCover, roughness = landCover, climb = landCover) {
   const { knobs } = gameRules.trackPrice
   const saved = { ...knobs }
-  Object.assign(knobs, { landCover, elevation })
+  Object.assign(knobs, { landCover, roughness, climb })
   return () => Object.assign(knobs, saved)
 }
 
@@ -58,7 +60,7 @@ export function pinKnobs(landCover, elevation = landCover) {
  * speed unit — one cell of the test grids, so a Freight runs 90 km a turn —
  * and level track on the test grids costing exactly its land cover cost in
  * dollars. For tests about which cells are charged, or how players play,
- * rather than at what rate. Both tuning knobs are set to whatever makes a
+ * rather than at what rate. Every tuning knob is set to whatever makes a
  * level cell's price its land cover cost.
  *
  * @returns {Function} Puts the settings back

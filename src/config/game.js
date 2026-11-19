@@ -39,7 +39,7 @@ export const gameRules = {
   /**
    * What track over land costs: Empire Builder's $1 million a milepost of
    * clear ground, here $1,000 per speed unit (see composables/boardScale.js),
-   * scaled up for built-up or steep ground. (Water is bridged instead, see
+   * scaled up for built-up, broken or climbing ground. (Water is bridged instead, see
    * `bridges`, and reaching a town adds its entry fee, see `townEntry`.)
    *
    * Priced per speed unit rather than per km or per grid cell, so a turn's
@@ -47,13 +47,21 @@ export const gameRules = {
    * ground on every board, whatever the board's size or its cells': 20 at
    * the board game's rate, a little over two turns of a Freight's running.
    *
-   * A cell's terrain cost has two parts, one from each source of terrain:
+   * A cell's terrain cost has three parts:
    * - land cover: the average cost of the ground in the cell, from the
    *   table in config/nlcd.js (grassland 70, forest 350, a city 500–800)
-   * - elevation: `slopeCost` times the cell's slope, as a grade (rise over
-   *   run: a 10% grade is 0.1, and adds 450). See composables/map/slope.js.
+   * - roughness: `roughnessCost` times how broken the cell's ground is — the
+   *   average steepness between neighboring elevation pixels inside it, as a
+   *   grade (rise over run: 0.1 is 10%). It stands for the cuts and fills a
+   *   line needs over hills too small to show from cell to cell.
+   * - climb: how steeply the line climbs into the cell from the one before,
+   *   measured along the line from the two cells' average heights (see
+   *   composables/map/climb.js and `climbPoints` in trackCost.js). Up to
+   *   `climb.rulingGrade` it adds nothing; past it, it is priced as the
+   *   extra track a railroad lays to hold that grade: climbing at twice the
+   *   ruling grade costs one extra ordinary cell, at three times two extra.
    *
-   * Each part is multiplied by its own tuning knob (`knobs`) and the two are
+   * Each part is multiplied by its own tuning knob (`knobs`) and the three are
    * added. The total is read against `openGroundCost`, the terrain cost of
    * ordinary ground — Empire Builder's clear terrain, the most common ground
    * on its map: a cell at that cost is priced at `perSpeedUnit` per speed
@@ -61,38 +69,54 @@ export const gameRules = {
    * boards cut to the cell budget (2026-11-04), before the knobs: Colorado's
    * plains run about 175–245, and the middle of all the cells is 560 in
    * Colorado, 610 in Maryland and 710 in Massachusetts, so a typical cell
-   * costs 1.2–1.6 times ordinary ground.
+   * costs 1.2–1.6 times ordinary ground. (On 2026-11-18, land cover plus the
+   * old slope came to a middle of 435–455 on Minnesota and two Rocky Mountain
+   * boards.)
    *
-   * `slopeCost` is set so a 10% grade adds a whole ordinary ground's worth,
-   * about doubling a cell's price, as Empire Builder's mountains double its
-   * clear ground, and a 40% grade reaches the cap of five times, its alpine.
+   * `roughnessCost` is set so ground as broken as a 10% grade adds a whole
+   * ordinary ground's worth, before the knob.
+   *
+   * `climb.rulingGrade` is the grade a railroad is laid to: 2%, about the
+   * steepest main lines run. Cells' average heights smooth the ground out, so
+   * a climb measured between them is gentler than the steepest pitch on it.
    *
    * `maxTerrainFactor` caps how much dearer than ordinary ground a cell can
    * be: Empire Builder's alpine mileposts, its dearest ground, cost 5 times
    * its clear ones. The steepest cells would otherwise cost more than a
    * whole turn's allowance, and no one could build across them. The cap is
-   * on the terrain itself, before the knobs: ground past it is trimmed back,
-   * both parts alike, and the knobs then weigh what is left.
+   * on the cost after the knobs, against ordinary ground at the land cover
+   * knob, so worse ground never comes out cheaper.
    *
    * `knobs` are for tuning after playtests: raise one to make that part of
    * the terrain dearer, lower it to make it cheaper. At 1 each, track costs
    * the board game's rate. Bridges and town entry are not affected.
    *
-   * Both start at 0.5, half the board game's rate. With 1 each, on a
+   * Land cover started at 0.5, half the board game's rate. With 1, on a
    * Maryland board (bench run, 2026-11-05) the cheapest first delivery a
    * player was dealt cost a little over the $40,000 a player starts with —
    * nobody could afford one, and the computer players threw in their hands
-   * every turn and never built. At 0.5 each, computer players won on
-   * Colorado, Maryland and Massachusetts boards in 39–70 rounds.
+   * every turn and never built. At 0.5, computer players won on Colorado,
+   * Maryland and Massachusetts boards in 39–70 rounds.
+   *
+   * Roughness and climb replaced a single slope (the steeper of a cell's
+   * roughness and its grade to its neighbors, which in practice was always
+   * the roughness) on 2026-11-18 (#160). On a bench of Minnesota and two
+   * Rocky Mountain boards, roughness 0.15 and climb 0.5 brought topography
+   * from about 67% of mountain track prices to about 60%, and mountain
+   * prices down by about a seventh, leaving Minnesota's nearly as they were.
    */
   trackPrice: {
     perSpeedUnit: 1000,
     openGroundCost: 450,
-    slopeCost: 4500,
+    roughnessCost: 4500,
+    climb: {
+      rulingGrade: 0.02
+    },
     maxTerrainFactor: 5,
     knobs: {
       landCover: 0.5,
-      elevation: 0.5
+      roughness: 0.15,
+      climb: 0.5
     }
   },
 
@@ -189,7 +213,7 @@ export const gameRules = {
    *
    * `trackCostMultiple` is how many times that price a delivery pays. At 2,
    * a first delivery on a new, straight line pays for the line about twice
-   * over. With today's track knobs (0.5) ordinary ground costs $500 per speed
+   * over. With the land cover knob at 0.5, ordinary ground costs $500 per speed
    * unit, so a haul over it pays $1,000 per speed unit, the board game's
    * rate. Because payoffs follow track prices, turning the track knobs up or
    * down turns payoffs up or down with them.

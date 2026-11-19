@@ -16,6 +16,9 @@
  *   rules allow, and prices each bridge cell as pricing does (see water.js);
  * - it adds a river bridge for each step from cell to cell that crosses a
  *   river, as pricing does;
+ * - it prices each cell with the line's climb into it from the cell it came
+ *   from, as pricing does (see climb.js), so it winds up valleys rather than
+ *   going straight over ridges;
  * - it marks the cells right beside track already built and lets a line pass
  *   through no more than two of them in a row, which is about what crossing
  *   a line takes, so it crosses track rather than running alongside it.
@@ -44,6 +47,7 @@
 
 import { gameRules } from '@/config/game'
 import { pointsAlongLine, kmBetween, landCellPrice } from '@/composables/map/trackCost'
+import { stepGrade } from '@/composables/map/climb'
 import { townEntryFee } from '@/composables/townEntry'
 import { lineBlock } from '@/composables/map/buildRules'
 import {
@@ -123,6 +127,64 @@ function riverStepCrossings(grid, rivers) {
   })
   riverStepsByGrid.set(grid, { rivers, crossings })
   return crossings
+}
+
+/**
+ * Each grid's cell and step prices (see `stepPrices`), with the settings
+ * they were worked out at: they only change when the grid, the board's scale,
+ * or the track or bridge prices do, and every survey a computer player makes
+ * needs them.
+ */
+const stepPricesByGrid = new WeakMap()
+
+/**
+ * Per cell and step out of it (see `cellNeighbors`), what the step costs in
+ * the cell it goes into: the cell's price as land, with the line's climb
+ * into it from the cell the step leaves (see `landCellPrice` and
+ * `stepGrade`), or a bridge's for water (see `bridgeCellPrice`). Whole
+ * dollars, which a Float32 holds exactly far past any cell's price.
+ *
+ * A cell's price depends on which way the line comes into it, because the
+ * climb does, so it is kept per step rather than per cell. The cell a line
+ * starts in has no climb, so each cell's price with none is kept too, for
+ * the search's starting cells. Worked out for the whole grid once and kept
+ * (see `stepPricesByGrid`).
+ *
+ * @param {Object} grid - The grid
+ * @param {number} priceScale - Dollars per point of terrain cost (see
+ *   `trackPriceScale`)
+ * @param {number} speedUnitKm - The board's speed unit, which bridges are
+ *   priced by
+ * @returns {{starts: Float32Array, steps: Float32Array}} Per cell, its price
+ *   with no climb, and at `cell * NEIGHBOR_STEPS + step`, the step's price
+ */
+function stepPrices(grid, priceScale, speedUnitKm) {
+  // Tests and tuning change the prices in place, so they are part of what the
+  // kept prices were worked out at
+  const settings = JSON.stringify([
+    priceScale,
+    speedUnitKm,
+    gameRules.trackPrice,
+    gameRules.bridges
+  ])
+  const kept = stepPricesByGrid.get(grid)
+  if (kept && kept.settings === settings) return kept
+
+  const bridgeCell = bridgeCellPrice(grid, speedUnitKm)
+  const starts = new Float32Array(grid.present.length)
+  const steps = new Float32Array(grid.present.length * NEIGHBOR_STEPS)
+  for (let index = 0; index < grid.present.length; index++) {
+    if (!grid.present[index]) continue
+    starts[index] = isWaterCell(grid, index) ? bridgeCell : landCellPrice(grid, index, priceScale)
+    cellNeighbors(grid, index).forEach(({ index: next, step }) => {
+      steps[index * NEIGHBOR_STEPS + step] = isWaterCell(grid, next)
+        ? bridgeCell
+        : landCellPrice(grid, next, priceScale, stepGrade(grid, index, next))
+    })
+  }
+  const worked = { settings, starts, steps }
+  stepPricesByGrid.set(grid, worked)
+  return worked
 }
 
 /**
@@ -243,27 +305,28 @@ export function searchBoard(rules, towns, reached = new Set()) {
     if (!reached.has(townKey(town))) townFee[index] = townEntryFee(town)
   })
 
-  // What each open cell costs a line passing through it, worked out once
-  // here rather than each time the search steps onto it: its price as land
-  // (see `landCellPrice`), or a bridge's for water (see `bridgeCellPrice`).
-  // Whole dollars, which a Float32 holds exactly far past any cell's price.
-  const bridgeCell = bridgeCellPrice(grid, rules.speedUnitKm)
-  const cellPrice = new Float32Array(size)
+  // What a line costs in the cell it starts in, and in each cell it steps
+  // into after, with the climb into it (see `stepPrices`)
+  const prices = stepPrices(grid, priceScale, rules.speedUnitKm)
   // The least a step onto any open cell can add, for the A* estimate (see
-  // `costField`): the step cost, plus the cheapest cell to step onto
-  let cheapestCell = Infinity
+  // `costField`): the step cost, plus the cheapest step between open cells
+  let cheapestStep = Infinity
   for (let index = 0; index < size; index++) {
     if (!isOpen[index]) continue
-    cellPrice[index] = isWater[index] ? bridgeCell : landCellPrice(grid, index, priceScale)
-    cheapestCell = Math.min(cheapestCell, cellPrice[index])
+    cellNeighbors(grid, index).forEach(({ index: next, step }) => {
+      if (isOpen[next]) {
+        cheapestStep = Math.min(cheapestStep, prices.steps[index * NEIGHBOR_STEPS + step])
+      }
+    })
   }
-  const minStep = STEP_COST * priceScale + (Number.isFinite(cheapestCell) ? cheapestCell : 0)
+  const minStep = STEP_COST * priceScale + (Number.isFinite(cheapestStep) ? cheapestStep : 0)
 
   return {
     grid,
     rules,
     priceScale,
-    cellPrice,
+    startPrice: prices.starts,
+    stepPrice: prices.steps,
     riverSteps: riverStepCrossings(grid, rules.rivers),
     isOpen,
     isWater,
@@ -311,7 +374,8 @@ export function costField(board, sources, { shut = new Set(), targets } = {}) {
     grid,
     rules,
     priceScale,
-    cellPrice,
+    startPrice,
+    stepPrice,
     riverSteps,
     isOpen,
     isWater,
@@ -363,7 +427,7 @@ export function costField(board, sources, { shut = new Set(), targets } = {}) {
     startIn.set(index, point)
     const water = isWater[index] && !isTownCell[index] ? 1 : 0
     const state = pack(index, water, isBeside[index])
-    cost[state] = cellPrice[index]
+    cost[state] = startPrice[index]
     frontier.push(cost[state] + estimate(index), state)
   })
 
@@ -396,11 +460,12 @@ export function costField(board, sources, { shut = new Set(), targets } = {}) {
       const nextBeside = isBeside[next] ? beside + 1 : 0
       if (nextBeside > MAX_BESIDE_CELLS) return
 
-      // The cell's price, any rivers the step crosses, the town's entry fee
-      // if it is a town not yet reached, and the search's own nudges
+      // The cell's price, with the climb into it, any rivers the step
+      // crosses, the town's entry fee if it is a town not yet reached, and
+      // the search's own nudges
       const rivers = riverSteps[index * NEIGHBOR_STEPS + stepOut]
       const step =
-        cellPrice[next] +
+        stepPrice[index * NEIGHBOR_STEPS + stepOut] +
         rivers * riverCrossing +
         townFee[next] +
         (STEP_COST + (isBeside[next] ? BESIDE_PENALTY : 0)) * priceScale

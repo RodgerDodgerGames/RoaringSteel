@@ -112,7 +112,7 @@ export const gameRules = {
     climb: {
       rulingGrade: 0.02
     },
-    maxTerrainFactor: 5,
+    maxTerrainFactor: 10,
     knobs: {
       landCover: 0.5,
       roughness: 0.15,

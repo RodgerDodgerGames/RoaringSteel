@@ -38,12 +38,11 @@ import { townsByKey, entryFees, entryFeesKept } from '@/composables/townEntry'
 import {
   lineBlock,
   blockMessage,
-  pricingBoard,
+  boardRulesFor,
   builtLegs,
   trackIndex
 } from '@/composables/map/buildRules'
 import { isEmptyGrid } from '@/composables/map/cellGrid'
-import { regionTest } from '@/composables/map/region'
 import { pointKey, liesOnTrack } from '@/composables/network'
 import { formatCurrency } from '@/composables/utils'
 import { startTowns, startRuleMessage } from '@/composables/startRule'
@@ -69,9 +68,9 @@ export function useTrackBuilder() {
    * board (`priceScale`, see `trackPriceScale`), the board's speed unit, which
    * bridges are priced and measured in, the rivers on the board (see
    * water.js), the region being played, the cells the towns sit in, and the
-   * track built so far, indexed by where it is (the pricing parts come from
-   * `pricingBoard` in buildRules.js, which payoffs share). Worked out once rather than
-   * on every move of the cursor; the board parts and the track are kept
+   * track built so far, indexed by where it is (the board's parts come from
+   * `boardRulesFor` in buildRules.js, which payoffs and setup share). Worked
+   * out once rather than on every move of the cursor; the board parts and the track are kept
    * apart, so building or tearing up track does not work the board out again.
    *
    * The grid is never reactive (see stores/grid.js), so it is used as it is.
@@ -81,15 +80,15 @@ export function useTrackBuilder() {
    * times slower. The track is still read through the store, so a section
    * added is noticed.
    */
-  const boardRules = computed(() => ({
-    ...pricingBoard(
+  const boardRules = computed(() =>
+    boardRulesFor(
       gridStore.grid,
       gameStore.boardScale.speedUnitKm,
       waterStore.data,
-      townsStore.towns
-    ),
-    isInRegion: regionTest(gameStore.region)
-  }))
+      townsStore.towns,
+      gameStore.region
+    )
+  )
   const buildRules = computed(() => ({
     ...boardRules.value,
     builtTrack: trackIndex(

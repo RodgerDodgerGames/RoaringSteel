@@ -531,6 +531,65 @@ export function costField(board, sources, { shut = new Set(), targets } = {}) {
 }
 
 /**
+ * Whether track could be built from the sources to a point at all, at any
+ * price: on a board with no track built yet, under the same rules the
+ * search keeps to (the region, cutting corners, and bridges no longer than
+ * the rules allow).
+ *
+ * Unlike `costField`, it goes as far as the rules allow over water, however
+ * many cells that is: it only asks whether a cell can be got to, so it keeps
+ * one count per cell, the fewest water cells in a row a line has just
+ * crossed on getting there (fewer is never worse: any line onward from a
+ * longer stretch of water could go on from a shorter one). That keeps it to
+ * one pass over the grid, a small part of a priced search's time and memory.
+ *
+ * Used at setup, to leave off the board any town no one could ever reach
+ * (see reachableTowns.js).
+ *
+ * @param {Object} board - From `searchBoard`
+ * @param {Array<{lat: number, lng: number}>} sources - Where track starts
+ * @returns {Function} (point: {lat, lng}) => true if track could reach it
+ */
+export function reachableFrom(board, sources) {
+  const { grid, rules, isOpen, isWater, isTownCell } = board
+  const maxCells = maxBridgeCells(grid, rules.speedUnitKm)
+  const NOT_REACHED = 0xffff
+  // Per cell, the fewest water cells in a row on getting there
+  const leastWater = new Uint16Array(grid.present.length).fill(NOT_REACHED)
+  // Cells to step on from, each again whenever it is got to over less water
+  const queue = []
+
+  const mayEnter = (index) => index !== -1 && isOpen[index] === 1
+  const isBridge = (index) => isWater[index] === 1 && isTownCell[index] === 0
+  const reach = (index, water) => {
+    if (water > maxCells || water >= leastWater[index]) return
+    leastWater[index] = water
+    queue.push(index)
+  }
+
+  sources.forEach((point) => {
+    const index = findCell(point, grid)
+    if (mayEnter(index)) reach(index, isBridge(index) ? 1 : 0)
+  })
+  for (let i = 0; i < queue.length; i++) {
+    const index = queue[i]
+    const water = leastWater[index]
+    cellNeighbors(grid, index).forEach(({ index: next, sides }) => {
+      if (!mayEnter(next)) return
+      // Cutting a corner passes by the two cells beside it, so they have to
+      // be somewhere a line may go too
+      if (sides.some((side) => !mayEnter(side))) return
+      reach(next, isBridge(next) ? water + 1 : 0)
+    })
+  }
+
+  return (point) => {
+    const index = findCell(point, grid)
+    return index !== -1 && leastWater[index] !== NOT_REACHED
+  }
+}
+
+/**
  * How many of a line's points can be kept before it first breaks a build
  * rule: the longest start of it the rules allow while it is still being
  * drawn. Breaking a rule never comes undone further along (a line that has

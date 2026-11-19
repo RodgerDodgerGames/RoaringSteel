@@ -74,6 +74,20 @@ describe('regionTest', () => {
     expect(regionTest(reactive(polygon(0)))({ lat: 1, lng: 1 })).toBe(true)
   })
 
+  it('should give the same region the same test every time, held in the store or not', () => {
+    // So what is worked out per test, such as the route search's marking of
+    // the cells inside the region, is worked out once for a game
+    const region = polygon(0)
+    const isInRegion = regionTest(region)
+    expect(regionTest(region)).toBe(isInRegion)
+    expect(regionTest(reactive(region))).toBe(isInRegion)
+    expect(regionTest(polygon(0))).not.toBe(isInRegion)
+  })
+
+  it("should count every point as inside a damaged save's region that is not GeoJSON", () => {
+    expect(regionTest('27')({ lat: 1, lng: 1 })).toBe(true)
+  })
+
   it('should count everywhere as inside when there is no region', () => {
     expect(regionTest(null)({ lat: 50, lng: 50 })).toBe(true)
   })

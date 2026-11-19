@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { lineBlock, townCells, builtLegs, trackIndex } from '@/composables/map/buildRules'
 import { regionTest } from '@/composables/map/region'
+import { maxBridgeCells } from '@/composables/map/water'
 import { linePrice, cellPath } from '@/composables/map/trackCost'
 import { findCell, rowOf, colOf } from '@/composables/map/cellGrid'
 import { isWaterCell, riverIndex, riverCrossings } from '@/composables/map/water'
@@ -20,7 +21,8 @@ import {
   searchBoard,
   costField,
   planLine,
-  affordableSection
+  affordableSection,
+  reachableFrom
 } from '@/composables/bot/botPathfinder'
 import {
   makeGrid,
@@ -341,5 +343,79 @@ describe('botPathfinder', () => {
 
       expect(affordableSection(line, 10, rules, priceOn(rules))).toBeNull()
     })
+  })
+})
+
+describe('reachableFrom', () => {
+  /**
+   * A row of land, water and land: three cells of land each side of a
+   * stretch of water some cells wide, three rows deep.
+   */
+  function strait(waterCells) {
+    const cols = 6 + waterCells
+    return makeTestGrid({
+      rows: 3,
+      cols,
+      cell: (row, col) => (col >= 3 && col < 3 + waterCells ? { water: true } : { landCover: 100 })
+    })
+  }
+
+  /** The board's search parts, at a speed unit given in cells */
+  function boardOf(grid, speedUnitCells, region = null) {
+    return searchBoard(
+      {
+        grid,
+        priceScale: 1,
+        speedUnitKm: speedUnitCells * SPEED_UNIT_KM,
+        rivers: null,
+        townCells: [],
+        isInRegion: regionTest(region)
+      },
+      []
+    )
+  }
+
+  /** The center of a cell in the middle row */
+  const middleOf = (col) => ({ lat: 1.5 * CELL, lng: (col + 0.5) * CELL })
+
+  it('crosses water as wide as the rules allow a bridge, past the longest the priced search plans', () => {
+    // 3 speed units of 3 cells each: a bridge of 9 cells, where the priced
+    // search stops at 6
+    const grid = strait(8)
+    const board = boardOf(grid, 3)
+    expect(maxBridgeCells(grid, 3 * SPEED_UNIT_KM)).toBe(9)
+    expect(reachableFrom(board, [middleOf(0)])(middleOf(13))).toBe(true)
+    expect(costField(board, [middleOf(0)]).costTo(middleOf(13))).toBe(Infinity)
+  })
+
+  it('does not cross water wider than a bridge may span', () => {
+    // A bridge of 3 cells, over 4 of water
+    const reaches = reachableFrom(boardOf(strait(4), 1), [middleOf(0)])
+    expect(reaches(middleOf(2))).toBe(true)
+    expect(reaches(middleOf(9))).toBe(false)
+  })
+
+  it('stays inside the region', () => {
+    // Two pieces of region, with land between them outside it
+    const grid = makeTestGrid({ rows: 3, cols: 10, cell: () => ({ landCover: 100 }) })
+    const box = (west, east) => ({
+      type: 'Feature',
+      geometry: {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [west * CELL, 0],
+            [east * CELL, 0],
+            [east * CELL, 3 * CELL],
+            [west * CELL, 3 * CELL],
+            [west * CELL, 0]
+          ]
+        ]
+      }
+    })
+    const region = { type: 'FeatureCollection', features: [box(0, 4), box(6, 10)] }
+    const reaches = reachableFrom(boardOf(grid, 1, region), [middleOf(0)])
+    expect(reaches(middleOf(3))).toBe(true)
+    expect(reaches(middleOf(8))).toBe(false)
   })
 })

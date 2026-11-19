@@ -127,6 +127,10 @@ async function handlePlayGameClick() {
     // Entering the game view here would drop the player onto an empty map.
     if (!generated) return
 
+    // Leave off any town track cannot reach, such as one on an island too
+    // far out to bridge: the grid says where the water is
+    townsStore.dropUnreachableTowns()
+
     // Build the demand deck, then deal every player their opening hand in
     // turn order — the players were confirmed before the region was picked.
     // After the grid, as payoffs are priced by the terrain each haul crosses

@@ -38,7 +38,7 @@ const DB_NAME = 'roaring-steel'
  * state, cell size and year alone, so a grid built the old way would
  * otherwise go on being used.
  */
-const DB_VERSION = 5
+const DB_VERSION = 6
 
 /** How many autosaves are kept; the oldest goes when another is added */
 export const MAX_AUTOSAVES = 3

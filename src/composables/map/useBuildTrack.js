@@ -67,7 +67,8 @@ export default function useBuildTrack(formatCurrency) {
 
   /**
    * Cost of the line being drawn, out to the cursor: the vertices placed so
-   * far plus the leg the cursor is pulling out from the last one. Repriced from scratch each time (see `priceSection` in
+   * far plus the leg the cursor is pulling out from the last one. Repriced
+   * from scratch each time (see `priceSection` in
    * trackBuilder.js), so it follows the cursor down as well as up.
    */
   const pendingCost = ref(0)

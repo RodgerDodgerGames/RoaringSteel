@@ -21,9 +21,9 @@
  *
  * A section's price is its track: each grid cell it crosses, priced for this
  * board (see trackCost.js), and any bridges. Reaching a town costs nothing
- * more; a town's own cells are priced by their land cover, which is
- * developed land, so a big city's many cells cost more to build into than a
- * small town's one.
+ * more: the developed land around it is priced by its land cover, so the
+ * many developed cells around a big city cost more to build through than a
+ * small town's one (see `trackPrice` in config/game.js).
  *
  * @module composables/trackBuilder
  */

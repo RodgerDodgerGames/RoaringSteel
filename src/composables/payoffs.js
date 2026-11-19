@@ -259,7 +259,8 @@ export function haulPricer({ grid, priceScale, speedUnitKm, rivers = null, townC
  * price over the straight line's (see `haulPricer`), both on the same grid.
  *
  * The route is found by the search computer players use (see `costField`
- * in botPathfinder.js), with no track built, and priced as track is (see `linePrice`): over the cheapest ground, round
+ * in botPathfinder.js), with no track built, and priced as track is (see
+ * `linePrice`): over the cheapest ground, round
  * water too wide to bridge, inside the region. On a coarse grid the region
  * is judged at the coarse cells' centers, so a strip of the region
  * narrower than a coarse cell can close up; a town beyond it then has no

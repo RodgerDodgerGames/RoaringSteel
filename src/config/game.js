@@ -43,10 +43,12 @@ export const gameRules = {
    * `bridges`.)
    *
    * Reaching a town costs nothing on top of its track. Empire Builder charges
-   * an entry fee for its cities; here a town's cells are developed land,
-   * priced high (see config/nlcd.js), so a big city's many cells cost more to
-   * build into than a small town's one, and a fee would charge for the city
-   * twice. (The fee, $3,000 for small and medium towns and $5,000 for major
+   * an entry fee for its cities; here the developed land a town stands on is
+   * priced high (see config/nlcd.js). A big city's developed land spreads
+   * over many cells, every one of which a line into it pays for; a small
+   * town is a few developed pixels in a cell of farms or forest. So a big
+   * city costs more to build into than a small town, and a fee would charge
+   * for the city twice. (The fee, $3,000 for small and medium towns and $5,000 for major
    * cities, was removed on 2026-11-18, #166.)
    *
    * Priced per speed unit rather than per km or per grid cell, so a turn's

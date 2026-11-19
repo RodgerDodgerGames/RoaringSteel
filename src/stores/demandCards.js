@@ -31,7 +31,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { useTownsStore } from './towns'
+import { useTownsStore, percentOf } from './towns'
 import { usePlayerStore } from './players'
 import { useSettingsStore } from './settings'
 import { useGameStore } from './game'
@@ -42,9 +42,28 @@ import { demandPayoff, mapSpanKm, deckPricer } from '@/composables/payoffs'
 import { isEmptyGrid } from '@/composables/map/cellGrid'
 import { buildDemandDeck } from '@/composables/demandDeck'
 import { debug } from '@/composables/debug'
+import { yieldToBrowser } from '@/composables/utils'
 
 /** How many demand cards each player holds, per the Empire Builder rules */
 export const HAND_SIZE = 3
+
+/**
+ * What the setup screen says while the deck is built, by step: pricing every
+ * haul over the board's terrain (see payoffs.js), the long part, counted
+ * town by town; then making up the cards from the prices.
+ */
+const DECK_MESSAGES = Object.freeze({
+  pricing: 'Pricing demands…',
+  dealing: 'Building the deck…'
+})
+
+/**
+ * How long the deck's pricing runs before it gives the browser its turn to
+ * draw the progress bar (see `yieldToBrowser`), in milliseconds: often
+ * enough for the bar to move smoothly, rarely enough to cost next to
+ * nothing.
+ */
+const YIELD_EVERY_MS = 50
 
 export const useDemandCardsStore = defineStore('demandCards', () => {
   const townsStore = useTownsStore()
@@ -80,6 +99,14 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
    * where the pointer is, so it is not saved.
    */
   const hoveredLine = ref(null)
+
+  /**
+   * Which step of building the deck is running (a key of DECK_MESSAGES), or
+   * empty when no deck is being built; and, while its hauls are priced, how
+   * many towns' hauls are done out of how many. For the setup screen.
+   */
+  const deckStep = ref('')
+  const pricedCount = ref({ done: 0, total: 0 })
 
   // GETTERS
 
@@ -196,6 +223,18 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
     return { isHovering: false, lines }
   })
 
+  /** What the setup screen says while the deck is built; empty otherwise */
+  const setupMessage = computed(() => DECK_MESSAGES[deckStep.value] ?? '')
+
+  /**
+   * How far building the deck has got, as a percentage for the setup
+   * screen's bar: the towns whose hauls are priced. Null while dealing,
+   * which has nothing to count.
+   */
+  const setupPercent = computed(() =>
+    deckStep.value === 'pricing' ? percentOf(pricedCount.value) : null
+  )
+
   // ACTIONS
 
   /**
@@ -205,8 +244,14 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
    * Payoffs are priced by the track their hauls would need over the board's
    * grid (see payoffs.js), so the grid must be in place first; with none,
    * no deck is built.
+   *
+   * Pricing every haul takes seconds on a board of many towns, so it is
+   * done first, town by town, counted for the setup screen, and the browser
+   * is given its turn to draw the count every so often. The cards are then
+   * made up from the prices worked out.
+   * @returns {Promise<void>} Resolves once the deck is built
    */
-  const generateDemandCards = () => {
+  const generateDemandCards = async () => {
     debug.log('Generating demand cards...')
 
     // A new deck means a new game, so the last game's cards go first — even if
@@ -235,28 +280,62 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
       `Board scale: ${Math.round(sizeKm)} km across, crossed by a Freight in ` +
         `${turnsToCross.toFixed(1)} turns; speed unit ${speedUnitKm.toFixed(2)} km`
     )
-    // Hauls are priced over the grid as track building prices lines, brought
-    // part of the way toward the cheapest route (see `deckPricer` in
-    // payoffs.js), each worked out once for the deck
-    const priceOf = deckPricer({
-      grid,
-      speedUnitKm,
-      waterData: useWaterStore().data,
-      towns: townsData,
-      region: useGameStore().region
-    })
+    try {
+      // The count first, so the step never shows the last deck's
+      pricedCount.value = { done: 0, total: townsData.length }
+      deckStep.value = 'pricing'
+      await yieldToBrowser()
 
-    // Every town-and-commodity pair at most once, three to a card, one each
-    // from the bottom, middle and upper pools of payoffs (see demandDeck.js).
-    // Each pays by what the track to bring the commodity in would cost, with
-    // a bonus for long hauls (see payoffs.js).
-    const options = buildDemandDeck(townsData, (destination, industry) =>
-      demandPayoff(destination, industry, townsData, { spanKm, priceOf })
-    )
-    drawPile.value = options
+      // Hauls are priced over the grid as track building prices lines,
+      // brought part of the way toward the cheapest route (see `deckPricer`
+      // in payoffs.js), each worked out once for the deck
+      const priceOf = deckPricer({
+        grid,
+        speedUnitKm,
+        waterData: useWaterStore().data,
+        towns: townsData,
+        region: useGameStore().region
+      })
 
-    // Summarize the demand cards
-    debug.log('demand card generated', summarizeDemandCards(options))
+      // Every haul a payoff may be set by, into each town in turn: from each
+      // town that makes something the town does not make itself, as a town
+      // is never asked for what it makes (see demandDeck.js). The pricer
+      // keeps each, so the deck below is made up from prices already worked
+      // out.
+      let sinceYield = performance.now()
+      for (const destination of townsData) {
+        const makes = new Set(destination.industries.map(({ name }) => name))
+        townsData.forEach((producer) => {
+          if (
+            producer !== destination &&
+            producer.industries.some(({ name }) => !makes.has(name))
+          ) {
+            priceOf(producer, destination)
+          }
+        })
+        pricedCount.value = { done: pricedCount.value.done + 1, total: townsData.length }
+        if (performance.now() - sinceYield >= YIELD_EVERY_MS) {
+          await yieldToBrowser()
+          sinceYield = performance.now()
+        }
+      }
+
+      deckStep.value = 'dealing'
+      await yieldToBrowser()
+      // Every town-and-commodity pair at most once, three to a card, one
+      // each from the bottom, middle and upper pools of payoffs (see
+      // demandDeck.js). Each pays by what the track to bring the commodity
+      // in would cost, with a bonus for long hauls (see payoffs.js).
+      const options = buildDemandDeck(townsData, (destination, industry) =>
+        demandPayoff(destination, industry, townsData, { spanKm, priceOf })
+      )
+      drawPile.value = options
+
+      // Summarize the demand cards
+      debug.log('demand card generated', summarizeDemandCards(options))
+    } finally {
+      deckStep.value = ''
+    }
   }
 
   /**
@@ -502,6 +581,8 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
     pinColor,
     nextPinColor,
     markedLines,
+    setupMessage,
+    setupPercent,
     generateDemandCards,
     dealHands,
     discardCard,

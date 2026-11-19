@@ -988,17 +988,28 @@ describe('Towns Store', () => {
 
     afterEach(() => restoreSpeedUnit())
 
-    it('leaves off the board the towns across water too wide to bridge', () => {
+    it('leaves off the board the towns across water too wide to bridge', async () => {
       townsStore.setTowns(Object.values(makeIslandTowns()))
-      townsStore.dropUnreachableTowns()
+      await townsStore.dropUnreachableTowns()
       expect(townsStore.towns.map(({ name }) => name)).toEqual(['West', 'Middle', 'East', 'Near'])
     })
 
-    it('keeps every town when track can reach them all', () => {
+    it('keeps every town when track can reach them all', async () => {
       const { West, East, Near } = makeIslandTowns()
       townsStore.setTowns([West, East, Near])
-      townsStore.dropUnreachableTowns()
+      await townsStore.dropUnreachableTowns()
       expect(townsStore.towns.map(({ name }) => name)).toEqual(['West', 'East', 'Near'])
+    })
+
+    it('tells the setup screen what it is doing while it works, and clears it after', async () => {
+      townsStore.setTowns(Object.values(makeIslandTowns()))
+      const dropping = townsStore.dropUnreachableTowns()
+      expect(townsStore.setupStep).toBe(SETUP_STEPS.reaching)
+      expect(townsStore.setupMessage).toBe('Finding the towns track can reach…')
+
+      await dropping
+      expect(townsStore.setupStep).toBe('')
+      expect(townsStore.setupMessage).toBe('')
     })
   })
 })

@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { nextTick } from 'vue'
+import { nextTick, watch } from 'vue'
 import { useDemandCardsStore, HAND_SIZE } from '@/stores/demandCards'
 import { useTownsStore } from '@/stores/towns'
 import { usePlayerStore } from '@/stores/players'
@@ -84,8 +84,8 @@ describe('demandCards store', () => {
       )
     })
 
-    it('should build a deck from the demands the towns have, each card with a unique id', () => {
-      store.generateDemandCards()
+    it('should build a deck from the demands the towns have, each card with a unique id', async () => {
+      await store.generateDemandCards()
 
       // Four towns, each wanting the other three's commodities: twelve
       // demands, enough for four cards at most (see demandDeck.spec.js)
@@ -94,35 +94,55 @@ describe('demandCards store', () => {
       expect(new Set(idsOf(store.drawPile)).size).toBe(store.drawPile.length)
     })
 
-    it('should give every card three contracts', () => {
-      store.generateDemandCards()
+    it('should give every card three contracts', async () => {
+      await store.generateDemandCards()
 
       store.drawPile.forEach((c) => expect(c.demands).toHaveLength(3))
     })
 
-    it('should clear the hands left over from a previous game', () => {
+    it('should clear the hands left over from a previous game', async () => {
       store.setDeck({ drawPile: deckOf(5), hands: { 1: [card(99)] } })
 
-      store.generateDemandCards()
+      await store.generateDemandCards()
 
       expect(store.handOf(1)).toEqual([])
     })
 
-    it('should not leave the last deck to be dealt from when there are no towns', () => {
+    it('should not leave the last deck to be dealt from when there are no towns', async () => {
       useTownsStore().setTowns([])
       store.setDeck({ drawPile: deckOf(5), hands: { 1: [card(99)] } })
 
-      store.generateDemandCards()
+      await store.generateDemandCards()
 
       expect(store.drawPile).toEqual([])
       expect(store.handOf(1)).toEqual([])
     })
 
-    it('should not build a deck before there is a grid to price its payoffs on', () => {
+    it('should tell the setup screen how many towns are priced, and clear it once built', async () => {
+      const percents = []
+      const stop = watch(
+        () => store.setupPercent,
+        (percent) => percents.push(percent),
+        { flush: 'sync' }
+      )
+
+      const building = store.generateDemandCards()
+      expect(store.setupMessage).toBe('Pricing demands…')
+      await building
+      stop()
+
+      // Four towns, a quarter each, then making up the cards, which has
+      // nothing to count
+      expect(percents).toEqual([0, 25, 50, 75, 100, null])
+      expect(store.setupMessage).toBe('')
+      expect(store.drawPile.length).toBeGreaterThan(0)
+    })
+
+    it('should not build a deck before there is a grid to price its payoffs on', async () => {
       useGridStore().reset()
       store.setDeck({ drawPile: deckOf(5), hands: { 1: [card(99)] } })
 
-      store.generateDemandCards()
+      await store.generateDemandCards()
 
       expect(store.drawPile).toEqual([])
       expect(store.handOf(1)).toEqual([])

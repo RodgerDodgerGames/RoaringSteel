@@ -50,7 +50,7 @@ import { useWaterStore } from './water'
 import { useGameStore } from './game'
 import usStates from '@/config/usStates'
 import { fetchDataWindow } from '../composables/setup/dataWindow'
-import { isRefusal, refusalMessage } from '../composables/utils'
+import { isRefusal, refusalMessage, yieldToBrowser } from '../composables/utils'
 import { readCache, writeCache } from '../composables/database'
 import { debug } from '@/composables/debug'
 
@@ -66,7 +66,9 @@ export const SETUP_STEPS = Object.freeze({
   counties: 'counties',
   population: 'population',
   placing: 'placing',
-  assigning: 'assigning'
+  assigning: 'assigning',
+  // Once the grid is built: leaving off the towns track cannot reach
+  reaching: 'reaching'
 })
 
 /**
@@ -657,23 +659,35 @@ export const useTownsStore = defineStore('towns', () => {
    *
    * Judged by the rules a player's track is built by: this game's grid,
    * water and region, with no track built yet.
+   *
+   * A step of its own on the setup screen, as it can take a few seconds on
+   * a board with a long, ragged coastline (marking which cells are in the
+   * region, see reachableTowns.js). The screen is given its turn to say so
+   * before the work starts.
+   * @returns {Promise<void>} Resolves once the towns are dropped
    */
-  function dropUnreachableTowns() {
-    const gameStore = useGameStore()
-    const rules = boardRulesFor(
-      useGridStore().grid,
-      gameStore.boardScale.speedUnitKm,
-      useWaterStore().data,
-      towns.value,
-      gameStore.region
-    )
-    const kept = reachableTowns(rules, towns.value)
-    if (kept === towns.value) return
-    debug.log(
-      'Towns track cannot reach, left off the board:',
-      towns.value.filter((town) => !kept.includes(town)).map(({ name }) => name)
-    )
-    towns.value = kept
+  async function dropUnreachableTowns() {
+    setStep(SETUP_STEPS.reaching, 'Finding the towns track can reach…')
+    try {
+      await yieldToBrowser()
+      const gameStore = useGameStore()
+      const rules = boardRulesFor(
+        useGridStore().grid,
+        gameStore.boardScale.speedUnitKm,
+        useWaterStore().data,
+        towns.value,
+        gameStore.region
+      )
+      const kept = reachableTowns(rules, towns.value)
+      if (kept === towns.value) return
+      debug.log(
+        'Towns track cannot reach, left off the board:',
+        towns.value.filter((town) => !kept.includes(town)).map(({ name }) => name)
+      )
+      towns.value = kept
+    } finally {
+      setStep('')
+    }
   }
 
   /**

@@ -15,8 +15,7 @@ import { linePrice, cellPath } from '@/composables/map/trackCost'
 import { findCell, rowOf, colOf } from '@/composables/map/cellGrid'
 import { isWaterCell, riverIndex, riverCrossings } from '@/composables/map/water'
 import { gameRules } from '@/config/game'
-import { pointKey, townKey } from '@/composables/network'
-import { townEntryFee } from '@/composables/townEntry'
+import { pointKey } from '@/composables/network'
 import {
   searchBoard,
   costField,
@@ -64,7 +63,7 @@ function rulesWith(segments = [], { withRiver = true } = {}) {
   }
 }
 
-/** What a line's track costs on the rules' board (town entry left out) */
+/** What a line's track costs on the rules' board */
 const priceOn = (rules) => (points) => linePrice(points, rules).total
 
 /** The row and column of a cell */
@@ -246,17 +245,6 @@ describe('botPathfinder', () => {
       expect(wet - dry).toBeCloseTo(gameRules.bridges.riverCrossing, 6)
       const line = planLine(board, from, to)
       expect(riverCrossings(line, rules.grid, rules.rivers)).toHaveLength(1)
-    })
-
-    it("should add a town's entry fee unless the player's track reaches it", () => {
-      const from = [pointOf(townNamed('Alder'))]
-      const target = townNamed('Dogwood')
-      const reachedBoard = searchBoard(rules, towns, new Set([townKey(target)]))
-
-      const fresh = costField(board, from).costTo(pointOf(target))
-      const reached = costField(reachedBoard, from).costTo(pointOf(target))
-
-      expect(fresh - reached).toBeGreaterThanOrEqual(townEntryFee(target))
     })
 
     it('should cost nothing it cannot reach as Infinity', () => {

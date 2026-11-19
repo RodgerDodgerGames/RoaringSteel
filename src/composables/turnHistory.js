@@ -61,9 +61,9 @@ const capitalized = (text) => text.charAt(0).toUpperCase() + text.slice(1)
  *
  * A town counts as joined by the first section with a point on it — the one
  * its track runs through or ends in — so a town reached by the player's track
- * in an earlier turn is not joined again. Unlike town entry fees (see
- * townEntry.js), a major city a section merely starts from counts too: it is
- * on the player's network from then on, which is what the history is for.
+ * in an earlier turn is not joined again. A town a section merely starts
+ * from counts too: it is on the player's network from then on, which is what
+ * the history is for.
  *
  * @param {Array<Object>} segments - All of one player's sections, in the
  *   order they were built, each with its `coordinates` and the `turn` (round)

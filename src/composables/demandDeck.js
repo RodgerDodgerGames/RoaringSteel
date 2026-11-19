@@ -24,7 +24,16 @@
  * near the top than a light one.
  *
  * The deck has at most `cardsPerTown` cards per town (see config/demands.js),
- * and at most a third as many as there are pairs.
+ * and at most a third as many as there are pairs, so on most boards it
+ * leaves some pairs out (a bench of three boards, 2026-11-18, dealt 55–79% of
+ * them). The cheap demands are dealt before the rest: every pair that pays
+ * under `cheapUnder` goes into the deck as far as it has room (three to a
+ * card, never two to one town on a card), and the weighted draw fills the
+ * rest. Early in a game those are the only deliveries a player can
+ * afford to build for, and a board has few of them. They are dealt out
+ * first, one to a card in turn, so they are spread across the deck rather
+ * than bunched on cards of their own, and the weighted draw fills each
+ * card's other places.
  *
  * Pure functions over plain data, so they are tested without stores.
  *
@@ -92,11 +101,15 @@ function shuffle(items, random) {
  * @param {Array<Object>} towns - The towns on the board, each with name and
  *   industries ([{name}])
  * @param {Function} payoffOf - What delivering a commodity to a town pays:
- *   (town, commodity name) => dollars (see payoffs.js)
+ *   (town, commodity name) => dollars (see payoffs.js). Asked of every pair,
+ *   so the cheap ones can be found.
  * @param {Object} [options]
  * @param {Function} [options.random] - Draws a number in [0, 1); Math.random
  *   unless a test needs a fixed deck
  * @param {number} [options.cardsPerTown] - See `demandDeckConfig`
+ * @param {number} [options.cheapUnder] - Every pair paying less than this
+ *   goes into the deck, as far as it has room; none are sure to unless it is
+ *   given
  * @returns {Array<{id: number, demands: Array<{destination: string,
  *   industry: string, payoff: number}>}>} The deck, top first, its cards
  *   numbered from 1
@@ -104,36 +117,82 @@ function shuffle(items, random) {
 export function buildDemandDeck(
   towns,
   payoffOf,
-  { random = Math.random, cardsPerTown = demandDeckConfig.cardsPerTown } = {}
+  { random = Math.random, cardsPerTown = demandDeckConfig.cardsPerTown, cheapUnder = 0 } = {}
 ) {
-  const pairs = demandPairs(towns)
+  const pairs = demandPairs(towns).map((pair) => ({
+    ...pair,
+    payoff: payoffOf(pair.town, pair.industry)
+  }))
   const size = Math.min(towns.length * cardsPerTown, Math.floor(pairs.length / DEMANDS_PER_CARD))
-  const order = weightedOrder(pairs, random)
+  const cheap = []
+  const dear = []
+  pairs.forEach((pair) => (pair.payoff < cheapUnder ? cheap : dear).push(pair))
 
-  const deck = []
-  while (deck.length < size) {
-    // The first pairs left in the order that go to towns not already on the
-    // card. The ones passed over stay where they are, for later cards.
-    const card = []
-    for (let i = 0; i < order.length && card.length < DEMANDS_PER_CARD; i++) {
-      const pair = order[i]
-      const isRepeat = card.some((taken) => taken.town === pair.town)
-      if (!isRepeat) {
+  // The cards, and whether a card can take a pair: not full, and not
+  // already sending a demand to the pair's town
+  const cards = Array.from({ length: size }, () => [])
+  const fits = (card, pair) =>
+    card.length < DEMANDS_PER_CARD && !card.some((taken) => taken.town === pair.town)
+
+  // The cheap pairs are dealt first, in their weighted order, round the
+  // cards in turn, so they are spread one to a card before any card gets a
+  // second. One that no card can take (every card full, or with its town on
+  // it) is left out: there is no room for it.
+  let next = 0
+  weightedOrder(cheap, random).forEach((pair) => {
+    for (let tried = 0; tried < size; tried++) {
+      const card = cards[(next + tried) % size]
+      if (fits(card, pair)) {
         card.push(pair)
+        next = (next + tried + 1) % size
+        return
+      }
+    }
+  })
+
+  // Then each card is filled from the dear pairs in their weighted order:
+  // the first going to towns not already on it. The ones passed over stay
+  // where they are, for later cards. A card that cannot be filled is left
+  // out, and its pairs go back to the front of the order for the cards
+  // after it, so a cheap pair dealt to it is not lost with it.
+  const order = weightedOrder(dear, random)
+  const filled = []
+  cards.forEach((card) => {
+    for (let i = 0; i < order.length && card.length < DEMANDS_PER_CARD; i++) {
+      if (fits(card, order[i])) {
+        card.push(order[i])
         order.splice(i, 1)
         i--
       }
     }
-    // What is left cannot make a card of its own; the deck stops short
-    if (card.length < DEMANDS_PER_CARD) break
+    if (card.length === DEMANDS_PER_CARD) filled.push(card)
+    else order.unshift(...card)
+  })
 
-    deck.push(
-      card.map(({ town, industry }) => ({
-        destination: town.name,
-        industry,
-        payoff: payoffOf(town, industry)
-      }))
-    )
-  }
+  // A cheap pair still left over came off a card that could not be filled
+  // at the end of the deck. It takes the place of a dear pair on a card
+  // that has room for its town, and the dear pair is left out instead.
+  order
+    .filter((pair) => pair.payoff < cheapUnder)
+    .forEach((pair) => {
+      for (const card of filled) {
+        const dearAt = card.findIndex((taken) => !(taken.payoff < cheapUnder))
+        const others = card.filter((_, i) => i !== dearAt)
+        if (dearAt !== -1 && !others.some((taken) => taken.town === pair.town)) {
+          card[dearAt] = pair
+          return
+        }
+      }
+    })
+
+  // Each card's demands shuffled, so a card's cheap demand is not always
+  // the first on it
+  const deck = filled.map((card) =>
+    shuffle(card, random).map(({ town, industry, payoff }) => ({
+      destination: town.name,
+      industry,
+      payoff
+    }))
+  )
   return shuffle(deck, random).map((demands, index) => ({ id: index + 1, demands }))
 }

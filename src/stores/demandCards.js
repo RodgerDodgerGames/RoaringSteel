@@ -37,7 +37,8 @@ import { useSettingsStore } from './settings'
 import { useGameStore } from './game'
 import { useGridStore } from './grid'
 import { useWaterStore } from './water'
-import { PIN_COLORS } from '@/config/demands'
+import { PIN_COLORS, demandDeckConfig } from '@/config/demands'
+import { gameRules } from '@/config/game'
 import { demandPayoff, mapSpanKm, deckPricer } from '@/composables/payoffs'
 import { isEmptyGrid } from '@/composables/map/cellGrid'
 import { buildDemandDeck } from '@/composables/demandDeck'
@@ -249,8 +250,13 @@ export const useDemandCardsStore = defineStore('demandCards', () => {
     // Every town-and-commodity pair at most once, three to a card (see
     // demandDeck.js). Each pays by what the track to bring the commodity in
     // would cost, with a bonus for long hauls (see payoffs.js).
-    const options = buildDemandDeck(townsData, (destination, industry) =>
-      demandPayoff(destination, industry, townsData, { spanKm, priceOf })
+    // Every demand cheap enough for a player to afford early goes in (see
+    // `demandDeckConfig.cheapShareOfStartingCash`)
+    const options = buildDemandDeck(
+      townsData,
+      (destination, industry) =>
+        demandPayoff(destination, industry, townsData, { spanKm, priceOf }),
+      { cheapUnder: demandDeckConfig.cheapShareOfStartingCash * gameRules.startingCash }
     )
     drawPile.value = options
 

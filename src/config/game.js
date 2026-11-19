@@ -121,9 +121,9 @@ export const gameRules = {
     climb: {
       rulingGrade: 0.02
     },
-    maxTerrainFactor: 10,
+    maxTerrainFactor: 999, // essentially no cap
     knobs: {
-      landCover: 0.5,
+      landCover: 0.4,
       roughness: 0.15,
       climb: 0.5
     }

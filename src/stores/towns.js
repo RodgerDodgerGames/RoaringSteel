@@ -43,6 +43,11 @@ import getMSALatLon, { findPrincipalCity } from '../composables/setup/useTigerWe
 import { assignSizes } from '../composables/setup/townSizes'
 import { assignIndustries as assignTownIndustries } from '../composables/setup/townIndustries'
 import { regionTest } from '@/composables/map/region'
+import { boardRulesFor } from '@/composables/map/buildRules'
+import { reachableTowns } from '@/composables/reachableTowns'
+import { useGridStore } from './grid'
+import { useWaterStore } from './water'
+import { useGameStore } from './game'
 import usStates from '@/config/usStates'
 import { fetchDataWindow } from '../composables/setup/dataWindow'
 import { isRefusal, refusalMessage } from '../composables/utils'
@@ -644,6 +649,34 @@ export const useTownsStore = defineStore('towns', () => {
   }
 
   /**
+   * Leaves off the board every town track cannot be laid to: those on
+   * islands too far offshore to bridge (see reachableTowns.js). Run once the
+   * grid is built, as only the grid says where the water is, and before the
+   * demand deck is built, so no demand is ever for a town no one can reach.
+   * The player is not told: the towns simply never appear.
+   *
+   * Judged by the rules a player's track is built by: this game's grid,
+   * water and region, with no track built yet.
+   */
+  function dropUnreachableTowns() {
+    const gameStore = useGameStore()
+    const rules = boardRulesFor(
+      useGridStore().grid,
+      gameStore.boardScale.speedUnitKm,
+      useWaterStore().data,
+      towns.value,
+      gameStore.region
+    )
+    const kept = reachableTowns(rules, towns.value)
+    if (kept === towns.value) return
+    debug.log(
+      'Towns track cannot reach, left off the board:',
+      towns.value.filter((town) => !kept.includes(town)).map(({ name }) => name)
+    )
+    towns.value = kept
+  }
+
+  /**
    * Sets the complete towns array (used for loading saved games).
    * @param {Array} townsArray - Array of town objects
    */
@@ -667,6 +700,7 @@ export const useTownsStore = defineStore('towns', () => {
     setupTowns,
     clearError,
     reset,
-    setTowns
+    setTowns,
+    dropUnreachableTowns
   }
 })

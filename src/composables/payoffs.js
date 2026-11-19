@@ -52,8 +52,7 @@ import {
 import { cellAt, walkCells } from '@/composables/map/cellGrid'
 import { stepGrade } from '@/composables/map/climb'
 import { coarsenGrid, coarseFactor } from '@/composables/map/coarseGrid'
-import { pricingBoard } from '@/composables/map/buildRules'
-import { regionTest } from '@/composables/map/region'
+import { pricingBoard, boardRulesFor } from '@/composables/map/buildRules'
 import { searchBoard, costField } from '@/composables/bot/botPathfinder'
 
 /**
@@ -370,10 +369,7 @@ export function deckPricer({ grid, speedUnitKm, waterData, towns, region }) {
   // At a weight of 0 the route does not count, so no route is looked for
   if (weight <= 0) return straightOf
   const coarse = coarsenGrid(grid, coarseFactor(grid, searchCells))
-  const coarseBoard = {
-    ...pricingBoard(coarse, speedUnitKm, waterData, towns),
-    isInRegion: regionTest(region)
-  }
+  const coarseBoard = boardRulesFor(coarse, speedUnitKm, waterData, towns, region)
   return blendedPricer(straightOf, routeRatios(coarseBoard, towns), weight)
 }
 

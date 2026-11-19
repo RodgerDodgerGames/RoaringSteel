@@ -10,7 +10,7 @@
  * - Town classification
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 // Create hoisted mocks
 const mockFetchPopulationData = vi.hoisted(() => vi.fn())
@@ -43,6 +43,9 @@ import { useTownsStore, mergeSites, percentOf, SETUP_STEPS } from '@/stores/town
 import { useIndustryStore } from '@/stores/industry'
 import { RequestError } from '@/composables/utils'
 import { readCache, writeCache } from '@/composables/database'
+import { useGridStore } from '@/stores/grid'
+import { pinSpeedUnit } from '../utils/boardScale'
+import { makeIslandGrid, makeIslandTowns, ISLAND_SPEED_UNIT_KM } from '../utils/islandBoard'
 
 /** The state's data window: QWI from 2021 to 2025 */
 const WINDOW = { start: 2021, end: 2025, middle: 2023 }
@@ -971,6 +974,31 @@ describe('Towns Store', () => {
         { msa: '1', name: 'Boston', population: 13, lat: 42.3 },
         { msa: '2', name: 'Worcester', population: 5, lat: 42.2 }
       ])
+    })
+  })
+
+  describe('dropUnreachableTowns', () => {
+    let restoreSpeedUnit
+
+    beforeEach(() => {
+      // A bridge may span 3 cells of the island board (see islandBoard.js)
+      restoreSpeedUnit = pinSpeedUnit(ISLAND_SPEED_UNIT_KM)
+      useGridStore().setGrid(makeIslandGrid(), null)
+    })
+
+    afterEach(() => restoreSpeedUnit())
+
+    it('leaves off the board the towns across water too wide to bridge', () => {
+      townsStore.setTowns(Object.values(makeIslandTowns()))
+      townsStore.dropUnreachableTowns()
+      expect(townsStore.towns.map(({ name }) => name)).toEqual(['West', 'Middle', 'East', 'Near'])
+    })
+
+    it('keeps every town when track can reach them all', () => {
+      const { West, East, Near } = makeIslandTowns()
+      townsStore.setTowns([West, East, Near])
+      townsStore.dropUnreachableTowns()
+      expect(townsStore.towns.map(({ name }) => name)).toEqual(['West', 'East', 'Near'])
     })
   })
 })

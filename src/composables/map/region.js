@@ -34,9 +34,25 @@ export function regionPolygons(region) {
 }
 
 /**
+ * The test made for each region so far (see `regionTest`), by the region's
+ * raw object, so a game asks for its region's test as often as it likes and
+ * always gets the same one back.
+ * @type {WeakMap<Object, Function>}
+ */
+const regionTests = new WeakMap()
+
+/**
  * A test for whether points are inside the region, made once per region so
  * each point costs as little as possible: a point outside a polygon's
  * bounding box is ruled out before the polygon itself is looked at.
+ *
+ * The same region always gets the same test back. What is worked out from
+ * a test can then be kept and found again by it: the route search marks
+ * every cell of the grid as in or out of the region once per test (see
+ * `regionMask` in botPathfinder.js), which takes seconds on a board with a
+ * long, ragged coastline, and setup's check of which towns track can reach
+ * (see reachableTowns.js) leaves that marking for the computer players'
+ * searches to use, rather than each working it out again.
  *
  * With no region at all (a damaged save) there is no outside to keep track
  * out of, so every point counts as inside.
@@ -45,16 +61,24 @@ export function regionPolygons(region) {
  * @returns {Function} (point: {lat, lng}) => boolean, true if inside
  */
 export function regionTest(region) {
-  const polygons = regionPolygons(region).map((feature) => ({ feature, box: bbox(feature) }))
-  if (polygons.length === 0) return () => true
+  // Only an object can be kept by: a damaged save's region may be anything
+  const raw = toRaw(region)
+  const canKeep = raw !== null && typeof raw === 'object'
+  if (canKeep && regionTests.has(raw)) return regionTests.get(raw)
 
-  return ({ lat, lng }) =>
-    polygons.some(
-      ({ feature, box: [west, south, east, north] }) =>
-        lng >= west &&
-        lng <= east &&
-        lat >= south &&
-        lat <= north &&
-        booleanPointInPolygon([lng, lat], feature)
-    )
+  const polygons = regionPolygons(region).map((feature) => ({ feature, box: bbox(feature) }))
+  const test =
+    polygons.length === 0
+      ? () => true
+      : ({ lat, lng }) =>
+          polygons.some(
+            ({ feature, box: [west, south, east, north] }) =>
+              lng >= west &&
+              lng <= east &&
+              lat >= south &&
+              lat <= north &&
+              booleanPointInPolygon([lng, lat], feature)
+          )
+  if (canKeep) regionTests.set(raw, test)
+  return test
 }

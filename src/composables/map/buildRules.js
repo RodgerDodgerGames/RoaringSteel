@@ -51,6 +51,7 @@ import { boardConfig } from '@/config/board'
 import { pointsAlongLine, cellPath, kmBetween, trackPriceScale } from '@/composables/map/trackCost'
 import { findCell, cellContaining, cellKm, isEmptyGrid } from '@/composables/map/cellGrid'
 import { riversFor } from '@/composables/map/waterData'
+import { regionTest } from '@/composables/map/region'
 import {
   latitudeDegreesToMeters,
   longitudeDegreesToMeters,
@@ -99,6 +100,31 @@ export function pricingBoard(grid, speedUnitKm, waterData, towns) {
     speedUnitKm,
     rivers: riversFor(grid, waterData),
     townCells: townCells(towns, grid)
+  }
+}
+
+/**
+ * What every line on a board with no track yet is judged against: what
+ * track is priced against (see `pricingBoard`) and whether a point is in
+ * the region being played (see `regionTest` in region.js).
+ *
+ * Shared by the track builder, which adds the track built so far (see
+ * `boardRules` in trackBuilder.js), the demand deck, which searches routes
+ * on a coarse copy of the grid (see `deckPricer` in payoffs.js), and setup,
+ * which leaves off the board any town track cannot reach (see
+ * reachableTowns.js), so all of them hold track to the same rules.
+ *
+ * @param {Object|null} grid - The grid (see cellGrid.js)
+ * @param {number} speedUnitKm - The board's speed unit (see boardScale.js)
+ * @param {Object|null} waterData - The water data (see stores/water.js)
+ * @param {Array<Object>} towns - The towns, each with lat and lon
+ * @param {Object|null} region - The region being played, GeoJSON
+ * @returns {Object} The board's pricing parts and `isInRegion`
+ */
+export function boardRulesFor(grid, speedUnitKm, waterData, towns, region) {
+  return {
+    ...pricingBoard(grid, speedUnitKm, waterData, towns),
+    isInRegion: regionTest(region)
   }
 }
 

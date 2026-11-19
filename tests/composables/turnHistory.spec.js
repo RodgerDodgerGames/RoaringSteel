@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { sectionsBuilt, summarizeTurn, turnLines } from '@/composables/turnHistory'
-import { townsByKey } from '@/composables/townEntry'
+import { townsByKey } from '@/composables/network'
 
 const names = { 1: 'Ann', 2: 'Bo', 3: 'Cy' }
 const nameOf = (id) => names[id]

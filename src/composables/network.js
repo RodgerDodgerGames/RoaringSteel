@@ -265,6 +265,17 @@ export function townKey(town) {
 }
 
 /**
+ * Every town by the key of the point it sits on, so a line's points can be
+ * checked for towns quickly (see turnHistory.js). Worked out once per set of
+ * towns rather than for every line.
+ * @param {Array<Object>} towns - Every town, each with lat and lon
+ * @returns {Map<string, Object>} Towns by point key
+ */
+export function townsByKey(towns) {
+  return new Map(towns.map((town) => [townKey(town), town]))
+}
+
+/**
  * Builds the network from the track and towns.
  *
  * @param {Array<Object>} segments - Every section of track, each with

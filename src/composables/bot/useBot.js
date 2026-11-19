@@ -149,13 +149,7 @@ export function useBot() {
    */
   function survey(playerId) {
     const held = holdings(playerId)
-    // Searched with this player's entry fees: towns their track reaches
-    // already cost nothing more to build into
-    const board = searchBoard(
-      builder.buildRules.value,
-      townsStore.towns,
-      builder.reachedKeys(playerId)
-    )
+    const board = searchBoard(builder.buildRules.value, townsStore.towns)
 
     // Every question the plan asks of a search is what track to some town
     // would cost, or the line there, so each search stops once it has
@@ -520,8 +514,8 @@ export function useBot() {
         given.add(target.town.msa)
         continue
       }
-      // Priced as building will charge it, town entry included
-      const price = (points) => builder.priceSection(playerId, points).total
+      // Priced as building will charge it
+      const price = (points) => builder.priceSection(points).total
       step.linePrice = price(line)
       step.lineCells = line.length
       const section = affordableSection(line, budget, picture.board.rules, price)

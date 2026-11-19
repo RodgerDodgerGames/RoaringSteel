@@ -43,8 +43,8 @@ export function reachableTowns(rules, towns) {
   if (towns.length < 2) return towns
   // The first of the biggest, should two be the same size
   const biggest = towns.reduce((big, town) => (town.population > big.population ? town : big))
-  // No towns are given to the search: entering a town costs a fee, but
-  // never stops track getting there
+  // No towns are given to the search: the detours a computer player makes
+  // through towns change what track costs, never whether it can get there
   const reaches = reachableFrom(searchBoard(rules, []), [pointOf(biggest)])
   const kept = towns.filter((town) => town === biggest || reaches(pointOf(town)))
   return kept.length === towns.length ? towns : kept

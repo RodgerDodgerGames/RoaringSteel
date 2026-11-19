@@ -259,8 +259,8 @@ export function haulPricer({ grid, priceScale, speedUnitKm, rivers = null, townC
  * price over the straight line's (see `haulPricer`), both on the same grid.
  *
  * The route is found by the search computer players use (see `costField`
- * in botPathfinder.js), with no track built and no town entry fees, and
- * priced as track is (see `linePrice`): over the cheapest ground, round
+ * in botPathfinder.js), with no track built, and priced as track is (see
+ * `linePrice`): over the cheapest ground, round
  * water too wide to bridge, inside the region. On a coarse grid the region
  * is judged at the coarse cells' centers, so a strip of the region
  * narrower than a coarse cell can close up; a town beyond it then has no
@@ -283,8 +283,8 @@ export function haulPricer({ grid, priceScale, speedUnitKm, rivers = null, townC
  */
 export function routeRatios(board, towns) {
   const straightOf = haulPricer(board)
-  // No towns: a route here is only track, without entry fees or the detours
-  // through towns that a computer player's search makes
+  // No towns: a route here is only track, without the detours through towns
+  // that a computer player's search makes
   const search = searchBoard(board, [])
   const pointOf = (town) => ({ lat: town.lat, lng: town.lon })
   // The ratios worked out so far, by one town of the pair, then the other

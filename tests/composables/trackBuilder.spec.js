@@ -61,33 +61,16 @@ describe('useTrackBuilder', () => {
     expect(playerStore.trackSpendThisTurn(ANN)).toBe(3000)
   })
 
-  it('should charge the entry fee for a town the section reaches', () => {
-    // Ending on the small town at the east end: six cells and its entry fee
+  it('should charge only the track for a section that reaches a town', () => {
+    // Ending on the small town at the east end: six cells, and nothing more
+    // for the town (there is no entry fee)
     const result = builder.buildSection(ANN, [centerOf(0), centerOf(5)])
 
-    expect(result).toMatchObject({ ok: true, cost: 6000 + gameRules.townEntry.small })
+    expect(result).toMatchObject({ ok: true, cost: 6000 })
   })
 
-  it('should price a section with its entry fees, as building will charge it', () => {
-    expect(builder.priceSection(ANN, [centerOf(0), centerOf(5)])).toEqual({
-      total: 6000 + gameRules.townEntry.small,
-      bridges: 0,
-      entry: gameRules.townEntry.small
-    })
-  })
-
-  it('should hold back an entry fee from a refund while other track still reaches the town', () => {
-    // The first section pays to enter Small; the second reaches it for free
-    const first = builder.buildSection(ANN, [centerOf(0), centerOf(5)]).segment
-    builder.buildSection(ANN, [centerOf(0), { lat: CELL, lng: 3 * CELL }, centerOf(5)])
-
-    expect(builder.refundFor(first)).toBe(first.cost - gameRules.townEntry.small)
-  })
-
-  it('should refund the whole price, entry fee too, when nothing else reaches the town', () => {
-    const only = builder.buildSection(ANN, [centerOf(0), centerOf(5)]).segment
-
-    expect(builder.refundFor(only)).toBe(only.cost)
+  it('should price a section as building will charge it', () => {
+    expect(builder.priceSection([centerOf(0), centerOf(5)])).toEqual({ total: 6000, bridges: 0 })
   })
 
   it("should build on from the end of the player's own track", () => {

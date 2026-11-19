@@ -40,7 +40,16 @@ export const gameRules = {
    * What track over land costs: Empire Builder's $1 million a milepost of
    * clear ground, here $1,000 per speed unit (see composables/boardScale.js),
    * scaled up for built-up, broken or climbing ground. (Water is bridged instead, see
-   * `bridges`, and reaching a town adds its entry fee, see `townEntry`.)
+   * `bridges`.)
+   *
+   * Reaching a town costs nothing on top of its track. Empire Builder charges
+   * an entry fee for its cities; here the developed land a town stands on is
+   * priced high (see config/nlcd.js). A big city's developed land spreads
+   * over many cells, every one of which a line into it pays for; a small
+   * town is a few developed pixels in a cell of farms or forest. So a big
+   * city costs more to build into than a small town, and a fee would charge
+   * for the city twice. (The fee, $3,000 for small and medium towns and $5,000 for major
+   * cities, was removed on 2026-11-18, #166.)
    *
    * Priced per speed unit rather than per km or per grid cell, so a turn's
    * $20,000 allowance builds the same number of speed units of ordinary
@@ -89,7 +98,7 @@ export const gameRules = {
    *
    * `knobs` are for tuning after playtests: raise one to make that part of
    * the terrain dearer, lower it to make it cheaper. At 1 each, track costs
-   * the board game's rate. Bridges and town entry are not affected.
+   * the board game's rate. Bridges are not affected.
    *
    * Land cover started at 0.5, half the board game's rate. With 1, on a
    * Maryland board (bench run, 2026-11-05) the cheapest first delivery a
@@ -118,22 +127,6 @@ export const gameRules = {
       roughness: 0.15,
       climb: 0.5
     }
-  },
-
-  /**
-   * What it costs to build track into a town, on top of the track itself, by
-   * the town's size: Empire Builder's $3 million for small and medium cities
-   * and $5 million for major ones.
-   *
-   * A player pays once per town, when a section of their track first reaches
-   * it — has a point on the town, so trains can stop there. A line that only
-   * passes through the town's cell does not reach it and does not pay, and
-   * nor does the town a section starts from.
-   */
-  townEntry: {
-    small: 3000,
-    medium: 3000,
-    large: 5000
   },
 
   /**

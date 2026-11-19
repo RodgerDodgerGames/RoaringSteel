@@ -31,7 +31,7 @@ import { ref } from 'vue'
 import { useGameStore } from '@/stores/game'
 import { useTrackStore } from '@/stores/track'
 import { useTownsStore } from '@/stores/towns'
-import { townsByKey } from '@/composables/townEntry'
+import { townsByKey } from '@/composables/network'
 import { sectionsBuilt } from '@/composables/turnHistory'
 
 /**

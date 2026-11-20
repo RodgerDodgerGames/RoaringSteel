@@ -83,10 +83,14 @@ describe('Towns Store', () => {
     mockPopulationData.value = []
     // Default mock implementations
     mockFetchPopulationData.mockResolvedValue(undefined)
-    mockGetMSALatLon.mockResolvedValue({
+    // The first area looked up is at these coordinates, and each after it a
+    // degree of latitude (about 111 km) further north: far enough apart that
+    // no towns merge or crowd each other off the board (see townSpacing.js)
+    let lookups = 0
+    mockGetMSALatLon.mockImplementation(async () => ({
       centroidLongitude: '-93.2650',
-      centroidLatitude: '44.9778'
-    })
+      centroidLatitude: String(44.9778 + lookups++)
+    }))
     mockFetchDataWindow.mockResolvedValue(WINDOW)
     // No main city found unless a test says so: the town goes in the middle
     // of its area, at the coordinates above
@@ -578,11 +582,6 @@ describe('Towns Store', () => {
         { msa_code: '12346', name: 'Rochester, MN', population: '200000', state_code: '27' },
         { msa_code: '12347', name: 'Duluth, MN', population: '50000', state_code: '27' }
       ]
-
-      mockGetMSALatLon.mockResolvedValue({
-        centroidLongitude: '-93.0',
-        centroidLatitude: '44.9'
-      })
     })
 
     it("should make a town of an area with people but no jobs in the game's industries", async () => {
@@ -908,9 +907,11 @@ describe('Towns Store', () => {
     })
 
     it('should play a state from its cache when its years cannot be looked up, and the rest as usual', async () => {
+      // Away from Boston, which the first lookup puts at the cached site's
+      // spot: a small town there would be too close to it to stay
       await writeCache('townSites_33', {
         dataWindow: EARLIER_WINDOW,
-        sites: [{ ...CACHED_SITE, msa: '31700', stateCode: '33' }]
+        sites: [{ ...CACHED_SITE, msa: '31700', stateCode: '33', lat: 40 }]
       })
       mockFetchDataWindow.mockImplementation(async (state) => {
         if (state === '33') throw new Error('QWI year lookup failed: 500')
@@ -959,6 +960,73 @@ describe('Towns Store', () => {
 
       expect(townsStore.towns).toEqual([])
       expect(townsStore.error).toMatch(/New Hampshire's towns/)
+    })
+  })
+
+  describe('spacing towns out', () => {
+    // A 10 km speed unit, so towns closer than 4 speed units are within 40 km
+    let restoreSpeedUnit
+    beforeEach(() => {
+      restoreSpeedUnit = pinSpeedUnit(10)
+      // Raleigh and Durham, about 33 km apart; Cary, a small town about 13
+      // km from Raleigh; and Wilmington, far off. Four towns make one major
+      // city and one medium town.
+      mockPopulationData.value = [
+        { msa_code: '39580', name: 'Raleigh-Cary, NC', population: '1500000', state_code: '37' },
+        {
+          msa_code: '20500',
+          name: 'Durham-Chapel Hill, NC',
+          population: '600000',
+          state_code: '37'
+        },
+        { msa_code: '48900', name: 'Wilmington, NC', population: '300000', state_code: '37' },
+        { msa_code: '99901', name: 'Cary, NC', population: '50000', state_code: '37' }
+      ]
+      const cities = {
+        Raleigh: { lon: -78.64, lat: 35.78 },
+        Durham: { lon: -78.9, lat: 35.99 },
+        Wilmington: { lon: -77.89, lat: 34.21 },
+        Cary: { lon: -78.78, lat: 35.79 }
+      }
+      mockFindPrincipalCity.mockImplementation(async (name) => {
+        const city = name.split(/[-,]/)[0]
+        return { ...cities[city], name: city, stateFips: '37' }
+      })
+      // Computers: Durham has far more jobs in them than an average town;
+      // Raleigh has none
+      industryStore.industries.push({ naics_code: 3341, label: 'Computers', national_share: 0.001 })
+      industryStore.employmentData.push({
+        industry: 3341,
+        category: 'Machinery',
+        meanEmp: { 20500: 2000 }
+      })
+      industryStore.totalJobs = { 39580: 100000, 20500: 20000, 48900: 30000, 99901: 5000 }
+    })
+    afterEach(() => restoreSpeedUnit())
+
+    it('should make one town of a major and a medium city too close together', async () => {
+      await townsStore.setupTowns('37')
+
+      const merged = townsStore.towns.find((town) => town.msa === '39580')
+      expect(merged).toMatchObject({ name: 'Raleigh-Durham', population: 2100000, size: 'large' })
+      expect(msaCodes(townsStore.towns)).not.toContain('20500')
+    })
+
+    it("should give a merged town its industries from both cities' jobs", async () => {
+      await townsStore.setupTowns('37')
+
+      const merged = townsStore.towns.find((town) => town.msa === '39580')
+      expect(merged.industries.map(({ name }) => name)).toEqual(['Tourism', 'Computers'])
+    })
+
+    it('should leave off the board a small town too close to another', async () => {
+      await townsStore.setupTowns('37')
+
+      // Wilmington is promoted to medium in Durham's place
+      expect(townsStore.towns.map(({ name, size }) => [name, size])).toEqual([
+        ['Raleigh-Durham', 'large'],
+        ['Wilmington', 'medium']
+      ])
     })
   })
 

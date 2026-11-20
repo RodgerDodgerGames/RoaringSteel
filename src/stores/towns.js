@@ -13,17 +13,21 @@
  *    the state, each of which is a town
  * 3. Place each MSA's town at its main city, from TigerWeb (see useTigerWeb.js)
  * 4. Leave out the towns whose main city is off the board
- * 5. Classify towns by population (small/medium/large)
- * 6. For the towns' areas the jobs data has no numbers for as areas, add up
+ * 5. For the towns' areas the jobs data has no numbers for as areas, add up
  *    their counties' jobs instead (see the industry store's `fillAreas`)
+ * 6. Classify towns by population (small/medium/large), and make one town
+ *    of major and medium cities too close together (see townSpacing.js)
  * 7. Give the towns their industries: each the things its jobs lean on most
  *    (see townIndustries.js)
+ * 8. Leave off the small towns too close to another (see townSpacing.js)
  *
  * Town Object Structure:
  * {
- *   msa: string,           // MSA code (e.g., "33460")
- *   fullName: string,      // Full MSA name (e.g., "Minneapolis-St. Paul-Bloomington")
- *   name: string,          // Short name (e.g., "Minneapolis")
+ *   msa: string,           // MSA code (e.g., "33460"); a merged town's biggest city's
+ *   fullName: string,      // Full MSA name (e.g., "Minneapolis-St. Paul-Bloomington");
+ *                          //   a merged town's, each area's joined by " / "
+ *   name: string,          // Short name (e.g., "Minneapolis"); a merged town's, each
+ *                          //   city's joined by hyphens (e.g., "Raleigh-Durham")
  *   stateCode: string,     // State FIPS code
  *   population: number,    // Population count
  *   lon: number,           // Longitude coordinate
@@ -40,8 +44,10 @@ import { defineStore } from 'pinia'
 import { useIndustryStore } from './industry'
 import useCensus from '../composables/setup/useCensus'
 import getMSALatLon, { findPrincipalCity } from '../composables/setup/useTigerWeb'
-import { assignSizes } from '../composables/setup/townSizes'
+import { sizeCounts } from '../composables/setup/townSizes'
 import { assignIndustries as assignTownIndustries } from '../composables/setup/townIndustries'
+import { mergeCities, combinedJobs, thinTowns } from '../composables/setup/townSpacing'
+import { townSpacingConfig } from '@/config/towns'
 import { regionTest } from '@/composables/map/region'
 import { boardRulesFor } from '@/composables/map/buildRules'
 import { reachableTowns } from '@/composables/reachableTowns'
@@ -564,8 +570,9 @@ export const useTownsStore = defineStore('towns', () => {
 
   /**
    * Makes the game's towns from a state's sites: those whose main city is on
-   * the board, each with its size and industries (see `assignTowns`). A
-   * board none of whose towns is on it cannot be played: `error` says so.
+   * the board, each with its size and industries, spaced out (see
+   * `assignTowns`). A board none of whose towns is on it cannot be played:
+   * `error` says so.
    * @param {{dataWindow: Object, sites: Array}} built - The sites, and the
    *   data window they were built for
    * @param {Function} isOnBoard - The board's point test (see `regionTest`)
@@ -582,15 +589,49 @@ export const useTownsStore = defineStore('towns', () => {
   }
 
   /**
-   * Orchestrates the town assignment process: classifies by population,
-   * assigns tourism to large towns, and distributes industries.
+   * Turns the board's towns into the game's: sized, spaced out and given
+   * their industries, in this order (see townSpacing.js):
+   *
+   * 1. Sizes by population, and major and medium cities too close together
+   *    made one town. The board keeps the counts of major cities and medium
+   *    towns its full list of towns gives it.
+   * 2. Tourism for the major cities, then everyone's industries, a merged
+   *    town's from all its areas' jobs together.
+   * 3. Small towns too close to another left off the board. This needs the
+   *    industries, as a town that alone makes something is kept ahead of
+   *    others; the towns left keep the industries they were given.
+   *
+   * The spacing distances are in speed units, the board's own (see
+   * boardScale.js), which the game store works out from the region.
    */
   function assignTowns() {
     debug.log('Assigning towns...')
-    // major cities, medium and small towns, by population
-    towns.value = assignSizes(towns.value)
+    const { speedUnitKm } = useGameStore().boardScale
+    const { mergeUnits, gapUnits } = townSpacingConfig
+    const { towns: merged, areasOf } = mergeCities(
+      towns.value,
+      sizeCounts(towns.value.length),
+      mergeUnits * speedUnitKm
+    )
+    if (areasOf.size > 0) {
+      debug.log(
+        'Cities too close together, made one town:',
+        merged.filter(({ msa }) => areasOf.has(msa)).map(({ name }) => name)
+      )
+    }
+    towns.value = merged
     assignTourism()
-    assignIndustries()
+    assignIndustries(areasOf)
+
+    const kept = thinTowns(towns.value, gapUnits * speedUnitKm)
+    if (kept.length < towns.value.length) {
+      const keptSet = new Set(kept)
+      debug.log(
+        'Towns too close to another, left off the board:',
+        towns.value.filter((town) => !keptSet.has(town)).map(({ name }) => name)
+      )
+    }
+    towns.value = kept
   }
 
   /**
@@ -612,8 +653,10 @@ export const useTownsStore = defineStore('towns', () => {
    * in the list without its share of the country's jobs cannot be scored,
    * so it is left out, with a warning: the share is filled in by
    * scripts/build-national-shares.mjs.
+   * @param {Map<string, Array<string>>} areasOf - The areas each merged town
+   *   stands for, whose jobs are added together (see `mergeCities`)
    */
-  function assignIndustries() {
+  function assignIndustries(areasOf) {
     const listed = new Map(industryStore.industries.map((ind) => [String(ind.naics_code), ind]))
     const employment = industryStore.employmentData
       .filter(({ industry }) => {
@@ -627,7 +670,8 @@ export const useTownsStore = defineStore('towns', () => {
         const { label, national_share } = listed.get(String(data.industry))
         return { ...data, label, nationalShare: national_share }
       })
-    towns.value = assignTownIndustries(towns.value, employment, industryStore.totalJobs)
+    const jobs = combinedJobs(employment, industryStore.totalJobs, areasOf)
+    towns.value = assignTownIndustries(towns.value, jobs.employment, jobs.totalJobs)
     debug.log(
       'Industries on the board:',
       towns.value.flatMap(({ name, industries }) =>

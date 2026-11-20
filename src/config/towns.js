@@ -25,6 +25,31 @@ export const townSizeConfig = {
 }
 
 /**
+ * How far apart a board's towns must be (see townSpacing.js), in speed units
+ * (see boardScale.js), so the rule is the same on every board: 4 speed units
+ * is about 22 km on a board Minnesota's size and 35 km on the Rockies.
+ *
+ * Census areas are drawn by where people commute, not by how a board looks,
+ * so in thickly settled country they crowd together. Measured on saved
+ * boards (2026-11-19), BosWash and the South Atlantic states had about
+ * three times the towns per area of Minnesota or the Rockies, some as close
+ * as 1.6 speed units. With both distances at 4, no two towns on a board are
+ * closer than 4 speed units (#167).
+ */
+export const townSpacingConfig = {
+  /**
+   * Major and medium cities closer together than this are made one town,
+   * as Raleigh and Durham become Raleigh-Durham
+   */
+  mergeUnits: 4,
+  /**
+   * A small town closer than this to a town kept ahead of it is left off
+   * the board
+   */
+  gapUnits: 4
+}
+
+/**
  * How a board's industries are given to its towns (see townIndustries.js).
  *
  * A town's industries are scored by their "extra jobs": its jobs in an

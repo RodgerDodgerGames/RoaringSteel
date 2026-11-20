@@ -9,6 +9,7 @@
  * - Auto-saving after each turn
  * - Clearing the finishing player's track building allowance
  * - Closing the finished turn into the turn history
+ * - Handing the map to each player's own view
  * - Holding the End turn button until the player has used the turn
  */
 
@@ -22,6 +23,8 @@ import { useTrainsStore } from '@/stores/trains'
 import { useDemandCardsStore } from '@/stores/demandCards'
 import { useTrainStopStore } from '@/stores/trainStop'
 import { useHistoryStore } from '@/stores/history'
+import { useMapStore } from '@/stores/map'
+import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 import { ref } from 'vue'
 import { gameRules } from '@/config/game'
 
@@ -185,6 +188,44 @@ describe('useTurn', () => {
       endTurn()
 
       expect(autoSave).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('the map view', () => {
+    it("should take the map to each player's own view as their turn comes round", () => {
+      // Two players open Alice, Bob, Bob, Alice (the switchback start)
+      seedPlayers(['Alice', 'Bob'])
+      const mapStore = useMapStore()
+      const { endTurn } = useTurn()
+      mapStore.setViewMode(BUILD_VIEW)
+      mapStore.setMapView({ zoom: 9, center: [39.7, -105] })
+
+      endTurn()
+      // Bob has not ended a turn yet
+      expect(mapStore.viewMode).toBe(PLAN_VIEW)
+
+      endTurn()
+      endTurn()
+      expect(playerStore.activePlayer.name).toBe('Alice')
+      expect(mapStore.viewMode).toBe(BUILD_VIEW)
+      expect(mapStore.mapCenter).toEqual([39.7, -105])
+    })
+
+    it("should have the finishing player's view kept by the time the round's auto-save runs", () => {
+      seedPlayers(['Alice'])
+      const mapStore = useMapStore()
+      const { endTurn } = useTurn()
+      mapStore.setViewMode(BUILD_VIEW)
+      // A solo game's every turn ends a round, so every turn auto-saves
+      let keptAtSave
+      autoSave.mockImplementationOnce(() => {
+        keptAtSave = mapStore.playerViews[playerStore.players[0].id]
+        return true
+      })
+
+      endTurn()
+
+      expect(keptAtSave?.view).toBe(BUILD_VIEW)
     })
   })
 

@@ -242,5 +242,22 @@ describe('useMapView', () => {
       expect(map.getBounds().contains(coloradoBounds)).toBe(true)
       expect(map.dragging.enabled()).toBe(false)
     })
+
+    it("should move to the next person's own spot when the turn passes between two people in the Build view", () => {
+      const ann = { id: 1, isBot: false }
+      const bob = { id: 2, isBot: false }
+      // Ann leaves the map over Pueblo; Bob, over Grand Junction
+      moveTo([38.3, -104.6], coloradoRange.max)
+      mapStore.passView(ann, bob)
+      mapStore.setViewMode(BUILD_VIEW)
+      moveTo([39.1, -108.5], coloradoRange.max)
+
+      // Back to Ann: both in the Build view, so the view itself does not change
+      mapStore.passView(bob, ann)
+
+      expect(mapStore.viewMode).toBe(BUILD_VIEW)
+      expect(map.getCenter().lat).toBeCloseTo(38.3, 2)
+      expect(map.getCenter().lng).toBeCloseTo(-104.6, 2)
+    })
   })
 })

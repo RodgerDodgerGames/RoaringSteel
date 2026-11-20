@@ -6,7 +6,8 @@
  *
  * The map is seen in one of two views, Plan or Build (see
  * composables/map/mapViews.js). The view is chosen in the top bar and
- * applied to the map by useMapView.
+ * applied to the map by useMapView. Each person has their own: as a turn
+ * passes, the map goes to the view the next person left it in (`passView`).
  *
  * Used by:
  * - MainMap.vue for map initialization
@@ -60,6 +61,28 @@ export const useMapStore = defineStore('map', () => {
    * Plan view, and used up as the Build view opens. Not saved.
    */
   const buildFocus = ref(null)
+
+  /**
+   * The view each person left the map in as their last turn ended, kept for
+   * them while others play, so their next turn picks up where they were:
+   * { [playerId]: { view, zoom, center } }, where `view` is PLAN_VIEW or
+   * BUILD_VIEW and `zoom` and `center` are their Build view position (null
+   * if they had not opened the Build view yet). Computer players have no
+   * entry: they never look at the map. Saved with the game.
+   *
+   * `viewMode`, `mapZoom` and `mapCenter` above are what is on screen now,
+   * for whoever holds the turn; this is everyone else's.
+   */
+  const playerViews = ref({})
+
+  /**
+   * Counts the times the map has been handed to a player's view (see
+   * `passView`). A change of `viewMode` moves the map by itself, but a hand
+   * from one person in the Build view to another in the Build view leaves
+   * `viewMode` as it was, and the map would stay over the first person's
+   * spot. useMapView watches this as well, so the map moves either way.
+   */
+  const viewHandoffs = ref(0)
 
   /** Leaflet LayerGroup containing town markers */
   const townsLayer = shallowRef(null)
@@ -119,6 +142,87 @@ export const useMapStore = defineStore('map', () => {
     buildFocus.value = null
   }
 
+  /**
+   * Hands the map from the player whose turn ended to the player whose turn
+   * begins.
+   *
+   * The finishing player's view is kept for them (see `playerViews`). The
+   * next player gets the view they left at the end of their own last turn,
+   * Build position and all. Someone with nothing kept yet (they have not
+   * ended a turn, or the save is from before views were kept) gets the Plan
+   * view, and their Build view opens at its first opening, not over another
+   * player's spot.
+   *
+   * A computer player's turn is shown in the Plan view, so the table watches
+   * it build and run across the whole board. Computer players keep no view
+   * of their own, and the Build position is left alone through their turns:
+   * a person handed the turn after them gets their own back regardless.
+   *
+   * The same player playing again (the turn of a building round, or a solo
+   * game) is handed their own view back, so nothing changes for them.
+   *
+   * @param {Object|null} fromPlayer - The player whose turn ended, if any
+   * @param {Object|null} toPlayer - The player whose turn begins
+   */
+  const passView = (fromPlayer, toPlayer) => {
+    if (fromPlayer && !fromPlayer.isBot) {
+      playerViews.value = {
+        ...playerViews.value,
+        [fromPlayer.id]: { view: viewMode.value, zoom: mapZoom.value, center: mapCenter.value }
+      }
+    }
+
+    let view = PLAN_VIEW
+    if (toPlayer && !toPlayer.isBot) {
+      const kept = playerViews.value[toPlayer.id]
+      if (kept) view = kept.view
+      mapZoom.value = kept?.zoom ?? null
+      mapCenter.value = kept?.center ?? null
+    }
+
+    // A point the Build view was to open over belonged to the last turn
+    buildFocus.value = null
+    // Set after the position, so a switch into the Build view opens over it.
+    // A change of view moves the map by itself; the same view needs the nudge
+    if (viewMode.value === view) viewHandoffs.value++
+    else viewMode.value = view
+  }
+
+  /**
+   * Puts back each person's kept view from a saved game (see `playerViews`).
+   * A save from before views were kept has none, and everyone starts from
+   * the Plan view.
+   *
+   * Each view is checked as it comes in, and one that cannot be shown (a
+   * damaged or hand-edited save) is dropped, so that person starts from the
+   * Plan view too. It is checked here, not when the turn reaches them: by
+   * then the turn is half handed over, and a position the map cannot go to
+   * would throw partway through, leaving the finished turn never filed.
+   * @param {Object} [views] - The save's `mapView.players`
+   */
+  const setPlayerViews = (views) => {
+    const readable = views && typeof views === 'object' && !Array.isArray(views)
+    playerViews.value = readable
+      ? Object.fromEntries(Object.entries(views).filter(([, kept]) => isShowableView(kept)))
+      : {}
+  }
+
+  /**
+   * Whether a kept view is one the map can be put in: a view it knows, and a
+   * Build position that is either not there yet (null) or a whole one, a
+   * zoom and a [lat, lng] center.
+   * @param {*} kept - One player's entry from a save
+   * @returns {boolean} True if the map can show it
+   */
+  function isShowableView(kept) {
+    if (!kept || typeof kept !== 'object' || !MAP_VIEWS.includes(kept.view)) return false
+    const zoomOk = kept.zoom == null || Number.isFinite(kept.zoom)
+    const centerOk =
+      kept.center == null ||
+      (Array.isArray(kept.center) && kept.center.length === 2 && kept.center.every(Number.isFinite))
+    return zoomOk && centerOk
+  }
+
   /** @param {boolean} status - Whether drawing mode is active */
   const setIsDrawingActive = (status) => {
     isDrawingActive.value = status
@@ -141,7 +245,7 @@ export const useMapStore = defineStore('map', () => {
 
   /**
    * Resets the map store to initial state: the Plan view, with no Build view
-   * position yet.
+   * position yet, and no player's view kept.
    * Note: Only resets serializable state, not Leaflet instances.
    */
   const reset = () => {
@@ -149,6 +253,7 @@ export const useMapStore = defineStore('map', () => {
     mapZoom.value = null
     mapCenter.value = null
     buildFocus.value = null
+    playerViews.value = {}
     isDrawingActive.value = false
     townPicker.value = null
     // Note: map and townsLayer are Leaflet instances and should not be reset here
@@ -171,6 +276,8 @@ export const useMapStore = defineStore('map', () => {
     mapZoom,
     mapCenter,
     buildFocus,
+    playerViews,
+    viewHandoffs,
     townsLayer,
     isDrawingActive,
     townPicker,
@@ -179,6 +286,8 @@ export const useMapStore = defineStore('map', () => {
     setViewMode,
     showInBuildView,
     clearBuildFocus,
+    passView,
+    setPlayerViews,
     setIsDrawingActive,
     setTownPicker,
     setTownsLayer,

@@ -1209,6 +1209,23 @@ describe('useBuildTrack', () => {
       expect(api.hasLineToBuild.value).toBe(false)
     })
 
+    it("should throw away, not build, a line still being drawn when the turn passes and the map goes to the next player's Plan view", () => {
+      // Throwing in the hand mid-line ends the turn without building it, and
+      // the next player, never having ended a turn, is shown the Plan view
+      playerStore.addPlayer({ name: 'Bob', color: 'blue', cash: 20000 })
+      const { api, workingLayer } = startLineAtTown()
+      place(workingLayer, centerOf(1))
+      const drawing = playerStore.activePlayer
+      const next = playerStore.players.find((player) => player !== drawing)
+
+      // What ending the turn does: the turn passes, then the map with it
+      playerStore.setActivePlayer(next.id)
+      useMapStore().passView(drawing, next)
+
+      expect(trackStore.segments).toEqual([])
+      expect(api.isDrawingActive.value).toBe(false)
+    })
+
     it('should build the line drawn so far when switched to the Plan view', () => {
       const { workingLayer } = startLineAtTown()
       place(workingLayer, centerOf(1))

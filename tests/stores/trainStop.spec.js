@@ -199,6 +199,95 @@ describe('train stop store', () => {
     })
   })
 
+  describe('reporting moves', () => {
+    it('should report a move apart from the last load action', () => {
+      annPlaces('East')
+      store.pickUp('Steel')
+
+      store.reportMove({ ok: false, error: 'Not enough cash.' }, () => '')
+
+      expect(store.moveNotice).toEqual({ text: 'Not enough cash.', isError: true })
+      // A move that did not happen leaves the train where the load message was about
+      expect(store.notice).toEqual({ text: 'Loaded Steel.', isError: false })
+    })
+
+    it('should clear the last load message once the train has moved on', () => {
+      annPlaces('East')
+      store.pickUp('Steel')
+
+      store.reportMove(trainsStore.moveTrain(ANN, 'Middle'), () => 'Arrived in Middle.')
+
+      expect(store.moveNotice).toEqual({ text: 'Arrived in Middle.', isError: false })
+      expect(store.notice).toBeNull()
+    })
+  })
+
+  describe('the cars', () => {
+    it('should lay out one car per load the train can carry, empty ones last', () => {
+      annPlaces('East')
+      store.pickUp('Beef')
+
+      // A Freight carries two loads
+      expect(store.cars.map(({ load }) => load)).toEqual(['Beef', null])
+      expect(store.cars[0].code).toBe(3116)
+    })
+
+    it('should give a car the delivery its load can make here, and other cars none', () => {
+      annPlaces('East')
+      store.pickUp('Beef')
+      store.pickUp('Steel')
+
+      annRuns('Middle')
+
+      const [beef, steel] = store.cars
+      expect(beef.deliveries.map(({ demand }) => demand.destination)).toEqual(['Middle'])
+      expect(steel.deliveries).toEqual([])
+    })
+
+    it('should put a delivery on the first of two cars carrying the same load only', () => {
+      annPlaces('East')
+      store.pickUp('Steel')
+      store.pickUp('Steel')
+
+      annRuns('West')
+
+      const [first, second] = store.cars
+      expect(first.deliveries).toHaveLength(1)
+      expect(second.deliveries).toEqual([])
+    })
+
+    it('should move a delivery still left to the next car of that load after one is made', () => {
+      demandCardsStore.setDeck({
+        drawPile: [
+          { id: 8, demands: [] },
+          { id: 9, demands: [] }
+        ],
+        hands: {
+          [ANN]: [
+            { id: 1, demands: [{ destination: 'West', industry: 'Steel', payoff: 12000 }] },
+            { id: 2, demands: [{ destination: 'West', industry: 'Steel', payoff: 15000 }] },
+            { id: 3, demands: [] }
+          ]
+        }
+      })
+      annPlaces('East')
+      store.pickUp('Steel')
+      store.pickUp('Steel')
+      annRuns('West')
+
+      // Two cards pay for Steel here: both deliveries on the first car, so
+      // the player chooses which card to cash in
+      expect(store.cars[0].deliveries.map(({ cardId }) => cardId)).toEqual([1, 2])
+      expect(store.cars[1].deliveries).toEqual([])
+
+      store.deliver(2, 0)
+
+      // The loads close up, and the Steel left takes the delivery still open
+      expect(store.cars.map(({ load }) => load)).toEqual(['Steel', null])
+      expect(store.cars[0].deliveries.map(({ cardId }) => cardId)).toEqual([1])
+    })
+  })
+
   describe("a computer player's turn", () => {
     it('should offer no loading town, so the map has nothing to click', async () => {
       annPlaces('East')

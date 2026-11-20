@@ -408,21 +408,28 @@ describe('useTurn', () => {
       expect(trainsStore.trainOf(1).hasActed).toBe(false)
     })
 
-    it('should close the stop card and clear the report of the last move, even in a solo game', () => {
+    it('should close the stop card and clear the reports of the last move and load, even in a solo game', () => {
       seedPlayers(['Alice'])
       useTownsStore().setTowns([
         { name: 'Alpha', msa: 'A', lat: 0, lon: 0, size: 'small', industries: [{ name: 'Coal' }] }
       ])
       gameStore.setGameState({ turn: 2 })
       const trainStopStore = useTrainStopStore()
-      trainStopStore.report(useTrainsStore().placeTrain(1, 'A'), () => 'Your train is in Alpha.')
+      trainStopStore.reportMove(
+        useTrainsStore().placeTrain(1, 'A'),
+        () => 'Your train is in Alpha.'
+      )
       trainStopStore.arrive()
+      trainStopStore.pickUp('Coal')
       expect(trainStopStore.stopTown?.name).toBe('Alpha')
+      expect(trainStopStore.moveNotice).not.toBeNull()
+      expect(trainStopStore.notice).not.toBeNull()
       const { endTurn } = useTurn()
 
       endTurn()
 
       expect(trainStopStore.stopTown).toBeNull()
+      expect(trainStopStore.moveNotice).toBeNull()
       expect(trainStopStore.notice).toBeNull()
     })
   })

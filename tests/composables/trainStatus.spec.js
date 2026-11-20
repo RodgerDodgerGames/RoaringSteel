@@ -4,7 +4,9 @@
  * The words the dock uses for where a train is and where it is heading: how
  * long a run takes ("this turn", "2 turns"), and the whereabouts sentence,
  * in a town or stopped on the track, with or without a heading (a town or a
- * point on the track), and with a heading no track leads to any more.
+ * point on the track), and with a heading no track leads to any more; and
+ * the same sentence in pieces, with every town it names marked so the Train
+ * section can set the names in the board's style.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -12,6 +14,7 @@ import {
   turnsText,
   spacesText,
   whereabouts,
+  whereaboutsParts,
   trackPointName,
   trackPointTitle
 } from '@/composables/trainStatus'
@@ -146,6 +149,51 @@ describe('trainStatus', () => {
       expect(whereabouts({ placed: true, town: omaha, heading: lost })).toBe(
         'In Omaha, heading toward Denver, but no track leads there now'
       )
+    })
+  })
+
+  describe('whereaboutsParts', () => {
+    /** The pieces marked as town names, in order */
+    const townsIn = (parts) => parts.filter(({ isTown }) => isTown).map(({ text }) => text)
+
+    it('should mark the town a train is in', () => {
+      expect(townsIn(whereaboutsParts({ placed: true, town: omaha, heading: null }))).toEqual([
+        'Omaha'
+      ])
+    })
+
+    it('should mark both the town a train is in and the one it is heading for', () => {
+      const parts = whereaboutsParts({ placed: true, town: omaha, heading: toDenver(1, false) })
+
+      expect(townsIn(parts)).toEqual(['Omaha', 'Denver'])
+    })
+
+    it('should mark the nearest town of a train stopped on the line', () => {
+      const nearest = { town: omaha, km: 24 }
+      const parts = whereaboutsParts({
+        placed: true,
+        town: null,
+        heading: null,
+        nearest,
+        speedUnitKm: 10
+      })
+
+      expect(townsIn(parts)).toEqual(['Omaha'])
+    })
+
+    it('should mark the town a point on the track is named by', () => {
+      const heading = {
+        town: null,
+        point: { near: denver, isEnd: false },
+        route: { turns: 1, runsNow: true }
+      }
+
+      expect(townsIn(whereaboutsParts({ placed: true, town: null, heading }))).toEqual(['Denver'])
+    })
+
+    it('should mark nothing when no town is named', () => {
+      expect(townsIn(whereaboutsParts({ placed: false, town: null, heading: null }))).toEqual([])
+      expect(townsIn(whereaboutsParts({ placed: true, town: null, heading: null }))).toEqual([])
     })
   })
 })

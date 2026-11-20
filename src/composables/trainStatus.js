@@ -37,6 +37,49 @@ export function spacesText(km, speedUnitKm) {
   return `${spaces} ${spaces === '1' ? 'space' : 'spaces'}`
 }
 
+// SENTENCES IN PIECES
+//
+// The dock's Train section sets each town's name the way the board labels
+// towns, so the sentences below are built as a list of pieces, each plain
+// words or a town's name. `joinParts` turns the pieces back into the plain
+// sentence that everything else shows.
+
+/**
+ * A piece of plain words.
+ * @param {string} text - The words
+ * @returns {{text: string, isTown: boolean}} The piece
+ */
+const words = (text) => ({ text, isTown: false })
+
+/**
+ * A piece that is a town's name.
+ * @param {string} name - The town's name
+ * @returns {{text: string, isTown: boolean}} The piece
+ */
+const townName = (name) => ({ text: name, isTown: true })
+
+/**
+ * Puts the pieces of a sentence back together as plain text.
+ * @param {Array<{text: string}>} parts - The pieces
+ * @returns {string} The sentence
+ */
+const joinParts = (parts) => parts.map(({ text }) => text).join('')
+
+/**
+ * A point on the track, named by the town nearest it, in pieces (see
+ * `trackPointName` for the wording).
+ * @param {{near: Object|null, isEnd: boolean}} point - From the trains
+ *   store's `trackPoint`
+ * @returns {Array<{text: string, isTown: boolean}>} The pieces
+ */
+function trackPointParts({ near, isEnd }) {
+  if (isEnd)
+    return near
+      ? [words('the end of the line near '), townName(near.name)]
+      : [words('the end of the line')]
+  return near ? [words('the track near '), townName(near.name)] : [words('a point on the track')]
+}
+
 /**
  * A point on the track, named for the player by the town nearest it.
  * @param {{near: Object|null, isEnd: boolean}} point - From the trains
@@ -45,9 +88,8 @@ export function spacesText(km, speedUnitKm) {
  *   Pueblo", or, with no town reached by track, "the end of the line" or "a
  *   point on the track"
  */
-export function trackPointName({ near, isEnd }) {
-  if (isEnd) return near ? `the end of the line near ${near.name}` : 'the end of the line'
-  return near ? `the track near ${near.name}` : 'a point on the track'
+export function trackPointName(point) {
+  return joinParts(trackPointParts(point))
 }
 
 /**
@@ -62,7 +104,21 @@ export function trackPointTitle(point) {
 }
 
 /**
- * Where a train is and where it is heading, in a sentence.
+ * Where a train is and where it is heading, in a sentence. The plain-text
+ * form of `whereaboutsParts`, which has the details.
+ * @param {Object} status - As for `whereaboutsParts`
+ * @returns {string} The sentence
+ */
+export function whereabouts(status) {
+  return joinParts(whereaboutsParts(status))
+}
+
+/**
+ * Where a train is and where it is heading, as a sentence in pieces, each
+ * plain words or a town's name, so the Train section can set the names in
+ * the board's town-name style. Every town named is marked: the one the train
+ * is in, the one it is heading for, the nearest one to a train stopped on
+ * the line, and the one a point on the track is named by.
  *
  * @param {Object} status
  * @param {boolean} status.placed - Whether the train is on the board yet
@@ -76,33 +132,37 @@ export function trackPointTitle(point) {
  *   leads to a town
  * @param {number} [status.speedUnitKm] - The board's speed unit, to give
  *   that distance in spaces as every distance is shown (see formatDistance)
- * @returns {string} e.g. "In Omaha", "Heading toward Denver, expected to
- *   arrive in 2 turns", "In Omaha, heading toward Denver (this turn)",
- *   "Heading toward the end of the line near Willmar, expected to arrive in
- *   2 turns", or "Stopped on the track 2.4 spaces away from Pueblo"
+ * @returns {Array<{text: string, isTown: boolean}>} The pieces, which read
+ *   e.g. "In Omaha", "Heading toward Denver, expected to arrive in 2 turns",
+ *   "In Omaha, heading toward Denver (this turn)", "Heading toward the end
+ *   of the line near Willmar, expected to arrive in 2 turns", or "Stopped on
+ *   the track 2.4 spaces away from Pueblo"
  */
-export function whereabouts({ placed, town, heading, nearest = null, speedUnitKm }) {
-  if (!placed) return 'Not on the board yet'
+export function whereaboutsParts({ placed, town, heading, nearest = null, speedUnitKm }) {
+  if (!placed) return [words('Not on the board yet')]
   if (!heading) {
-    if (town) return `In ${town.name}`
-    if (!nearest) return 'Stopped on the track'
-    return `Stopped on the track ${spacesText(nearest.km, speedUnitKm)} away from ${nearest.town.name}`
+    if (town) return [words('In '), townName(town.name)]
+    if (!nearest) return [words('Stopped on the track')]
+    return [
+      words(`Stopped on the track ${spacesText(nearest.km, speedUnitKm)} away from `),
+      townName(nearest.town.name)
+    ]
   }
 
-  const name = heading.town ? heading.town.name : trackPointName(heading.point)
-  if (!heading.route) {
-    const toward = `heading toward ${name}, but no track leads there now`
-    return town ? `In ${town.name}, ${toward}` : capitalize(toward)
-  }
+  // The start of the sentence: the town the train is in, if it is in one,
+  // then where it is heading — a town, or a point on the track named by its
+  // nearest town
+  const start = town
+    ? [words('In '), townName(town.name), words(', heading toward ')]
+    : [words('Heading toward ')]
+  const goal = heading.town ? [townName(heading.town.name)] : trackPointParts(heading.point)
+
+  if (!heading.route) return [...start, ...goal, words(', but no track leads there now')]
   const when = turnsText(heading.route)
-  if (town) return `In ${town.name}, heading toward ${name} (${when})`
-  return `Heading toward ${name}, expected to arrive ${when === 'this turn' ? when : `in ${when}`}`
-}
-
-/**
- * @param {string} text - A sentence starting lowercase
- * @returns {string} The same, starting with a capital
- */
-function capitalize(text) {
-  return text.charAt(0).toUpperCase() + text.slice(1)
+  if (town) return [...start, ...goal, words(` (${when})`)]
+  return [
+    ...start,
+    ...goal,
+    words(`, expected to arrive ${when === 'this turn' ? when : `in ${when}`}`)
+  ]
 }

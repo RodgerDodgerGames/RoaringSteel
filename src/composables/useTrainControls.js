@@ -2,14 +2,15 @@
  * Train Controls Composable (useTrainControls.js)
  *
  * What the dock's "Move your train" step needs: the active player's train
- * as the controls show it, the choices open to it (where it can go, what it
- * can load or deliver here), and the actions, each reporting back in a
- * sentence for the player.
+ * as the controls show it, where it can go, and the moves, each reporting
+ * back in a sentence for the player. Loading and unloading are not here:
+ * the dock's Train section, the map's stop card and the town icons do those
+ * through the train stop store.
  *
  * The rules themselves are all in the trains store; this only puts them in
- * front of a person. Loading and unloading, and the report of how each
- * action went, are shared with the map's stop card and commodity icons
- * through the train stop store. This also runs choosing a town on the map:
+ * front of a person. How each move went is kept in the train stop store
+ * (its `moveNotice`), apart from how loading went. This also runs choosing a
+ * town on the map:
  * while that is on, clicking a town places the train there, or runs it
  * there, and clicking a marked point on the track runs it there (or toward
  * it, if it is too far for one turn) and stops.
@@ -110,9 +111,6 @@ export function useTrainControls() {
   /** Why the train cannot run anywhere now, or null */
   const moveBlock = computed(() => trainsStore.whyCannotMove(playerId.value))
 
-  /** Why nothing can be loaded or unloaded now, or null */
-  const loadBlock = computed(() => trainsStore.whyCannotLoad(playerId.value))
-
   /**
    * The town, or point on the track, a run of more than one turn is still on
    * its way to, and how it stands now, or null (see the trains store's
@@ -200,18 +198,11 @@ export function useTrainControls() {
     })
   )
 
-  /**
-   * What the train can pick up and deliver where it stands: the same lists
-   * the map's stop card shows (see the train stop store)
-   */
-  const pickups = computed(() => trainStopStore.pickups)
-  const deliveries = computed(() => trainStopStore.deliveries)
-
   /** Every town, by name, for placing the train */
   const towns = computed(() => [...townsStore.towns].sort((a, b) => a.name.localeCompare(b.name)))
 
-  /** What the last action did, or why it could not: { text, isError } */
-  const notice = computed(() => trainStopStore.notice)
+  /** What the last move did, or why it could not: { text, isError } */
+  const moveNotice = computed(() => trainStopStore.moveNotice)
 
   /**
    * A player's name, for saying who was paid.
@@ -236,7 +227,7 @@ export function useTrainControls() {
    * @param {string} townId - The town's id
    */
   function place(townId) {
-    const result = trainStopStore.report(
+    const result = trainStopStore.reportMove(
       trainsStore.placeTrain(playerId.value, townId),
       () => `Your train is in ${town.value.name}.`
     )
@@ -249,7 +240,7 @@ export function useTrainControls() {
    */
   function move(townId) {
     const target = townsStore.towns.find((t) => t.msa === townId)
-    const result = trainStopStore.report(
+    const result = trainStopStore.reportMove(
       trainsStore.moveTrain(playerId.value, townId),
       ({ arrived, km, paid }) => {
         const run = arrived
@@ -271,7 +262,7 @@ export function useTrainControls() {
    * @param {string} nodeKey - The point (see the trains store's `trackStops`)
    */
   function moveToTrack(nodeKey) {
-    const result = trainStopStore.report(
+    const result = trainStopStore.reportMove(
       trainsStore.moveTrainToTrack(playerId.value, nodeKey),
       ({ arrived, km, paid, point }) => {
         const where = trackPointName(point)
@@ -297,10 +288,6 @@ export function useTrainControls() {
     if (choice?.kind === 'town') move(choice.key)
     else if (choice?.kind === 'point') moveToTrack(choice.key)
   }
-
-  // Loading and unloading go through the train stop store, which the map's
-  // stop card and commodity icons use too
-  const { pickUp, deliver, drop } = trainStopStore
 
   // CHOOSING A TOWN ON THE MAP
 
@@ -362,24 +349,18 @@ export function useTrainControls() {
     distanceLeft,
     distance,
     moveBlock,
-    loadBlock,
     runChoices,
     hasOthersTrackChoices,
     othersTrackShown,
     headingChoiceId,
     heading,
     status,
-    pickups,
-    deliveries,
     towns,
-    notice,
+    moveNotice,
     nameOf,
     colorOf,
     place,
     run,
-    pickUp,
-    deliver,
-    drop,
     isPicking,
     startPicking,
     stopPicking,

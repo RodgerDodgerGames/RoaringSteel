@@ -31,9 +31,12 @@
 
 
 
-/* town tooltip (town display names under the icon), in small bold
-   capitals like the names on the Empire Builder board */
-.town-tooltip {
+/* Town names in small bold capitals like the names on the Empire Builder
+   board: on the map (the town tooltip, the name under each town's icon)
+   and wherever else a town is named the same way, such as the dock's
+   Train section (`.town-name`) */
+.town-tooltip,
+.town-name {
   font-family: var(--font-town-name);
   font-size: 0.75rem;
   font-weight: 700;
@@ -54,6 +57,11 @@
   text-shadow:
     0 0 3px var(--coal),
     0 0 6px var(--coal);
+}
+
+/* The rest is for the map's tooltip only: Leaflet draws a tooltip as a box
+   with a border, shadow and fill, which the name goes without */
+.town-tooltip {
   border: none;
   box-shadow: none;
   background: none;

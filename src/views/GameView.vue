@@ -139,9 +139,14 @@ onBeforeUnmount(() => document.documentElement.classList.remove(PAGE_CLASS))
   Desktop: a two-row, two-column grid filling the window exactly. `dvh`
   rather than `vh` so mobile browser toolbars do not push the bottom off
   screen; `vh` is the fallback for browsers without it.
+
+  The dock is 400px wide, room for the Train section's locomotive and three
+  cars side by side. On smaller laptop screens (1024–1279px) it narrows to
+  340px to leave the map more room; below 1024px it moves under the map at
+  full width (see the media query at the end).
 */
 .game-view {
-  --dock-width: 340px;
+  --dock-width: 400px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--dock-width);
   grid-template-rows: auto minmax(0, 1fr);
@@ -175,6 +180,13 @@ onBeforeUnmount(() => document.documentElement.classList.remove(PAGE_CLASS))
 .game-view__dock {
   grid-area: dock;
   min-height: 0;
+}
+
+/* Smaller laptop screens: a narrower dock, so the map keeps its room */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .game-view {
+    --dock-width: 340px;
+  }
 }
 
 /*

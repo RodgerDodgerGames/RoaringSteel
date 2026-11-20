@@ -43,9 +43,9 @@ const WORLD_RING = [
  */
 const MASK_STYLE = {
   pane: MASK_PANE,
-  color: '#333',
-  weight: 1.5,
-  fillColor: '#555',
+  color: '#000000',
+  weight: 3,
+  fillColor: '#000000',
   fillOpacity: 0.45,
   interactive: false,
   pmIgnore: true,

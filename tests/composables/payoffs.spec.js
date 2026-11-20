@@ -246,13 +246,15 @@ describe('payoffs', () => {
     })
 
     it('should charge the climb along the line, as track pricing does', () => {
-      // 600 m over one 10 km cell is a 6% grade, two ordinary cells past the
-      // ruling grade, charged in the cell it climbs into
+      // A climb over one cell at three times the ruling grade: two ordinary
+      // cells past it, charged in the cell it climbs into. The height comes
+      // from the ruling grade, so retuning it does not break the test.
+      const top = 3 * gameRules.trackPrice.climb.rulingGrade * CELL_METERS
       const grid = makeTestGrid({
         rows: 1,
         cols: 3,
         south: -CELL / 2,
-        cell: (row, col) => ({ landCover: 100, elevation: col === 0 ? 0 : 600 })
+        cell: (row, col) => ({ landCover: 100, elevation: col === 0 ? 0 : top })
       })
 
       expect(haulPrice(townAt('A', 0), townAt('B', 2), board(grid))).toBe(

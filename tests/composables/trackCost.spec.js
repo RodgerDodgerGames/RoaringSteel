@@ -390,8 +390,18 @@ describe('trackCost', () => {
     const BRIDGE = gameRules.bridges.perSpeedUnit
 
     /**
-     * A row of cells of land cover 100, at the heights given, west to east.
-     * The cells are 10 km apart, so 200 m between neighbors is a 2% grade.
+     * How high to climb over one cell to make a grade some multiple of the
+     * ruling grade. Worked out from the rule rather than written in meters,
+     * so these tests check the climb rule, not whatever the ruling grade is
+     * tuned to today.
+     * @param {number} times - The grade, in ruling grades
+     * @returns {number} Meters
+     */
+    const rulingClimb = (times) => times * gameRules.trackPrice.climb.rulingGrade * CELL_METERS
+
+    /**
+     * A row of cells of land cover 100, at the heights given, west to east,
+     * one cell apart.
      * @param {Array<number|string>} heights - Each cell's height in meters,
      *   or 'W' for lake or sea
      * @returns {Object} The grid
@@ -408,9 +418,10 @@ describe('trackCost', () => {
       })
 
     it('should charge a climb past the ruling grade in the cell it climbs into', () => {
-      // 600 m over 10 km is a 6% grade: twice past the 2% ruling grade, so
-      // two extra cells of ordinary ground
-      const grid = rowAtHeights([0, 600, 600])
+      // Three times the ruling grade: twice past it, so two extra cells of
+      // ordinary ground
+      const top = rulingClimb(3)
+      const grid = rowAtHeights([0, top, top])
       const extra = 2 * gameRules.trackPrice.openGroundCost
 
       expect(linePrice([centerOf(0), centerOf(2)], board(grid)).total).toBe(300 + extra)
@@ -425,7 +436,7 @@ describe('trackCost', () => {
     })
 
     it('should charge nothing for a climb no steeper than the ruling grade', () => {
-      const grid = rowAtHeights([0, 200, 400])
+      const grid = rowAtHeights([0, rulingClimb(1), rulingClimb(2)])
 
       expect(linePrice([centerOf(0), centerOf(2)], board(grid)).total).toBe(300)
     })
@@ -456,7 +467,8 @@ describe('trackCost', () => {
     })
 
     it('should weigh the climb by the climb knob', () => {
-      const grid = rowAtHeights([0, 600])
+      // Three times the ruling grade: two extra cells, at half weight
+      const grid = rowAtHeights([0, rulingClimb(3)])
       Object.assign(gameRules.trackPrice.knobs, { landCover: 1, roughness: 0, climb: 0.5 })
 
       expect(linePrice([centerOf(0), centerOf(1)], board(grid)).total).toBe(

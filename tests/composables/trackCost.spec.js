@@ -70,11 +70,32 @@ const board = (grid, priceScale = 1, rivers = null) => ({
 // The knobs are meant to be edited after playtests. Every test here starts
 // them at 1, so a level cell at a price scale of 1 costs its land cover, and
 // the tests check the rules rather than today's tuning.
+//
+// The cap is tuning too: it may be set so high that it never binds (999, "no
+// cap", since 2026-11-19). The tests of the cap set one that binds, with
+// `pinCap`, and every test puts the configured cap back when it ends.
 let restoreKnobs
+let savedCap
 beforeEach(() => {
   restoreKnobs = pinKnobs(1)
+  savedCap = gameRules.trackPrice.maxTerrainFactor
 })
-afterEach(() => restoreKnobs())
+afterEach(() => {
+  restoreKnobs()
+  gameRules.trackPrice.maxTerrainFactor = savedCap
+})
+
+/**
+ * Sets the cap to Empire Builder's own: its alpine mileposts, its dearest
+ * ground, cost 5 times its clear ones. The cap tests need one low enough to
+ * reach with the ground they build, whatever the cap is tuned to today.
+ * (The hooks above put the configured cap back after each test.)
+ * @returns {number} The cap, as a factor of ordinary ground
+ */
+function pinCap() {
+  gameRules.trackPrice.maxTerrainFactor = 5
+  return gameRules.trackPrice.maxTerrainFactor
+}
 
 /**
  * The center of a cell in `rowOfCells`.
@@ -355,8 +376,7 @@ describe('trackCost', () => {
     })
 
     it('should cap a cell at the dearest ground, however steep', () => {
-      const { openGroundCost, maxTerrainFactor } = gameRules.trackPrice
-      const cap = maxTerrainFactor * openGroundCost
+      const cap = pinCap() * gameRules.trackPrice.openGroundCost
       const grid = rowOfCells([cap, 10 * cap, 0], [0, 0, 1])
 
       expect(linePrice([centerOf(0)], board(grid, 1)).total).toBe(cap)
@@ -513,7 +533,8 @@ describe('trackCost', () => {
     })
 
     it('should cap a cell at the dearest ground, priced at the land cover knob', () => {
-      const { openGroundCost, maxTerrainFactor } = gameRules.trackPrice
+      const maxTerrainFactor = pinCap()
+      const { openGroundCost } = gameRules.trackPrice
       Object.assign(gameRules.trackPrice.knobs, { landCover: 0.5, roughness: 0.15, climb: 0.5 })
 
       expect(terrainCost(450, 2, 0.2)).toBeCloseTo(maxTerrainFactor * 0.5 * openGroundCost, 9)
@@ -531,8 +552,7 @@ describe('trackCost', () => {
     })
 
     it('should price capped ground at the cap times the knob when the knobs match', () => {
-      const { openGroundCost, maxTerrainFactor } = gameRules.trackPrice
-      const cap = maxTerrainFactor * openGroundCost
+      const cap = pinCap() * gameRules.trackPrice.openGroundCost
       Object.assign(gameRules.trackPrice.knobs, { landCover: 0.5, roughness: 0.5, climb: 0.5 })
 
       expect(terrainCost(800, 1, 0.5)).toBeCloseTo(0.5 * cap, 9)

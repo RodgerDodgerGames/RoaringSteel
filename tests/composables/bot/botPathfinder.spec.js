@@ -366,21 +366,39 @@ describe('reachableFrom', () => {
   /** The center of a cell in the middle row */
   const middleOf = (col) => ({ lat: 1.5 * CELL, lng: (col + 0.5) * CELL })
 
+  /**
+   * The most water cells in a row the priced search plans a bridge over
+   * (`MAX_SEARCH_BRIDGE_CELLS` in botPathfinder.js). If that limit grows, the
+   * first test below fails at its `costTo`, and this needs raising with it.
+   */
+  const SEARCH_BRIDGE_CELLS = 6
+
   it('crosses water as wide as the rules allow a bridge, past the longest the priced search plans', () => {
-    // 3 speed units of 3 cells each: a bridge of 9 cells, where the priced
-    // search stops at 6
-    const grid = strait(8)
-    const board = boardOf(grid, 3)
-    expect(maxBridgeCells(grid, 3 * SPEED_UNIT_KM)).toBe(9)
-    expect(reachableFrom(board, [middleOf(0)])(middleOf(13))).toBe(true)
-    expect(costField(board, [middleOf(0)]).costTo(middleOf(13))).toBe(Infinity)
+    // A speed unit wide enough that a bridge spans more than the priced
+    // search plans, whatever a bridge may span today, and water one cell
+    // wider than the search goes
+    const { maxSpeedUnits } = gameRules.bridges
+    const speedUnitCells = Math.ceil((SEARCH_BRIDGE_CELLS + 1) / maxSpeedUnits)
+    const waterCells = SEARCH_BRIDGE_CELLS + 1
+    const grid = strait(waterCells)
+    const board = boardOf(grid, speedUnitCells)
+    const farShore = middleOf(6 + waterCells - 1)
+
+    expect(maxBridgeCells(grid, speedUnitCells * SPEED_UNIT_KM)).toBe(
+      maxSpeedUnits * speedUnitCells
+    )
+    expect(maxSpeedUnits * speedUnitCells).toBeGreaterThanOrEqual(waterCells)
+    expect(reachableFrom(board, [middleOf(0)])(farShore)).toBe(true)
+    expect(costField(board, [middleOf(0)]).costTo(farShore)).toBe(Infinity)
   })
 
   it('does not cross water wider than a bridge may span', () => {
-    // A bridge of 3 cells, over 4 of water
-    const reaches = reachableFrom(boardOf(strait(4), 1), [middleOf(0)])
+    // A speed unit one cell wide, so a bridge spans `maxSpeedUnits` cells,
+    // over one cell more than that
+    const waterCells = gameRules.bridges.maxSpeedUnits + 1
+    const reaches = reachableFrom(boardOf(strait(waterCells), 1), [middleOf(0)])
     expect(reaches(middleOf(2))).toBe(true)
-    expect(reaches(middleOf(9))).toBe(false)
+    expect(reaches(middleOf(6 + waterCells - 1))).toBe(false)
   })
 
   it('stays inside the region', () => {

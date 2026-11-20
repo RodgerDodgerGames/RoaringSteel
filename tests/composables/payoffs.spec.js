@@ -286,15 +286,22 @@ describe('payoffs', () => {
     })
 
     it("should end a stretch of water at a town's cell, still bridging the cell", () => {
-      // Five water cells in a row, a town on the middle one
-      const grid = rowOf([100, 'W', 'W', 'W', 'W', 'W', 100])
+      // Two bridges' worth of water and one cell more, with a town on the
+      // middle cell, whatever a bridge may span today
+      const water = Array(2 * MAX_BRIDGE_CELLS + 1).fill('W')
+      const grid = rowOf([100, ...water, 100])
+      const townCell = MAX_BRIDGE_CELLS + 1
       const from = townAt('A', 0)
-      const to = townAt('B', 6)
+      const to = townAt('B', water.length + 1)
 
-      // Without the town: one stretch, two cells past what a bridge spans
-      expect(haulPrice(from, to, board(grid))).toBe(200 + 3 * BRIDGE + 2 * (BRIDGE / 2))
-      // With it: two stretches of two, each bridged, and the town's cell bridged too
-      expect(haulPrice(from, to, board(grid, { townCells: [3] }))).toBe(200 + 5 * BRIDGE)
+      // Without the town: one stretch, the cells past what a bridge spans at half a bridge each
+      expect(haulPrice(from, to, board(grid))).toBe(
+        200 + MAX_BRIDGE_CELLS * BRIDGE + (MAX_BRIDGE_CELLS + 1) * (BRIDGE / 2)
+      )
+      // With it: two stretches a bridge long, each bridged, and the town's cell bridged too
+      expect(haulPrice(from, to, board(grid, { townCells: [townCell] }))).toBe(
+        200 + water.length * BRIDGE
+      )
     })
 
     it('should charge ordinary ground for a cell whose terrain did not load', () => {

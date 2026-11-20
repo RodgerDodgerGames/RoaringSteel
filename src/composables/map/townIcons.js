@@ -52,9 +52,9 @@ const SHAPE_MARKUP = {
  * are easy to tell apart when zoomed in.
  */
 export const TOWN_ICONS = {
-  small: { shape: 'circle', size: 20, planSize: 16 },
-  medium: { shape: 'square', size: 26, planSize: 20 },
-  large: { shape: 'hexagon', size: 32, planSize: 24 }
+  small: { shape: 'circle', size: 20, planSize: 14 },
+  medium: { shape: 'square', size: 26, planSize: 18 },
+  large: { shape: 'hexagon', size: 32, planSize: 22 }
 }
 
 /**

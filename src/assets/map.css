@@ -19,6 +19,18 @@
   stroke: #fff;
 }
 
+/* Town shapes in the Plan view */
+.is-plan-view .town-shape__fill circle,
+.is-plan-view .town-shape__fill rect {
+  stroke-width: 2;
+}
+
+.is-plan-view .town-shape__fill polygon {
+  stroke-width: 1.5;
+}
+
+
+
 /* town tooltip (town display names under the icon), in small bold
    capitals like the names on the Empire Builder board */
 .town-tooltip {

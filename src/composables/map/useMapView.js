@@ -244,8 +244,13 @@ export function useMapView() {
   // the view while the region is briefly gone, so the view can only be put
   // right once the save's region is back. Synchronous, so the map is already
   // in the Build view by the time a drawing that switched it there starts
-  // (see useBuildTrack).
-  watch([() => mapStore.viewMode, bounds], showView, { flush: 'sync' })
+  // (see useBuildTrack). And on a turn passing to someone in the same view
+  // as the player before them, which leaves the view itself unchanged (see
+  // the map store's `viewHandoffs`): the Build view moves to the next
+  // player's own spot.
+  watch([() => mapStore.viewMode, bounds, () => mapStore.viewHandoffs], showView, {
+    flush: 'sync'
+  })
 
   onBeforeUnmount(() => {
     map?.off('moveend', handleMoveEnd)

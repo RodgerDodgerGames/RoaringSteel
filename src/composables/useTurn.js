@@ -8,7 +8,9 @@
  * victory.js) — a win made by building the last link to a city shows up
  * here. Once someone has won, no more turns are played. The finished turn
  * goes into the turn history (see the history store) as play moves on; a
- * winning turn has gone in already, as the win was declared.
+ * winning turn has gone in already, as the win was declared. The map is
+ * handed on with the turn: the next person sees the view they left it in
+ * (see the map store's `passView`).
  *
  * A player may instead give up their turn to throw in their hand of demand
  * cards for a new one (`discardHand`), as long as they have not yet done
@@ -34,6 +36,7 @@ import { useTrainsStore } from '@/stores/trains'
 import { useDemandCardsStore } from '@/stores/demandCards'
 import { useTrainStopStore } from '@/stores/trainStop'
 import { useHistoryStore } from '@/stores/history'
+import { useMapStore } from '@/stores/map'
 import { useVictory } from '@/composables/victory'
 import { useGamePersistence } from '@/composables/useGamePersistence'
 import { turnAfter } from '@/composables/turnOrder'
@@ -53,6 +56,7 @@ export function useTurn({ buildTrack = null } = {}) {
   const demandCardsStore = useDemandCardsStore()
   const trainStopStore = useTrainStopStore()
   const historyStore = useHistoryStore()
+  const mapStore = useMapStore()
   const { autoSave } = useGamePersistence()
   const { checkForWinner } = useVictory()
 
@@ -104,7 +108,8 @@ export function useTurn({ buildTrack = null } = {}) {
     // Read before anything changes: once the turn moves, these describe the
     // next player's turn instead
     const { endsRound } = upNext.value
-    const finishingId = playerStore.activePlayer?.id
+    const finishing = playerStore.activePlayer
+    const finishingId = finishing?.id
 
     // A win ends the game where it stands: the turn is not passed on
     if (finishingId !== undefined && checkForWinner(finishingId)) {
@@ -113,6 +118,11 @@ export function useTurn({ buildTrack = null } = {}) {
     }
 
     if (!playerStore.setActivePlayer(nextPlayer.value.id)) return false
+
+    // The finishing player's view is kept for them and the next player's put
+    // up. Before the auto-save below, so the save holds both where they stand
+    // now.
+    mapStore.passView(finishing, playerStore.activePlayer)
 
     // Closed before the round moves on: the history files the turn under
     // the round it was played in, and reads that round's track off the board

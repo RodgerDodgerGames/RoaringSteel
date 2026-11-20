@@ -300,6 +300,35 @@ describe('useGamePersistence', () => {
     })
   })
 
+  describe("each player's map view", () => {
+    it('should bring back the view each player left the map in, for their next turn', async () => {
+      const mapStore = useMapStore()
+      const [alice, bob] = playerStore.players
+      mapStore.setViewMode(BUILD_VIEW)
+      mapStore.setMapView({ zoom: 9, center: [39.7, -105] })
+      mapStore.passView(alice, bob)
+      await persistence.autoSave()
+
+      await loadLatest()
+      mapStore.passView(playerStore.players[1], playerStore.players[0])
+
+      expect(mapStore.viewMode).toBe(BUILD_VIEW)
+      expect(mapStore.mapZoom).toBe(9)
+      expect(mapStore.mapCenter).toEqual([39.7, -105])
+    })
+
+    it('should still open a loaded game in the Plan view', async () => {
+      const mapStore = useMapStore()
+      mapStore.setPlayerViews({ 1: { view: BUILD_VIEW, zoom: 9, center: [39.7, -105] } })
+      mapStore.setViewMode(BUILD_VIEW)
+      await persistence.autoSave()
+
+      await loadLatest()
+
+      expect(mapStore.viewMode).toBe(PLAN_VIEW)
+    })
+  })
+
   describe('saves from other versions', () => {
     it('should refuse a save from an older version of the game', async () => {
       const save = persistence.serializeGameState()

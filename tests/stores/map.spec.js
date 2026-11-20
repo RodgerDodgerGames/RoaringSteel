@@ -4,6 +4,7 @@
  * Tests for the map state store including:
  * - Map reference management
  * - The Plan and Build views, and where the Build view was left
+ * - Each person's own view, handed back to them as their turn comes round
  * - Drawing state management
  * - Towns layer management
  * - Holding real Leaflet objects without leaking their listeners
@@ -98,6 +99,14 @@ describe('Map Store', () => {
       expect(mapStore.viewMode).toBe(PLAN_VIEW)
       expect(mapStore.mapZoom).toBeNull()
       expect(mapStore.mapCenter).toBeNull()
+    })
+
+    it("should forget every player's kept view", () => {
+      mapStore.passView({ id: 1, isBot: false }, { id: 2, isBot: false })
+
+      mapStore.reset()
+
+      expect(mapStore.playerViews).toEqual({})
     })
   })
 
@@ -216,6 +225,165 @@ describe('Map Store', () => {
       mapStore.clearBuildFocus()
 
       expect(mapStore.buildFocus).toBeNull()
+    })
+  })
+
+  describe('passView', () => {
+    const ann = { id: 1, isBot: false }
+    const bob = { id: 2, isBot: false }
+    const bot = { id: 3, isBot: true }
+
+    /** Puts the map where a player looking over Denver in the Build view has it */
+    function lookOverDenver() {
+      mapStore.setViewMode(BUILD_VIEW)
+      mapStore.setMapView({ zoom: 9, center: [39.7, -105] })
+    }
+
+    it('should give a person back the view they ended their last turn in, Build position and all', () => {
+      lookOverDenver()
+      mapStore.passView(ann, bob)
+      mapStore.passView(bob, ann)
+
+      expect(mapStore.viewMode).toBe(BUILD_VIEW)
+      expect(mapStore.mapZoom).toBe(9)
+      expect(mapStore.mapCenter).toEqual([39.7, -105])
+    })
+
+    it('should show the Plan view to someone who has not ended a turn yet', () => {
+      lookOverDenver()
+
+      mapStore.passView(ann, bob)
+
+      expect(mapStore.viewMode).toBe(PLAN_VIEW)
+    })
+
+    it("should not open someone's Build view over the last player's spot", () => {
+      lookOverDenver()
+
+      mapStore.passView(ann, bob)
+
+      expect(mapStore.mapZoom).toBeNull()
+      expect(mapStore.mapCenter).toBeNull()
+    })
+
+    it("should keep each person's Build position apart from the others'", () => {
+      lookOverDenver()
+      mapStore.passView(ann, bob)
+      // Bob looks elsewhere, then ends his turn in the Plan view
+      mapStore.setViewMode(BUILD_VIEW)
+      mapStore.setMapView({ zoom: 8, center: [38.3, -104.6] })
+      mapStore.setViewMode(PLAN_VIEW)
+      mapStore.passView(bob, ann)
+
+      expect(mapStore.mapCenter).toEqual([39.7, -105])
+
+      mapStore.passView(ann, bob)
+
+      // Bob is back in the Plan view he ended in, his own Build spot kept
+      expect(mapStore.viewMode).toBe(PLAN_VIEW)
+      expect(mapStore.mapZoom).toBe(8)
+      expect(mapStore.mapCenter).toEqual([38.3, -104.6])
+    })
+
+    it("should show a computer player's turn in the Plan view", () => {
+      lookOverDenver()
+
+      mapStore.passView(ann, bot)
+
+      expect(mapStore.viewMode).toBe(PLAN_VIEW)
+    })
+
+    it("should hand a person their own view after a computer player's turn", () => {
+      lookOverDenver()
+      mapStore.passView(ann, bot)
+      mapStore.passView(bot, ann)
+
+      expect(mapStore.viewMode).toBe(BUILD_VIEW)
+      expect(mapStore.mapCenter).toEqual([39.7, -105])
+    })
+
+    it('should keep no view for a computer player', () => {
+      mapStore.passView(bot, ann)
+
+      expect(mapStore.playerViews).not.toHaveProperty(String(bot.id))
+    })
+
+    it('should leave the view as it was for a player who plays again', () => {
+      lookOverDenver()
+
+      mapStore.passView(ann, ann)
+
+      expect(mapStore.viewMode).toBe(BUILD_VIEW)
+      expect(mapStore.mapZoom).toBe(9)
+      expect(mapStore.mapCenter).toEqual([39.7, -105])
+    })
+
+    it('should signal a move when the next player is in the same view as the last', () => {
+      // Both in the Build view: the view does not change, but the spot does
+      lookOverDenver()
+      mapStore.passView(ann, bob)
+      mapStore.setViewMode(BUILD_VIEW)
+      mapStore.passView(bob, ann)
+      const before = mapStore.viewHandoffs
+
+      mapStore.passView(ann, bob)
+
+      expect(mapStore.viewHandoffs).toBe(before + 1)
+    })
+
+    it('should drop a point the Build view was to open over', () => {
+      mapStore.showInBuildView([39.74, -104.99])
+
+      mapStore.passView(ann, bob)
+
+      expect(mapStore.buildFocus).toBeNull()
+    })
+  })
+
+  describe('setPlayerViews', () => {
+    it("should put back each person's kept view from a save", () => {
+      mapStore.setPlayerViews({ 2: { view: BUILD_VIEW, zoom: 9, center: [39.7, -105] } })
+
+      mapStore.passView({ id: 1, isBot: false }, { id: 2, isBot: false })
+
+      expect(mapStore.viewMode).toBe(BUILD_VIEW)
+      expect(mapStore.mapZoom).toBe(9)
+    })
+
+    it('should keep no views from a save that has none', () => {
+      mapStore.setPlayerViews({ 2: { view: BUILD_VIEW } })
+
+      mapStore.setPlayerViews(undefined)
+
+      expect(mapStore.playerViews).toEqual({})
+    })
+
+    it('should keep no views from a save whose views cannot be read', () => {
+      mapStore.setPlayerViews([{ view: BUILD_VIEW }])
+
+      expect(mapStore.playerViews).toEqual({})
+    })
+
+    it('should keep the view of someone who had not opened the Build view yet', () => {
+      mapStore.setPlayerViews({ 2: { view: PLAN_VIEW, zoom: null, center: null } })
+
+      expect(mapStore.playerViews).toHaveProperty('2')
+    })
+
+    it.each([
+      ['a view nothing knows how to show', { view: 'satellite', zoom: 9, center: [39.7, -105] }],
+      ['a center that is not [lat, lng]', { view: BUILD_VIEW, zoom: 9, center: { lat: 39.7 } }],
+      ['a center with a gap in it', { view: BUILD_VIEW, zoom: 9, center: [39.7, null] }],
+      ['a zoom that is not a number', { view: BUILD_VIEW, zoom: 'close', center: [39.7, -105] }]
+    ])('should show the Plan view to someone whose saved view has %s', (_, kept) => {
+      mapStore.setPlayerViews({ 2: kept, 3: { view: BUILD_VIEW, zoom: 9, center: [38, -104] } })
+
+      mapStore.passView({ id: 1, isBot: false }, { id: 2, isBot: false })
+
+      expect(mapStore.viewMode).toBe(PLAN_VIEW)
+      expect(mapStore.mapCenter).toBeNull()
+      // The rest of the save's views are kept
+      expect(mapStore.playerViews).toHaveProperty('3')
     })
   })
 

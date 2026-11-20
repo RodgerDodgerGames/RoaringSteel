@@ -178,7 +178,16 @@ export default function useBuildTrack(formatCurrency) {
    * is someone else's, and the track builder would refuse it. The End turn
    * button builds it first, while the turn is still the drawing player's
    * (see `stopDrawing`), so this only catches a turn that ended some other
-   * way.
+   * way, such as throwing in the hand.
+   *
+   * Synchronous, so the line is thrown away the moment the turn passes. Right
+   * after that, ending the turn hands the map to the next player's view (see
+   * the map store's `passView`), and a switch to the Plan view builds a line
+   * in progress (see the view watcher below). Left to the end of the tick,
+   * this ran after that switch, and the half-drawn line was built and charged
+   * to the next player. Handing the turn over can set off this watcher twice
+   * (the old player's turn is cleared, then the new one's set); everything
+   * here is safe to do twice.
    *
    * Completed track layers are deliberately left on the map; the segments
    * behind them are already recorded in the track store.
@@ -189,7 +198,8 @@ export default function useBuildTrack(formatCurrency) {
       if (isDrawingActive.value) cancelDrawing()
       stopRemoving()
       resetLineTracking()
-    }
+    },
+    { flush: 'sync' }
   )
 
   /**

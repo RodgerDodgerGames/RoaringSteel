@@ -89,7 +89,10 @@ export function useGamePersistence() {
       players: playerStore.players,
       mapView: {
         zoom: mapStore.mapZoom,
-        center: mapStore.mapCenter
+        center: mapStore.mapCenter,
+        // The view each person left the map in, for their next turn (see
+        // the map store's `playerViews`)
+        players: mapStore.playerViews
       },
       towns: townsStore.towns,
       // What the grid was built from, by which a load finds it again (see
@@ -173,7 +176,12 @@ export function useGamePersistence() {
       trackStore.setTrack(data.track)
       trainsStore.setTrains(data.trains)
       historyStore.setHistory(data.history)
-      if (data.mapView) mapStore.setMapView(data.mapView)
+      // The game still opens in the Plan view (the reset above put it there);
+      // the kept views come into play as turns pass
+      if (data.mapView) {
+        mapStore.setMapView(data.mapView)
+        mapStore.setPlayerViews(data.mapView.players)
+      }
       // A save's settings replace the browser's (the player chose this: a game
       // picks up looking as it was saved)
       settingsStore.applySettings(data.settings)

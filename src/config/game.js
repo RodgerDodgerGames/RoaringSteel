@@ -115,11 +115,11 @@ export const gameRules = {
    * prices down by about a seventh, leaving Minnesota's nearly as they were.
    */
   trackPrice: {
-    perSpeedUnit: 1000,
+    perSpeedUnit: 900,
     openGroundCost: 450,
     roughnessCost: 4500,
     climb: {
-      rulingGrade: 0.02
+      rulingGrade: 0.014
     },
     maxTerrainFactor: 999, // essentially no cap
     knobs: {

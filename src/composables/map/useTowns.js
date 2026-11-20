@@ -420,8 +420,10 @@ export function useTowns() {
         // would also stop track from snapping to the town.
         marker.pm.setOptions({ allowRemoval: false })
 
-        // Bind a tooltip to display the town's name
-        marker.bindTooltip(feature.properties.name.split('-')[0], {
+        // Bind a tooltip to display the town's name, whole: a hyphen is part
+        // of it, as in Winston-Salem, or joins the cities of a merged town,
+        // as in Raleigh-Durham (see townSpacing.js)
+        marker.bindTooltip(feature.properties.name, {
           permanent: true, // Make the tooltip always visible
           direction: 'center',
           className: 'town-tooltip',

@@ -37,13 +37,20 @@ export function sizeCounts(count, shares = townSizeConfig) {
 
 /**
  * Gives each town its size: "large", "medium" or "small".
+ *
+ * How many of each there are is normally set by how many towns there are.
+ * They can be given instead: merging close cities (see townSpacing.js)
+ * sizes the towns with counts it is handed, and keeps those same counts
+ * when it sizes them again after the merge.
+ *
  * @param {Array<Object>} towns - The board's towns, each with a population
- * @param {{largeShare: number, mediumShare: number}} [shares] - See `sizeCounts`
+ * @param {{large: number, medium: number}} [counts] - How many major cities
+ *   and medium towns to make; `sizeCounts` for these towns if left out
  * @returns {Array<Object>} The same towns, each with its `size` set, biggest
  *   first
  */
-export function assignSizes(towns, shares = townSizeConfig) {
-  const { large, medium } = sizeCounts(towns.length, shares)
+export function assignSizes(towns, counts = sizeCounts(towns.length)) {
+  const { large, medium } = counts
   const ranked = [...towns].sort((a, b) => b.population - a.population)
   ranked.forEach((town, rank) => {
     town.size = rank < large ? 'large' : rank < large + medium ? 'medium' : 'small'

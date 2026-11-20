@@ -14,8 +14,12 @@
  *   network grows out of one (see startRule.js). "On" means anywhere along
  *   it: at an end or bend, or part way along a leg, where the new section
  *   joins the network as a junction (see network.js);
- * - keep to the build rules (inside the region, bridges, spacing — see
- *   buildRules.js);
+ * - keep out of towns that are full, with the game setting that limits how
+ *   many players may build into a town on: a full town can be neither
+ *   started in nor built into or through by a player not already in it
+ *   (see townLimits.js);
+ * - keep to the build rules (inside the region, bridges, spacing, full
+ *   towns — see buildRules.js);
  * - cost no more than the player has left to spend this turn, in cash and
  *   in allowance (see the player store).
  *
@@ -41,13 +45,15 @@ import {
   blockMessage,
   boardRulesFor,
   builtLegs,
-  trackIndex
+  trackIndex,
+  closedCells
 } from '@/composables/map/buildRules'
 import { isEmptyGrid } from '@/composables/map/cellGrid'
-import { pointKey, liesOnTrack } from '@/composables/network'
+import { pointKey, townKey, liesOnTrack } from '@/composables/network'
 import { formatCurrency } from '@/composables/utils'
 import { startTowns, startRuleMessage } from '@/composables/startRule'
 import { affordableSection } from '@/composables/bot/botPathfinder'
+import { buildersByTown, closedTowns, townFullMessage } from '@/composables/townLimits'
 
 export function useTrackBuilder() {
   const gameStore = useGameStore()
@@ -90,22 +96,95 @@ export function useTrackBuilder() {
       gameStore.region
     )
   )
+  const builtTrack = computed(() =>
+    trackIndex(builtLegs(trackStore.segments).map((leg) => leg.map((point) => toRaw(point))))
+  )
+
+  /**
+   * Which players have built into each town (see `buildersByTown`), worked
+   * out once per change to the towns or track rather than on every move of
+   * the cursor.
+   */
+  const builders = computed(() =>
+    buildersByTown(
+      townsStore.towns,
+      trackStore.segments.map((segment) => toRaw(segment))
+    )
+  )
+
+  /**
+   * The towns closed to a player (see townLimits.js): full, with them not
+   * among the players in them. None when this game does not limit how many
+   * players may build into a town.
+   * @param {number} playerId - The player
+   * @returns {Array<{town: Object, limit: number, playerCount: number}>} The
+   *   closed towns
+   */
+  function closedTownsFor(playerId) {
+    if (!gameStore.gameSettings.limitTownBuilders) return []
+    return closedTowns(townsStore.towns, builders.value, playerId, playerStore.players.length)
+  }
+
+  /**
+   * Why a player may not start a section in a town they could otherwise
+   * start in (see startRule.js): it is full, and they are not in it. In
+   * words, for the player; null if the point is not such a town. A town the
+   * start rule rules out anyway (a small town, when track must start in a
+   * major city) gives null, so the player is told the start rule instead.
+   * @param {number} playerId - The player
+   * @param {{lat: number, lng: number}} point - The point
+   * @returns {string|null} The message, or null
+   */
+  function fullTownAt(playerId, point) {
+    const key = pointKey(point)
+    if (!startKeys.value.towns.has(key)) return null
+    const closed = closedTownsFor(playerId).find(({ town }) => townKey(town) === key)
+    return closed ? townFullMessage(closed) : null
+  }
+
+  /**
+   * The towns a player may still build into: every town but those closed to
+   * them.
+   * @param {number} playerId - The player
+   * @returns {Array<Object>} The towns
+   */
+  function openTowns(playerId) {
+    const closed = new Set(closedTownsFor(playerId).map(({ town }) => town))
+    return townsStore.towns.filter((town) => !closed.has(town))
+  }
+
+  /**
+   * The cells of the towns closed to the player whose turn it is (see
+   * `closedCells`). Track is only ever built by that player (see
+   * `buildSection`), whether drawn on the map or planned by a computer
+   * player on its turn, so the build rules are always theirs.
+   */
+  const activeClosedCells = computed(() =>
+    closedCells(closedTownsFor(playerStore.activePlayer?.id), gridStore.grid)
+  )
+
+  /**
+   * The rules every line is checked against: the board's, the track built so
+   * far, and the towns closed to the player whose turn it is. Each part is
+   * worked out on its own, so a new turn does not index the track again, nor
+   * building track work the board out again.
+   */
   const buildRules = computed(() => ({
     ...boardRules.value,
-    builtTrack: trackIndex(
-      builtLegs(trackStore.segments).map((leg) => leg.map((point) => toRaw(point)))
-    )
+    builtTrack: builtTrack.value,
+    closedCells: activeClosedCells.value
   }))
 
   /**
    * Every point a player may start a section from: each town track may start
-   * in (see startRule.js), and every point their own track is drawn through — its ends, and its bends,
-   * so a branch can leave a line part way along.
+   * in (see startRule.js) that is not closed to them (see townLimits.js),
+   * and every point their own track is drawn through — its ends, and its
+   * bends, so a branch can leave a line part way along.
    * @param {number} playerId - The player
    * @returns {Array<{lat: number, lng: number}>} The points
    */
   function startPoints(playerId) {
-    const towns = startTowns(townsStore.towns, requireMajorCity()).map((town) => ({
+    const towns = startTowns(openTowns(playerId), requireMajorCity()).map((town) => ({
       lat: town.lat,
       lng: town.lon
     }))
@@ -136,9 +215,13 @@ export function useTrackBuilder() {
 
   /**
    * Whether a player may start a section at a point: in a town they may
-   * start in, or anywhere on their own track — at one of its points, or part
-   * way along a leg (see network.js's `liesOnTrack`). The quick check of the
-   * points comes first; looking along every leg is only needed off them.
+   * start in that is not full to them, or anywhere on their own track — at
+   * one of its points, or part way along a leg (see network.js's
+   * `liesOnTrack`). The quick check of the points comes first; looking along
+   * every leg is only needed off them.
+   *
+   * A town is never closed to a player with track at it, so their own
+   * points are checked before whether a town is full.
    * @param {number} playerId - The player
    * @param {{lat: number, lng: number}} point - Where the section would start
    * @returns {boolean} True if they may start there
@@ -146,7 +229,8 @@ export function useTrackBuilder() {
   function canStartAt(playerId, point) {
     const key = pointKey(point)
     const { towns, own } = startKeys.value
-    if (towns.has(key) || own.get(playerId)?.has(key)) return true
+    if (own.get(playerId)?.has(key)) return true
+    if (towns.has(key)) return !fullTownAt(playerId, point)
     return liesOnTrack(point, trackStore.segmentsForOwner(playerId))
   }
 
@@ -275,7 +359,11 @@ export function useTrackBuilder() {
     if (!Array.isArray(latlngs) || latlngs.length < 2) {
       return { ok: false, error: 'A section needs at least two points.' }
     }
-    if (!canStartAt(playerId, latlngs[0])) return { ok: false, error: startRule() }
+    // A full town is a place track could start but for the limit, so the
+    // player is told about the limit, not the start rule
+    if (!canStartAt(playerId, latlngs[0])) {
+      return { ok: false, error: fullTownAt(playerId, latlngs[0]) ?? startRule() }
+    }
 
     const blocked = whyNotBuildable(latlngs, { isFinished: true })
     if (blocked) return { ok: false, error: blocked }
@@ -328,6 +416,8 @@ export function useTrackBuilder() {
     buildRules,
     startPoints,
     canStartAt,
+    fullTownAt,
+    openTowns,
     priceSection,
     fitLine,
     whyNotBuildable,

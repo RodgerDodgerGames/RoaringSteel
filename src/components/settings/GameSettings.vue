@@ -17,6 +17,11 @@
 -->
 
 <script setup>
+import { builderLimitRows } from '@/composables/townLimits'
+
+/** The limits on building into towns, for the table under that setting */
+const limitRows = builderLimitRows()
+
 /** The settings, edited in place */
 const settings = defineModel({ type: Object, required: true })
 
@@ -44,5 +49,36 @@ defineProps({
       Off, a player's track may start in any town. On, every network grows out of a major city, as
       in Empire Builder.
     </p>
+  </div>
+
+  <div class="field">
+    <div class="control">
+      <label class="checkbox">
+        <input v-model="settings.limitTownBuilders" type="checkbox" :disabled="locked" />
+        Limit how many players may build into a town
+      </label>
+    </div>
+    <p class="help">
+      On, once a town has as many players' track in it as the table allows, no one else may build
+      into it. Major cities take everyone. Off, any player may build into any town.
+    </p>
+    <table class="table is-narrow is-size-7 mt-2">
+      <thead>
+        <tr>
+          <th>Players</th>
+          <th v-for="row in limitRows" :key="row.label">{{ row.label }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th>Small town</th>
+          <td v-for="row in limitRows" :key="row.label">{{ row.small }}</td>
+        </tr>
+        <tr>
+          <th>Medium town</th>
+          <td v-for="row in limitRows" :key="row.label">{{ row.medium }}</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </template>

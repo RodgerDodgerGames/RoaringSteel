@@ -8,7 +8,13 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { lineBlock, townCells, builtLegs, trackIndex } from '@/composables/map/buildRules'
+import {
+  lineBlock,
+  townCells,
+  builtLegs,
+  trackIndex,
+  closedCells
+} from '@/composables/map/buildRules'
 import { regionTest } from '@/composables/map/region'
 import { maxBridgeCells } from '@/composables/map/water'
 import { linePrice, cellPath } from '@/composables/map/trackCost'
@@ -90,6 +96,19 @@ describe('botPathfinder', () => {
       expect(lineBlock(line, rules, { isFinished: true })).toBeNull()
       expect(line[0]).toEqual(pointOf(townNamed('Alder')))
       expect(line.at(-1)).toEqual(pointOf(townNamed('Birch')))
+    })
+
+    it('should find no line into a town full to the player', () => {
+      const closed = [{ town: townNamed('Gum'), limit: 1, playerCount: 2 }]
+      const shutRules = { ...rules, closedCells: closedCells(closed, rules.grid) }
+      const shutBoard = searchBoard(shutRules, towns)
+      const alder = pointOf(townNamed('Alder'))
+
+      expect(planLine(shutBoard, [alder], pointOf(townNamed('Gum')))).toBeNull()
+      // Other towns are still reached, by lines that keep out of Gum's cell
+      const line = planLine(shutBoard, [alder], pointOf(townNamed('Cedar')))
+      expect(line).not.toBeNull()
+      expect(lineBlock(line, shutRules, { isFinished: true })).toBeNull()
     })
 
     it('should go round water too wide to bridge', () => {

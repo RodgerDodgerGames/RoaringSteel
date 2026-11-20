@@ -218,16 +218,17 @@ describe('settings store', () => {
 
   describe('gameSettingsFrom', () => {
     it('should pick out just the game settings', () => {
-      expect(gameSettingsFrom({ requireMajorCityStart: true, theme: 'dark' })).toEqual({
-        requireMajorCityStart: true
-      })
+      expect(
+        gameSettingsFrom({ requireMajorCityStart: true, limitTownBuilders: false, theme: 'dark' })
+      ).toEqual({ requireMajorCityStart: true, limitTownBuilders: false })
     })
 
     it('should give a missing or unusable game setting its default', () => {
-      expect(gameSettingsFrom(undefined)).toEqual({ requireMajorCityStart: false })
-      expect(gameSettingsFrom({ requireMajorCityStart: 'yes' })).toEqual({
-        requireMajorCityStart: false
-      })
+      const defaults = { requireMajorCityStart: false, limitTownBuilders: true }
+      expect(gameSettingsFrom(undefined)).toEqual(defaults)
+      expect(gameSettingsFrom({ requireMajorCityStart: 'yes', limitTownBuilders: 0 })).toEqual(
+        defaults
+      )
     })
   })
 })

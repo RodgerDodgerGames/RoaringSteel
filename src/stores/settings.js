@@ -63,14 +63,20 @@ export const DEFAULT_SETTINGS = Object.freeze({
    * Game setting: a player's track network must start in a major city, as
    * in Empire Builder. Off, any town will do (see startRule.js).
    */
-  requireMajorCityStart: false
+  requireMajorCityStart: false,
+  /**
+   * Game setting: a small or medium town takes only so many players' track,
+   * by how many players the game has; major cities take everyone's (see
+   * townLimits.js). Off, any player may build into any town.
+   */
+  limitTownBuilders: true
 })
 
 /**
  * The game settings: the settings a game is played by, copied into each new
  * game as it starts (see the game store's `gameSettings`).
  */
-export const GAME_SETTINGS = Object.freeze(['requireMajorCityStart'])
+export const GAME_SETTINGS = Object.freeze(['requireMajorCityStart', 'limitTownBuilders'])
 
 /**
  * Settings that belong to this browser alone: kept here, but never taken

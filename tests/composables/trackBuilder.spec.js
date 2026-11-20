@@ -4,12 +4,14 @@
  * The one way track is built, with or without the map: by the player whose
  * turn it is, starting in a town (only a major city, if the game says so) or
  * at the end of their own track, within the build rules, and paid for out of
- * cash and the turn's allowance.
+ * cash and the turn's allowance. With the game setting on, a town full to
+ * the player can be neither started in nor built into.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { useTrackBuilder } from '@/composables/trackBuilder'
 import { startRuleMessage } from '@/composables/startRule'
+import { townFullMessage } from '@/composables/townLimits'
 import { usePlayerStore } from '@/stores/players'
 import { useGameStore } from '@/stores/game'
 import { useGridStore } from '@/stores/grid'
@@ -214,6 +216,76 @@ describe('useTrackBuilder', () => {
     expect(result.ok).toBe(false)
     expect(playerStore.players[0].cash).toBe(40000)
     expect(playerStore.hasSpentThisTurn(ANN)).toBe(false)
+  })
+
+  describe('town limits', () => {
+    // Two players, so the small town at the east end takes one. Ann starts
+    // there, heading west part of the way.
+    const small = () => useTownsStore().towns[1]
+    const fullMessage = () => townFullMessage({ town: small(), limit: 1, playerCount: 2 })
+    /** From the major city, out north and back down into the small town's cell */
+    const roundToSmall = (end = centerOf(5)) => [
+      centerOf(0),
+      { lat: 2 * CELL, lng: centerOf(0).lng },
+      { lat: 2 * CELL, lng: centerOf(5).lng },
+      end
+    ]
+
+    beforeEach(() => {
+      builder.buildSection(ANN, [centerOf(5), centerOf(3)])
+      playerStore.setActivePlayer(BO)
+    })
+
+    it('should not let another player build into a full town, and say why', () => {
+      expect(builder.buildSection(BO, roundToSmall())).toEqual({ ok: false, error: fullMessage() })
+      expect(trackStore.segmentsForOwner(BO)).toEqual([])
+    })
+
+    it("should not let another player through a full town's cell without joining it", () => {
+      const besideTown = { lat: 0, lng: centerOf(5).lng + 0.3 * CELL }
+
+      expect(builder.buildSection(BO, roundToSmall(besideTown)).error).toBe(fullMessage())
+    })
+
+    it('should not let another player start in a full town, and say why', () => {
+      const south = { lat: -2 * CELL, lng: centerOf(5).lng }
+
+      expect(builder.canStartAt(BO, centerOf(5))).toBe(false)
+      expect(builder.fullTownAt(BO, centerOf(5))).toBe(fullMessage())
+      expect(builder.buildSection(BO, [centerOf(5), south]).error).toBe(fullMessage())
+      expect(builder.startPoints(BO)).not.toContainEqual({ lat: 0, lng: centerOf(5).lng })
+      expect(builder.openTowns(BO).map(({ name }) => name)).toEqual(['Big'])
+    })
+
+    it('should let the player already in a full town keep building there', () => {
+      playerStore.setActivePlayer(ANN)
+
+      expect(builder.fullTownAt(ANN, centerOf(5))).toBeNull()
+      expect(
+        builder.buildSection(ANN, [centerOf(5), { lat: -2 * CELL, lng: centerOf(5).lng }]).ok
+      ).toBe(true)
+    })
+
+    it('should open the town again once its player tears up their track there', () => {
+      trackStore.removeSegment(trackStore.segmentsForOwner(ANN)[0].id)
+
+      expect(builder.buildSection(BO, roundToSmall()).ok).toBe(true)
+    })
+
+    it('should give the start rule, not the limit, for a full town the rule rules out anyway', () => {
+      useGameStore().setGameSettings({ requireMajorCityStart: true, limitTownBuilders: true })
+      const south = { lat: -2 * CELL, lng: centerOf(5).lng }
+
+      expect(builder.fullTownAt(BO, centerOf(5))).toBeNull()
+      expect(builder.buildSection(BO, [centerOf(5), south]).error).toBe(startRuleMessage(true))
+    })
+
+    it('should let anyone build into any town when the game does not limit them', () => {
+      useGameStore().setGameSettings({ limitTownBuilders: false })
+
+      expect(builder.fullTownAt(BO, centerOf(5))).toBeNull()
+      expect(builder.buildSection(BO, roundToSmall()).ok).toBe(true)
+    })
   })
 
   describe('startPoints', () => {

@@ -248,7 +248,9 @@ const MAX_ATTEMPTS = 6
  * @param {Object} rules - What lines are judged against, as the track builder
  *   holds them (`buildRules` in trackBuilder.js): `grid`, `priceScale` (the
  *   dollars per point of terrain cost, see `trackPriceScale`), `speedUnitKm`,
- *   `rivers`, `isInRegion`, `townCells` and `builtTrack`
+ *   `rivers`, `isInRegion`, `townCells`, `builtTrack` and `closedCells`
+ *   (the towns full to the player building, whose cells are shut to the
+ *   search like land outside the region — see townLimits.js)
  * @param {Array<Object>} towns - Every town, each with lat and lon
  * @returns {Object} The board, for `costField` and `planLine`
  */
@@ -265,8 +267,10 @@ export function searchBoard(rules, towns) {
     isTownCell[index] = townCellSet.has(index) ? 1 : 0
     isWater[index] = isWaterCell(grid, index) ? 1 : 0
     // Town cells may be built in even where they reach outside the region,
-    // and water may be bridged wherever it is
-    isOpen[index] = isTownCell[index] || inside[index] || isWater[index] ? 1 : 0
+    // and water may be bridged wherever it is — but a full town's cell may
+    // not be built in at all by a player who is not in it
+    const isClosed = rules.closedCells?.has(index)
+    isOpen[index] = !isClosed && (isTownCell[index] || inside[index] || isWater[index]) ? 1 : 0
   })
 
   // Cells with a center within the spacing distance of built track. Track is

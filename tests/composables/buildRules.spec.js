@@ -13,6 +13,9 @@
  * Track may cross track already built, but not run alongside it: a line may
  * come close to built track only for the short stretch a crossing takes,
  * except inside the cells towns sit in.
+ *
+ * A town full to the player building may not be built into at all: no line
+ * of theirs may enter its cell, even to pass through.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -21,7 +24,8 @@ import {
   builtLegs,
   trackIndex,
   lineBlock,
-  blockMessage
+  blockMessage,
+  closedCells
 } from '@/composables/map/buildRules'
 import { regionTest } from '@/composables/map/region'
 import { gameRules } from '@/config/game'
@@ -323,7 +327,53 @@ describe('trackIndex', () => {
   })
 })
 
+describe('lineBlock into a full town', () => {
+  /** A small town in cell 1, full to the player building */
+  const fullTown = { name: 'Fairmont', lat: CELL / 2, lon: 1.5 * CELL, size: 'small' }
+  const closed = { town: fullTown, limit: 1, playerCount: 2 }
+  const fullRules = { ...rules, townCells: [1], closedCells: closedCells([closed], grid) }
+
+  it('should refuse a line ending on the town, naming it', () => {
+    expect(lineBlock([at(0), at(1)], fullRules)).toEqual({ reason: 'townFull', closed })
+  })
+
+  it('should refuse a line passing through its cell without touching the town', () => {
+    // Islands' first piece is cells 0–1, so stay in it: from cell 0 to the
+    // far edge of cell 1, beside the town rather than on it
+    const block = lineBlock([at(0), at(1, 0.9)], fullRules)
+
+    expect(block?.reason).toBe('townFull')
+  })
+
+  it('should refuse a line starting in its cell', () => {
+    expect(lineBlock([at(1), at(0)], fullRules)?.reason).toBe('townFull')
+  })
+
+  it('should let a line that keeps out of its cell be built', () => {
+    expect(lineBlock([at(4), at(5)], fullRules)).toBeNull()
+  })
+})
+
+describe('closedCells', () => {
+  it('should file each closed town under the cell it sits in', () => {
+    const inCell3 = { town: { lat: CELL / 2, lon: 3.2 * CELL } }
+    const inCell6 = { town: { lat: CELL / 2, lon: 6.7 * CELL } }
+
+    const cells = closedCells([inCell3, inCell6], grid)
+    expect([...cells.keys()]).toEqual([3, 6])
+    expect(cells.get(3)).toBe(inCell3)
+  })
+})
+
 describe('blockMessage', () => {
+  it('should say which town is full, and why', () => {
+    const town = { name: 'Fairmont', size: 'small' }
+
+    expect(blockMessage({ reason: 'townFull', closed: { town, limit: 2, playerCount: 4 } })).toBe(
+      'Fairmont is full: only 2 players may build into a small town in a 4-player game.'
+    )
+  })
+
   it('should say how far a bridge can go', () => {
     expect(blockMessage({ reason: 'water' })).toMatch(/water/)
   })

@@ -139,14 +139,25 @@ describe('Game Store', () => {
   })
 
   describe('game settings', () => {
-    it('should let track start in any town in a new game until told otherwise', () => {
-      expect(gameStore.gameSettings).toEqual({ requireMajorCityStart: false })
+    it('should let track start in any town, and limit building into towns, in a new game until told otherwise', () => {
+      expect(gameStore.gameSettings).toEqual({
+        requireMajorCityStart: false,
+        limitTownBuilders: true
+      })
     })
 
     it("should take only the game settings from the player's settings", () => {
-      gameStore.setGameSettings({ requireMajorCityStart: true, theme: 'dark', pinLimit: 2 })
+      gameStore.setGameSettings({
+        requireMajorCityStart: true,
+        limitTownBuilders: false,
+        theme: 'dark',
+        pinLimit: 2
+      })
 
-      expect(gameStore.gameSettings).toEqual({ requireMajorCityStart: true })
+      expect(gameStore.gameSettings).toEqual({
+        requireMajorCityStart: true,
+        limitTownBuilders: false
+      })
     })
 
     it("should keep its own copy, untouched by later changes to the player's settings", () => {
@@ -162,13 +173,16 @@ describe('Game Store', () => {
       // Track had to start in a major city then
       gameStore.setGameState({ region: { name: 'Old' }, turn: 4 })
 
-      expect(gameStore.gameSettings).toEqual({ requireMajorCityStart: true })
+      expect(gameStore.gameSettings.requireMajorCityStart).toBe(true)
     })
 
     it('should give a game setting a save does not know its default', () => {
       gameStore.setGameState({ region: { name: 'Newer' }, settings: {} })
 
-      expect(gameStore.gameSettings).toEqual({ requireMajorCityStart: false })
+      expect(gameStore.gameSettings).toEqual({
+        requireMajorCityStart: false,
+        limitTownBuilders: true
+      })
     })
 
     it('should go back to the defaults on reset', () => {

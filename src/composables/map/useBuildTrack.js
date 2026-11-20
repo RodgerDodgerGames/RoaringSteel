@@ -652,6 +652,11 @@ export default function useBuildTrack(formatCurrency) {
         if (!validateStartPoint(addedVertex)) {
           cancelDrawing() // Cancel if the start point is invalid
           startDrawingLine()
+          // A town that is full to the player (see townLimits.js) looks like
+          // anywhere else track could start, so they are told why it cannot.
+          // Set after the restart, which clears the last error.
+          const fullMessage = builder.fullTownAt(playerStore.activePlayer?.id, addedVertex)
+          if (fullMessage) buildError.value = fullMessage
         } else {
           isFirstVertexAdded.value = true
           // The cell the line starts in is charged too, so the price starts there

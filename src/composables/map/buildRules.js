@@ -33,6 +33,13 @@
  * waived, since every player builds into the same cities and their lines
  * bunch up there.
  *
+ * And with the game setting that limits how many players may build into a
+ * town on, a town that is full is closed to the players not already in it:
+ * their track may not go into its grid cell at all, not even to pass
+ * through without joining it (see townLimits.js). Which towns are closed
+ * depends on who is building, so the track builder works them out for the
+ * player whose turn it is (`closedCells`, see trackBuilder.js).
+ *
  * Where a line goes is checked at points a quarter of a cell apart (see
  * `pointsAlongLine` in trackCost.js), so a leg can slip across a narrow neck
  * of gray, or skirt the edge of another line's band, by up to that much
@@ -59,6 +66,18 @@ import {
   metersToLongitudeDegrees
 } from '@/composables/setup/useMapSupport'
 import { isWaterCell, longestCrossing, maxBridgeCells } from '@/composables/map/water'
+import { townFullMessage } from '@/composables/townLimits'
+
+/**
+ * The grid cell a town sits in: the cell its point is in, or for a town just
+ * off the grid the nearest cell (see `findCell`).
+ * @param {Object} town - A town, with lat and lon
+ * @param {Object} grid - The grid
+ * @returns {number} The cell, or -1 on an empty grid
+ */
+function townCell(town, grid) {
+  return findCell({ lat: town.lat, lng: town.lon }, grid)
+}
 
 /**
  * The grid cells the towns sit in. Track may go into these even where they
@@ -68,9 +87,30 @@ import { isWaterCell, longestCrossing, maxBridgeCells } from '@/composables/map/
  * @returns {Array<number>} The cells, each once
  */
 export function townCells(towns, grid) {
-  const cells = towns.map((town) => findCell({ lat: town.lat, lng: town.lon }, grid))
+  const cells = towns.map((town) => townCell(town, grid))
   return [...new Set(cells.filter((cell) => cell !== -1))]
 }
+
+/**
+ * The grid cells of the towns closed to a player (see `closedTowns` in
+ * townLimits.js), each with the town it is closed for, so a line can be
+ * checked cell by cell and the player told which town stopped it. Each town
+ * is in the same cell `townCells` gives it (see `townCell`).
+ * @param {Array<{town: Object}>} closed - The closed towns, from `closedTowns`
+ * @param {Object} grid - The grid
+ * @returns {Map<number, Object>} Each closed town's entry, by its cell
+ */
+export function closedCells(closed, grid) {
+  const cells = new Map()
+  closed.forEach((entry) => {
+    const cell = townCell(entry.town, grid)
+    if (cell !== -1) cells.set(cell, entry)
+  })
+  return cells
+}
+
+/** No town closed */
+const NONE_CLOSED = new Map()
 
 /**
  * What track on a board is priced against: the grid, what a point of its
@@ -301,17 +341,20 @@ function runsAlongside(legPoints, inTown, builtTrack, grid) {
  * @param {Array<number>} rules.townCells - The cells towns sit in (see `townCells`)
  * @param {Object} [rules.builtTrack] - The track built so far (see
  *   `trackIndex`)
+ * @param {Map<number, Object>} [rules.closedCells] - The cells of the towns
+ *   closed to the player building (see `closedCells`); none if left out
  * @param {Object} [options]
  * @param {boolean} [options.isFinished] - True for a finished line, which may
  *   not end on water; a line still being drawn may stop there for now
  * @returns {{reason: 'outside', point: {lat: number, lng: number}}|{reason:
- *   'water'|'alongside'|'endsOnWater'}|null} The rule broken — for the
- *   region, with the first point along the line that breaks it — or null if
- *   the line may be built
+ *   'townFull', closed: Object}|{reason: 'water'|'alongside'|'endsOnWater'}|null}
+ *   The rule broken — for the region, with the first point along the line
+ *   that breaks it; for a full town, with the first such town along the line
+ *   (its entry from `closedTowns`) — or null if the line may be built
  */
 export function lineBlock(
   latlngs,
-  { grid, speedUnitKm, isInRegion, townCells, builtTrack = NO_TRACK },
+  { grid, speedUnitKm, isInRegion, townCells, builtTrack = NO_TRACK, closedCells = NONE_CLOSED },
   { isFinished = false } = {}
 ) {
   // Each leg's sample points, and whether each point is in a town's cell,
@@ -332,7 +375,12 @@ export function lineBlock(
   })
   if (outside !== -1) return { reason: 'outside', point: points[outside] }
 
+  // Every cell the line crosses, found exactly, so even a corner clipped off
+  // a full town's cell counts as going into it
   const path = cellPath(latlngs, grid)
+  const full = path.find((cell) => closedCells.has(cell))
+  if (full !== undefined) return { reason: 'townFull', closed: closedCells.get(full) }
+
   if (longestCrossing(path, grid, townCells) > maxBridgeCells(grid, speedUnitKm)) {
     return { reason: 'water' }
   }
@@ -366,6 +414,8 @@ export function blockMessage(block, regionName) {
     }
     case 'endsOnWater':
       return "Track can't end on water: a bridge has to reach land."
+    case 'townFull':
+      return townFullMessage(block.closed)
     case 'alongside':
       return "Track can't run alongside track already built: cross it more squarely, or keep further away."
     default:

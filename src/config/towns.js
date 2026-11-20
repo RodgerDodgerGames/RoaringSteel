@@ -25,6 +25,26 @@ export const townSizeConfig = {
 }
 
 /**
+ * How many players may build into a small or medium town, by how many
+ * players the game has, bots included (see townLimits.js). Major cities have
+ * no limit. Used only with the game setting "Limit how many players may build
+ * into a town" on.
+ *
+ * Each row holds from its `players` up to the next row's: the row for 6 is
+ * also the row for 7, and the last row is for 8 players or more. A game with
+ * fewer players than the first row (a solo game) uses the first row. A medium
+ * town always takes one player more than a small town.
+ */
+export const townBuilderLimits = Object.freeze([
+  Object.freeze({ players: 2, small: 1, medium: 2 }),
+  Object.freeze({ players: 3, small: 2, medium: 3 }),
+  Object.freeze({ players: 4, small: 2, medium: 3 }),
+  Object.freeze({ players: 5, small: 3, medium: 4 }),
+  Object.freeze({ players: 6, small: 3, medium: 4 }),
+  Object.freeze({ players: 8, small: 4, medium: 5 })
+])
+
+/**
  * How far apart a board's towns must be (see townSpacing.js), in speed units
  * (see boardScale.js), so the rule is the same on every board: 4 speed units
  * is about 22 km on a board Minnesota's size and 35 km on the Rockies.

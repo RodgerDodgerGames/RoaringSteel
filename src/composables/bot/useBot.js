@@ -153,13 +153,17 @@ export function useBot() {
 
     // Every question the plan asks of a search is what track to some town
     // would cost, or the line there, so each search stops once it has
-    // reached every town
-    const townPoints = townsStore.towns.map(pointOf)
+    // reached every town. A town full to the player (see townLimits.js) can
+    // never be reached, so it is left out: the search would otherwise go on
+    // over the whole grid looking for it, and its track costs Infinity
+    // without asking.
+    const open = new Set(builder.openTowns(playerId))
+    const townPoints = [...open].map(pointOf)
 
     /** The plan if the player builds from these points */
     const planFrom = (sources, isJoined) => {
       const field = costField(board, sources, { targets: townPoints })
-      const costTo = (town) => field.costTo(pointOf(town))
+      const costTo = (town) => (open.has(town) ? field.costTo(pointOf(town)) : Infinity)
       const review = reviewDemands(held.lines, {
         towns: townsStore.towns,
         isJoined,
@@ -175,12 +179,12 @@ export function useBot() {
 
     const destinations = held.lines.map(({ demand }) => demand.destination)
     const requireMajorCity = gameStore.gameSettings.requireMajorCityStart
-    const starts = botStartTowns(townsStore.towns, requireMajorCity, destinations).map(
-      (startTown) => ({
-        start: startTown,
-        ...planFrom([pointOf(startTown)], (town) => town.msa === startTown.msa)
-      })
-    )
+    // Only towns it may still build into: a full one is closed to it (see
+    // townLimits.js)
+    const starts = botStartTowns([...open], requireMajorCity, destinations).map((startTown) => ({
+      start: startTown,
+      ...planFrom([pointOf(startTown)], (town) => town.msa === startTown.msa)
+    }))
     // The town whose cheapest demand costs least to connect. Whenever any
     // demand is workable from some city, the cheapest one anywhere is, so
     // this is the city with the cheapest workable demand. When none is, it

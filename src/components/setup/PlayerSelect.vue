@@ -21,7 +21,8 @@
   - A Settings button, so settings can be chosen before the game starts
 
   @emits back - User wants to go back to the welcome screen's New Game / Load Game buttons
-  @emits done - The roster, people then computer players, when validation passes
+  @emits done - When validation passes. The roster (people, then computer
+                players) stays in the player store; see `draftRoster`
 -->
 
 <script setup>
@@ -181,9 +182,9 @@ const handleDone = () => {
     return
   }
 
-  // All validations passed - drop the blank rows and hand over the roster
+  // All validations passed - drop the blank rows and move on
   playerStore.pruneEmptyDraftPlayers()
-  emit('done', playerStore.draftRoster)
+  emit('done')
 }
 
 /**

@@ -1,25 +1,28 @@
 <!--
   WelcomeView.vue
 
-  The landing page and entry point for the game. Handles the initial
-  game setup flow including player selection and confirmation.
+  The landing page and entry point for the game, and the first step of
+  setting up a new game: choosing the players.
 
   Flow:
   1. gameButtons - New Game / Load Game options
   2. playerSelect - Player name and color selection
-  3. playerConfirm - Review and confirm player selections
+
+  A new game then goes on to choosing the board (AreaSelectView), and then
+  to the Confirm Setup page (SetupConfirmView).
 
   @prop initialPane - The step to open on. A new game started from the
-                      Game menu skips the New Game / Load Game buttons and
-                      opens on player selection.
+                      Game menu, or a player coming back from a later setup
+                      step to change the players, skips the New Game /
+                      Load Game buttons and opens on player selection.
 
-  @emits players-confirmed - When players are confirmed and ready to proceed
+  @emits players-chosen - When the players pass validation, to go on to
+                          choosing the board
 -->
 
 <script setup>
 import { ref } from 'vue'
 import PlayerSelect from '@/components/setup/PlayerSelect.vue'
-import PlayerConfirm from '@/components/setup/PlayerConfirm.vue'
 import LoadGameDialog from '@/components/dialogs/LoadGameDialog.vue'
 import AboutButton from '@/components/AboutButton.vue'
 import { debug } from '@/composables/debug'
@@ -31,13 +34,10 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['players-confirmed', 'game-loaded'])
+const emit = defineEmits(['players-chosen', 'game-loaded'])
 
 // which pane should be shown
 const activePane = ref(props.initialPane)
-
-// Store selected players for confirmation
-const selectedPlayers = ref([])
 
 // Dialog visibility
 const showLoadDialog = ref(false)
@@ -61,27 +61,15 @@ function handleGameLoaded() {
   emit('game-loaded')
 }
 
-// Handle when player selection is done
-function handlePlayerSelectDone(players) {
-  selectedPlayers.value = players
-  activePane.value = 'playerConfirm'
+// Handle when player selection is done. The roster stays in the player
+// store as draft players; it is committed on the Confirm Setup page.
+function handlePlayerSelectDone() {
+  emit('players-chosen')
 }
 
 // Handle going back from player select to the New Game / Load Game buttons
 function handlePlayerSelectBack() {
   activePane.value = 'gameButtons'
-}
-
-// Handle going back from confirmation to player select
-function handleGoBack() {
-  activePane.value = 'playerSelect'
-}
-
-// Handle final confirmation
-function handleConfirmed() {
-  debug.log('Players confirmed and saved to store!')
-  // Navigate to area select view
-  emit('players-confirmed')
 }
 </script>
 
@@ -113,14 +101,6 @@ function handleConfirmed() {
             @back="handlePlayerSelectBack"
           />
         </keep-alive>
-
-        <!-- Player confirmation -->
-        <PlayerConfirm
-          v-if="activePane === 'playerConfirm'"
-          :players="selectedPlayers"
-          @back="handleGoBack"
-          @confirmed="handleConfirmed"
-        />
       </div>
     </div>
 

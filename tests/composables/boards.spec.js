@@ -12,8 +12,10 @@
 
 import { describe, it, expect } from 'vitest'
 import {
+  boardGrouping,
   boardGroupings,
   boardKey,
+  boardLabel,
   boardStates,
   boardsFor,
   regionBoard,
@@ -98,6 +100,89 @@ describe('boardStates and boardKey', () => {
   it('should read a board saved before regions existed, which names only its state', () => {
     expect(boardStates(connecticut)).toEqual(['09'])
     expect(boardKey(connecticut)).toBe('09')
+  })
+})
+
+/**
+ * A region's board as the Area Select screen makes it, without outlines:
+ * its name and its states' FIPS codes are all `boardGrouping` reads.
+ */
+const regionBoardOf = (region) => ({
+  type: 'Feature',
+  properties: {
+    NAME: region.name,
+    STATES: region.states.map((abbr) => usStates.find((state) => state.abbr === abbr).fips)
+  }
+})
+
+describe('boardGrouping', () => {
+  it("should find a state's own board under States", () => {
+    expect(boardGrouping(stateBoard(connecticut))).toBe(STATES_GROUPING)
+  })
+
+  it('should tell regions of the same name apart by their states', () => {
+    // Objective Lists' Midwest has Pennsylvania; the Census Bureau's does not
+    const censusMidwest = ['17', '18', '26', '39', '55', '19', '20', '27', '29', '31', '38', '46']
+    const objectiveMidwest = [...censusMidwest, '42']
+
+    expect(boardGrouping({ properties: { NAME: 'Midwest', STATES: censusMidwest } })).toBe(
+      'census-regions'
+    )
+    expect(boardGrouping({ properties: { NAME: 'Midwest', STATES: objectiveMidwest } })).toBe(
+      'regions'
+    )
+  })
+
+  it('should find a region by its states in any order', () => {
+    // New England, a Census division, listed out of the regions file's order
+    const states = ['50', '09', '44', '33', '25', '23']
+
+    expect(boardGrouping({ properties: { NAME: 'New England', STATES: states } })).toBe(
+      'census-divisions'
+    )
+  })
+
+  it('should find every region in the grouping that offers its states', () => {
+    // Regions share names between groupings, so each must be found by its
+    // states: the grouping found offers a region with the same states, and
+    // is this region's own grouping or one listed before it
+    REGION_GROUPINGS.forEach((grouping, index) => {
+      grouping.regions.forEach((region) => {
+        const board = regionBoardOf(region)
+        const foundIndex = REGION_GROUPINGS.findIndex(({ id }) => id === boardGrouping(board))
+
+        expect(foundIndex, region.name).toBeGreaterThanOrEqual(0)
+        expect(foundIndex, region.name).toBeLessThanOrEqual(index)
+        expect(
+          REGION_GROUPINGS[foundIndex].regions.some(
+            (other) => boardKey(regionBoardOf(other)) === boardKey(board)
+          ),
+          region.name
+        ).toBe(true)
+      })
+    })
+  })
+
+  it('should find no grouping for no board, or for states no region is made of', () => {
+    expect(boardGrouping(null)).toBeNull()
+    // Connecticut and Maine alone are not a region in any grouping
+    expect(boardGrouping({ properties: { NAME: 'Odd', STATES: ['09', '23'] } })).toBeNull()
+  })
+})
+
+describe('boardLabel', () => {
+  it("should name a state's board alone", () => {
+    expect(boardLabel(stateBoard(connecticut))).toBe('Board: Connecticut')
+  })
+
+  it("should name a region's board with how many states it covers", () => {
+    const board = regionBoard({ id: 'south', name: 'South', states: ['RI', 'CT'] }, STATES)
+
+    expect(boardLabel(board)).toBe('Board: South (2 states)')
+  })
+
+  it('should give no line when no board is chosen, for each screen to word', () => {
+    expect(boardLabel(null)).toBeNull()
   })
 })
 

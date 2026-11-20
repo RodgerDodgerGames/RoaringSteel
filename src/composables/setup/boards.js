@@ -59,6 +59,18 @@ export function stateBoard(state) {
 }
 
 /**
+ * The FIPS codes of a region's states, which regions.js names by postal
+ * abbreviation. An abbreviation that names no state is left out.
+ * @param {{states: Array<string>}} region - The region (see config/regions.js)
+ * @returns {Array<string>} The states' FIPS codes, in the region's order
+ */
+function regionFips(region) {
+  return region.states
+    .map((abbr) => usStates.find((state) => state.abbr === abbr)?.fips)
+    .filter(Boolean)
+}
+
+/**
  * The board for a region: its states' outlines joined into one.
  * @param {{id: string, name: string, states: Array<string>}} region - The
  *   region, its states by postal abbreviation (see config/regions.js)
@@ -67,9 +79,7 @@ export function stateBoard(state) {
  * @returns {Object|null} The board; null if none of its states has an outline
  */
 export function regionBoard(region, stateFeatures) {
-  const fips = region.states
-    .map((abbr) => usStates.find((state) => state.abbr === abbr)?.fips)
-    .filter(Boolean)
+  const fips = regionFips(region)
   const outlines = stateFeatures.filter((feature) => fips.includes(feature.properties.STATE))
   if (outlines.length === 0) return null
   const joined = outlines.length === 1 ? outlines[0] : union(featureCollection(outlines))
@@ -119,4 +129,46 @@ export function boardKey(board) {
   const states = boardStates(board)
   if (states.length === 0) return undefined
   return states.length === 1 ? states[0] : `states:${[...states].sort().join(',')}`
+}
+
+/**
+ * The grouping that offers a board, so the Area Select screen can open on it
+ * when the player comes back to change their board: the board they chose is
+ * then on the map, marked, rather than hidden under another grouping.
+ *
+ * A state's own board (it names its STATE) is offered by the States
+ * grouping. A region's board is found by its states, not its name: names
+ * repeat between groupings (there is a "Midwest" among Objective Lists'
+ * regions and among the Census regions), and the same states make the same
+ * board whatever it is called (see `boardKey`). When more than one grouping
+ * offers the same states, the first listed wins.
+ *
+ * @param {Object|null} board - The board chosen, or null
+ * @returns {string|null} The grouping's id; null for no board, or a board no
+ *   grouping offers (a region since taken out of regions.js)
+ */
+export function boardGrouping(board) {
+  if (!board) return null
+  if (board.properties?.STATE) return STATES_GROUPING
+  const key = boardKey(board)
+  if (!key) return null
+  const grouping = REGION_GROUPINGS.find(({ regions }) =>
+    regions.some((region) => boardKey({ properties: { STATES: regionFips(region) } }) === key)
+  )
+  return grouping?.id ?? null
+}
+
+/**
+ * What the setup screens say about the board chosen: its name, and how many
+ * states it covers when it is more than one, as "Board: Iowa" or
+ * "Board: New England (6 states)".
+ * @param {Object|null} board - The board chosen, or null
+ * @returns {string|null} The line to show; null when there is no board, as
+ *   each screen words that its own way (the map screen asks for a click)
+ */
+export function boardLabel(board) {
+  if (!board) return null
+  const count = boardStates(board).length
+  const states = count > 1 ? ` (${count} states)` : ''
+  return `Board: ${board.properties.NAME}${states}`
 }

@@ -6,6 +6,9 @@
  * at the end of their own track, within the build rules, and paid for out of
  * cash and the turn's allowance. With the game setting on, a town full to
  * the player can be neither started in nor built into.
+ *
+ * Track built this turn can be torn up again, one leg at a time from the
+ * far end of a line, for what each leg added to the line's price.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -379,6 +382,190 @@ describe('useTrackBuilder', () => {
       expect(builder.fitLine(ANN, overWater)).toMatchObject({
         points: [centerOf(0), centerOf(1)],
         toLand: true
+      })
+    })
+  })
+
+  describe('removeTrackEnd', () => {
+    /**
+     * The center of a cell on a board three rows tall, the middle row being
+     * the one the towns are in, so `at(1, i)` is `centerOf(i)`
+     */
+    const at = (row, col) => ({ lat: (row - 1) * CELL, lng: (col + 0.5) * CELL })
+
+    /**
+     * Three rows of six cells, each costing 1000, with any cells listed as
+     * water made lake instead
+     * @param {Array<string>} [water] - `"row,col"` of each water cell
+     */
+    const setBoard = (water = []) =>
+      useGridStore().setGrid(
+        makeTestGrid({
+          rows: 3,
+          cols: 6,
+          south: -1.5 * CELL,
+          cell: (row, col) =>
+            water.includes(`${row},${col}`) ? { water: true } : { landCover: 1000 }
+        })
+      )
+
+    /**
+     * Builds a line for Ann, failing the test if it is not built, so no test
+     * passes only because the track it is about was never there
+     * @param {Array<Object>} points - The line's points
+     * @returns {Object} What `buildSection` returned
+     */
+    const build = (points) => {
+      const result = builder.buildSection(ANN, points)
+      expect(result.ok).toBe(true)
+      return result
+    }
+
+    /** Ann's only line, as the store holds it now */
+    const annsLine = () => trackStore.segmentsForOwner(ANN)[0]
+
+    beforeEach(() => {
+      setBoard()
+      useGameStore().setGameSettings({ requireMajorCityStart: true })
+    })
+
+    it('should tear up only the last leg, refunding what it added to the line', () => {
+      const { segment } = build([centerOf(0), centerOf(1), centerOf(2), centerOf(3)])
+
+      const result = builder.removeTrackEnd(ANN, segment.id)
+
+      // The leg priced on its own would be two cells; it only added one,
+      // the cell at the bend having been paid for with the leg before it
+      expect(builder.priceSection([centerOf(2), centerOf(3)]).total).toBe(2000)
+      expect(result).toEqual({ ok: true, refund: 1000 })
+      expect(annsLine().coordinates).toEqual([centerOf(0), centerOf(1), centerOf(2)])
+      expect(annsLine().cost).toBe(3000)
+      expect(playerStore.players[0].cash).toBe(37000)
+      expect(playerStore.trackSpendThisTurn(ANN)).toBe(3000)
+    })
+
+    it('should walk a line back leg by leg, refunding exactly what it cost', () => {
+      const { segment } = build([centerOf(0), centerOf(1), centerOf(2), centerOf(3)])
+
+      builder.removeTrackEnd(ANN, segment.id)
+      builder.removeTrackEnd(ANN, segment.id)
+      const last = builder.removeTrackEnd(ANN, segment.id)
+
+      expect(last).toEqual({ ok: true, refund: 2000 })
+      expect(trackStore.segments).toHaveLength(0)
+      expect(playerStore.players[0].cash).toBe(40000)
+      expect(playerStore.trackSpendThisTurn(ANN)).toBe(0)
+    })
+
+    it('should take a bridge off whole, back to the last point on land', () => {
+      setBoard(['1,2'])
+      const line = [centerOf(0), centerOf(1), centerOf(2), centerOf(3)]
+      const { segment, cost } = build(line)
+      const keptCost = builder.priceSection([centerOf(0), centerOf(1)]).total
+
+      const result = builder.removeTrackEnd(ANN, segment.id)
+
+      expect(result).toEqual({ ok: true, refund: cost - keptCost })
+      expect(annsLine().coordinates).toEqual([centerOf(0), centerOf(1)])
+      expect(annsLine().cost).toBe(keptCost)
+    })
+
+    it('should take a line off whole when its bridge leaves from its start', () => {
+      setBoard(['1,1'])
+      const { segment, cost } = build([centerOf(0), centerOf(1), centerOf(2)])
+
+      expect(builder.removeTrackEnd(ANN, segment.id)).toEqual({ ok: true, refund: cost })
+      expect(trackStore.segments).toHaveLength(0)
+    })
+
+    it('should refuse while a branch built this turn grows out of the end', () => {
+      const { segment } = build([centerOf(0), centerOf(1), centerOf(2), centerOf(3)])
+      build([centerOf(3), at(2, 3)])
+      const cash = playerStore.players[0].cash
+
+      expect(builder.removeTrackEnd(ANN, segment.id)).toEqual({
+        ok: false,
+        error: 'Remove your branch track first'
+      })
+      expect(annsLine().coordinates).toHaveLength(4)
+      expect(playerStore.players[0].cash).toBe(cash)
+    })
+
+    it('should refuse while a branch starts part way along the end leg', () => {
+      const { segment } = build([centerOf(0), centerOf(1), centerOf(2), centerOf(3)])
+      const partWay = { lat: 0, lng: 3.2 * CELL }
+      expect(build([partWay, { lat: CELL, lng: 3.2 * CELL }]).ok).toBe(true)
+
+      expect(builder.removeTrackEnd(ANN, segment.id).ok).toBe(false)
+    })
+
+    it('should let the end come off once the branch is gone', () => {
+      const { segment } = build([centerOf(0), centerOf(1), centerOf(2), centerOf(3)])
+      const branch = build([centerOf(3), at(2, 3)]).segment
+
+      builder.removeTrackEnd(ANN, branch.id)
+
+      expect(builder.removeTrackEnd(ANN, segment.id).ok).toBe(true)
+    })
+
+    it('should let the end come off when a branch leaves from the point it is cut back to', () => {
+      const { segment } = build([centerOf(0), centerOf(1), centerOf(2), centerOf(3)])
+      build([centerOf(2), at(2, 2)])
+
+      expect(builder.removeTrackEnd(ANN, segment.id).ok).toBe(true)
+    })
+
+    it('should let the end come off when a branch still starts on track from an earlier turn', () => {
+      build([centerOf(0), centerOf(1), centerOf(2)])
+      useGameStore().advanceTurn()
+      const { segment } = build([centerOf(2), at(2, 2)])
+      build([centerOf(2), at(0, 2)])
+
+      expect(builder.removeTrackEnd(ANN, segment.id).ok).toBe(true)
+    })
+
+    it('should let the end come off when a branch leaves from a town track may start in', () => {
+      useGameStore().setGameSettings({ requireMajorCityStart: false })
+      const { segment } = build([centerOf(0), centerOf(3), centerOf(5)])
+      build([centerOf(5), at(2, 5)])
+
+      expect(builder.removeTrackEnd(ANN, segment.id).ok).toBe(true)
+    })
+
+    it('should refuse when a branch leaves from a town track may only be built into', () => {
+      // Small is not a major city, so the branch only starts there on the line
+      const { segment } = build([centerOf(0), centerOf(3), centerOf(5)])
+      build([centerOf(5), at(2, 5)])
+
+      expect(builder.removeTrackEnd(ANN, segment.id).ok).toBe(false)
+    })
+
+    it('should refuse track built on an earlier turn', () => {
+      const { segment } = build([centerOf(0), centerOf(1), centerOf(2)])
+      useGameStore().advanceTurn()
+
+      expect(builder.removeTrackEnd(ANN, segment.id)).toEqual({
+        ok: false,
+        error: 'Only track you built this turn can be removed.'
+      })
+      expect(annsLine().coordinates).toHaveLength(3)
+    })
+
+    it("should refuse another player's track", () => {
+      const { segment } = build([centerOf(0), centerOf(1), centerOf(2)])
+      playerStore.setActivePlayer(BO)
+
+      expect(builder.removeTrackEnd(BO, segment.id).ok).toBe(false)
+      expect(annsLine().coordinates).toHaveLength(3)
+    })
+
+    it('should refuse a player whose turn it is not', () => {
+      const { segment } = build([centerOf(0), centerOf(1), centerOf(2)])
+      playerStore.setActivePlayer(BO)
+
+      expect(builder.removeTrackEnd(ANN, segment.id)).toEqual({
+        ok: false,
+        error: "It isn't your turn."
       })
     })
   })

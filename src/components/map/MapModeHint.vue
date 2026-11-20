@@ -65,7 +65,7 @@ const modeHint = computed(() => {
     return {
       name: HELP_SCREENS.removing,
       title: 'Removing track',
-      body: 'Click a section you built this turn to tear it up and get your money back.'
+      body: 'Point at the end of a line you built this turn: click the part that lights up to tear it up, one section at a time, and get your money back.'
     }
   }
   return null

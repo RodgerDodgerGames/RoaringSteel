@@ -63,7 +63,12 @@ export default function useBuildTrack(formatCurrency) {
   const isFirstVertexAdded = ref(false) // Flag to track if the first vertex has been added
   const buildError = ref('') // Why the last section could not be built, if it could not
   const budgetNotice = ref('') // That the last line was cut short for money, and why
-  const isRemoving = ref(false) // True while Geoman's removal mode is on
+  const isRemoving = ref(false) // True while removal mode is on
+
+  // The lines that can be clicked in removal mode, one over the removable
+  // end of each line built this turn (see `drawRemovalTargets`). Plain
+  // Leaflet layers, so not reactive: nothing on screen reads them.
+  let removalTargets = []
 
   /**
    * Cost of the line being drawn, out to the cursor: the vertices placed so
@@ -295,9 +300,8 @@ export default function useBuildTrack(formatCurrency) {
 
     // A drawing left open would carry on with no listener to price or record it
     if (isDrawingActive.value) cancelDrawing()
-    // Likewise removal mode: left on, it would let a player tear sections off
-    // the map with nothing listening to take them out of the store or refund
-    // them — the drift between map and save that #83 fixed
+    // Likewise removal mode: its targets would be left on the map, still
+    // clickable, after their owner is gone
     stopRemoving()
     // The start-point check may have left a "not allowed" cursor on the map,
     // and an over-budget leg a red X: the watchers that clear them have
@@ -325,6 +329,17 @@ export default function useBuildTrack(formatCurrency) {
    * time means any section added, removed or replaced sets it off.
    */
   watch(() => [...trackStore.segments], syncTrackLayers)
+
+  /**
+   * Keeps removal mode's targets on the ends of the lines while it is on: a
+   * line cut back has a new end, and a line torn up whole has none.
+   */
+  watch(
+    () => [...trackStore.segments],
+    () => {
+      if (isRemoving.value) drawRemovalTargets()
+    }
+  )
 
   // A section's bridges are found from the grid and the rivers as it is
   // drawn. The rivers come from a file fetched in the background, and can
@@ -355,31 +370,81 @@ export default function useBuildTrack(formatCurrency) {
   // ================== PUBLIC FUNCTIONS (EXPOSED) ==================
 
   /**
-   * Switches removal mode on or off. While it is on, clicking a section the
-   * active player built this turn tears it up and refunds it.
-   *
-   * `isRemoving` is not set here: Geoman announces every change of mode with
-   * an event, whatever caused it, and the listener for that event keeps the
-   * flag in step.
+   * Switches removal mode on or off. While it is on, the far end of each
+   * line the active player built this turn lights up under the cursor, and
+   * clicking it tears that leg up and refunds it (see `drawRemovalTargets`).
    */
   function toggleRemoveMode() {
+    if (isRemoving.value) {
+      stopRemoving()
+      return
+    }
     // Drawing, removing and choosing a town for the train all act on map
     // clicks, so only one may be live. A line being drawn is built first,
-    // as Stop building would.
+    // as Stop building would, so it can be torn up like any other.
     stopDrawing()
     mapStore.setTownPicker(null)
-    // Track is torn up in the Build view. Removal mode is only ever on in that
-    // view, so when this switches it off the view stays as it is.
+    // Track is torn up in the Build view
     mapStore.setViewMode(BUILD_VIEW)
-    mapStore.map.pm.toggleGlobalRemovalMode()
+    isRemoving.value = true
+    drawRemovalTargets()
+  }
+
+  /** Switches removal mode off, if it is on, and takes its targets off the map */
+  function stopRemoving() {
+    isRemoving.value = false
+    clearRemovalTargets()
   }
 
   /**
-   * Switches removal mode off if it is on. Asks Geoman rather than trusting
-   * `isRemoving`, so it is right even before the first toggle event arrives.
+   * Puts a clickable line over the part of each line the active player
+   * built this turn that a click would tear up: its last leg, or back to the
+   * last point on land where it ends on a bridge (see `removableEnd` in
+   * trackBuilder.js). Only the end of a line can come off, so the line is
+   * walked back one leg at a time toward where it started.
+   *
+   * The targets are invisible until the cursor is over one, when it lights
+   * up in red to show what a click would remove. They sit in a pane of
+   * their own above the rails, so they take the click wherever they lie
+   * over track.
    */
-  function stopRemoving() {
-    if (mapStore.map?.pm.globalRemovalModeEnabled()) mapStore.map.pm.disableGlobalRemovalMode()
+  function drawRemovalTargets() {
+    clearRemovalTargets()
+    if (!isAttached) return
+    const playerId = playerStore.activePlayer?.id
+    removalTargets = trackStore.segmentsBuiltOn(playerId, gameStore.turn).map((segment) => {
+      const { stretch } = builder.removableEnd(toRaw(segment).coordinates)
+      const latlngs = stretch.map((point) => L.latLng(point.lat, point.lng))
+      const target = L.polyline(latlngs, { ...REMOVAL_TARGET_STYLE, pane: REMOVAL_PANE })
+      target.on({
+        mouseover: () => target.setStyle({ opacity: REMOVAL_HOVER_OPACITY }),
+        mouseout: () => target.setStyle({ opacity: 0 }),
+        click: () => removeTrackEnd(segment.id)
+      })
+      return target.addTo(mapStore.map)
+    })
+  }
+
+  /** Takes removal mode's clickable lines off the map */
+  function clearRemovalTargets() {
+    removalTargets.forEach((target) => mapStore.map?.removeLayer(target))
+    removalTargets = []
+  }
+
+  /**
+   * Tears up the far end of one of the active player's lines and refunds it,
+   * through the track builder, which decides what may come off. The map
+   * follows the track store: the line is redrawn shorter, or taken off, by
+   * `syncTrackLayers`, and the targets are redrawn for the line's new end.
+   * A refusal — a branch still growing out of that end — is shown where
+   * build errors are.
+   * @param {number} segmentId - The line clicked
+   */
+  function removeTrackEnd(segmentId) {
+    const result = builder.removeTrackEnd(playerStore.activePlayer?.id, segmentId)
+    // The panel may still be itemizing a line or showing an old error
+    resetLineTracking()
+    if (!result.ok) buildError.value = result.error
   }
 
   // ================== DRAWING CONTROL FUNCTIONS ==================
@@ -528,23 +593,7 @@ export default function useBuildTrack(formatCurrency) {
   const mapEvents = {
     'pm:drawstart': handleDrawStart,
     'pm:create': finalizeDrawing,
-    // Geoman's global removal mode acts on the layer, so the store has to be
-    // told; without this the map and the rail network drift apart (#83).
-    // Removal is re-fired on the map (`_fireRemove(this.map, layer)`), so one
-    // map-level listener catches every section.
-    'pm:remove': handleLayerRemoved,
-    'pm:globalremovalmodetoggled': handleRemovalModeToggled,
     mousemove: handleCursorMove
-  }
-
-  /**
-   * Keeps `isRemoving` in step with Geoman's removal mode, so the controls and
-   * the map's hint can say which mode the player is in.
-   * @param {Object} e - Geoman toggle event
-   * @param {boolean} e.enabled - Whether removal mode is now on
-   */
-  function handleRemovalModeToggled({ enabled }) {
-    isRemoving.value = enabled
   }
 
   /**
@@ -805,104 +854,14 @@ export default function useBuildTrack(formatCurrency) {
   // ================== MAP / STORE SYNCHRONIZATION ==================
 
   /**
-   * Ties a Leaflet layer to the segment it draws, so a later removal can find
-   * what to take out of the store, and the map can be kept in step with the
-   * store (see `syncTrackLayers`).
+   * Ties a Leaflet layer to the segment it draws, so the map can be kept in
+   * step with the store (see `syncTrackLayers`).
    * @param {Object} layer - The track layer
    * @param {Object} segment - The segment it draws
    */
   function attachSegment(layer, segment) {
     layer.segmentId = segment.id
     layer.segment = toRaw(segment)
-  }
-
-  /**
-   * Finds the track layer an event belongs to.
-   *
-   * Track is drawn as several pieces: the layer itself, which is the rail,
-   * and the casing, ties and bridges `styleTracks` lays under it. A click in
-   * removal mode can land on any of them, depending on where on the track it
-   * falls, and all of them have to lead back to the same segment.
-   *
-   * @param {Object} layer - The layer the Geoman event fired on
-   * @returns {Object|null} The track layer carrying a segment id, if any
-   */
-  function resolveTrackLayer(layer) {
-    if (!layer) return null
-    if (layer.trackLayer) return layer.trackLayer
-    // `!= null` rather than a truthiness check: a save can carry segment id 0
-    return layer.segmentId != null ? layer : null
-  }
-
-  /**
-   * Whether the active player is allowed to tear up this segment.
-   *
-   * Geoman's global removal mode offers up every track layer on the map,
-   * including other players' and earlier turns'. That was harmless while
-   * removal was cosmetic; now that it reaches the save and refunds money, an
-   * unguarded removal would delete another player's network permanently and
-   * pay the wrong player for it.
-   *
-   * @param {Object|undefined} segment - The segment behind the layer
-   * @returns {boolean} True if the segment is the active player's, built this turn
-   */
-  function canRemoveSegment(segment) {
-    return trackStore.isOwnedFromTurn(segment, playerStore.activePlayer?.id, gameStore.turn)
-  }
-
-  /**
-   * Takes a removed layer out of the rail network, so a torn-up section stays
-   * torn up after a reload.
-   * @param {Object} e - Geoman removal event
-   */
-  function handleLayerRemoved(e) {
-    const layer = resolveTrackLayer(e.layer)
-    if (!layer) return
-
-    const segment = trackStore.getSegment(layer.segmentId)
-    if (!canRemoveSegment(segment)) {
-      // Geoman has already taken it off the map, so put it back rather than
-      // let the map lose track the store still holds
-      redrawLayer(layer, segment)
-      return
-    }
-
-    if (!trackStore.removeSegment(layer.segmentId)) {
-      console.error('Could not remove track segment:', trackStore.error)
-      redrawLayer(layer, segment)
-      return
-    }
-
-    // Only track built this turn by the active player gets here, so the money
-    // and the allowance both go back to the player who put them in, in full
-    if (!playerStore.refundTrackSpend(segment.ownerId, segment.cost)) {
-      console.error('Could not refund track segment:', playerStore.error)
-    }
-
-    // Geoman removed whichever of the rail, casing or ties was clicked; this
-    // takes off the rest
-    removeTrackLayer(layer)
-
-    existingLineLayers.value = existingLineLayers.value.filter((l) => l !== layer)
-    restoredLineLayers.value = restoredLineLayers.value.filter((l) => l !== layer)
-    // The panel was itemizing the section just torn up
-    resetLineTracking()
-  }
-
-  /**
-   * Puts a layer back the way the store has it — on the map, in the stored
-   * shape, with a fresh casing and ties. Used whenever a change is refused, so a rejected
-   * removal or edit cannot leave the map showing something the save does not.
-   * @param {Object} layer - The track layer
-   * @param {Object|undefined} segment - The segment it should match
-   */
-  function redrawLayer(layer, segment) {
-    if (segment) {
-      layer.setLatLngs(segment.coordinates.map((point) => L.latLng(point.lat, point.lng)))
-    }
-    if (!mapStore.map.hasLayer(layer)) layer.addTo(mapStore.map)
-    removeStyling(layer)
-    styleTracks(layer, segment?.ownerId)
   }
 
   // ================== COST TRACKING & TOOLTIP ==================
@@ -1184,6 +1143,9 @@ export default function useBuildTrack(formatCurrency) {
    * be drawn entirely over the older ones, and its casing would cut a dark
    * notch across the rail wherever two sections meet.
    *
+   * Above them all is the pane removal mode's targets go in (see
+   * `drawRemovalTargets`), so a target takes the click over the track under it.
+   *
    * The panes sit just above Leaflet's overlay pane (z-index 400) and below
    * the town markers (600), so towns stay clickable on top of the track.
    * Geoman draws in the rail pane too (see `setGeomanOptions`).
@@ -1192,9 +1154,31 @@ export default function useBuildTrack(formatCurrency) {
     { name: 'trackCasing', zIndex: 410 },
     { name: 'trackTies', zIndex: 420 },
     { name: 'trackBridges', zIndex: 425 },
-    { name: 'trackRails', zIndex: 430 }
+    { name: 'trackRails', zIndex: 430 },
+    { name: 'trackRemoval', zIndex: 440 }
   ]
-  const [CASING_PANE, TIES_PANE, BRIDGES_PANE, RAILS_PANE] = TRACK_PANES.map((pane) => pane.name)
+  const [CASING_PANE, TIES_PANE, BRIDGES_PANE, RAILS_PANE, REMOVAL_PANE] = TRACK_PANES.map(
+    (pane) => pane.name
+  )
+
+  /**
+   * Removal mode's targets: wider than the track, so the end of a line is
+   * easy to hit, and invisible until the cursor is over one (see
+   * `drawRemovalTargets`). Leaflet still sends an invisible line the cursor's
+   * events, since only its opacity is 0. Kept out of Geoman's snapping, like
+   * the casing and ties.
+   */
+  const REMOVAL_TARGET_STYLE = {
+    color: BLOCKED_LEG_COLOR,
+    weight: 14,
+    opacity: 0,
+    lineCap: 'round',
+    lineJoin: 'round',
+    snapIgnore: true
+  }
+
+  /** How strongly a removal target lights up under the cursor */
+  const REMOVAL_HOVER_OPACITY = 0.7
 
   /**
    * Creates the panes finished track is drawn in, if this map does not have
@@ -1251,10 +1235,10 @@ export default function useBuildTrack(formatCurrency) {
    * game (a damaged save) has a black rail.
    *
    * The layer itself becomes the rail. The casing and ties are two more lines
-   * on the same route, kept on the layer as its `decorations` and each linked
-   * back to it, so a click on any of them finds the same section. So are the
-   * section's bridges, where it crosses lakes, the sea or rivers (see
-   * bridges.js): a solid deck over the ties, with a post at each end.
+   * on the same route, kept on the layer as its `decorations`, so they come
+   * off the map with it. So are the section's bridges, where it crosses
+   * lakes, the sea or rivers (see bridges.js): a solid deck over the ties,
+   * with a post at each end.
    *
    * @param {Object} layer - A track layer, created in the rail pane
    * @param {number} ownerId - Id of the player who built the track
@@ -1276,10 +1260,7 @@ export default function useBuildTrack(formatCurrency) {
         L.circleMarker(span.at(-1), { ...BRIDGE_POST_STYLE, pane: BRIDGES_PANE })
       ])
     ]
-    layer.decorations.forEach((decoration) => {
-      decoration.trackLayer = layer
-      decoration.addTo(mapStore.map)
-    })
+    layer.decorations.forEach((decoration) => decoration.addTo(mapStore.map))
   }
 
   /**

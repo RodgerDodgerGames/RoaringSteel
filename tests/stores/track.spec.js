@@ -136,6 +136,59 @@ describe('track store', () => {
     })
   })
 
+  describe('shortenSegment', () => {
+    it('should keep the first points of a segment at its new cost', () => {
+      const segment = trackStore.addSegment({
+        ownerId: 2,
+        coordinates: line(4),
+        cost: 400,
+        turn: 5
+      })
+
+      expect(trackStore.shortenSegment(segment.id, 3, 300)).toBe(true)
+      expect(trackStore.getSegment(segment.id)).toEqual({
+        id: segment.id,
+        ownerId: 2,
+        coordinates: line(3),
+        cost: 300,
+        turn: 5
+      })
+    })
+
+    it('should replace the segment rather than change it, so the map redraws it', () => {
+      const segment = trackStore.addSegment({ ownerId: 1, coordinates: line(3), cost: 300 })
+
+      trackStore.shortenSegment(segment.id, 2, 200)
+
+      expect(trackStore.getSegment(segment.id)).not.toBe(segment)
+      expect(segment.coordinates).toHaveLength(3)
+    })
+
+    it.each([
+      ['fewer than two points', 1],
+      ['every point it has', 3],
+      ['a count that is not a whole number', 2.5]
+    ])('should refuse to keep %s', (_, keep) => {
+      const segment = trackStore.addSegment({ ownerId: 1, coordinates: line(3), cost: 300 })
+
+      expect(trackStore.shortenSegment(segment.id, keep, 200)).toBe(false)
+      expect(trackStore.error).toBeTruthy()
+      expect(trackStore.getSegment(segment.id).coordinates).toHaveLength(3)
+    })
+
+    it('should refuse a cost that is not a non-negative number', () => {
+      const segment = trackStore.addSegment({ ownerId: 1, coordinates: line(3), cost: 300 })
+
+      expect(trackStore.shortenSegment(segment.id, 2, -1)).toBe(false)
+      expect(trackStore.getSegment(segment.id).cost).toBe(300)
+    })
+
+    it('should report a segment it cannot find', () => {
+      expect(trackStore.shortenSegment(99, 2, 0)).toBe(false)
+      expect(trackStore.error).toMatch(/not found/)
+    })
+  })
+
   describe('updateSegmentCoordinates', () => {
     it('should rewrite a reshaped segment in place', () => {
       const segment = trackStore.addSegment({ ownerId: 1, coordinates: line(), cost: 400 })

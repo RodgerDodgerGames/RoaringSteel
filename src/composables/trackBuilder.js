@@ -29,6 +29,10 @@
  * many developed cells around a big city cost more to build through than a
  * small town's one (see `trackPrice` in config/game.js).
  *
+ * Track built this turn can be torn up again, one leg at a time from a
+ * line's far end, for what that leg added to the line's price (see
+ * `removeTrackEnd`).
+ *
  * @module composables/trackBuilder
  */
 
@@ -48,7 +52,8 @@ import {
   trackIndex,
   closedCells
 } from '@/composables/map/buildRules'
-import { isEmptyGrid } from '@/composables/map/cellGrid'
+import { isEmptyGrid, cellContaining } from '@/composables/map/cellGrid'
+import { isWaterCell } from '@/composables/map/water'
 import { pointKey, townKey, liesOnTrack } from '@/composables/network'
 import { formatCurrency } from '@/composables/utils'
 import { startTowns, startRuleMessage } from '@/composables/startRule'
@@ -410,6 +415,158 @@ export function useTrackBuilder() {
     return { ok: true, segment, cost }
   }
 
+  /**
+   * The cells of the towns on the board, as a set, so a point can be checked
+   * for being in one quickly. A town on the shore can be built to across
+   * water, so a line may end in a town's cell even when it is water.
+   */
+  const townCellSet = computed(() => new Set(boardRules.value.townCells))
+
+  /**
+   * Whether a point of a line is out on water: in a lake or sea cell that is
+   * not a town's. A finished line may not end at such a point (see
+   * `lineBlock` in buildRules.js, which judges a line's end the same way).
+   * @param {{lat: number, lng: number}} point - The point
+   * @returns {boolean} True if the point is on water
+   */
+  function isOnWater(point) {
+    const { grid } = boardRules.value
+    if (isEmptyGrid(grid)) return false
+    const cell = cellContaining(point, grid)
+    return cell !== -1 && isWaterCell(grid, cell) && !townCellSet.value.has(cell)
+  }
+
+  /**
+   * What tearing up the far end of a line leaves of it: its last leg comes
+   * off, and so does every leg before that back to the last point on land,
+   * so a bridge comes off whole however many legs it spans — a line may not
+   * be left ending out on the water.
+   *
+   * The map highlights what this returns as the part a click would remove,
+   * and `removeTrackEnd` removes the same part, so the two always agree.
+   *
+   * @param {Array<{lat: number, lng: number}>} coordinates - The line's
+   *   points, from where it starts
+   * @returns {{keep: number, stretch: Array<Object>}} `keep`: how many of
+   *   the line's points are left, from its start — 0 when the whole line
+   *   goes, since a single point is not track; `stretch`: the points of the
+   *   part that comes off, starting from the point it is cut back to (the
+   *   line's first point when it all goes)
+   */
+  function removableEnd(coordinates) {
+    let keep = coordinates.length - 1
+    while (keep >= 2 && isOnWater(coordinates[keep - 1])) keep--
+    if (keep < 2) keep = 0
+    return { keep, stretch: coordinates.slice(Math.max(keep, 1) - 1) }
+  }
+
+  /**
+   * Whether tearing up the end of a line would leave a branch hanging: a
+   * line the player built this turn that starts on the part coming off,
+   * and would then start on nothing it may start on — no town track may
+   * start in, and none of the player's other track.
+   *
+   * Only this turn's lines can start there: the part coming off was built
+   * this turn, so nothing from an earlier turn grew out of it.
+   *
+   * @param {number} playerId - The player tearing up track
+   * @param {Object} segment - The line being cut back
+   * @param {{keep: number, stretch: Array<Object>}} end - What
+   *   `removableEnd` gave for it
+   * @returns {boolean} True if a branch would be left unconnected
+   */
+  function wouldStrandBranch(playerId, segment, { keep, stretch }) {
+    const removed = [{ coordinates: stretch }]
+    const kept = keep ? [{ coordinates: segment.coordinates.slice(0, keep) }] : []
+    const { towns } = startKeys.value
+
+    return trackStore
+      .segmentsBuiltOn(playerId, gameStore.turn)
+      .filter((branch) => branch.id !== segment.id)
+      .some((branch) => {
+        const start = branch.coordinates[0]
+        if (!liesOnTrack(start, removed)) return false
+        if (towns.has(pointKey(start))) return false
+        // The player's track as it would be afterwards, less the branch
+        // itself, which its own start trivially lies on
+        const remaining = trackStore
+          .segmentsForOwner(playerId)
+          .filter((other) => other.id !== segment.id && other.id !== branch.id)
+          .concat(kept)
+        return !liesOnTrack(start, remaining)
+      })
+  }
+
+  /**
+   * Tears up the far end of a line the player built this turn (see
+   * `removableEnd` for how much comes off), and gives them back what it
+   * added to the line's price: the line's price with it, less its price
+   * without it. A line torn up leg by leg in this way refunds exactly what
+   * it cost, though no single leg's own price would add up to that: a line
+   * is priced as a whole, and a cell it crosses twice, or the cell at a
+   * bend shared by two legs, is only charged once (see `linePrice`).
+   *
+   * Refused when it is not the player's turn, when the line is not theirs
+   * from this turn, or when a branch built this turn grows out of the part
+   * that would come off (see `wouldStrandBranch`) — the branch has to go
+   * first.
+   *
+   * @param {number} playerId - The player tearing up track
+   * @param {number} segmentId - The line to cut back
+   * @returns {{ok: boolean, error?: string, refund?: number}} What the
+   *   player got back, or why nothing was removed
+   */
+  function removeTrackEnd(playerId, segmentId) {
+    if (gameStore.isOver) return { ok: false, error: 'The game is over.' }
+    if (playerStore.activePlayer?.id !== playerId) {
+      return { ok: false, error: "It isn't your turn." }
+    }
+    const segment = toRaw(trackStore.getSegment(segmentId))
+    if (!trackStore.isOwnedFromTurn(segment, playerId, gameStore.turn)) {
+      return { ok: false, error: 'Only track you built this turn can be removed.' }
+    }
+
+    const end = removableEnd(segment.coordinates)
+    if (wouldStrandBranch(playerId, segment, end)) {
+      return { ok: false, error: 'Remove your branch track first' }
+    }
+
+    if (!end.keep) {
+      if (!trackStore.removeSegment(segmentId)) {
+        console.error('Could not remove track segment:', trackStore.error)
+        return { ok: false, error: 'That track could not be removed.' }
+      }
+      refund(playerId, segment.cost)
+      return { ok: true, refund: segment.cost }
+    }
+
+    const keptPrice = priceSection(segment.coordinates.slice(0, end.keep)).total
+    if (!Number.isFinite(keptPrice)) {
+      return { ok: false, error: 'That track could not be priced, so it was not removed.' }
+    }
+    // Never more than was paid for the whole line: a price that has crept up
+    // since it was built must not turn a refund into a charge
+    const keptCost = Math.min(segment.cost, keptPrice)
+    if (!trackStore.shortenSegment(segmentId, end.keep, keptCost)) {
+      console.error('Could not shorten track segment:', trackStore.error)
+      return { ok: false, error: 'That track could not be removed.' }
+    }
+    refund(playerId, segment.cost - keptCost)
+    return { ok: true, refund: segment.cost - keptCost }
+  }
+
+  /**
+   * Gives a player back money they put into track this turn: into their
+   * cash, and back into this turn's allowance.
+   * @param {number} playerId - The player
+   * @param {number} amount - How much
+   */
+  function refund(playerId, amount) {
+    if (!playerStore.refundTrackSpend(playerId, amount)) {
+      console.error('Could not refund track:', playerStore.error)
+    }
+  }
+
   return {
     startRule,
     boardRules,
@@ -422,6 +579,8 @@ export function useTrackBuilder() {
     fitLine,
     whyNotBuildable,
     describeBlock,
-    buildSection
+    buildSection,
+    removableEnd,
+    removeTrackEnd
   }
 }

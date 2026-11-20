@@ -60,7 +60,7 @@ const AREA_STYLE = {
 
 /**
  * What every water layer is told, so it is left alone: it takes no clicks,
- * and Geoman neither snaps track to it nor offers it for removal.
+ * and Geoman does not snap track to it.
  */
 const INERT = { interactive: false, pmIgnore: true, snapIgnore: true }
 

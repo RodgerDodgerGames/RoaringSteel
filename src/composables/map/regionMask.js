@@ -39,7 +39,7 @@ const WORLD_RING = [
  * can still be made out, edged with a dark line along the region's border.
  *
  * It takes no clicks, and Geoman leaves it alone: snapping to its border
- * would pull track onto the state line, and removal mode must not offer it.
+ * would pull track onto the state line.
  */
 const MASK_STYLE = {
   pane: MASK_PANE,

@@ -5,8 +5,10 @@
  * layers, so track has an owner, survives a save/load, and can be read by the
  * rest of the game (connection checks, movement, delivery scoring).
  *
- * A segment is one continuous line the player drew in a single build action —
- * the same unit the cost panel calls a "section".
+ * A segment is one continuous line the player drew in a single build action.
+ * Its legs — from one of its points to the next — are what a player tears up
+ * one at a time, from the line's far end back (see `removeTrackEnd` in
+ * trackBuilder.js), so a line can also be shortened after it is built.
  *
  * Segment Object Structure:
  * {
@@ -148,6 +150,46 @@ export const useTrackStore = defineStore('track', () => {
   }
 
   /**
+   * Cut a segment back to its first `keep` points, at a new cost — used when
+   * a player tears up the far end of a line they just built.
+   *
+   * The segment is replaced with a new object rather than changed in place.
+   * The map matches its track layers to segments by the object itself (see
+   * `syncTrackLayers` in useBuildTrack.js), so a new object is what gets the
+   * shortened line redrawn; and it changes the list, which is what the
+   * watchers on the track look for.
+   *
+   * @param {number} id - The segment id.
+   * @param {number} keep - How many of its points to keep, from the start: at
+   *   least two, and fewer than it has.
+   * @param {number} cost - What the shortened segment costs.
+   * @returns {boolean} True if the segment was found and shortened.
+   */
+  function shortenSegment(id, keep, cost) {
+    error.value = null
+
+    const segment = getSegment(id)
+    if (!segment) {
+      error.value = `Track segment with ID ${id} not found`
+      return false
+    }
+
+    if (!Number.isInteger(keep) || keep < 2 || keep >= segment.coordinates.length) {
+      error.value = 'A shortened track segment needs at least two points, and fewer than it had'
+      return false
+    }
+
+    if (!Number.isFinite(cost) || cost < 0) {
+      error.value = 'Track segment cost must be a non-negative number'
+      return false
+    }
+
+    const shortened = { ...segment, coordinates: segment.coordinates.slice(0, keep), cost }
+    segments.value = segments.value.map((s) => (s.id === id ? shortened : s))
+    return true
+  }
+
+  /**
    * Rewrite a segment's coordinates after the player reshapes it on the map.
    * Only the geometry is editable: ownership, price and turn are decided when
    * the track is built, not when a vertex is dragged.
@@ -262,6 +304,7 @@ export const useTrackStore = defineStore('track', () => {
     addSegment,
     getSegment,
     removeSegment,
+    shortenSegment,
     updateSegmentCoordinates,
     isOwnedFromTurn,
     segmentsBuiltOn,

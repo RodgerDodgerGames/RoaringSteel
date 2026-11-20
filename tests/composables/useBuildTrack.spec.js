@@ -12,7 +12,8 @@
  * afterwards was charged for and recorded once per visit.
  *
  * Modes: drawing and removing both act on map clicks, so at most one may be on,
- * and Escape backs out of either. Both happen in the map's Build view: starting
+ * and Escape backs out of either. Removing tears track up a leg at a time,
+ * from the far end of a line. Both happen in the map's Build view: starting
  * either switches the map to it, and switching to the Plan view ends them.
  *
  * Pricing: a line costs the grid cells it crosses, followed live as it is drawn.
@@ -86,14 +87,6 @@ function createFakeMap() {
   /** @returns {Array} Layers on the map that draw a recorded track segment */
   map.trackLayers = () => [...layers].filter((layer) => layer.segmentId != null)
 
-  // Geoman's removal mode, reduced to its on/off state. Like the real thing,
-  // every change is announced on the map with `pm:globalremovalmodetoggled`.
-  let removalMode = false
-  const setRemovalMode = (enabled) => {
-    removalMode = enabled
-    map.fire('pm:globalremovalmodetoggled', { enabled })
-  }
-
   map.pm = {
     // Kept, like the real thing, so a drawn line can be put in the pane
     // Geoman would put it in (see `createDrawnLine`)
@@ -102,9 +95,6 @@ function createFakeMap() {
     setGlobalOptions: (options) => Object.assign(map.pm.globalOptions, options),
     enableDraw: () => {},
     disableDraw: () => {},
-    toggleGlobalRemovalMode: () => setRemovalMode(!removalMode),
-    disableGlobalRemovalMode: () => setRemovalMode(false),
-    globalRemovalModeEnabled: () => removalMode,
     Draw: { Line: {} }
   }
 
@@ -194,6 +184,24 @@ function createDrawnLine(map) {
   return layer
 }
 
+/**
+ * Removal mode's targets on the map: the lines a click tears up track by
+ * @param {Object} map - Fake map from `createFakeMap`
+ * @returns {Array} The targets
+ */
+function removalTargets(map) {
+  return map.allLayers().filter((layer) => layer.options.pane === 'trackRemoval')
+}
+
+/**
+ * A line's points, as plain `[lat, lng]` pairs, for comparing
+ * @param {Object} layer - A line on the map
+ * @returns {Array<Array<number>>} Its points
+ */
+function pointsOf(layer) {
+  return layer.getLatLngs().map(({ lat, lng }) => [lat, lng])
+}
+
 /** Presses Escape the way the browser would deliver it */
 function pressEscape() {
   window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
@@ -271,13 +279,15 @@ describe('useBuildTrack', () => {
       expect(town.listens('click')).toBe(false)
     })
 
-    it('should switch off removal mode the player left on', () => {
+    it('should switch off removal mode the player left on, targets and all', () => {
+      trackStore.addSegment(savedSegment)
       const { wrapper, api } = mountBuildTrack(map)
       api.toggleRemoveMode()
 
       wrapper.unmount()
 
-      expect(map.pm.globalRemovalModeEnabled()).toBe(false)
+      expect(api.isRemoving.value).toBe(false)
+      expect(removalTargets(map)).toHaveLength(0)
     })
 
     it('should clear any "not allowed" cursor left on the map', () => {
@@ -317,15 +327,6 @@ describe('useBuildTrack', () => {
 
       api.toggleRemoveMode()
       api.toggleRemoveMode()
-
-      expect(api.isRemoving.value).toBe(false)
-    })
-
-    it('should follow removal mode switched off from outside the controls', () => {
-      const { api } = mountBuildTrack(map)
-      api.toggleRemoveMode()
-
-      map.pm.disableGlobalRemovalMode()
 
       expect(api.isRemoving.value).toBe(false)
     })
@@ -383,12 +384,6 @@ describe('useBuildTrack', () => {
     })
   })
 
-  /**
-   * Track is drawn as three lines — rail, casing and ties — and a click in
-   * removal mode lands on whichever is under the cursor. Every one of them has
-   * to act on the whole section, or a click on the edge of the track would
-   * tear up only part of the drawing and leave the rest behind.
-   */
   describe('track built or loaded without the map', () => {
     it('should draw a section built through the track builder', async () => {
       mountBuildTrack(map)
@@ -597,61 +592,127 @@ describe('useBuildTrack', () => {
     })
   })
 
-  describe('removing a section by clicking one of its lines', () => {
-    /** The pane each of a section's three lines is drawn in */
-    const linePanes = { rail: 'trackRails', casing: 'trackCasing', ties: 'trackTies' }
+  /**
+   * In removal mode the far end of each line built this turn has a target
+   * over it, which lights up under the cursor; clicking it tears up that
+   * leg alone, and the target moves back to the line's new end. Each test
+   * has a line of three points running east from a town, one cell apart.
+   */
+  describe('removing track by clicking the end of a line', () => {
+    /** A row of three cells, each costing 1000, from the town east */
+    const rowGrid = makeTestGrid({
+      rows: 1,
+      cols: 3,
+      south: 40 - CELL / 2,
+      west: -100 - CELL / 2,
+      cell: () => ({ landCover: 1000 })
+    })
+    const points = [0, 1, 2].map((i) => ({ lat: 40, lng: -100 + i * CELL }))
+    /** Ann's line, built this turn and paid for */
+    const annsLine = { ownerId: 1, coordinates: points, cost: 3000, turn: 0 }
 
-    /**
-     * Finds the one line of the given kind on the map.
-     * @param {Object} map - Fake map
-     * @param {string} kind - 'rail', 'casing' or 'ties'
-     * @returns {Object} The layer
-     */
-    function lineOfKind(map, kind) {
-      return map.allLayers().find((layer) => layer.options.pane === linePanes[kind])
+    /** Mounts with the row of cells, and removal mode switched on */
+    function mountRemoving() {
+      const mounted = mountBuildTrack(map, undefined, rowGrid)
+      mounted.api.toggleRemoveMode()
+      return mounted
     }
 
-    /**
-     * Clicks a line in removal mode the way Geoman handles it: the clicked
-     * layer comes off the map, then the removal is announced on the map.
-     * @param {Object} map - Fake map
-     * @param {Object} layer - The line clicked
-     */
-    function removeByClick(map, layer) {
-      map.removeLayer(layer)
-      map.fire('pm:remove', { layer })
-    }
+    it('should put a target over the last leg of a line built this turn', () => {
+      trackStore.addSegment(annsLine)
+      mountRemoving()
 
-    it.each(['rail', 'casing', 'ties'])(
-      'should tear up the whole section when its %s is clicked',
-      (kind) => {
-        trackStore.addSegment(savedSegment)
-        mountBuildTrack(map)
+      expect(removalTargets(map)).toHaveLength(1)
+      expect(pointsOf(removalTargets(map)[0])).toEqual([
+        [40, points[1].lng],
+        [40, points[2].lng]
+      ])
+    })
 
-        removeByClick(map, lineOfKind(map, kind))
+    it('should tear up only the last leg when its target is clicked, and refund it', async () => {
+      trackStore.addSegment(annsLine)
+      mountRemoving()
 
-        expect(trackStore.segments).toHaveLength(0)
-        expect(map.allLayers()).toHaveLength(0)
-      }
-    )
+      removalTargets(map)[0].fire('click')
+      await nextTick()
 
-    it.each(['rail', 'casing', 'ties'])(
-      "should redraw another player's section once when its %s is clicked",
-      (kind) => {
-        // Owned by a player other than Ann, whose turn it is
-        trackStore.addSegment({ ...savedSegment, ownerId: 2 })
-        mountBuildTrack(map)
+      expect(trackStore.segments[0].coordinates).toEqual(points.slice(0, 2))
+      expect(trackStore.segments[0].cost).toBe(2000)
+      expect(playerStore.players[0].cash).toBe(21000)
+      // The rail on the map is the shortened line
+      expect(map.trackLayers().map(pointsOf)).toEqual([
+        [
+          [40, points[0].lng],
+          [40, points[1].lng]
+        ]
+      ])
+    })
 
-        removeByClick(map, lineOfKind(map, kind))
+    it("should move the target back to the line's new end", async () => {
+      trackStore.addSegment(annsLine)
+      mountRemoving()
 
-        expect(trackStore.segments).toHaveLength(1)
-        // One rail, one casing and one set of ties: nothing lost, nothing doubled
-        expect(map.allLayers().map((layer) => layer.options.pane)).toEqual(
-          expect.arrayContaining(Object.values(linePanes))
-        )
-        expect(map.allLayers()).toHaveLength(3)
-      }
-    )
+      removalTargets(map)[0].fire('click')
+      await nextTick()
+
+      expect(removalTargets(map)).toHaveLength(1)
+      expect(pointsOf(removalTargets(map)[0])).toEqual([
+        [40, points[0].lng],
+        [40, points[1].lng]
+      ])
+    })
+
+    it('should light a target up only while the cursor is over it', () => {
+      trackStore.addSegment(annsLine)
+      mountRemoving()
+      const [target] = removalTargets(map)
+
+      target.fire('mouseover')
+      expect(target.options.opacity).toBeGreaterThan(0)
+
+      target.fire('mouseout')
+      expect(target.options.opacity).toBe(0)
+    })
+
+    it("should offer no target on another player's track or an earlier turn's", () => {
+      trackStore.addSegment({ ...annsLine, ownerId: 2 })
+      trackStore.addSegment({ ...annsLine, turn: 0 })
+      useGameStore().advanceTurn()
+      trackStore.addSegment({ ...annsLine, turn: 1 })
+      mountRemoving()
+
+      expect(removalTargets(map)).toHaveLength(1)
+    })
+
+    it('should say why a click is refused while a branch grows out of the end', async () => {
+      trackStore.addSegment(annsLine)
+      const branch = trackStore.addSegment({
+        ownerId: 1,
+        coordinates: [points[2], { lat: 40 + CELL, lng: points[2].lng }],
+        cost: 1000,
+        turn: 0
+      })
+      const { api } = mountRemoving()
+      const lineTarget = removalTargets(map).find((target) =>
+        target.getLatLngs()[0].equals(L.latLng(points[1]))
+      )
+
+      lineTarget.fire('click')
+      await nextTick()
+
+      expect(api.buildError.value).toBe('Remove your branch track first')
+      expect(trackStore.segments).toHaveLength(2)
+      expect(trackStore.getSegment(branch.id)).toBeDefined()
+    })
+
+    it('should take its targets off the map when switched off', () => {
+      trackStore.addSegment(annsLine)
+      const { api } = mountRemoving()
+
+      api.toggleRemoveMode()
+
+      expect(removalTargets(map)).toHaveLength(0)
+    })
   })
 
   /**

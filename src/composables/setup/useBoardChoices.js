@@ -22,20 +22,26 @@ const STATES_FILE = '/data/us-states.geojson'
 
 /**
  * The boards to choose from, by grouping.
+ * @param {string|null} [initialGrouping] - The id of the grouping to open
+ *   on: the one offering the board already chosen, when the player comes
+ *   back to change it (see `boardGrouping`). The first grouping offered when
+ *   it is left out or names no grouping.
  * @returns {Object} `groupings` (every way of choosing), `grouping` (the
  *   id of the one shown), `boards` (its boards), `stateFeatures` (every
  *   state's outline, for drawing the state lines), `error` (why the outlines
  *   could not be had, or null) and `load` (fetches the outlines)
  */
-export function useBoardChoices() {
+export function useBoardChoices(initialGrouping = null) {
   /** Every state's outline, once fetched */
   const stateFeatures = shallowRef([])
 
   /** Every way of choosing a board, in the order the screen offers them */
   const groupings = boardGroupings()
 
-  /** The grouping shown on the map: the first offered, when the screen opens */
-  const grouping = ref(groupings[0].id)
+  /** The grouping shown on the map: the one asked for, or else the first offered */
+  const grouping = ref(
+    groupings.some(({ id }) => id === initialGrouping) ? initialGrouping : groupings[0].id
+  )
 
   /** Why the outlines could not be fetched, for the screen; null if they were */
   const error = ref(null)

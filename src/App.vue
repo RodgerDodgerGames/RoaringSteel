@@ -6,6 +6,7 @@ import * as turf from '@turf/turf'
 
 // import components
 import AreaSelectView from '@/views/AreaSelectView.vue'
+import SetupConfirmView from '@/views/SetupConfirmView.vue'
 import GameView from './views/GameView.vue'
 import WelcomeView from './views/WelcomeView.vue'
 import GridProgressModal from './components/setup/GridProgressModal.vue'
@@ -41,7 +42,10 @@ useTheme()
 
 // STATE
 
-// which view should be shown (start with welcome)
+// which view should be shown (start with welcome). A new game is set up in
+// three steps, each its own view: the players (welcome), the board
+// (areaSelect), then the Confirm Setup page (setupConfirm), which starts
+// the game.
 const currentView = ref('welcome')
 
 // which step the welcome view opens on (see WelcomeView's initialPane)
@@ -72,14 +76,32 @@ const showProgressModal = computed(() => isSettingUpGame.value)
 const viewComponents = {
   welcome: WelcomeView,
   areaSelect: AreaSelectView,
+  setupConfirm: SetupConfirmView,
   game: GameView
 }
 
 // METHODS
 
-// Handle players confirmed event from WelcomeView
-function handlePlayersConfirmed() {
-  debug.log('Players confirmed, navigating to area select')
+// The players are chosen: on to choosing the board
+function handlePlayersChosen() {
+  debug.log('Players chosen, navigating to area select')
+  currentView.value = 'areaSelect'
+}
+
+// Back to the players, from the board or from Confirm Setup. The welcome
+// view opens straight on them, with the players as they were left.
+function handleEditPlayers() {
+  welcomePane.value = 'playerSelect'
+  currentView.value = 'welcome'
+}
+
+// The board is chosen: on to the Confirm Setup page
+function handleBoardChosen() {
+  currentView.value = 'setupConfirm'
+}
+
+// Back to the board, from Confirm Setup. The board chosen stays chosen.
+function handleChangeBoard() {
   currentView.value = 'areaSelect'
 }
 
@@ -132,7 +154,8 @@ async function handlePlayGameClick() {
     await townsStore.dropUnreachableTowns()
 
     // Build the demand deck, then deal every player their opening hand in
-    // turn order — the players were confirmed before the region was picked.
+    // turn order — the Confirm Setup page committed the players before
+    // asking for the game to be set up.
     // After the grid, as payoffs are priced by the terrain each haul crosses
     // (see payoffs.js).
     await demandCardsStore.generateDemandCards()
@@ -189,7 +212,10 @@ function handleSetupCancel() {
       :is="viewComponents[currentView]"
       v-if="currentView"
       v-bind="viewProps"
-      @players-confirmed="handlePlayersConfirmed"
+      @players-chosen="handlePlayersChosen"
+      @edit-players="handleEditPlayers"
+      @board-chosen="handleBoardChosen"
+      @change-board="handleChangeBoard"
       @game-loaded="handleGameLoaded"
       @play-game="handlePlayGameClick"
       @new-game="handleNewGame"

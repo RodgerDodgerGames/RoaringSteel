@@ -76,6 +76,27 @@ describe('useBoardChoices', () => {
     ])
   })
 
+  it('should open on the grouping asked for, as when coming back to change the board', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => ({ features: STATES }) }))
+    )
+    const choices = useBoardChoices(STATES_GROUPING)
+    await choices.load()
+    await settle()
+
+    expect(choices.grouping.value).toBe(STATES_GROUPING)
+    expect(choices.boards.value.map((b) => b.properties.NAME)).toEqual([
+      'Connecticut',
+      'Rhode Island'
+    ])
+  })
+
+  it('should open on the first grouping when the one asked for does not exist', () => {
+    expect(useBoardChoices(null).grouping.value).toBe('sub-regions')
+    expect(useBoardChoices('nonsense').grouping.value).toBe('sub-regions')
+  })
+
   it('should say so when the outlines cannot be had', async () => {
     vi.stubGlobal(
       'fetch',

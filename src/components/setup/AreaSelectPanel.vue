@@ -4,13 +4,15 @@
   - buttons for the ways of choosing a board — a grouping of regions, or
     single states — which change what the map offers;
   - the board chosen, and how many states it covers;
-  - a Settings button, an About button, and "Play Game", which is disabled
-    until a board is chosen.
+  - "Back", to the players; an About button; and "Continue", to the Confirm
+    Setup page, which is disabled until a board is chosen. There is no
+    Settings button: the settings are on the Confirm Setup page, next.
 
   @prop region - The board chosen (GeoJSON feature), or null
   @prop groupings - The ways of choosing a board: [{id, label}]
   @model grouping - The id of the way being shown
-  @emits play-game - Triggered when user clicks Play Game button
+  @emits back - The player wants to go back to the players
+  @emits continue - The player has chosen their board
 -->
 <template>
   <div class="area-select-panel">
@@ -20,10 +22,10 @@
       </div>
       <div class="level-right">
         <div class="buttons">
-          <SettingsButton />
+          <button class="button is-warning is-light" @click="emit('back')">Back</button>
           <AboutButton />
-          <button class="button is-primary" :disabled="!region" @click="emit('play-game')">
-            Play Game
+          <button class="button is-primary" :disabled="!region" @click="emit('continue')">
+            Continue
           </button>
         </div>
       </div>
@@ -51,9 +53,8 @@
 
 <script setup>
 import { computed } from 'vue'
-import SettingsButton from '@/components/SettingsButton.vue'
 import AboutButton from '@/components/AboutButton.vue'
-import { boardStates } from '@/composables/setup/boards'
+import { boardLabel } from '@/composables/setup/boards'
 
 const props = defineProps({
   region: { type: Object, default: null },
@@ -63,15 +64,10 @@ const props = defineProps({
 /** The way of choosing being shown on the map */
 const grouping = defineModel('grouping', { type: String, required: true })
 
-const emit = defineEmits(['play-game'])
+const emit = defineEmits(['back', 'continue'])
 
-/** What the panel says about the board chosen */
-const chosen = computed(() => {
-  if (!props.region) return 'Click a state or region on the map'
-  const count = boardStates(props.region).length
-  const states = count > 1 ? ` (${count} states)` : ''
-  return `Board: ${props.region.properties.NAME}${states}`
-})
+/** What the panel says about the board chosen, or how to choose one */
+const chosen = computed(() => boardLabel(props.region) ?? 'Click a state or region on the map')
 </script>
 
 <style scoped>

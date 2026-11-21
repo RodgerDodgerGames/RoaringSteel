@@ -14,8 +14,11 @@
   - carrying on toward a town or point a run of more than one turn is still
     heading for: it is chosen in the list already, with Confirm in place of
     Go
-  - in a town: picking up what it produces, delivering loads the player's
-    demand cards want there, and dropping loads
+  - how the last move went (arrived, stopped on the way, track fees paid, or
+    why it could not go)
+
+  Loading and unloading are not here: they are on the train's cars in the
+  dock's Train section (see TrainPanel).
 
   Kept plain on purpose for now: the rules and choices are all live, the look
   is a first pass. Everything here goes through useTrainControls and the
@@ -35,29 +38,22 @@ import { formatCurrency } from '@/composables/utils'
 
 const {
   train,
-  town,
   distanceLeft,
   distance,
   trainType,
   moveBlock,
-  loadBlock,
   runChoices,
   hasOthersTrackChoices,
   othersTrackShown,
   toggleOthersTrack,
   headingChoiceId,
   status,
-  pickups,
-  deliveries,
   towns,
-  notice,
+  moveNotice,
   nameOf,
   colorOf,
   place,
   run,
-  pickUp,
-  deliver,
-  drop,
   isPicking,
   startPicking,
   stopPicking
@@ -265,60 +261,14 @@ const runButtonText = computed(() => {
         }}</span>
       </button>
 
-      <!-- In a town: load and unload -->
-      <template v-if="town && !loadBlock">
-        <div v-if="deliveries.length" class="move-controls__group">
-          <span class="move-controls__label">Deliver here</span>
-          <div class="buttons are-small">
-            <button
-              v-for="option in deliveries"
-              :key="`${option.cardId}-${option.line}`"
-              class="button is-success"
-              @click="deliver(option.cardId, option.line)"
-            >
-              {{ option.demand.industry }} for {{ formatCurrency(option.demand.payoff) }}
-            </button>
-          </div>
-        </div>
-
-        <div v-if="pickups.length" class="move-controls__group">
-          <span class="move-controls__label">Pick up here</span>
-          <div class="buttons are-small">
-            <button
-              v-for="option in pickups"
-              :key="option.industry"
-              class="button"
-              :disabled="!option.hasRoom"
-              :title="option.hasRoom ? '' : 'Your train is full'"
-              @click="pickUp(option.industry)"
-            >
-              {{ option.industry }}
-            </button>
-          </div>
-        </div>
-
-        <div v-if="train.loads.length" class="move-controls__group">
-          <span class="move-controls__label">Drop a load here (for nothing)</span>
-          <div class="buttons are-small">
-            <button
-              v-for="(load, index) in train.loads"
-              :key="`${load}-${index}`"
-              class="button is-light"
-              @click="drop(load)"
-            >
-              {{ load }}
-            </button>
-          </div>
-        </div>
-      </template>
-
+      <!-- How the last move went -->
       <p
-        v-if="notice"
+        v-if="moveNotice"
         class="notification p-2 mb-0"
-        :class="notice.isError ? 'is-danger is-light' : 'is-info is-light'"
+        :class="moveNotice.isError ? 'is-danger is-light' : 'is-info is-light'"
         role="status"
       >
-        {{ notice.text }}
+        {{ moveNotice.text }}
       </p>
     </template>
   </div>
@@ -352,15 +302,5 @@ const runButtonText = computed(() => {
 .move-controls__left {
   flex: none;
   white-space: nowrap;
-}
-
-.move-controls__group .buttons {
-  margin-top: 0.25rem;
-  margin-bottom: 0;
-}
-
-.move-controls__label {
-  font-size: 0.8rem;
-  font-weight: 700;
 }
 </style>

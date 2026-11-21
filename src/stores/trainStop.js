@@ -14,8 +14,16 @@
  * Computer players load through the trains store directly and never get a
  * card.
  *
- * Every action answers in a sentence for the player (`notice`), kept here so
- * the dock and the card show the same one, whichever the player used.
+ * Every action answers in a sentence for the player, kept here so the dock
+ * and the card show the same one, whichever the player used. Loading and
+ * unloading answer in `notice`, which the dock's Train section and the stop
+ * card show beside their load buttons. Placing and running the train answer
+ * in `moveNotice`, which the dock's "Move your train" step shows beside its
+ * Go button. Each message sits by the button that caused it. A move clears
+ * the last load message, which was about the town the train has just left.
+ *
+ * `cars` lays the train out one car per load it can carry, with the
+ * deliveries each car's load can make here, for the Train section to draw.
  *
  * The rules are all in the trains store; this only puts them in front of a
  * person.
@@ -57,8 +65,11 @@ export const useTrainStopStore = defineStore('trainStop', () => {
   /** The id of the town whose stop card is open, or null */
   const stopTownId = ref(null)
 
-  /** What the last action with the train did, or why it could not: { text, isError } */
+  /** What the last load action did, or why it could not: { text, isError } */
   const notice = ref(null)
+
+  /** What the last move of the train did, or why it could not: { text, isError } */
+  const moveNotice = ref(null)
 
   // GETTERS
 
@@ -117,6 +128,36 @@ export const useTrainStopStore = defineStore('trainStop', () => {
       : []
   )
 
+  /**
+   * The train laid out one car per load it can carry, in the order the loads
+   * were picked up, for the Train section to draw. Each car has its load (or
+   * null when empty), the load's industry code for its icon, and the
+   * deliveries it can make where the train stands.
+   *
+   * A delivery goes on the first car carrying that load. Two cars of Coal
+   * and one card paying for Coal here give the first car the Deliver button
+   * and the second none, rather than two buttons for the one delivery. When
+   * more than one card pays for the load here, that car gets one delivery
+   * per card, so the player still chooses which card to cash in. After a
+   * delivery the loads close up, and the next car of the same load becomes
+   * the first, taking any delivery still left.
+   * @returns {Array<{load: string|null, code: number|undefined,
+   *   deliveries: Array<{cardId: number, line: number, demand: Object, code: number}>}>}
+   */
+  const cars = computed(() =>
+    Array.from({ length: cargo.value.capacity }, (_, index) => {
+      const load = cargo.value.loads[index] ?? null
+      const isFirstOfItsLoad = load !== null && cargo.value.loads.indexOf(load) === index
+      return {
+        load,
+        code: load === null ? undefined : townsStore.industryCodes.get(load),
+        deliveries: isFirstOfItsLoad
+          ? deliveries.value.filter(({ demand }) => demand.industry === load)
+          : []
+      }
+    })
+  )
+
   /** The town whose stop card is showing: open, with the train still there */
   const stopTown = computed(() =>
     loadingTown.value && loadingTown.value.msa === stopTownId.value ? loadingTown.value : null
@@ -141,15 +182,38 @@ export const useTrainStopStore = defineStore('trainStop', () => {
   }
 
   /**
-   * Shows how an action went.
+   * Puts how an action went into a sentence for the player.
+   * @param {{ok: boolean, error?: string}} result - What the trains store answered
+   * @param {Function} describe - Makes the sentence for a success, from the result
+   * @returns {{text: string, isError: boolean}} The message
+   */
+  function messageFor(result, describe) {
+    return result.ok
+      ? { text: describe(result), isError: false }
+      : { text: result.error, isError: true }
+  }
+
+  /**
+   * Shows how a load action went (picking up, delivering, dropping).
    * @param {{ok: boolean, error?: string}} result - What the trains store answered
    * @param {Function} describe - Makes the sentence for a success, from the result
    * @returns {Object} The result, passed through
    */
   function report(result, describe) {
-    notice.value = result.ok
-      ? { text: describe(result), isError: false }
-      : { text: result.error, isError: true }
+    notice.value = messageFor(result, describe)
+    return result
+  }
+
+  /**
+   * Shows how placing or running the train went. A train that has moved has
+   * left the town the last load message was about, so that message goes.
+   * @param {{ok: boolean, error?: string}} result - What the trains store answered
+   * @param {Function} describe - Makes the sentence for a success, from the result
+   * @returns {Object} The result, passed through
+   */
+  function reportMove(result, describe) {
+    moveNotice.value = messageFor(result, describe)
+    if (result.ok) notice.value = null
     return result
   }
 
@@ -184,23 +248,26 @@ export const useTrainStopStore = defineStore('trainStop', () => {
     return report(trainsStore.dropLoad(playerId.value, industry), () => `Dropped ${industry}.`)
   }
 
-  /** Closes the card and forgets the last report, as a turn or game ends */
+  /** Closes the card and forgets the last reports, as a turn or game ends */
   function reset() {
     stopTownId.value = null
     notice.value = null
+    moveNotice.value = null
   }
 
   return {
     stopTownId,
     notice,
+    moveNotice,
     loadingTown,
     cargo,
+    cars,
     pickups,
     deliveries,
     stopTown,
     arrive,
     closeStop,
-    report,
+    reportMove,
     pickUp,
     deliver,
     drop,

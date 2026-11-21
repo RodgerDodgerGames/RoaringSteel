@@ -233,6 +233,25 @@ function regionMask(grid, isInRegion) {
   return inside
 }
 
+/**
+ * The town in each town's grid cell, as a track point, so a line passing
+ * through the cell can go through the town itself and join it to the network
+ * on the way (the network only joins a town that track has a point on — see
+ * network.js). Where two towns share a cell, the first one listed has it.
+ * @param {Array<Object>} towns - Every town, each with lat and lon
+ * @param {Object} grid - The grid
+ * @returns {Map<number, {lat: number, lng: number}>} The town's point, by cell
+ */
+export function townsByCell(towns, grid) {
+  const townIn = new Map()
+  towns.forEach((town) => {
+    const index = findCell({ lat: town.lat, lng: town.lon }, grid)
+    if (index === -1 || townIn.has(index)) return
+    townIn.set(index, { lat: town.lat, lng: town.lon })
+  })
+  return townIn
+}
+
 /** How many times a line that breaks a build rule is searched for again */
 const MAX_ATTEMPTS = 6
 
@@ -292,12 +311,7 @@ export function searchBoard(rules, towns) {
   })
 
   // The town in each town cell, so a line through the cell goes through it
-  const townIn = new Map()
-  towns.forEach((town) => {
-    const index = findCell({ lat: town.lat, lng: town.lon }, grid)
-    if (index === -1 || townIn.has(index)) return
-    townIn.set(index, { lat: town.lat, lng: town.lon })
-  })
+  const townIn = townsByCell(towns, grid)
 
   // What a line costs in the cell it starts in, and in each cell it steps
   // into after, with the climb into it (see `stepPrices`)

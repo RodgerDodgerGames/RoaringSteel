@@ -696,18 +696,18 @@ describe('useGamePersistence', () => {
       expect(dana.color.toLowerCase()).not.toBe('red')
     })
 
-    it('should start the new setup with as many computer players as the game had', () => {
+    it('should start the new setup with the computer players the game had, each of its kind', () => {
       playerStore.setPlayers([
         ...playerStore.players,
-        { id: 4, name: 'Bot 1', color: 'purple', cash: 0, isTurn: false, isBot: true },
+        { id: 4, name: 'Fast Bot 1', color: 'purple', cash: 0, isBot: true, botKind: 'fast' },
         { id: 5, name: 'Bot 2', color: 'orange', cash: 0, isTurn: false, isBot: true }
       ])
 
       persistence.startNewGame()
 
-      // The people as rows to edit, the computer players as a count
+      // The people as rows to edit, the computer players by kind
       expect(playerStore.draftPlayers.map(({ name }) => name)).toEqual(['Alice', 'Bob', 'Charlie'])
-      expect(playerStore.draftBotCount).toBe(2)
+      expect(playerStore.draftBots).toEqual(['fast', 'standard'])
     })
 
     it('should start the new setup empty when the game had no players', () => {

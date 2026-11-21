@@ -6,8 +6,10 @@
  * builder, throwing in a hand through the turn composable — so a computer
  * player is held to exactly the rules a person is, and cannot do anything a
  * person could not. What it decides to do comes from the planner (see
- * botPlanner.js) and the track it lays out from the pathfinder (see
- * botPathfinder.js).
+ * botPlanner.js), and the track it lays out from its kind (see
+ * config/botKinds.js): the Standard bot's search for the cheapest line (see
+ * botPathfinder.js), or the Fast Bot's straight lines (see
+ * botStraightLine.js). Every kind plays the turn below the same way.
  *
  * A turn, in order:
  * 1. In an operating round, if no demand in hand can be worked toward —
@@ -45,7 +47,9 @@ import { useTurn } from '@/composables/useTurn'
 import { useVictory } from '@/composables/victory'
 import { townKey } from '@/composables/network'
 import { botStartTowns } from '@/composables/startRule'
-import { searchBoard, costField, planLine, affordableSection } from './botPathfinder'
+import { botKindOr } from '@/config/botKinds'
+import { searchBoard, costField, planLine, affordableSection, townsByCell } from './botPathfinder'
+import { straightRouter } from './botStraightLine'
 import {
   upgradeFor,
   demandLines,
@@ -124,13 +128,80 @@ export function useBot() {
     return { joined, isJoined, joinedNames, lines }
   }
 
+  /** A computer player's kind (a key of BOT_KINDS) */
+  const kindOf = (playerId) =>
+    botKindOr(playerStore.players.find((p) => p.id === playerId)?.botKind)
+
   /**
-   * Everything the player needs to plan building: what they hold, the search
-   * board, where they would build from, what track to anywhere would cost,
-   * every demand in hand weighed up (see `reviewDemands`) and those worth
-   * working toward (see `workableDemands`). Runs searches
-   * over the whole grid, so it is only asked for when building or deciding
-   * whether to throw in the hand.
+   * How each kind of computer player plans track (see config/botKinds.js),
+   * for one look at the board: given what the look shares (`look`), a
+   * function that, given where the player may start building, hands back
+   * `costTo(point)`, what track to a point would cost, and `lineTo(point)`,
+   * the line they would build there as `{line, route, blocked}` (see
+   * `straightRouter`).
+   *
+   * - Standard: one search from the starting places out to every town the
+   *   player could build into answers every cost, and the line to a town is
+   *   planned from it (see `planLine`).
+   * - Fast: straight lines, searched only where one breaks a rule (see
+   *   botStraightLine.js).
+   *
+   * Every kind in BOT_KINDS has one; `routerFor` refuses a kind without.
+   */
+  const ROUTERS = {
+    standard: (look) => (sources) => {
+      const field = costField(look.board(), sources, { targets: look.townPoints })
+      return {
+        costTo: (point) => field.costTo(point),
+        lineTo: (point) => {
+          const line = planLine(look.board(), sources, point, field)
+          return { line, route: line ? 'search' : null, blocked: null }
+        }
+      }
+    },
+    fast: (look) => {
+      const townIn = townsByCell(townsStore.towns, look.rules.grid)
+      const price = (points) => builder.priceSection(points).total
+      return (sources) =>
+        straightRouter({ rules: look.rules, sources, townIn, price, board: look.board })
+    }
+  }
+
+  /**
+   * How a kind of computer player plans track, for one look at the board
+   * (see `ROUTERS`). What the look shares between every router made from it:
+   * the build rules as they stand, every town the player could build into
+   * (`townPoints`), and the search's board, worked out the first time any
+   * router needs it — so a Fast Bot whose straight lines all keep to the
+   * rules never works it out at all.
+   *
+   * @param {string} kind - The computer player's kind (a key of BOT_KINDS)
+   * @param {Array<{lat: number, lng: number}>} townPoints - Every town the
+   *   player could build into
+   * @returns {Function} (sources) => {costTo, lineTo}
+   */
+  function routerFor(kind, townPoints) {
+    if (!ROUTERS[kind]) {
+      throw new Error(`No way of planning track for computer players of kind ${kind}`)
+    }
+    const rules = builder.buildRules.value
+    let board = null
+    const look = {
+      rules,
+      townPoints,
+      board: () => (board ??= searchBoard(rules, townsStore.towns))
+    }
+    return ROUTERS[kind](look)
+  }
+
+  /**
+   * Everything the player needs to plan building: what they hold, where they
+   * would build from, what track to anywhere would cost and the line they
+   * would build there (by their kind, see `routerFor`), every demand in hand
+   * weighed up (see `reviewDemands`) and those worth working toward (see
+   * `workableDemands`). For the Standard bot this runs searches over the
+   * whole grid, so it is only asked for when building or deciding whether to
+   * throw in the hand.
    *
    * A player with track builds on from it, which keeps their network in one
    * piece so the train can reach all of it. A player with none yet picks a
@@ -141,15 +212,14 @@ export function useBot() {
    * there is picked, and planned from as though already joined.
    *
    * @param {number} playerId - The player
-   * @returns {Object} The picture: `sources` to build from and the search
-   *   from them (`field`, see `costField`), `isJoined` and `costTo` for any
-   *   town, the demand `review` and the workable `options` from it, and —
-   *   for a player with no track yet — the `start` city picked, besides what
-   *   `holdings` gives
+   * @returns {Object} The picture: `sources` to build from, `isJoined` and
+   *   `costTo` for any town, `lineTo` for the line to a point (see
+   *   `routerFor`), the demand `review` and the workable `options` from it,
+   *   and — for a player with no track yet — the `start` city picked,
+   *   besides what `holdings` gives
    */
   function survey(playerId) {
     const held = holdings(playerId)
-    const board = searchBoard(builder.buildRules.value, townsStore.towns)
 
     // Every question the plan asks of a search is what track to some town
     // would cost, or the line there, so each search stops once it has
@@ -159,11 +229,12 @@ export function useBot() {
     // without asking.
     const open = new Set(builder.openTowns(playerId))
     const townPoints = [...open].map(pointOf)
+    const routeFrom = routerFor(kindOf(playerId), townPoints)
 
     /** The plan if the player builds from these points */
     const planFrom = (sources, isJoined) => {
-      const field = costField(board, sources, { targets: townPoints })
-      const costTo = (town) => (open.has(town) ? field.costTo(pointOf(town)) : Infinity)
+      const router = routeFrom(sources)
+      const costTo = (town) => (open.has(town) ? router.costTo(pointOf(town)) : Infinity)
       const review = reviewDemands(held.lines, {
         towns: townsStore.towns,
         isJoined,
@@ -171,11 +242,18 @@ export function useBot() {
         loads: trainsStore.trainOf(playerId).loads,
         cash: cashOf(playerId)
       })
-      return { sources, field, isJoined, costTo, review, options: workableDemands(review) }
+      return {
+        sources,
+        lineTo: router.lineTo,
+        isJoined,
+        costTo,
+        review,
+        options: workableDemands(review)
+      }
     }
 
     const own = trackStore.segmentsForOwner(playerId).flatMap(({ coordinates }) => coordinates)
-    if (own.length) return { ...held, board, ...planFrom(own, held.isJoined) }
+    if (own.length) return { ...held, ...planFrom(own, held.isJoined) }
 
     const destinations = held.lines.map(({ demand }) => demand.destination)
     const requireMajorCity = gameStore.gameSettings.requireMajorCityStart
@@ -196,7 +274,7 @@ export function useBot() {
     const [best] = starts
       .filter((start) => Number.isFinite(cheapestDemand(start)))
       .sort((a, b) => cheapestDemand(a) - cheapestDemand(b))
-    return { ...held, board, ...(best ?? planFrom([], held.isJoined)) }
+    return { ...held, ...(best ?? planFrom([], held.isJoined)) }
   }
 
   /**
@@ -479,10 +557,13 @@ export function useBot() {
    * for and why, what the player could spend (`available`, the turn's
    * allowance or cash, whichever is less) and the `budget` for this town
    * after any limit of its own, then — once a line is found — the whole
-   * line's price and length in cells (`linePrice`, `lineCells`) against what
-   * was built (`built`, `builtCells`), or `noLine` when no buildable line
-   * reaches the town. The first try also records the demands as weighed up
-   * for building (see `playTurn`).
+   * line's price and length in cells (`linePrice`, `lineCells`) and how it
+   * was found (`route`: 'straight' or 'search', see `routerFor`) against
+   * what was built (`built`, `builtCells`), or `noLine` when no buildable
+   * line reaches the town. For a Fast Bot whose straight line broke a build
+   * rule, `straightBlocked` names the rule (a `lineBlock` reason). The first
+   * try also records the demands as weighed up for building (see
+   * `playTurn`).
    *
    * @returns {string} Why building stopped, for the trace
    */
@@ -511,8 +592,9 @@ export function useBot() {
       trace.build.push(step)
       if (budget <= 0) return 'no cash to spare above what winning needs'
 
-      // The survey's own search is the planner's first try
-      const line = planLine(picture.board, picture.sources, pointOf(target.town), picture.field)
+      // Planned as the survey costed it, by the player's kind
+      const { line, route, blocked } = picture.lineTo(pointOf(target.town))
+      if (blocked) step.straightBlocked = blocked
       if (!line) {
         step.noLine = true
         given.add(target.town.msa)
@@ -522,7 +604,8 @@ export function useBot() {
       const price = (points) => builder.priceSection(points).total
       step.linePrice = price(line)
       step.lineCells = line.length
-      const section = affordableSection(line, budget, picture.board.rules, price)
+      step.route = route
+      const section = affordableSection(line, budget, builder.buildRules.value, price)
       if (!section) {
         return `the budget does not stretch to the first cell toward ${target.town.name}`
       }

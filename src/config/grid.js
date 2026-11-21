@@ -19,7 +19,7 @@ export const gridConfig = {
    * computer player's route search takes (about half a second each on a
    * desktop, three to five times that on a phone).
    */
-  cellBudget: 150000,
+  cellBudget: 110000,
 
   /**
    * The smallest a cell may be, in meters, however small the region. The

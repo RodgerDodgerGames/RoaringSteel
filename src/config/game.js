@@ -115,7 +115,7 @@ export const gameRules = {
    * prices down by about a seventh, leaving Minnesota's nearly as they were.
    */
   trackPrice: {
-    perSpeedUnit: 900,
+    perSpeedUnit: 600,
     openGroundCost: 450,
     roughnessCost: 4500,
     climb: {
@@ -245,17 +245,17 @@ export const gameRules = {
    * At 0 (or below), the bonus grows in a straight line with distance.
    */
   payoffs: {
-    trackCostMultiple: 2,
+    trackCostMultiple: 1.5,
     unbridgeableWater: 0.5,
     route: {
       weight: 0.5,
       searchCells: 20000
     },
     roundTo: 1000,
-    minimum: 3000,
+    minimum: 5000,
     longHaul: {
       maxBonus: 1,
-      steepness: 2
+      steepness: 1.5
     }
   }
 }

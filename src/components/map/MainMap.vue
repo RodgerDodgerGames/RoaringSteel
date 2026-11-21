@@ -2,7 +2,8 @@
   MainMap.vue
 
   The primary game map component built on Leaflet. Displays:
-  - Stamen terrain background tiles
+  - Esri satellite imagery, with Esri's hillshade blended into it so the
+    lie of the land stands out (see hillshadeConfig in config/map.js)
   - Everything outside the region being played grayed out (regionMask.js)
   - The rivers, lakes and sea track has to bridge, with their names (waterLayer.js)
   - Town markers with size-based icons
@@ -43,6 +44,7 @@ import { useWaterLayer } from '@/composables/map/waterLayer'
 import { useTrainMarkers } from '@/composables/map/trainMarkers'
 import { useTrackStopMarkers } from '@/composables/map/trackStopMarkers'
 import MapCreditsLink from '@/components/map/MapCreditsLink.vue'
+import { hillshadeConfig } from '@/config/map'
 
 const townsStore = useTownsStore()
 const mapStore = useMapStore()
@@ -74,6 +76,19 @@ onMounted(() => {
       maxZoom: 18
     }
   ).addTo(map.value)
+
+  // The hillshade, over the imagery and under everything else (the gray
+  // outside the region, the water, the track). The class is what the style
+  // below blends it in by; zIndex 2 keeps it above the imagery's 1 however
+  // the two tile layers end up ordered.
+  L.tileLayer(hillshadeConfig.url, {
+    className: 'hillshade-layer',
+    opacity: hillshadeConfig.opacity,
+    maxNativeZoom: hillshadeConfig.maxNativeZoom,
+    zIndex: 2,
+    minZoom: 0,
+    maxZoom: 18
+  }).addTo(map.value)
 
   // Into the Plan view (or whichever the store holds) before the towns go on
   mapView.attach(map.value)
@@ -135,5 +150,16 @@ useResizeObserver(mapContainer, () => {
 .game-map {
   height: 100%;
   width: 100%;
+}
+
+/*
+ * The hillshade's tiles are opaque gray, so laid plainly over the imagery
+ * they would hide it. Multiplied into it instead, their white leaves the
+ * imagery as it is and their gray darkens it into shadow. Leaflet makes the
+ * layer's element, outside this component's markup, hence :deep. It blends
+ * with the imagery beneath it in Leaflet's tile pane, and nothing above.
+ */
+.game-map :deep(.hillshade-layer) {
+  mix-blend-mode: multiply;
 }
 </style>

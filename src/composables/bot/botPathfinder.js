@@ -11,7 +11,11 @@
  * The search knows the build rules only roughly — enough that the lines it
  * finds are nearly always buildable:
  * - it stays in cells inside the region, or a town's cell, or water, which
- *   may be bridged beyond the region's border (see buildRules.js);
+ *   may be bridged beyond the region's border (see buildRules.js), and
+ *   takes no step from one cell to the next that would cut across land
+ *   outside the region on the way — judged at the very points along the
+ *   step that the build rules judge a line at, so a line never clips the
+ *   border where it wanders between the centers of the cells along it;
  * - it counts lake and sea cells in a row and never bridges more than the
  *   rules allow, and prices each bridge cell as pricing does (see water.js);
  * - it adds a river bridge for each step from cell to cell that crosses a
@@ -25,9 +29,12 @@
  *
  * "Nearly always" is not good enough for a player who must never break the
  * rules, so every line found is then judged by the build rules themselves
- * (`lineBlock`, the same check a person's line gets). If it breaks one, the
- * cell where it first goes wrong is shut and the search runs again, a few
- * times at most. A line that cannot be made to pass is not built at all.
+ * (`lineBlock`, the same check a person's line gets). A line that breaks
+ * one is not built at all, and no other way is looked for: the computer
+ * player builds toward something else this turn and tries the town again on
+ * a later one (see `buildTrack` in useBot.js). The first computer players
+ * are meant to be simple; a search that keeps to the rules is what keeps
+ * that from costing them turns.
  *
  * Where the line passes through a town's cell it goes through the town
  * itself rather than the cell's center, so the town joins the network on the
@@ -46,9 +53,10 @@
  */
 
 import { gameRules } from '@/config/game'
-import { pointsAlongLine, kmBetween, landCellPrice } from '@/composables/map/trackCost'
+import { pointsAlongLine, kmBetween, landCellPrice, cellPath } from '@/composables/map/trackCost'
 import { stepGrade } from '@/composables/map/climb'
-import { lineBlock } from '@/composables/map/buildRules'
+import { lineBlock, isOutsideRegion } from '@/composables/map/buildRules'
+import { regionOutline } from '@/composables/map/region'
 import {
   isWaterCell,
   bridgeCellPrice,
@@ -58,6 +66,7 @@ import {
 import {
   cellKm,
   findCell,
+  cellContaining,
   cellCenter,
   cellIndexes,
   cellNeighbors,
@@ -252,14 +261,206 @@ export function townsByCell(towns, grid) {
   return townIn
 }
 
-/** How many times a line that breaks a build rule is searched for again */
-const MAX_ATTEMPTS = 6
+/**
+ * Each grid's verdicts on which steps leave the region (see
+ * `borderSteps`), with what they were worked out from: they only change
+ * when the grid, the region, or the towns do, and every survey a computer
+ * player makes needs them.
+ */
+const borderStepsByGrid = new WeakMap()
+
+/**
+ * How near to nothing the side a point is on (see `legsMeet`) may come and
+ * still count as on the line, in squared degrees: far above the rounding
+ * error of working it out, far below any real distance on the map (a meter
+ * is about a hundred-thousandth of a degree).
+ */
+const ON_LINE = 1e-14
+
+/** A step's verdict (see `borderSteps`): not worked out yet */
+const UNJUDGED = 0
+/** A step's verdict: it keeps to the region */
+const STAYS = 1
+/** A step's verdict: it cuts across land outside the region */
+const LEAVES = 2
+
+/**
+ * Whether two straight legs meet, on the flat lat/lng plane the region is
+ * tested on. Legs that only touch, or lie along each other, count as
+ * meeting: the answer only decides whether a step is worth judging point by
+ * point (see `borderSteps`), so erring toward yes is never wrong.
+ * @param {{lat: number, lng: number}} a - One end of the first leg
+ * @param {{lat: number, lng: number}} b - Its other end
+ * @param {{lat: number, lng: number}} c - One end of the second leg
+ * @param {{lat: number, lng: number}} d - Its other end
+ * @returns {boolean} True if they meet
+ */
+function legsMeet(a, b, c, d) {
+  // Which side of the line through p and q a point r is on: + left, - right
+  const side = (p, q, r) => (q.lng - p.lng) * (r.lat - p.lat) - (q.lat - p.lat) * (r.lng - p.lng)
+  const ab = [side(a, b, c), side(a, b, d)]
+  const cd = [side(c, d, a), side(c, d, b)]
+  // Each leg's ends on opposite sides of the other: a clean crossing
+  if (ab[0] * ab[1] < 0 && cd[0] * cd[1] < 0) return true
+  // An end on the other leg's line, or as near as rounding can tell:
+  // touching, or lying along it, if their boxes overlap
+  const touches = [...ab, ...cd].some((value) => Math.abs(value) <= ON_LINE)
+  const overlap = (u, v, w, x) =>
+    Math.max(u, v) >= Math.min(w, x) && Math.max(w, x) >= Math.min(u, v)
+  return touches && overlap(a.lat, b.lat, c.lat, d.lat) && overlap(a.lng, b.lng, c.lng, d.lng)
+}
+
+/**
+ * Which steps from a cell to its neighbor would cut across land outside the
+ * region (see `isOutsideRegion` in buildRules.js), as the build rules judge
+ * it: at the points along the step a line is checked at (see
+ * `pointsAlongLine`), from the point the line passes through in the cell —
+ * the town in a town's cell, the center in any other (see `costField`) — to
+ * the point in the next.
+ *
+ * Testing a point against the region is slow on a long, ragged coastline
+ * (marking every cell in or out takes seconds, see `regionMask`), so as few
+ * steps as can be are tested point by point:
+ * - A step from one cell to its neighbor stays within the two (and, cutting
+ *   a corner, the two beside it). A cell the border does not pass through
+ *   is wholly inside the region or wholly outside it, where the search only
+ *   goes on water or in a town's cell. So only steps in cells the border
+ *   passes through can leave the region.
+ * - Outside the region, track may go on water and in a town's cell, so a
+ *   step among only water and town cells never leaves it.
+ * - A step that crosses none of the border's edges in its cells is wholly
+ *   on one side of the border, the side its start is on: inside the
+ *   region, it stays in; outside, it leaves it if any of its points is on
+ *   land outside a town's cell.
+ * Only a step that crosses the border is tested point by point. Each is
+ * worked out the first time the search asks about it, and kept for every
+ * later search (see `borderStepsByGrid`).
+ *
+ * A line ends at the point it was asked for, so the step into its last
+ * cell is judged as though it ended on the cell's own point. A computer
+ * player's line ends on a town, which is that point — unless two towns
+ * share the cell and it is bound for the second (see `townsByCell`). A line
+ * ending anywhere but the cell's point could still clip the border on its
+ * last step, and is caught by the build rules' own check (see `planLine`).
+ *
+ * A region test whose border is not known (see `regionOutline`) has every
+ * step tested point by point: slower, never wrong.
+ *
+ * @param {Object} rules - See `searchBoard`
+ * @param {Array<Object>} towns - The towns the search goes through (see
+ *   `searchBoard`)
+ * @param {Map<number, {lat: number, lng: number}>} townIn - The town in each
+ *   town cell, from those towns (see `townsByCell`)
+ * @returns {Function} (cell, next, step, sides, from) => true if the step
+ *   from a cell to its neighbor leaves the region; `sides` are the cells
+ *   beside a corner it cuts (see `cellNeighbors`), and `from`, if given, a
+ *   point the line starts at in the cell, worked out afresh rather than kept
+ */
+function borderSteps(rules, towns, townIn) {
+  const { grid, isInRegion, townCells } = rules
+  let kept = borderStepsByGrid.get(grid)
+  if (
+    !kept ||
+    kept.isInRegion !== isInRegion ||
+    kept.townCells !== townCells ||
+    kept.towns !== towns
+  ) {
+    const size = grid.present.length
+    const edges = borderEdges(grid, regionOutline(isInRegion))
+    // Per cell, 1 if the border passes through it: looked up for every step
+    // the search asks about, so kept as flags rather than asked of the map
+    const isBorder = new Uint8Array(size).fill(edges ? 0 : 1)
+    edges?.forEach((_, cell) => {
+      isBorder[cell] = 1
+    })
+    kept = {
+      isInRegion,
+      townCells,
+      towns,
+      townCellSet: new Set(townCells),
+      edges,
+      isBorder,
+      verdicts: new Uint8Array(size * NEIGHBOR_STEPS)
+    }
+    borderStepsByGrid.set(grid, kept)
+  }
+  const { townCellSet, edges, isBorder, verdicts } = kept
+  const inside = regionMask(grid, isInRegion)
+  const isWaterOrTown = (cell) => cell !== -1 && (townCellSet.has(cell) || isWaterCell(grid, cell))
+
+  /** The point a line passes through in a cell */
+  const pointIn = (cell) => townIn.get(cell) ?? cellCenter(grid, cell)
+
+  /** Whether a leg leaves the region, tested at every point (see above) */
+  const testedLeaves = (from, to) =>
+    pointsAlongLine([from, to], grid).some((point) =>
+      isOutsideRegion(point, townCellSet.has(cellContaining(point, grid)), grid, isInRegion)
+    )
+
+  /**
+   * Whether a leg from a point in a cell to the point in its neighbor
+   * leaves the region (see above). `isCenter` says the leg starts at the
+   * cell's center, which the region mask already places in or out.
+   */
+  function leaves(from, isCenter, cell, next, sides) {
+    if (!isBorder[cell] && !isBorder[next] && !sides.some((side) => isBorder[side])) return false
+    const cells = [cell, next, ...sides]
+    if (cells.every(isWaterOrTown)) return false
+    const to = pointIn(next)
+    if (edges === null) return testedLeaves(from, to)
+    const crosses = cells.some((each) =>
+      (edges.get(each) ?? []).some(([a, b]) => legsMeet(from, to, a, b))
+    )
+    if (crosses) return testedLeaves(from, to)
+    const startsInside = isCenter ? inside[cell] === 1 : isInRegion(from)
+    return (
+      !startsInside &&
+      pointsAlongLine([from, to], grid).some((point) => !isWaterOrTown(cellContaining(point, grid)))
+    )
+  }
+
+  return (cell, next, step, sides, from) => {
+    if (from) return leaves(from, false, cell, next, sides)
+    const at = cell * NEIGHBOR_STEPS + step
+    if (verdicts[at] === UNJUDGED) {
+      const isCenter = !townIn.has(cell)
+      verdicts[at] = leaves(pointIn(cell), isCenter, cell, next, sides) ? LEAVES : STAYS
+    }
+    return verdicts[at] === LEAVES
+  }
+}
+
+/**
+ * The region's border on a grid: for each cell it passes through, the
+ * border's edges in that cell (see `borderSteps`).
+ * @param {Object} grid - The grid
+ * @param {Array<Array<{lat: number, lng: number}>>|null} outline - The
+ *   region's rings (see `regionOutline`), or null if not known
+ * @returns {Map<number, Array<Array<Object>>>|null} The edges, each as its
+ *   two ends, by cell; null for a border not known
+ */
+function borderEdges(grid, outline) {
+  if (!outline) return null
+  const byCell = new Map()
+  outline.forEach((ring) => {
+    ring.slice(1).forEach((to, i) => {
+      const edge = [ring[i], to]
+      cellPath(edge, grid).forEach((cell) => {
+        if (!byCell.has(cell)) byCell.set(cell, [])
+        const list = byCell.get(cell)
+        if (list.at(-1) !== edge) list.push(edge)
+      })
+    })
+  })
+  return byCell
+}
 
 /**
  * Everything the search needs to know about the board, worked out once per
  * search: which cells a line may pass through, which are water, which steps
- * cross rivers, which cells are right beside track already built, where the
- * towns are, and the least any step of a line can cost.
+ * cross rivers or leave the region, which cells are right beside track
+ * already built, where the towns are, and the least any step of a line can
+ * cost.
  *
  * The flags are per cell of the grid's whole rectangle, holes included (a
  * hole is never open), so a cell's index looks its flags up directly.
@@ -336,6 +537,9 @@ export function searchBoard(rules, towns) {
     startPrice: prices.starts,
     stepPrice: prices.steps,
     riverSteps: riverStepCrossings(grid, rules.rivers),
+    // Asked for by each search, so a caller that never searches (see
+    // `reachableFrom`) never works out the border
+    regionSteps: () => borderSteps(rules, towns, townIn),
     isOpen,
     isWater,
     isTownCell,
@@ -367,7 +571,6 @@ export function searchBoard(rules, towns) {
  * @param {Array<{lat: number, lng: number}>} sources - Where the player may
  *   start building (see `startPoints` in trackBuilder.js)
  * @param {Object} [options]
- * @param {Set<number>} [options.shut] - Cells the line may not pass through
  * @param {Array<{lat: number, lng: number}>} [options.targets] - The only
  *   points that will be asked about; without them, the whole grid is searched
  * @returns {{costTo: Function, lineTo: Function}} `costTo(point)` is what
@@ -376,7 +579,7 @@ export function searchBoard(rules, towns) {
  *   itself, or null. Both throw for a point that was not among the targets
  *   of a search that stopped early, which cannot answer for it.
  */
-export function costField(board, sources, { shut = new Set(), targets } = {}) {
+export function costField(board, sources, { targets } = {}) {
   const {
     grid,
     rules,
@@ -384,6 +587,7 @@ export function costField(board, sources, { shut = new Set(), targets } = {}) {
     startPrice,
     stepPrice,
     riverSteps,
+    regionSteps,
     isOpen,
     isWater,
     isTownCell,
@@ -425,7 +629,9 @@ export function costField(board, sources, { shut = new Set(), targets } = {}) {
   const estimate = (index) => (goal === -1 ? 0 : stepsBetween(grid, index, goal) * minStep)
   let stoppedEarly = false
 
-  const mayEnter = (index) => index !== -1 && isOpen[index] && !shut.has(index)
+  const mayEnter = (index) => index !== -1 && isOpen[index]
+  // Which steps cut across land outside the region (see `borderSteps`)
+  const leavesRegion = regionSteps()
 
   sources.forEach((point) => {
     const index = findCell(point, grid)
@@ -459,6 +665,11 @@ export function costField(board, sources, { shut = new Set(), targets } = {}) {
       // Cutting a corner passes by the two cells beside it, so they have to
       // be somewhere a line may go too
       if (sides.some((side) => !mayEnter(side))) return
+      // Nor may the step cut across land outside the region on the way. A
+      // line starts from the source point in its first cell (see `lineTo`),
+      // so a step out of a starting cell is judged from there.
+      const from = previous[state] === -1 ? startIn.get(index) : undefined
+      if (leavesRegion(index, next, stepOut, sides, from)) return
 
       const isBridge = isWater[next] && !isTownCell[next]
       const nextWater = isBridge ? water + 1 : 0
@@ -536,9 +747,15 @@ export function costField(board, sources, { shut = new Set(), targets } = {}) {
 
 /**
  * Whether track could be built from the sources to a point at all, at any
- * price: on a board with no track built yet, under the same rules the
- * search keeps to (the region, cutting corners, and bridges no longer than
- * the rules allow).
+ * price: on a board with no track built yet, keeping to the cells the
+ * search may go in, cutting corners as it may, and bridging no further than
+ * the rules allow.
+ *
+ * Unlike the search, it does not judge each step against the border (see
+ * `borderSteps`): a person draws track wherever they like, not from cell
+ * center to cell center, so where the border wanders between two cells'
+ * centers they can draw round it. A town is left off only when no one
+ * could reach it.
  *
  * Unlike `costField`, it goes as far as the rules allow over water, however
  * many cells that is: it only asks whether a cell can be got to, so it keeps
@@ -594,35 +811,12 @@ export function reachableFrom(board, sources) {
 }
 
 /**
- * How many of a line's points can be kept before it first breaks a build
- * rule: the longest start of it the rules allow while it is still being
- * drawn. Breaking a rule never comes undone further along (a line that has
- * strayed outside the region, bridged too far or run alongside track has
- * done so for good), so the answer is found by halving.
- * @param {Array<Object>} line - The line's points
- * @param {Object} rules - See `searchBoard`
- * @returns {number} How many points pass; the whole line's length if it does
- */
-function pointsThatPass(line, rules) {
-  let passing = 1
-  let failing = line.length + 1
-  while (failing - passing > 1) {
-    const middle = Math.floor((passing + failing) / 2)
-    if (lineBlock(line.slice(0, middle), rules)) failing = middle
-    else passing = middle
-  }
-  return passing
-}
-
-/**
  * The line of track a player would build to reach a point, keeping to every
- * build rule, or null if no such line can be found.
+ * build rule, or null if the search finds no such line.
  *
- * The search's line is judged by the build rules (`lineBlock`). If it breaks
- * one, the cell of the point where it goes wrong is shut and the search runs
- * again — or the cell before it, when the point it goes wrong at is the
- * end, which cannot be moved. A line whose very first leg breaks a rule
- * cannot be mended this way, and none is offered.
+ * The search's cheapest line is judged by the build rules (`lineBlock`). If
+ * it breaks one, there is no line: no other way is searched for (see the
+ * module notes).
  *
  * @param {Object} board - From `searchBoard`
  * @param {Array<{lat: number, lng: number}>} sources - Where the player may
@@ -630,28 +824,13 @@ function pointsThatPass(line, rules) {
  * @param {{lat: number, lng: number}} target - Where the track should reach
  * @param {Object} [field] - A search already made from the same sources
  *   (see `costField`), with the target among its targets if it was given
- *   any, used for the first try instead of searching again
+ *   any, used instead of searching again
  * @returns {Array<Object>|null} The line's points, or null
  */
 export function planLine(board, sources, target, field = null) {
-  const shut = new Set()
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const search =
-      attempt === 0 && field ? field : costField(board, sources, { shut, targets: [target] })
-    const line = search.lineTo(target)
-    if (!line) return null
-    if (!lineBlock(line, board.rules, { isFinished: true })) return line
-
-    // The first point the line cannot get to without breaking a rule. When
-    // the whole line passes as it is drawn, it only fails as a finished one,
-    // which is ending on water, and that is the end's cell.
-    const passing = pointsThatPass(line, board.rules)
-    const badPoint = Math.min(passing, line.length - 1)
-    const movable = badPoint < line.length - 1 ? badPoint : badPoint - 1
-    if (movable < 1) return null
-    shut.add(findCell(line[movable], board.grid))
-  }
-  return null
+  const search = field ?? costField(board, sources, { targets: [target] })
+  const line = search.lineTo(target)
+  return line && !lineBlock(line, board.rules, { isFinished: true }) ? line : null
 }
 
 /**

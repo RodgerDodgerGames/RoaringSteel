@@ -35,9 +35,12 @@ import {
   makeTowns,
   makeRivers,
   centerAt,
+  cornerAt,
   ROWS,
+  COLS,
   isLake,
   isChannel,
+  seededRandom,
   isRidge
 } from '../../utils/botBoard'
 import { pinKnobs } from '../../utils/boardScale'
@@ -247,6 +250,77 @@ describe('botPathfinder', () => {
       const line = planLine(board, sources, pointOf(townNamed('Fir')))
 
       expect(line[0]).toEqual(pointOf(townNamed('Dogwood')))
+    })
+
+    describe('a border that runs between cell centers', () => {
+      /**
+       * The test board's region with a slit of land outside it cut down from
+       * the north edge to row 6: a fifth of a cell wide, along the side
+       * between columns 9 and 10. Every cell's center is still inside, but a
+       * line from a center in column 9 to the one beside it in column 10
+       * runs across the slit — where a real state's border wanders between
+       * the centers of the cells along it.
+       */
+      function slitRules() {
+        const ring = [
+          cornerAt(0, 0),
+          cornerAt(0, COLS),
+          cornerAt(ROWS, COLS),
+          cornerAt(ROWS, 10.1),
+          cornerAt(6, 10.1),
+          cornerAt(6, 9.9),
+          cornerAt(ROWS, 9.9),
+          cornerAt(ROWS, 0),
+          cornerAt(0, 0)
+        ].map(({ lat, lng }) => [lng, lat])
+        const region = { type: 'Feature', geometry: { type: 'Polygon', coordinates: [ring] } }
+        // No towns, so no town's cell lets a line through the slit
+        return { ...rulesWith(), isInRegion: regionTest(region), townCells: [] }
+      }
+      // Either side of the slit, on row 16, ten rows above its foot
+      const west = centerAt(16, 7)
+      const east = centerAt(16, 11)
+
+      it('should not plan a line across land outside the region between two centers', () => {
+        const slit = slitRules()
+
+        const line = costField(searchBoard(slit, []), [west], { targets: [east] }).lineTo(east)
+
+        expect(lineBlock(line, slit, { isFinished: true })).toBeNull()
+      })
+
+      it('should find the way round, below the foot of the slit', () => {
+        const slit = slitRules()
+
+        const line = planLine(searchBoard(slit, []), [west], east)
+
+        expect(line).not.toBeNull()
+        expect(lineBlock(line, slit, { isFinished: true })).toBeNull()
+        const rows = cellPath(line, slit.grid).map((cell) => rowOf(slit.grid, cell))
+        expect(Math.min(...rows)).toBeLessThan(6)
+      })
+
+      it('should keep to the border on every line it plans, from anywhere to any cell', () => {
+        // From points anywhere in a cell, as track's points are, to the
+        // center of a cell, which is where the line ends in a cell with no
+        // town (a computer player's target is always a town, which its line
+        // ends on)
+        const slit = slitRules()
+        const slitBoard = searchBoard(slit, [])
+        const random = seededRandom(7)
+        const anywhere = () => centerAt(random() * (ROWS - 1), random() * (COLS - 1))
+        const anyCell = () => centerAt(Math.floor(random() * ROWS), Math.floor(random() * COLS))
+        for (let i = 0; i < 60; i++) {
+          const from = anywhere()
+          const to = anyCell()
+
+          const line = costField(slitBoard, [from], { targets: [to] }).lineTo(to)
+
+          // Every cell can be reached, round the slit's foot
+          expect(line).not.toBeNull()
+          expect(lineBlock(line, slit)?.reason).not.toBe('outside')
+        }
+      })
     })
   })
 

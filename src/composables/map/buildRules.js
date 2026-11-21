@@ -324,6 +324,32 @@ function runsAlongside(legPoints, inTown, builtTrack, grid) {
 }
 
 /**
+ * Whether a point of a line is somewhere track may not go for being outside
+ * the region. Outside it, track may only be on water, which may be bridged
+ * wherever it is, or in a town's cell, which may reach over the border.
+ *
+ * The region rule of `lineBlock`, point by point. The computer players'
+ * search judges the steps of its lines by it too (see `searchBoard` in
+ * botPathfinder.js), so the lines it plans keep to the border as the rule
+ * draws it, not only at the centers of the cells they pass through.
+ *
+ * @param {{lat: number, lng: number}} point - A point along the line (see
+ *   `pointsAlongLine`)
+ * @param {boolean} inTown - Whether the point is in a town's cell
+ * @param {Object} grid - The grid
+ * @param {Function} isInRegion - Whether a point is inside the region (see
+ *   `regionTest` in region.js)
+ * @returns {boolean} True if track may not go there
+ */
+export function isOutsideRegion(point, inTown, grid, isInRegion) {
+  if (inTown) return false
+  // Water first: testing a point against the region is the slow part
+  const cell = cellContaining(point, grid)
+  if (cell !== -1 && isWaterCell(grid, cell)) return false
+  return !isInRegion(point)
+}
+
+/**
  * Why a line of track may not be built, or null if it may.
  *
  * The rules are checked in turn, and the first one broken is the answer.
@@ -367,12 +393,9 @@ export function lineBlock(
   const towns = new Set(townCells)
   const inTown = points.map((point) => towns.has(cellContaining(point, grid)))
 
-  // Outside the region only on water, which may be bridged wherever it is
-  const outside = points.findIndex((point, i) => {
-    if (inTown[i] || isInRegion(point)) return false
-    const cell = cellContaining(point, grid)
-    return cell === -1 || !isWaterCell(grid, cell)
-  })
+  const outside = points.findIndex((point, i) =>
+    isOutsideRegion(point, inTown[i], grid, isInRegion)
+  )
   if (outside !== -1) return { reason: 'outside', point: points[outside] }
 
   // Every cell the line crosses, found exactly, so even a corner clipped off

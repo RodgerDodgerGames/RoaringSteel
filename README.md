@@ -26,9 +26,10 @@ See [docs/workflow.md](docs/workflow.md) for how work moves from issue to merge,
 
 The game's About dialog lists every credit; the list lives in `src/config/credits.js`.
 
-- Map tiles: [Stadia Maps](https://www.stadiamaps.com/), [Stamen Design](https://www.stamen.com/), [OpenMapTiles](https://openmaptiles.org/), and [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors
+- Map tiles: [Esri World Imagery](https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9) (Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community) and [Esri World Hillshade](https://www.arcgis.com/home/item.html?id=1b243539f4514b6ba35e7d995890db1d) (Sources: Esri, Vantor, Airbus DS, USGS, NGA, NASA, CGIAR, N Robinson, NCEAS, NLS, OS, NMA, Geodatastyrelsen, Rijkswaterstaat, GSA, Geoland, FEMA, Intermap, and the GIS user community)
 - Elevation: [Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (Mapzen, on AWS Open Data). United States 3DEP (formerly NED) and global GMTED2010 and SRTM terrain data courtesy of the U.S. Geological Survey. Global ETOPO1 terrain data U.S. National Oceanic and Atmospheric Administration.
 - Land cover: [Annual National Land Cover Database](https://www.mrlc.gov/data/project/annual-nlcd) (Annual NLCD), U.S. Geological Survey and the MRLC Consortium
+- Rivers, lakes, sea and bays: [Natural Earth](https://www.naturalearthdata.com/). Made with Natural Earth. Free vector and raster map data @ naturalearthdata.com.
 - Towns and industries: [U.S. Census Bureau](https://www.census.gov/data/developers.html) (American Community Survey, Quarterly Workforce Indicators, TIGERweb). This product uses the Census Bureau Data API but is not endorsed or certified by the Census Bureau.
 - Commodity icons: [game-icons.net](https://game-icons.net) (CC BY 3.0; authors in `src/assets/icons/commodities/CREDITS.md`)
 - Typefaces: Eutemia I, Saddlebag and Steelplate Textura, from [1001 Fonts](https://www.1001fonts.com/)

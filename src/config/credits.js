@@ -4,8 +4,8 @@
  * Everything the game is built on that someone else made: the maps, the
  * terrain and census data, the art and type, and the main libraries. The
  * About dialog lists all of it. Several of these licenses ask for a credit
- * (the map tiles, OpenStreetMap, the icons, the terrain data, the Census
- * Bureau's API); the rest are credited because they deserve it.
+ * (Esri's map tiles, the icons, the terrain data, the Census Bureau's API);
+ * the rest are credited because they deserve it.
  *
  * Kept here, not in the dialog, so adding a source means adding a line of
  * data rather than editing markup.
@@ -35,17 +35,10 @@ export const CREDIT_GROUPS = [
   {
     title: 'Maps',
     credits: [
-      { name: 'Stadia Maps', url: 'https://www.stadiamaps.com/', note: 'Map tiles' },
       {
-        name: 'Stamen Design',
-        url: 'https://www.stamen.com/',
-        note: 'Terrain background map style'
-      },
-      { name: 'OpenMapTiles', url: 'https://openmaptiles.org/', note: 'Map tile schema' },
-      {
-        name: 'OpenStreetMap contributors',
-        url: 'https://www.openstreetmap.org/copyright',
-        note: 'Map data'
+        name: 'Esri World Imagery',
+        url: 'https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9',
+        note: 'Satellite imagery. Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community.'
       },
       {
         name: 'Esri World Hillshade',

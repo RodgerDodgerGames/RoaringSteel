@@ -215,10 +215,15 @@ const loadBlock = computed(() =>
   font-size: 0.9rem;
 }
 
-/* Town names here are a touch smaller than the sentence around them, as on
-   the board */
+/* Town names keep the board's lettering (see `.town-name` in map.css) but not
+   its white-on-dark halo, which is made for the map and smudges on the paper
+   panel: here they take the panel's own strong text color, in either mode.
+   A touch smaller than the sentence around them, as on the board. */
 .train-panel .town-name {
   font-size: 0.78rem;
+  color: var(--bulma-text-strong);
+  -webkit-text-stroke: 0;
+  text-shadow: none;
 }
 
 /* THE TRAIN */

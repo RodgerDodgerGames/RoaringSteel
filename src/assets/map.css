@@ -34,7 +34,8 @@
 /* Town names in small bold capitals like the names on the Empire Builder
    board: on the map (the town tooltip, the name under each town's icon)
    and wherever else a town is named the same way, such as the dock's
-   Train section (`.town-name`) */
+   Train section (`.town-name`, which drops the halo there to suit the
+   panel; see TrainPanel.vue) */
 .town-tooltip,
 .town-name {
   font-family: var(--font-town-name);

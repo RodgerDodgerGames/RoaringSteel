@@ -222,7 +222,8 @@ export function useGamePersistence() {
    *
    * The game is cleared away (see `resetGame`), and the setup roster is filled
    * with this game's people, names and colors, in turn order, and as many
-   * computer players as this game had, so the same table can play again
+   * computer players as this game had, each of the same kind (see
+   * config/botKinds.js), so the same table can play again
    * without typing everything in a second time. The roster can still be
    * changed before the new game starts. Computer players are named and
    * colored afresh (see `draftRoster` in the player store).
@@ -238,13 +239,17 @@ export function useGamePersistence() {
     const people = playerStore.players
       .filter((player) => !player.isBot)
       .map(({ name, color }) => ({ name, color }))
-    const botCount = playerStore.players.filter((player) => player.isBot).length
+    const botKinds = playerStore.players
+      .filter((player) => player.isBot)
+      .map((player) => player.botKind)
     resetGame()
     people.forEach(
       (draft) =>
         playerStore.addDraftPlayer(draft) ?? playerStore.addDraftPlayer({ name: draft.name })
     )
-    playerStore.setDraftBotCount(botCount)
+    // The same computer players, each of the same kind as before
+    playerStore.setDraftBotCount(botKinds.length)
+    botKinds.forEach((kind, index) => playerStore.setDraftBotKind(index, kind))
   }
 
   /**

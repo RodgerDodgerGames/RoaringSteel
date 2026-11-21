@@ -109,10 +109,15 @@ function eventLines(events) {
  */
 function buildLines(steps) {
   return steps.map((step) => {
-    const aim = `Build toward ${step.toward} (${step.why}): ${money(step.available)} available, budget ${money(step.budget)}`
+    // A Fast Bot's straight line that broke a rule, and was searched instead
+    const blocked = step.straightBlocked
+      ? ` (the straight line broke a rule: ${step.straightBlocked})`
+      : ''
+    const aim = `Build toward ${step.toward} (${step.why}): ${money(step.available)} available, budget ${money(step.budget)}${blocked}`
     if (step.noLine) return `${aim} — no buildable line reaches it, given up for this turn`
     if (step.linePrice === undefined) return aim
-    const line = `whole line ${money(step.linePrice)} over ${step.lineCells} cells`
+    const kind = step.route === 'straight' ? 'straight line' : 'whole line'
+    const line = `${kind} ${money(step.linePrice)} over ${step.lineCells} cells`
     if (step.built === undefined) return `${aim} — ${line}, nothing built`
     return `${aim} — ${line}; built ${money(step.built)} over ${step.builtCells} cells`
   })

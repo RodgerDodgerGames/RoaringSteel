@@ -13,6 +13,8 @@
  *   isTurn: boolean,   // True if it's this player's turn
  *   color: string,     // Player's chosen color, never shared with another player
  *   isBot: boolean,    // True for a computer player (see composables/bot)
+ *   botKind: string|null, // A computer player's kind (a key of BOT_KINDS in
+ *                         // config/botKinds.js); null for a person
  *   position: number,  // Board position (for future use)
  *   trackSpentThisTurn: number, // Spent on track this turn, against the budget
  *   hasSpentThisTurn: boolean   // Spent any of the allowance this turn, even
@@ -26,6 +28,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { gameRules } from '@/config/game'
 import { playerColors } from '@/config/playerColors'
+import { BOT_KINDS, DEFAULT_BOT_KIND, botKindOr } from '@/config/botKinds'
 
 /**
  * Whether two color strings name the same color. Hex codes are compared
@@ -55,11 +58,12 @@ export const usePlayerStore = defineStore('playerStore', () => {
   let nextDraftId = 1
 
   /**
-   * How many computer players the setup screen has asked for. They are not
-   * drafts of their own: they need no names or colors typed in, and are given
-   * them when the roster is drawn up (see `draftRoster`).
+   * The computer players the setup screen has asked for, in turn order: each
+   * one's kind (a key of BOT_KINDS). They are not drafts of their own: they
+   * need no names or colors typed in, and are given them when the roster is
+   * drawn up (see `draftRoster`).
    */
-  const draftBotCount = ref(0)
+  const draftBots = ref([])
 
   /** Loading state for async operations */
   const isLoading = ref(false)
@@ -87,30 +91,39 @@ export const usePlayerStore = defineStore('playerStore', () => {
    */
   const maxDraftBots = computed(() => Math.max(0, playerColors.length - draftPlayers.value.length))
 
+  /** How many computer players the setup screen has asked for */
+  const draftBotCount = computed(() => draftBots.value.length)
+
   /**
    * The roster the game would start with: the people's rows in the order
-   * they were entered, then the computer players. Computer players are named
-   * "Bot 1", "Bot 2" and so on — skipping any name a person has already
-   * taken — and given the first palette colors nobody has.
+   * they were entered, then the computer players. Computer players are
+   * numbered in turn order, each named for its kind — "Bot 1", "Fast Bot 2",
+   * "Bot 3" — skipping any number whose name a person has already taken, and
+   * given the first palette colors nobody has.
    *
    * Rows left blank are kept, so committing them fails as it always has; the
    * setup screen drops them before it gets that far.
-   * @returns {Array<{name: string, color: string, isBot: boolean}>}
+   * @returns {Array<{name: string, color: string, isBot: boolean,
+   *   botKind: string|null}>}
    */
   const draftRoster = computed(() => {
     const people = draftPlayers.value.map((draft) => ({
       name: draft.name.trim(),
       color: draft.color,
-      isBot: false
+      isBot: false,
+      botKind: null
     }))
     const takenNames = new Set(people.map(({ name }) => name.toLowerCase()))
     const freeColors = playerColors.filter((color) => !draftHoldingColor(color))
 
     const bots = []
-    for (let number = 1; bots.length < draftBotCount.value; number++) {
-      const name = `Bot ${number}`
+    for (let number = 1; bots.length < draftBots.value.length; number++) {
+      // Set only through `setDraftBotCount` and `setDraftBotKind`, which keep
+      // to the kinds there are; anything else is read as the default
+      const botKind = botKindOr(draftBots.value[bots.length])
+      const name = `${BOT_KINDS[botKind].name} ${number}`
       if (takenNames.has(name.toLowerCase())) continue
-      bots.push({ name, color: freeColors[bots.length], isBot: true })
+      bots.push({ name, color: freeColors[bots.length], isBot: true, botKind })
     }
     return [...people, ...bots]
   })
@@ -209,6 +222,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
         isTurn: false,
         color: player.color,
         isBot: player.isBot === true,
+        botKind: player.isBot === true ? botKindOr(player.botKind) : null,
         position: 0,
         trackSpentThisTurn: 0,
         hasSpentThisTurn: false
@@ -639,14 +653,30 @@ export const usePlayerStore = defineStore('playerStore', () => {
 
   /**
    * Set how many computer players the game will have, kept between none and
-   * as many as there are colors left for them (see `maxDraftBots`).
+   * as many as there are colors left for them (see `maxDraftBots`). Fewer
+   * drops the last ones; more adds players of the default kind at the end,
+   * so the kinds already chosen stay where they are.
    * @param {number} count How many computer players.
    * @returns {number} The count kept.
    */
   function setDraftBotCount(count) {
     const whole = Number.isFinite(count) ? Math.floor(count) : 0
-    draftBotCount.value = Math.min(Math.max(0, whole), maxDraftBots.value)
-    return draftBotCount.value
+    const kept = Math.min(Math.max(0, whole), maxDraftBots.value)
+    const added = Array(Math.max(0, kept - draftBots.value.length)).fill(DEFAULT_BOT_KIND)
+    draftBots.value = [...draftBots.value.slice(0, kept), ...added]
+    return kept
+  }
+
+  /**
+   * Set the kind of one of the setup screen's computer players.
+   * @param {number} index Which computer player, from 0, in turn order.
+   * @param {string} kind The kind (a key of BOT_KINDS).
+   * @returns {boolean} True if there is such a player and such a kind.
+   */
+  function setDraftBotKind(index, kind) {
+    if (!Object.hasOwn(BOT_KINDS, kind) || !(index in draftBots.value)) return false
+    draftBots.value[index] = kind
+    return true
   }
 
   /**
@@ -713,7 +743,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
    */
   function resetDraftPlayers() {
     draftPlayers.value = []
-    draftBotCount.value = 0
+    draftBots.value = []
     nextDraftId = 1
   }
 
@@ -743,7 +773,10 @@ export const usePlayerStore = defineStore('playerStore', () => {
         // Saves from before this flag: anything spent this turn still counts
         hasSpentThisTurn: player.hasSpentThisTurn === true || Number(player.trackSpentThisTurn) > 0,
         // Saves from before computer players have only people
-        isBot: player.isBot === true
+        isBot: player.isBot === true,
+        // Saves from before there were kinds of computer player have only the
+        // first kind
+        botKind: player.isBot === true ? botKindOr(player.botKind) : null
       }))
     }
   }
@@ -752,7 +785,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     // state
     players,
     draftPlayers,
-    draftBotCount,
+    draftBots,
     isLoading,
     error,
     // getters
@@ -761,6 +794,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     colorOf,
     draftColorOptions,
     maxDraftBots,
+    draftBotCount,
     draftRoster,
     // actions
     addPlayer,
@@ -781,6 +815,7 @@ export const usePlayerStore = defineStore('playerStore', () => {
     updateDraftPlayer,
     removeDraftPlayer,
     setDraftBotCount,
+    setDraftBotKind,
     pruneEmptyDraftPlayers,
     commitDraftPlayers,
     resetDraftPlayers,

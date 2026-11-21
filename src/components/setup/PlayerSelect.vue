@@ -16,7 +16,9 @@
     has are dimmed and can't be picked, so no two players share a color.
   - Name uniqueness validation
   - How many computer players, after the people in turn order. They are
-    named and colored automatically (see `draftRoster` in the player store).
+    named and colored automatically (see `draftRoster` in the player store),
+    and listed a row each, with a toggle for each one's kind: Standard or
+    Fast (see config/botKinds.js).
   - Notification system for validation errors
   - A Settings button, so settings can be chosen before the game starts
 
@@ -26,9 +28,10 @@
 -->
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { usePlayerStore } from '@/stores/players'
+import { BOT_KINDS } from '@/config/botKinds'
 import SettingsButton from '@/components/SettingsButton.vue'
 import AboutButton from '@/components/AboutButton.vue'
 
@@ -41,7 +44,10 @@ const showNotification = ref(false)
 const openColorPickerId = ref(null)
 
 /** The setup roster lives in the store, so it survives leaving this screen. */
-const { draftPlayers: players, draftBotCount, maxDraftBots } = storeToRefs(playerStore)
+const { draftPlayers: players, draftBotCount, maxDraftBots, draftRoster } = storeToRefs(playerStore)
+
+/** The computer players' rows, in turn order, as the roster names them */
+const botRows = computed(() => draftRoster.value.filter((entry) => entry.isBot))
 
 /**
  * Keep at least one row on screen, so the form is never a dead end. The store
@@ -315,6 +321,27 @@ const handleBack = () => {
       </div>
     </div>
 
+    <!-- Each computer player, with a toggle for its kind -->
+    <div
+      v-for="(bot, index) in botRows"
+      :key="index"
+      class="field is-grouped is-align-items-center is-justify-content-center has-text-grey-lighter"
+    >
+      <span class="bot-swatch mr-2" :style="{ backgroundColor: bot.color }"></span>
+      <span class="bot-name mr-3">{{ bot.name }}</span>
+      <div class="buttons has-addons mb-0" role="group" :aria-label="`Kind of ${bot.name}`">
+        <button
+          v-for="(kind, key) in BOT_KINDS"
+          :key="key"
+          :class="['button', 'is-small', 'mb-0', { 'is-info is-selected': bot.botKind === key }]"
+          :aria-pressed="bot.botKind === key"
+          @click="playerStore.setDraftBotKind(index, key)"
+        >
+          {{ kind.label }}
+        </button>
+      </div>
+    </div>
+
     <!-- bottom buttons -->
     <div class="buttons is-centered">
       <!-- Add Player Button -->
@@ -348,6 +375,19 @@ const handleBack = () => {
 <style scoped>
 .bot-count__input {
   width: 4rem;
+}
+
+/* A computer player's color, as a small dot beside its name */
+.bot-swatch {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+}
+
+/* Wide enough for "Fast Bot 12", so the toggles line up row to row */
+.bot-name {
+  min-width: 6.5rem;
 }
 
 .selected-color {

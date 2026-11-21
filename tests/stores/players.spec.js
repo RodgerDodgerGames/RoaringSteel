@@ -452,11 +452,43 @@ describe('Player Store', () => {
       playerStore.setDraftBotCount(2)
 
       expect(playerStore.draftRoster).toEqual([
-        { name: 'Alice', color: playerColors[1], isBot: false },
+        { name: 'Alice', color: playerColors[1], isBot: false, botKind: null },
         // The first colors nobody has: Alice holds the second
-        { name: 'Bot 1', color: playerColors[0], isBot: true },
-        { name: 'Bot 2', color: playerColors[2], isBot: true }
+        { name: 'Bot 1', color: playerColors[0], isBot: true, botKind: 'standard' },
+        { name: 'Bot 2', color: playerColors[2], isBot: true, botKind: 'standard' }
       ])
+    })
+
+    it('should name each computer player for its kind, numbered in turn order', () => {
+      playerStore.setDraftBotCount(3)
+
+      expect(playerStore.setDraftBotKind(1, 'fast')).toBe(true)
+
+      expect(playerStore.draftRoster.map(({ name, botKind }) => ({ name, botKind }))).toEqual([
+        { name: 'Bot 1', botKind: 'standard' },
+        { name: 'Fast Bot 2', botKind: 'fast' },
+        { name: 'Bot 3', botKind: 'standard' }
+      ])
+    })
+
+    it('should refuse a kind there is no such thing as, or a computer player not asked for', () => {
+      playerStore.setDraftBotCount(1)
+
+      expect(playerStore.setDraftBotKind(0, 'clever')).toBe(false)
+      expect(playerStore.setDraftBotKind(1, 'fast')).toBe(false)
+      expect(playerStore.draftBots).toEqual(['standard'])
+    })
+
+    it('should keep the kinds chosen when the count changes', () => {
+      playerStore.setDraftBotCount(3)
+      playerStore.setDraftBotKind(0, 'fast')
+      playerStore.setDraftBotKind(2, 'fast')
+
+      // Fewer drops the last; more adds the default kind at the end
+      playerStore.setDraftBotCount(2)
+      playerStore.setDraftBotCount(3)
+
+      expect(playerStore.draftBots).toEqual(['fast', 'standard', 'standard'])
     })
 
     it("should not give a computer player a person's name", () => {
@@ -493,6 +525,16 @@ describe('Player Store', () => {
       ])
     })
 
+    it('should start each computer player as the kind chosen for it', () => {
+      playerStore.addDraftPlayer({ name: 'Alice', color: 'red' })
+      playerStore.setDraftBotCount(2)
+      playerStore.setDraftBotKind(1, 'fast')
+
+      playerStore.commitDraftPlayers()
+
+      expect(playerStore.players.map(({ botKind }) => botKind)).toEqual([null, 'standard', 'fast'])
+    })
+
     it('should start a game of computer players only', () => {
       playerStore.setDraftBotCount(3)
 
@@ -509,6 +551,17 @@ describe('Player Store', () => {
 
       // A save from before computer players has only people
       expect(playerStore.players.map(({ isBot }) => isBot)).toEqual([false, true])
+    })
+
+    it("should keep each computer player's kind when a game is restored", () => {
+      playerStore.setPlayers([
+        { id: 1, name: 'Alice', color: 'red', cash: 0, isTurn: true },
+        { id: 2, name: 'Fast Bot 1', color: 'blue', cash: 0, isBot: true, botKind: 'fast' },
+        // A save from before there were kinds of computer player
+        { id: 3, name: 'Bot 2', color: 'green', cash: 0, isBot: true }
+      ])
+
+      expect(playerStore.players.map(({ botKind }) => botKind)).toEqual([null, 'fast', 'standard'])
     })
   })
 

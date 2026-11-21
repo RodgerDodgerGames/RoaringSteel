@@ -26,7 +26,8 @@ import { pinPlainScale } from '../../utils/boardScale'
 
 /**
  * Sets up a game on the test board.
- * @param {Array<{name: string, isBot: boolean}>} roster - The players, in turn order
+ * @param {Array<{name: string, isBot: boolean, botKind?: string}>} roster -
+ *   The players, in turn order
  * @returns {Promise<void>} Resolves once the deck is built and dealt
  */
 async function setUpGame(roster) {
@@ -103,49 +104,73 @@ describe('useBot', () => {
       gameRules.victory.cash = fullCash
     })
 
-    it('should be played to a win without the rules ever refusing a move', async () => {
-      await setUpGame([
-        { name: 'Bot 1', isBot: true },
-        { name: 'Bot 2', isBot: true },
-        { name: 'Bot 3', isBot: true }
-      ])
-      const gameStore = useGameStore()
-      const playerStore = usePlayerStore()
-      const { playTurn } = useBot()
-      const { endTurn } = useTurn()
-      const refused = []
-      const delivered = new Set()
-      let slowest = 0
+    const standard = (name) => ({ name, isBot: true, botKind: 'standard' })
+    const fast = (name) => ({ name, isBot: true, botKind: 'fast' })
 
-      for (let turn = 0; turn < 600 && !gameStore.isOver; turn++) {
-        const player = playerStore.activePlayer
-        const started = performance.now()
-        const report = playTurn(player.id)
-        slowest = Math.max(slowest, performance.now() - started)
+    it.each([
+      ['Standard bots', [standard('Bot 1'), standard('Bot 2'), standard('Bot 3')]],
+      ['Fast Bots', [fast('Fast Bot 1'), fast('Fast Bot 2'), fast('Fast Bot 3')]],
+      ['both kinds', [standard('Bot 1'), fast('Fast Bot 2'), standard('Bot 3')]]
+    ])(
+      'should be played to a win by %s without the rules ever refusing a move',
+      async (_, roster) => {
+        await setUpGame(roster)
+        const gameStore = useGameStore()
+        const playerStore = usePlayerStore()
+        const { playTurn } = useBot()
+        const { endTurn } = useTurn()
+        const refused = []
+        const delivered = new Set()
+        // How each kind's lines were found, as 'kind: route'
+        const routes = new Set()
+        let slowest = 0
 
-        refused.push(...report.errors)
-        report.events
-          .filter(({ type }) => type === 'deliver')
-          .forEach(() => delivered.add(player.id))
-        expectGameWhole()
-        if (!report.endedTurn && !gameStore.isOver) endTurn()
-      }
+        for (let turn = 0; turn < 600 && !gameStore.isOver; turn++) {
+          const player = playerStore.activePlayer
+          const started = performance.now()
+          const report = playTurn(player.id)
+          slowest = Math.max(slowest, performance.now() - started)
 
-      expect(refused).toEqual([])
-      expect(gameStore.winnerId).not.toBeNull()
-      // Every computer player got its business going, not just the winner
-      expect(delivered.size).toBe(3)
-      // Nobody ever built into the town outside the region
-      const kauri = makeTowns().find(({ name }) => name === 'Kauri')
-      const kauriCell = findCell({ lat: kauri.lat, lng: kauri.lon }, useGridStore().grid)
-      useTrackStore().segments.forEach(({ coordinates }) =>
-        coordinates.forEach((point) =>
-          expect(findCell(point, useGridStore().grid)).not.toBe(kauriCell)
+          refused.push(...report.errors)
+          report.events
+            .filter(({ type }) => type === 'deliver')
+            .forEach(() => delivered.add(player.id))
+          report.trace.build
+            .filter(({ route }) => route)
+            .forEach(({ route, straightBlocked }) => {
+              routes.add(`${player.botKind}: ${route}${straightBlocked ? ' (blocked)' : ''}`)
+            })
+          expectGameWhole()
+          if (!report.endedTurn && !gameStore.isOver) endTurn()
+        }
+
+        expect(refused).toEqual([])
+        expect(gameStore.winnerId).not.toBeNull()
+        // Every computer player got its business going, not just the winner
+        expect(delivered.size).toBe(3)
+        // Standard bots always searched; Fast Bots built straight, and searched
+        // only where a straight line broke a rule
+        expect(
+          [...routes].every((route) =>
+            ['standard: search', 'fast: straight', 'fast: search (blocked)'].includes(route)
+          )
+        ).toBe(true)
+        roster.forEach(({ botKind }) =>
+          expect([...routes].some((route) => route.startsWith(botKind))).toBe(true)
         )
-      )
-      // Quick enough that people are not left waiting on a computer player
-      expect(slowest).toBeLessThan(1000)
-    }, 60000)
+        // Nobody ever built into the town outside the region
+        const kauri = makeTowns().find(({ name }) => name === 'Kauri')
+        const kauriCell = findCell({ lat: kauri.lat, lng: kauri.lon }, useGridStore().grid)
+        useTrackStore().segments.forEach(({ coordinates }) =>
+          coordinates.forEach((point) =>
+            expect(findCell(point, useGridStore().grid)).not.toBe(kauriCell)
+          )
+        )
+        // Quick enough that people are not left waiting on a computer player
+        expect(slowest).toBeLessThan(1000)
+      },
+      60000
+    )
   })
 
   describe('alongside a person', () => {
@@ -308,6 +333,44 @@ describe('useBot', () => {
       expect(report.trace.demands).toHaveLength(1)
       expect(report.trace.trainStop).toBe('no track of its own to put the train on yet')
       expect(report.trace.cashAfter).toBe(report.trace.cashBefore)
+    })
+  })
+
+  describe('a Fast Bot', () => {
+    beforeEach(async () => {
+      await setUpGame([{ name: 'Fast Bot 1', isBot: true, botKind: 'fast' }])
+      // One demand: coal from Alder, the major city in the northwest, to
+      // Birch, the one in the southwest, with nothing in the way
+      useDemandCardsStore().setDeck({
+        drawPile: [],
+        hands: {
+          1: [{ id: 9, demands: [{ destination: 'Birch', industry: 'Coal', payoff: 9000 }] }]
+        }
+      })
+    })
+
+    it('should build its track straight, through any town on the way', () => {
+      const towns = makeTowns()
+      const isTown = (point) => towns.some(({ lat, lon }) => lat === point.lat && lon === point.lng)
+
+      const report = useBot().playTurn(1)
+
+      expect(report.errors).toEqual([])
+      const [section] = useTrackStore().segmentsForOwner(1)
+      expect(section).toBeDefined()
+      expect(report.trace.build[0].route).toBe('straight')
+      // Every point is on the line between the ends, but for any town the
+      // line went through on the way
+      const from = section.coordinates[0]
+      const to = section.coordinates.at(-1)
+      // How far a point is off the line between the ends, in degrees: the
+      // cross product, which holds for a line in any direction
+      const offLine = ({ lat, lng }) =>
+        Math.abs((lat - from.lat) * (to.lng - from.lng) - (lng - from.lng) * (to.lat - from.lat)) /
+        Math.hypot(to.lat - from.lat, to.lng - from.lng)
+      section.coordinates
+        .filter((point) => !isTown(point))
+        .forEach((point) => expect(offLine(point)).toBeLessThan(1e-9))
     })
   })
 

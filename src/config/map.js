@@ -28,6 +28,31 @@ export const mapViewConfig = {
 }
 
 /**
+ * The hillshade laid over the satellite imagery on the game map (see
+ * MainMap.vue), so mountains, ridges and valleys stand out. It is Esri's
+ * World Hillshade: gray tiles, white where ground faces the light and darker
+ * where it slopes away. They are blended into the imagery by multiplying
+ * ("multiply" blending): white leaves the imagery as it is, gray darkens it,
+ * so the imagery keeps its colors and the slopes get shadows.
+ */
+export const hillshadeConfig = {
+  /** Where the tiles are, in Leaflet's {z}/{y}/{x} form */
+  url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}',
+  /**
+   * How strong the shading is, from 0 (none) to 1 (the full hillshade).
+   * Multiplying dims flat ground a little as well as shading slopes, so the
+   * higher this is, the darker the whole map.
+   */
+  opacity: 0.6,
+  /**
+   * The closest zoom Esri draws real hillshade at. Past it the server sends
+   * a "map data not yet available" tile rather than an error, so Leaflet is
+   * told to stretch this zoom's tiles instead of asking for closer ones.
+   */
+  maxNativeZoom: 16
+}
+
+/**
  * How the board's water is drawn (see composables/map/waterLayer.js): the
  * lakes, sea and rivers track has to bridge, and their names.
  */

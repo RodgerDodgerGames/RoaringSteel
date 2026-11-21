@@ -46,6 +46,14 @@ export const CREDIT_GROUPS = [
         name: 'OpenStreetMap contributors',
         url: 'https://www.openstreetmap.org/copyright',
         note: 'Map data'
+      },
+      {
+        name: 'Esri World Hillshade',
+        url: 'https://www.arcgis.com/home/item.html?id=1b243539f4514b6ba35e7d995890db1d',
+        note:
+          'Hillshade. Sources: Esri, Vantor, Airbus DS, USGS, NGA, NASA, CGIAR, N Robinson, ' +
+          'NCEAS, NLS, OS, NMA, Geodatastyrelsen, Rijkswaterstaat, GSA, Geoland, FEMA, ' +
+          'Intermap, and the GIS user community.'
       }
     ]
   },

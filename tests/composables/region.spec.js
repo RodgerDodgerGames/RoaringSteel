@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { reactive } from 'vue'
-import { regionPolygons, regionTest } from '@/composables/map/region'
+import { regionPolygons, regionTest, regionOutline } from '@/composables/map/region'
 
 const polygon = (x) => ({
   type: 'Feature',
@@ -99,5 +99,34 @@ describe('regionTest', () => {
     }
 
     expect(regionTest(region)({ lat: 1, lng: 1 })).toBe(true)
+  })
+})
+
+describe('regionOutline', () => {
+  it('should give every ring of every piece, holes and all, as points', () => {
+    const square = (x, size) => [
+      [x, 0],
+      [x + size, 0],
+      [x + size, size],
+      [x, size],
+      [x, 0]
+    ]
+    const region = {
+      type: 'Feature',
+      geometry: {
+        type: 'MultiPolygon',
+        coordinates: [[square(0, 4), square(1, 1)], [square(10, 2)]]
+      }
+    }
+
+    const outline = regionOutline(regionTest(region))
+
+    expect(outline).toHaveLength(3)
+    expect(outline[2][1]).toEqual({ lat: 0, lng: 12 })
+  })
+
+  it('should give no border for no region, and none known for a test it did not make', () => {
+    expect(regionOutline(regionTest(null))).toEqual([])
+    expect(regionOutline(() => true)).toBeNull()
   })
 })

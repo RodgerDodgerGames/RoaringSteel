@@ -66,7 +66,8 @@ export function regionTest(region) {
   const canKeep = raw !== null && typeof raw === 'object'
   if (canKeep && regionTests.has(raw)) return regionTests.get(raw)
 
-  const polygons = regionPolygons(region).map((feature) => ({ feature, box: bbox(feature) }))
+  const features = regionPolygons(region)
+  const polygons = features.map((feature) => ({ feature, box: bbox(feature) }))
   const test =
     polygons.length === 0
       ? () => true
@@ -80,5 +81,44 @@ export function regionTest(region) {
               booleanPointInPolygon([lng, lat], feature)
           )
   if (canKeep) regionTests.set(raw, test)
+  regionOutlines.set(test, outlineOf(features))
   return test
+}
+
+/**
+ * The outline of the region each test was made for (see `regionOutline`), by
+ * the test.
+ * @type {WeakMap<Function, Array<Array<{lat: number, lng: number}>>>}
+ */
+const regionOutlines = new WeakMap()
+
+/**
+ * Every ring of a region's polygons — each piece's outer edge and the edge
+ * of every hole in it — as points.
+ * @param {Array<Object>} features - Polygon and MultiPolygon features (see
+ *   `regionPolygons`)
+ * @returns {Array<Array<{lat: number, lng: number}>>} The rings
+ */
+function outlineOf(features) {
+  return features
+    .flatMap(({ geometry }) =>
+      geometry.type === 'Polygon' ? geometry.coordinates : geometry.coordinates.flat()
+    )
+    .map((ring) => ring.map(([lng, lat]) => ({ lat, lng })))
+}
+
+/**
+ * The border of the region a test was made for (see `regionTest`): every
+ * ring of its polygons, as points. Where the border runs is all that tells
+ * the cells it passes through from those wholly inside or outside the
+ * region, so a check along a line need only be made in the cells the border
+ * passes through (see `searchBoard` in botPathfinder.js).
+ *
+ * @param {Function} isInRegion - A region test
+ * @returns {Array<Array<{lat: number, lng: number}>>|null} The rings — none
+ *   for no region, where nothing is outside — or null for a test
+ *   `regionTest` did not make, whose border is not known
+ */
+export function regionOutline(isInRegion) {
+  return regionOutlines.get(isInRegion) ?? null
 }

@@ -37,6 +37,16 @@ export const centerAt = (row, col) => ({
   lng: WEST + (col + 0.5) * LNG_STEP
 })
 
+/**
+ * The south-west corner of the cell at a row and column. Fractions and the
+ * row and column just past the board's edge work too, so a region can be
+ * drawn along and between the cells' sides.
+ */
+export const cornerAt = (row, col) => ({
+  lat: SOUTH + row * LAT_STEP,
+  lng: WEST + col * LNG_STEP
+})
+
 /** Whether a cell is in the lake (rows 8–11, columns 4–7) */
 export const isLake = (row, col) => row >= 8 && row <= 11 && col >= 4 && col <= 7
 

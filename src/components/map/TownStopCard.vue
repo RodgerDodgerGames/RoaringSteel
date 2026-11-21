@@ -22,7 +22,7 @@
 import { storeToRefs } from 'pinia'
 import { useTrainStopStore, wantedLabel } from '@/stores/trainStop'
 import { commodityIconUrl } from '@/composables/map/commodityIcons'
-import { formatCurrency } from '@/composables/utils'
+import { formatShortCurrency } from '@/composables/utils'
 
 const trainStopStore = useTrainStopStore()
 const { stopTown, pickups, deliveries, cargo, notice } = storeToRefs(trainStopStore)
@@ -49,7 +49,9 @@ const { pickUp, deliver, closeStop } = trainStopStore
           @click="deliver(option.cardId, option.line)"
         >
           <img class="town-stop__icon" :src="commodityIconUrl(option.code)" alt="" />
-          <span>{{ option.demand.industry }} for {{ formatCurrency(option.demand.payoff) }}</span>
+          <span
+            >{{ option.demand.industry }} for {{ formatShortCurrency(option.demand.payoff) }}</span
+          >
         </button>
       </div>
     </div>

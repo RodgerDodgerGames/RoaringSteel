@@ -34,7 +34,7 @@ import { ref, computed, watch } from 'vue'
 import DestinationSelect from './DestinationSelect.vue'
 import { useTrainControls } from '@/composables/useTrainControls'
 import { turnsText } from '@/composables/trainStatus'
-import { formatCurrency } from '@/composables/utils'
+import { formatShortCurrency } from '@/composables/utils'
 
 const {
   train,
@@ -134,7 +134,7 @@ function choiceLabel({ name, entry }) {
  * @returns {string} e.g. "$4M to Ann"
  */
 function feeText(fee, payTo) {
-  return `${formatCurrency(fee)} to ${payTo.map(nameOf).join(', ')}`
+  return `${formatShortCurrency(fee)} to ${payTo.map(nameOf).join(', ')}`
 }
 
 /** The places as the dropdown shows them, with a dot per other track owner */

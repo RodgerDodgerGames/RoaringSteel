@@ -49,14 +49,13 @@ import { useGameStore } from '@/stores/game'
 import { useMapStore } from '@/stores/map'
 import useBuildTrack, { buildTrackKey } from '@/composables/map/useBuildTrack'
 import { useBotRunner } from '@/composables/bot/useBotRunner'
-import { formatCurrency } from '@/composables/utils'
 
 const emit = defineEmits(['new-game'])
 
 // One build-track instance for the whole game. Its onMounted runs after
 // MainMap's (a parent mounts after its children), so the map and towns are in
 // the store by the time it reads them.
-const buildTrack = useBuildTrack(formatCurrency)
+const buildTrack = useBuildTrack()
 provide(buildTrackKey, buildTrack)
 
 // Destructured so the template unwraps them; refs nested inside a plain

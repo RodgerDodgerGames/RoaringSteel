@@ -170,7 +170,7 @@ describe('useTrackBuilder', () => {
     const result = builder.buildSection(ANN, [centerOf(0), centerOf(2)])
 
     expect(result.ok).toBe(false)
-    expect(result.error).toMatch(/costs \$3,000/)
+    expect(result.error).toMatch(/costs \$3 million/)
     expect(trackStore.segments).toEqual([])
   })
 

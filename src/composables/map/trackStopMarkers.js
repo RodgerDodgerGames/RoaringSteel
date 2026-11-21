@@ -30,7 +30,7 @@ import { usePlayerStore } from '@/stores/players'
 import { useGameStore } from '@/stores/game'
 import { useTrainsStore } from '@/stores/trains'
 import { spacesText, turnsText } from '@/composables/trainStatus'
-import { formatCurrency } from '@/composables/utils'
+import { formatShortCurrency } from '@/composables/utils'
 
 /** The clickable box round each ring, in px: larger than the ring itself */
 const SIZE = 18
@@ -68,7 +68,7 @@ export function useTrackStopMarkers() {
     const names = stop.payTo.map(
       (id) => playerStore.players.find((p) => p.id === id)?.name ?? 'another player'
     )
-    return `${label} · ${formatCurrency(stop.fee)} to ${names.join(', ')}`
+    return `${label} · ${formatShortCurrency(stop.fee)} to ${names.join(', ')}`
   }
 
   /** Puts a mark on the map for each point the train can stop at */

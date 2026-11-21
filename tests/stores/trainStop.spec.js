@@ -171,8 +171,8 @@ describe('train stop store', () => {
           { destination: 'Far', payoff: 20000 },
           { destination: 'West', payoff: 12000 }
         ])
-      ).toBe('→ Far $20,000 (+1)')
-      expect(wantedLabel([{ destination: 'West', payoff: 12000 }])).toBe('→ West $12,000')
+      ).toBe('→ Far $20M (+1)')
+      expect(wantedLabel([{ destination: 'West', payoff: 12000 }])).toBe('→ West $12M')
     })
 
     it('should say nothing for a load no card wants', () => {

@@ -8,6 +8,12 @@
  * board game's figures carry straight over: its $20 million building
  * allowance is $20,000 here, its $250 million to win is $250,000.
  *
+ * Players never see these figures as written: every amount is shown in
+ * millions, as the board game prints them ("$20M", "$250 million"; see
+ * formatCurrency and formatShortCurrency in composables/utils.js). Amounts
+ * in the comments below are the game's own dollars, as in the code, unless
+ * they are named as Empire Builder's.
+ *
  * @module config/game
  */
 

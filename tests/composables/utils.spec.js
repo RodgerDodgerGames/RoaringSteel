@@ -12,6 +12,7 @@ import {
   DEFAULT_REQUEST_TIMEOUT_MS,
   fetchWithRetries,
   fetchWithTimeout,
+  formatCurrency,
   formatShortCurrency,
   isRefusal,
   mapWithConcurrency,
@@ -419,19 +420,56 @@ describe('isRefusal', () => {
   })
 })
 
+// The game's $1,000 is one of Empire Builder's millions (see config/game.js)
+describe('formatCurrency', () => {
+  it('should give a whole number of millions with the word', () => {
+    expect(formatCurrency(12000)).toBe('$12 million')
+  })
+
+  it('should keep every one of the game dollars, to three decimal places', () => {
+    expect(formatCurrency(1234)).toBe('$1.234 million')
+    expect(formatCurrency(500)).toBe('$0.5 million')
+  })
+
+  it('should put the minus sign before the dollar sign', () => {
+    expect(formatCurrency(-1500)).toBe('-$1.5 million')
+  })
+})
+
 describe('formatShortCurrency', () => {
-  it('should give thousands to one decimal place', () => {
-    expect(formatShortCurrency(20300)).toBe('$20.3k')
+  it('should give a whole number of millions as M', () => {
+    expect(formatShortCurrency(28000)).toBe('$28M')
   })
 
-  it('should drop the decimal from a whole number of thousands', () => {
-    expect(formatShortCurrency(8000)).toBe('$8k')
+  it('should keep every one of the game dollars, dropping trailing zeros', () => {
+    expect(formatShortCurrency(20300)).toBe('$20.3M')
+    expect(formatShortCurrency(18766)).toBe('$18.766M')
+    expect(formatShortCurrency(5)).toBe('$0.005M')
   })
 
-  it('should drop the decimal in browsers that give money cents by default', async () => {
-    // Chrome fills in a money format's smallest number of decimal places from
-    // the dollar's two (cut to the one allowed), so 8,000 came out "$8.0k".
-    // Node does not, so a browser that does is stood in for here.
+  it('should round fractions of a game dollar off', () => {
+    // Track prices are not whole dollars
+    expect(formatShortCurrency(1234.4)).toBe('$1.234M')
+    expect(formatShortCurrency(1234.6)).toBe('$1.235M')
+  })
+
+  it('should group a thousand millions and more with commas', () => {
+    expect(formatShortCurrency(1250000)).toBe('$1,250M')
+  })
+
+  it('should put the minus sign before the dollar sign', () => {
+    expect(formatShortCurrency(-1500)).toBe('-$1.5M')
+  })
+
+  it('should not sign an amount that rounds to nothing', () => {
+    expect(formatShortCurrency(0)).toBe('$0M')
+    expect(formatShortCurrency(-0.2)).toBe('$0M')
+  })
+
+  it('should drop the decimals in browsers that give money cents by default', async () => {
+    // Chrome has filled in a format's smallest number of decimal places from
+    // the dollar's two, so a whole amount came out "$8.0". Node does not, so
+    // a browser that does is stood in for here.
     const RealNumberFormat = Intl.NumberFormat
     const centsByDefault = function (locale, options = {}) {
       const minimumFractionDigits =
@@ -443,33 +481,10 @@ describe('formatShortCurrency', () => {
       // Imported afresh, so its formatter is made by the stand-in
       vi.resetModules()
       const utils = await import('@/composables/utils')
-      expect(utils.formatShortCurrency(8000)).toBe('$8k')
-      expect(utils.formatShortCurrency(20300)).toBe('$20.3k')
+      expect(utils.formatShortCurrency(8000)).toBe('$8M')
+      expect(utils.formatCurrency(20300)).toBe('$20.3 million')
     } finally {
       vi.unstubAllGlobals()
     }
-  })
-
-  it('should round to the nearest hundred', () => {
-    expect(formatShortCurrency(23340)).toBe('$23.3k')
-    expect(formatShortCurrency(19960)).toBe('$20k')
-  })
-
-  it('should round a half-hundred up', () => {
-    expect(formatShortCurrency(20350)).toBe('$20.4k')
-  })
-
-  it('should give an amount just under a million in thousands', () => {
-    expect(formatShortCurrency(950000)).toBe('$950k')
-  })
-
-  it('should give millions as M', () => {
-    expect(formatShortCurrency(1250000)).toBe('$1.3M')
-    // Just short of a million rounds up to one, not to "$1000k"
-    expect(formatShortCurrency(999960)).toBe('$1M')
-  })
-
-  it('should leave an amount that rounds to under a thousand as it is', () => {
-    expect(formatShortCurrency(940)).toBe('$940')
   })
 })

@@ -12,7 +12,7 @@ import { ref, computed, watch } from 'vue'
 import { usePlayerStore } from '@/stores/players'
 import { useTrainsStore } from '@/stores/trains'
 import { TRAIN_TYPES } from '@/config/trains'
-import { formatCurrency } from '@/composables/utils'
+import { formatShortCurrency } from '@/composables/utils'
 
 const playerStore = usePlayerStore()
 const trainsStore = useTrainsStore()
@@ -60,7 +60,7 @@ function change(option) {
           :disabled="Boolean(option.error)"
           @click="change(option)"
         >
-          {{ formatCurrency(option.cost) }}
+          {{ formatShortCurrency(option.cost) }}
         </button>
       </div>
       <p v-if="option.error" class="upgrade-controls__note">{{ option.error }}</p>

@@ -37,21 +37,21 @@ import { usePlayerStore } from './players'
 import { useTrainsStore } from './trains'
 import { useDemandCardsStore } from './demandCards'
 import { useTownsStore } from './towns'
-import { formatCurrency } from '@/composables/utils'
+import { formatCurrency, formatShortCurrency } from '@/composables/utils'
 
 /**
  * What a pick-up button says a load is wanted for: the best-paid demand in
  * the player's hand for it, and how many more there are.
  * @param {Array<{destination: string, payoff: number}>} wantedIn - The
  *   demands wanting it, best paid first
- * @returns {string} Such as "→ Gary $23,000" or "→ Gary $23,000 (+1)"; empty
+ * @returns {string} Such as "→ Gary $23M" or "→ Gary $23M (+1)"; empty
  *   if no card wants it
  */
 export function wantedLabel(wantedIn) {
   if (wantedIn.length === 0) return ''
   const [best, ...rest] = wantedIn
   const more = rest.length ? ` (+${rest.length})` : ''
-  return `→ ${best.destination} ${formatCurrency(best.payoff)}${more}`
+  return `→ ${best.destination} ${formatShortCurrency(best.payoff)}${more}`
 }
 
 export const useTrainStopStore = defineStore('trainStop', () => {

@@ -18,15 +18,19 @@
  * overlap, so a demand near a boundary may be dealt as either pool's.
  *
  * Which pairs of a pool make it into the deck, and in what order, is drawn
- * at random, weighted two ways, as the deck has always been:
- * - a town that makes little wants more: a town's weight is
- *   1 / (1 + the number of things it makes);
+ * at random, weighted three ways:
+ * - a bigger town wants more: major cities most, then medium towns (see
+ *   `demandDeckConfig.sizeWeights`);
+ * - a town that makes little wants more, so one that makes nothing still
+ *   turns up on cards: 1 / (1 + the number of things it makes), softened by
+ *   raising it to `demandDeckConfig.makesLittlePower`;
  * - a commodity made in many towns is wanted more often: a commodity's
  *   weight is how many towns make it.
- * A pair's weight is the two multiplied. The pairs are put in a random order
- * in which heavier pairs tend to come first (each pair's place is drawn as
- * random^(1 / weight), highest first); each pool takes its own pairs in
- * that order, and each card takes the first of each pool's that it can.
+ * A pair's weight is the three multiplied. The pairs are put in a random
+ * order in which heavier pairs tend to come first (each pair's place is
+ * drawn as random^(1 / weight), highest first); each pool takes its own
+ * pairs in that order, and each card takes the first of each pool's that it
+ * can.
  * The finished cards are then shuffled, and so is each card's three: the
  * weights choose which demands make it into the deck, but a heavy demand is
  * no likelier to be near the top than a light one, nor a cheap demand to be
@@ -35,12 +39,14 @@
  * The deck has at most `cardsPerTown` cards per town (see config/demands.js),
  * and at most a third as many as there are pairs, so on most boards it
  * leaves some pairs out (a bench of four boards, 2026-11-18, dealt 29–78%
- * of them, every deck at full size). On a board with few pairs for its
+ * of them). On a board with few pairs for its
  * towns, a pool can run out before the deck is full, or have left only
  * pairs for towns already on the card being made; the deck then stops
  * short, at the cards it could fill. The middle pool, which shares pairs
- * with both the others, is dealt first on each card, so it does not run
- * out first.
+ * with both the others, is dealt first on each card, so they do not take
+ * what it shares before it can. That does not keep every pool full: the
+ * middle takes shared pairs too, so a pool with a narrow band can still
+ * run out first, whether the middle's or one beside it.
  *
  * Pure functions over plain data, so they are tested without stores.
  *
@@ -50,13 +56,38 @@
 import { demandDeckConfig } from '@/config/demands'
 
 /**
+ * How much a town wants, for the draw: its size's weight times its weight
+ * for making little (see the module's notes).
+ * @param {Object} town - The town, with size and industries
+ * @param {{large: number, medium: number, small: number}} sizeWeights - See
+ *   `demandDeckConfig`
+ * @param {number} makesLittlePower - See `demandDeckConfig`
+ * @returns {number} The weight; a town without a size counts as small
+ */
+function townWeight({ size, industries }, sizeWeights, makesLittlePower) {
+  const forSize = sizeWeights[size] ?? sizeWeights.small
+  const forMakingLittle = (1 / (1 + industries.length)) ** makesLittlePower
+  return forSize * forMakingLittle
+}
+
+/**
  * Every demand the board has: each town paired with each commodity made in
  * some other town, with the pair's weight.
- * @param {Array<Object>} towns - The towns on the board, each with name and
- *   industries ([{name}])
+ * @param {Array<Object>} towns - The towns on the board, each with name,
+ *   size and industries ([{name}])
+ * @param {Object} [options]
+ * @param {{large: number, medium: number, small: number}} [options.sizeWeights] -
+ *   See `demandDeckConfig`
+ * @param {number} [options.makesLittlePower] - See `demandDeckConfig`
  * @returns {Array<{town: Object, industry: string, weight: number}>} The pairs
  */
-export function demandPairs(towns) {
+export function demandPairs(
+  towns,
+  {
+    sizeWeights = demandDeckConfig.sizeWeights,
+    makesLittlePower = demandDeckConfig.makesLittlePower
+  } = {}
+) {
   // How many towns make each commodity
   const makers = new Map()
   towns.forEach((town) =>
@@ -64,11 +95,11 @@ export function demandPairs(towns) {
   )
 
   return towns.flatMap((town) => {
-    const townWeight = 1 / (1 + town.industries.length)
+    const wants = townWeight(town, sizeWeights, makesLittlePower)
     const makes = new Set(town.industries.map(({ name }) => name))
     return [...makers.entries()]
       .filter(([industry]) => !makes.has(industry))
-      .map(([industry, count]) => ({ town, industry, weight: townWeight * count }))
+      .map(([industry, count]) => ({ town, industry, weight: wants * count }))
   })
 }
 
@@ -102,8 +133,8 @@ function shuffle(items, random) {
 /**
  * Builds the demand deck for a board.
  *
- * @param {Array<Object>} towns - The towns on the board, each with name and
- *   industries ([{name}])
+ * @param {Array<Object>} towns - The towns on the board, each with name,
+ *   size and industries ([{name}])
  * @param {Function} payoffOf - What delivering a commodity to a town pays:
  *   (town, commodity name) => dollars (see payoffs.js). Asked of every pair,
  *   so they can be ranked into the pools.
@@ -113,6 +144,9 @@ function shuffle(items, random) {
  * @param {number} [options.cardsPerTown] - See `demandDeckConfig`
  * @param {Array<{from: number, to: number}>} [options.pools] - See
  *   `demandDeckConfig`: one demand on each card from each
+ * @param {{large: number, medium: number, small: number}} [options.sizeWeights] -
+ *   See `demandDeckConfig`
+ * @param {number} [options.makesLittlePower] - See `demandDeckConfig`
  * @returns {Array<{id: number, demands: Array<{destination: string,
  *   industry: string, payoff: number}>}>} The deck, top first, its cards
  *   numbered from 1
@@ -123,10 +157,12 @@ export function buildDemandDeck(
   {
     random = Math.random,
     cardsPerTown = demandDeckConfig.cardsPerTown,
-    pools = demandDeckConfig.pools
+    pools = demandDeckConfig.pools,
+    sizeWeights,
+    makesLittlePower
   } = {}
 ) {
-  const pairs = demandPairs(towns).map((pair) => ({
+  const pairs = demandPairs(towns, { sizeWeights, makesLittlePower }).map((pair) => ({
     ...pair,
     payoff: payoffOf(pair.town, pair.industry)
   }))
@@ -146,8 +182,8 @@ export function buildDemandDeck(
     order.filter((pair) => standing.get(pair) >= from && standing.get(pair) < to)
   )
   // The pools are dealt from the middle out: a middle pool shares pairs with
-  // the pools on both sides, and has fewest of its own, so it is the first
-  // to run short if the others take what it shares with them first
+  // the pools on both sides, so it would run short if the others took what
+  // it shares with them first. It can drain a narrow pool beside it instead.
   const middle = (pools.length - 1) / 2
   const dealOrder = poolOrders
     .map((poolOrder, i) => ({ poolOrder, fromMiddle: Math.abs(i - middle) }))

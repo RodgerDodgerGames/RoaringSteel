@@ -9,6 +9,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { buildDemandDeck, demandPairs } from '@/composables/demandDeck'
+import { demandDeckConfig } from '@/config/demands'
 
 /**
  * A town making the given commodities.
@@ -72,7 +73,7 @@ describe('demandPairs', () => {
   })
 
   it('should weigh a pair up for a town that makes less, and for a commodity made in more towns', () => {
-    const pairs = demandPairs(TOWNS)
+    const pairs = demandPairs(TOWNS, { makesLittlePower: 0.5 })
     const weightOf = (name, industry) =>
       pairs.find((p) => p.town.name === name && p.industry === industry).weight
 
@@ -80,6 +81,179 @@ describe('demandPairs', () => {
     expect(weightOf('Greeley', 'Fruit')).toBeGreaterThan(weightOf('Denver', 'Fruit'))
     // Steel is made in two towns, Fruit in one: Steel is wanted more
     expect(weightOf('Greeley', 'Steel')).toBeGreaterThan(weightOf('Greeley', 'Fruit'))
+  })
+})
+
+describe('demandPairs town weights', () => {
+  // The tests' own, so retuning config/demands.js does not break them
+  const sizeWeights = { large: 8, medium: 4, small: 1 }
+  /** A town of the given size */
+  const sized = (size, name, ...makes) => ({ ...town(name, ...makes), size })
+  /** The weight of each town's demand for Salt, which none of them makes */
+  const saltWeights = (towns, options) =>
+    Object.fromEntries(
+      demandPairs([...towns, sized('small', 'Saltville', 'Salt')], options)
+        .filter(({ industry }) => industry === 'Salt')
+        .map(({ town: t, weight }) => [t.name, weight])
+    )
+
+  it('should weigh a town up by its size', () => {
+    const weights = saltWeights(
+      [
+        sized('large', 'Big', 'Coal'),
+        sized('medium', 'Mid', 'Coal'),
+        sized('small', 'Wee', 'Coal')
+      ],
+      { sizeWeights, makesLittlePower: 0.5 }
+    )
+
+    expect(weights.Big / weights.Wee).toBeCloseTo(8)
+    expect(weights.Mid / weights.Wee).toBeCloseTo(4)
+  })
+
+  it('should count a town without a size as small', () => {
+    const weights = saltWeights([town('Unsized', 'Coal'), sized('small', 'Wee', 'Coal')], {
+      sizeWeights,
+      makesLittlePower: 0.5
+    })
+
+    expect(weights.Unsized).toBe(weights.Wee)
+  })
+
+  it.each([
+    [1, 4],
+    [0.5, 2],
+    [0, 1]
+  ])(
+    'should, at a power of %s, weigh a town making nothing %s times one making three',
+    (makesLittlePower, times) => {
+      const weights = saltWeights(
+        [sized('small', 'Empty'), sized('small', 'Busy', 'Coal', 'Steel', 'Fruit')],
+        { sizeWeights, makesLittlePower }
+      )
+
+      expect(weights.Empty / weights.Busy).toBeCloseTo(times)
+    }
+  )
+
+  it('should multiply the size weight by the weight for making little', () => {
+    const weights = saltWeights(
+      [sized('large', 'Busy', 'Coal', 'Steel', 'Fruit'), sized('small', 'Empty')],
+      { sizeWeights, makesLittlePower: 0.5 }
+    )
+
+    // 8 for its size, halved for making three things, against 1 and 1
+    expect(weights.Busy / weights.Empty).toBeCloseTo(4)
+  })
+
+  it("should use the game's settings unless given others", () => {
+    const weights = saltWeights([
+      sized('large', 'Big', 'Coal'),
+      sized('medium', 'Mid', 'Coal'),
+      sized('small', 'Wee', 'Coal'),
+      sized('small', 'Empty')
+    ])
+    const { sizeWeights: set, makesLittlePower } = demandDeckConfig
+
+    expect(weights.Big / weights.Wee).toBeCloseTo(set.large / set.small)
+    expect(weights.Mid / weights.Wee).toBeCloseTo(set.medium / set.small)
+    expect(weights.Empty / weights.Wee).toBeCloseTo(2 ** makesLittlePower)
+  })
+})
+
+describe('buildDemandDeck town weights', () => {
+  // Thirty towns, three of them large, six medium and the rest small, each
+  // making one thing of its own, but for four small towns that make nothing
+  const board = Array.from({ length: 30 }, (_, i) => ({
+    ...town(`Town ${i}`, ...(i < 26 ? [`Good ${i}`] : [])),
+    size: i < 3 ? 'large' : i < 9 ? 'medium' : 'small'
+  }))
+  // A payoff for each demand that has nothing to do with the town's size
+  const random = seeded(99)
+  const payoffs = new Map(
+    demandPairs(board).map(({ town: t, industry }) => [`${t.name}:${industry}`, random()])
+  )
+  /** A hundred decks for the board, of so many cards per town */
+  const decksOf = (
+    cardsPerTown,
+    weights = { sizeWeights: { large: 5, medium: 2.5, small: 1 }, makesLittlePower: 0.5 }
+  ) =>
+    Array.from({ length: 100 }, (_, i) =>
+      buildDemandDeck(board, (t, industry) => payoffs.get(`${t.name}:${industry}`), {
+        random: seeded((i + 1) * 7919),
+        cardsPerTown,
+        pools: [
+          { from: 0, to: 0.4 },
+          { from: 0.3, to: 0.7 },
+          { from: 0.6, to: 1 }
+        ],
+        ...weights
+      })
+    )
+  /** How many demands the towns passed get over all the decks, per town */
+  const demandsEach = (decks, towns) => {
+    const names = new Set(towns.map(({ name }) => name))
+    const demands = decks.flat().flatMap((card) => card.demands)
+    return demands.filter(({ destination }) => names.has(destination)).length / towns.length
+  }
+
+  it('should send the most demands to large towns, then medium, then small', () => {
+    // A small deck, so the weights decide much of what is dealt; and only
+    // towns that make one thing, so size is all that tells them apart
+    const decks = decksOf(2)
+    const making = board.filter(({ industries }) => industries.length === 1)
+    const [large, medium, small] = ['large', 'medium', 'small'].map((size) =>
+      demandsEach(
+        decks,
+        making.filter((t) => t.size === size)
+      )
+    )
+
+    // By a clear margin: with size ignored the three still differ by a
+    // percent or so, as the draw falls
+    expect(large).toBeGreaterThan(medium * 1.2)
+    expect(medium).toBeGreaterThan(small * 1.2)
+  })
+
+  it('should send more demands to a small town that makes nothing than to one that makes something', () => {
+    const decks = decksOf(2)
+    const small = board.filter(({ size }) => size === 'small')
+    const [none, one] = [0, 1].map((count) =>
+      demandsEach(
+        decks,
+        small.filter(({ industries }) => industries.length === count)
+      )
+    )
+
+    // More than the few percent it gets just by having one more demand to deal
+    expect(none).toBeGreaterThan(one * 1.15)
+  })
+
+  it('should deal by the weights it is given', () => {
+    // Nothing like the game's: small towns first, and making little counts cubed
+    const decks = decksOf(2, {
+      sizeWeights: { large: 1, medium: 1, small: 5 },
+      makesLittlePower: 3
+    })
+    const of = (size, count) =>
+      demandsEach(
+        decks,
+        board.filter((t) => t.size === size && t.industries.length === count)
+      )
+
+    expect(of('small', 1)).toBeGreaterThan(of('large', 1) * 1.2)
+    expect(of('small', 0)).toBeGreaterThan(of('small', 1) * 1.8)
+  })
+
+  it('should still send demands to every town that makes nothing, in every deck', () => {
+    const empty = board.filter(({ industries }) => industries.length === 0)
+
+    // Six cards a town, as the game deals. A weight only makes a demand
+    // likelier, so in a deck much smaller a town can be missed now and then.
+    decksOf(6).forEach((deck) => {
+      const wanting = new Set(deck.flatMap((card) => card.demands.map((d) => d.destination)))
+      empty.forEach(({ name }) => expect(wanting).toContain(name))
+    })
   })
 })
 

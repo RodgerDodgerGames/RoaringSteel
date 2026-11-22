@@ -32,6 +32,23 @@ import { REGION_GROUPINGS } from '@/config/regions'
 /** The Area Select grouping that offers single states */
 export const STATES_GROUPING = 'states'
 
+/** The FIPS codes of the lower 48 states, and DC which lies among them */
+const LOWER_48_FIPS = new Set(
+  usStates.filter(({ abbr }) => abbr !== 'AK' && abbr !== 'HI').map(({ fips }) => fips)
+)
+
+/**
+ * The outlines that can be played on: the lower 48 and DC. The outlines file
+ * also has Alaska, Hawaii and Puerto Rico, which the Area Select screen
+ * neither draws nor offers. They stay in the file for the water data's build
+ * script (scripts/build-water-data.mjs).
+ * @param {Array<Object>} features - Outlines from us-states.geojson
+ * @returns {Array<Object>} Those in the lower 48 and DC
+ */
+export function lower48Outlines(features) {
+  return features.filter((feature) => LOWER_48_FIPS.has(feature.properties.STATE))
+}
+
 /**
  * Every way of choosing a board, in the order the Area Select screen offers
  * them: each grouping of regions, in the order regions.js lists them, then

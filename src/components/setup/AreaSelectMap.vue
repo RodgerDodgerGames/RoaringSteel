@@ -1,6 +1,7 @@
 <!--
   AreaSelectMap.vue
-  The map of the United States the board is chosen on, during game setup.
+  The map of the lower 48 states the board is chosen on, during game setup.
+  It opens zoomed to fit them.
 
   It shows the boards of the grouping being offered — regions of several
   states, or single states (see useBoardChoices.js) — each a shape to click,
@@ -21,7 +22,8 @@
   opens, in place of Leaflet's credit line.
 
   @prop boards - The boards to choose from (GeoJSON features)
-  @prop stateFeatures - Every state's outline, for the state lines
+  @prop stateFeatures - The outlines of the states on offer, for the state
+    lines and the extent the map opens on
   @prop selectedKey - The key of the board chosen (see `boardKey`), or null
   @emits select - A board was clicked; given its feature
 -->
@@ -69,11 +71,24 @@ const STATE_LINE_STYLE = {
   interactive: false
 }
 
-/** The lower 48 states, which the map opens on */
-const LOWER_48 = [
+/**
+ * How finely the map can zoom. Leaflet's default is whole levels, each twice
+ * the size of the last, and fitting rounds down to one: the states could end
+ * up filling only half the map.
+ */
+const ZOOM_SNAP = 0.1
+
+/**
+ * Roughly the lower 48, for the map to show until the outlines are in, or if
+ * they cannot be had: Leaflet throws when a map with no view is dragged.
+ */
+const STARTING_VIEW = [
   [24.4, -124.8],
   [49.4, -66.9]
 ]
+
+/** The room left around the states when the map opens, in pixels */
+const FIT_PADDING = [24, 24]
 
 const mapContainer = ref(null)
 let map = null
@@ -81,8 +96,8 @@ let boardsLayer = null
 let stateLinesLayer = null
 
 onMounted(() => {
-  map = L.map(mapContainer.value, { attributionControl: false })
-  map.fitBounds(LOWER_48)
+  map = L.map(mapContainer.value, { attributionControl: false, zoomSnap: ZOOM_SNAP })
+  map.fitBounds(STARTING_VIEW, { padding: FIT_PADDING })
   // L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_terrain_background/{z}/{x}/{y}{r}.{ext}', {
   //   minZoom: 0,
   //   maxZoom: 18,
@@ -151,13 +166,19 @@ function raiseSelected() {
   })
 }
 
-/** Draws the state lines, once the outlines are in */
+/**
+ * Draws the state lines, once the outlines are in, and zooms the map to fit
+ * them. This happens once, so changing grouping leaves the player's pan and
+ * zoom as they were.
+ */
 function drawStateLines() {
   if (!map || stateLinesLayer || props.stateFeatures.length === 0) return
   stateLinesLayer = L.geoJSON(
     { type: 'FeatureCollection', features: props.stateFeatures },
     { style: () => STATE_LINE_STYLE, pane: 'stateLines' }
   ).addTo(map)
+  // Not animated, so the map opens on the fit instead of sliding to it
+  map.fitBounds(stateLinesLayer.getBounds(), { padding: FIT_PADDING, animate: false })
 }
 
 // A new grouping redraws the boards; a new choice only restyles them

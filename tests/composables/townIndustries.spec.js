@@ -4,14 +4,17 @@
  * Each town's industries are scored by their extra jobs: its jobs in an
  * industry beyond what an average town of its size would have. Pairs of
  * town and industry go out from the most extra jobs down, a town making at
- * most three things (Tourism included) and an industry going to at most a
- * share of the board's towns. Then the board is shaped: few towns keep a
- * third thing, not too many a second, and the weakest are emptied until
- * enough towns make nothing.
+ * most three things and an industry going to at most a share of the board's
+ * towns. Then the board is shaped: few towns keep a third thing, not too
+ * many a second, and the weakest that are not major cities are emptied
+ * until enough towns make nothing.
+ *
+ * Before any of that, the biggest few major cities are given Tourism, and
+ * they make nothing else.
  */
 
 import { describe, it, expect } from 'vitest'
-import { assignIndustries, candidatePairs } from '@/composables/setup/townIndustries'
+import { assignIndustries, assignTourism, candidatePairs } from '@/composables/setup/townIndustries'
 import { townIndustryConfig } from '@/config/towns'
 
 /**
@@ -51,7 +54,7 @@ const industry = (code, nationalShare, meanEmp) => ({
  */
 const town = (msa, industries = []) => ({ msa, name: `T${msa}`, industries })
 
-/** Tourism, as the towns store gives it to a major city */
+/** Tourism, as the biggest major cities are given it */
 const TOURISM = { name: 'Tourism', industry: 9999 }
 
 /**
@@ -141,6 +144,60 @@ describe('townIndustries', () => {
     })
   })
 
+  describe('assignTourism', () => {
+    /** The share, spelled out, so the tests do not move when the setting does */
+    const SHARE = 2 / 7
+
+    /** Major cities, listed smallest first: city i has i + 1 million people */
+    const majors = (count) =>
+      Array.from({ length: count }, (_, i) => ({
+        ...town(String(i)),
+        size: 'large',
+        population: (i + 1) * 1e6
+      }))
+
+    /** The codes of the towns given Tourism */
+    const withTourism = (towns) =>
+      towns.filter((t) => names(t).includes('Tourism')).map(({ msa }) => msa)
+
+    it.each([
+      [1, 1],
+      [2, 1],
+      [3, 1],
+      [4, 1],
+      [5, 1],
+      [6, 2],
+      [7, 2],
+      [14, 4]
+    ])('of %i major cities, should give %i of them Tourism', (count, expected) => {
+      expect(withTourism(assignTourism(majors(count), SHARE))).toHaveLength(expected)
+    })
+
+    it('should give it to the biggest, whatever order they come in', () => {
+      expect(withTourism(assignTourism(majors(7), SHARE))).toEqual(['5', '6'])
+    })
+
+    it('should give it only to major cities', () => {
+      const medium = { ...town('medium'), size: 'medium', population: 9e6 }
+
+      expect(withTourism(assignTourism([medium, ...majors(2)], SHARE))).toEqual(['1'])
+    })
+
+    it('should give it to no town on a board with no major city', () => {
+      const small = { ...town('small'), size: 'small', population: 1000 }
+
+      expect(withTourism(assignTourism([small], SHARE))).toEqual([])
+    })
+
+    it('should not change the towns it is given', () => {
+      const towns = majors(3)
+
+      assignTourism(towns, SHARE)
+
+      expect(withTourism(towns)).toEqual([])
+    })
+  })
+
   describe('assignIndustries', () => {
     it('should give a town the three industries it has the most extra jobs in', () => {
       const employment = [
@@ -155,7 +212,7 @@ describe('townIndustries', () => {
       expect(names(result)).toEqual(['I2', 'I3', 'I4'])
     })
 
-    it("should count Tourism toward a town's three, and keep it first", () => {
+    it('should give a Tourism town nothing else, however many jobs it has', () => {
       const employment = [
         industry(1, 0, { 1: 100 }),
         industry(2, 0, { 1: 300 }),
@@ -164,7 +221,22 @@ describe('townIndustries', () => {
 
       const [result] = assignIndustries([town('1', [TOURISM])], employment, { 1: 10000 }, OPEN)
 
-      expect(names(result)).toEqual(['Tourism', 'I2', 'I3'])
+      expect(names(result)).toEqual(['Tourism'])
+    })
+
+    it('should pass the industry a Tourism town would have made to the next town in line', () => {
+      // Town 1 has the most meat, and meat may go to one town only
+      const employment = [industry(3116, 0, { 1: 400, 2: 300 })]
+
+      const [tourist, next] = assignIndustries(
+        [town('1', [TOURISM]), town('2')],
+        employment,
+        { 1: 10000, 2: 10000 },
+        { ...OPEN, maxTownShare: 0.5 }
+      )
+
+      expect(names(tourist)).toEqual(['Tourism'])
+      expect(names(next)).toEqual(['I3116'])
     })
 
     it('should hold an industry to its share of the towns, those with the most extra jobs keeping it', () => {
@@ -273,8 +345,8 @@ describe('townIndustries', () => {
       expect(result.map((t) => t.industries.length)).toEqual([0, 0, 1, 1])
     })
 
-    it('should never take Tourism away, nor empty a major city', () => {
-      // Town 0 is a major city that makes nothing but Tourism
+    it('should never take Tourism away', () => {
+      // Town 0 makes Tourism, and has no jobs in anything
       const { towns, employment, totalJobs } = oneEach(4)
       towns[0].industries = [TOURISM]
       delete employment[0].meanEmp['0']
@@ -283,6 +355,24 @@ describe('townIndustries', () => {
 
       expect(names(result[0])).toEqual(['Tourism'])
       expect(result.map((t) => t.industries.length)).toEqual([1, 0, 0, 1])
+    })
+
+    it('should never empty a major city, however weak what it makes', () => {
+      // Town 0 is the weakest of the four, and a major city without Tourism
+      const { towns, employment, totalJobs } = oneEach(4)
+      towns[0].size = 'large'
+
+      const result = assignIndustries(towns, employment, totalJobs, { ...OPEN, minNoneShare: 0.5 })
+
+      expect(result.map((t) => t.industries.length)).toEqual([1, 0, 0, 1])
+    })
+
+    it('should leave a major city that qualifies for no industry making nothing', () => {
+      const major = { ...town('1'), size: 'large' }
+
+      const [result] = assignIndustries([major], [], { 1: 10000 }, OPEN)
+
+      expect(names(result)).toEqual([])
     })
 
     it('should not change the towns it is given', () => {

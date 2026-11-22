@@ -20,8 +20,8 @@
  *    their counties' jobs instead (see the industry store's `fillAreas`)
  * 6. Classify towns by population (small/medium/large), and make one town
  *    of major and medium cities too close together (see townSpacing.js)
- * 7. Give the towns their industries: each the things its jobs lean on most
- *    (see townIndustries.js)
+ * 7. Give the biggest major cities Tourism, and the other towns their
+ *    industries: each the things its jobs lean on most (see townIndustries.js)
  * 8. Leave off the small towns too close to another (see townSpacing.js)
  *
  * Town Object Structure:
@@ -49,7 +49,10 @@ import useCensus from '../composables/setup/useCensus'
 import getMSALatLon, { findPrincipalCity } from '../composables/setup/useTigerWeb'
 import { atTownPoint, townPoint } from '../composables/setup/townPoints'
 import { sizeCounts } from '../composables/setup/townSizes'
-import { assignIndustries as assignTownIndustries } from '../composables/setup/townIndustries'
+import {
+  assignIndustries as assignTownIndustries,
+  assignTourism
+} from '../composables/setup/townIndustries'
 import { mergeCities, combinedJobs, thinTowns } from '../composables/setup/townSpacing'
 import { townSpacingConfig } from '@/config/towns'
 import { regionTest } from '@/composables/map/region'
@@ -608,8 +611,9 @@ export const useTownsStore = defineStore('towns', () => {
    * 1. Sizes by population, and major and medium cities too close together
    *    made one town. The board keeps the counts of major cities and medium
    *    towns its full list of towns gives it.
-   * 2. Tourism for the major cities, then everyone's industries, a merged
-   *    town's from all its areas' jobs together.
+   * 2. Tourism for the biggest major cities, which make nothing else, then
+   *    everyone else's industries, a merged town's from all its areas' jobs
+   *    together.
    * 3. Small towns too close to another left off the board. This needs the
    *    industries, as a town that alone makes something is kept ahead of
    *    others; the towns left keep the industries they were given.
@@ -632,8 +636,7 @@ export const useTownsStore = defineStore('towns', () => {
         merged.filter(({ msa }) => areasOf.has(msa)).map(({ name }) => name)
       )
     }
-    towns.value = merged
-    assignTourism()
+    towns.value = assignTourism(merged)
     assignIndustries(areasOf)
 
     const kept = thinTowns(towns.value, gapUnits * speedUnitKm)
@@ -648,21 +651,8 @@ export const useTownsStore = defineStore('towns', () => {
   }
 
   /**
-   * Assigns the Tourism industry to all large towns.
-   * Tourism is a special industry that large population centers always have.
-   */
-  function assignTourism() {
-    debug.log('Assigning tourism to towns...')
-    towns.value.forEach((town) => {
-      if (town.size === 'large') {
-        town.industries.push({ name: 'Tourism', industry: 9999 })
-      }
-    })
-  }
-
-  /**
    * Gives the towns their industries (see townIndustries.js). Tourism is
-   * given out first, so it counts toward a major city's three. An industry
+   * given out first, and a town with it is given nothing here. An industry
    * in the list without its share of the country's jobs cannot be scored,
    * so it is left out, with a warning: the share is filled in by
    * scripts/build-national-shares.mjs.

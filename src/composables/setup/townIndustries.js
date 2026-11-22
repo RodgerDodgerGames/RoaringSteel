@@ -7,6 +7,10 @@
  * Every board can draw on all of them; which ones it ends up with depends on
  * where its towns' jobs are.
  *
+ * Before they are handed out, the biggest few major cities are given Tourism
+ * (`assignTourism`), and it is all they make, as Chicago and New York supply
+ * nothing but Tourists in Empire Builder. Then:
+ *
  * 1. Scoring (`candidatePairs`): each town's industries are scored by their
  *    "extra jobs": the town's jobs in the industry, minus what an average
  *    town with the same total jobs would have (its total jobs times the
@@ -21,9 +25,10 @@
  *    payroll, and most farmers and fishermen work for themselves.
  *
  * 2. Handing out (`assignIndustries`): every pair of town and industry, from
- *    the most extra jobs down, is given out unless the town already makes
- *    three things (its Tourism included) or the industry already has its
- *    share of the board's towns.
+ *    the most extra jobs down, is given out unless the town has Tourism,
+ *    already makes three things, or the industry already has its share of
+ *    the board's towns. A Tourism town takes up none of an industry's
+ *    places, so what it would have made can go to the next town in line.
  *
  * 3. Shaping: then, so the board looks something like Empire Builder's,
  *    where most cities make one or two things:
@@ -35,7 +40,10 @@
  *      weakest are emptied, until enough are.
  *    Ranking by strength rather than by jobs lets a small town that leans
  *    hard on an industry beat a big city where it is one of many. Tourism
- *    is never dropped, so a major city is never emptied.
+ *    is never dropped, and a major city is never emptied: big cities lean
+ *    on any one industry so little that they would often be the first to
+ *    go. One that qualified for no industry makes nothing, as Atlanta does
+ *    in Empire Builder.
  *
  * The limits are in `townIndustryConfig`. Pure functions over plain data, so
  * they are tested without stores.
@@ -50,6 +58,35 @@ import { townIndustryConfig } from '@/config/towns'
  * 14% of 50 towns comes out a hair over 7, which would round up to 8
  */
 const ROUNDING_ALLOWANCE = 1e-9
+
+/**
+ * Tourism, as a town holds it. It is not in the jobs data, so its code is
+ * the game's own rather than a NAICS code.
+ */
+const TOURISM = Object.freeze({ name: 'Tourism', industry: 9999 })
+
+/**
+ * Gives Tourism to the biggest of the board's major cities, in place of
+ * anything else: `assignIndustries` gives nothing to a town that has it.
+ * The share is rounded to the nearest whole city, and a board with a major
+ * city always has at least one with Tourism.
+ *
+ * @param {Array<Object>} towns - The towns on the board, each with size,
+ *   population (a merged town's, all its areas' together) and industries
+ * @param {number} [share] - The share of major cities that get it; see
+ *   `townIndustryConfig.tourismShare`
+ * @returns {Array<Object>} The towns, copied, in the order they were given
+ */
+export function assignTourism(towns, share = townIndustryConfig.tourismShare) {
+  const majors = towns
+    .filter(({ size }) => size === 'large')
+    .sort((a, b) => b.population - a.population)
+  const tourist = new Set(majors.slice(0, Math.max(1, Math.round(majors.length * share))))
+  return towns.map((town) => ({
+    ...town,
+    industries: tourist.has(town) ? [{ ...TOURISM }] : [...town.industries]
+  }))
+}
 
 /**
  * Every pair of town and industry that could be given out: an industry
@@ -116,18 +153,22 @@ function keepStrongest(held, place, limit) {
 /**
  * Empties the towns whose best thing is weakest until enough towns make
  * nothing. That is nearly always a town that makes one thing, since a town
- * that kept a second is strong in its first. A town that makes something
- * it always does (Tourism) is never emptied.
+ * that kept a second is strong in its first. A major city, or a town that
+ * makes something it always does (Tourism), is never emptied.
+ * @param {Array<Object>} towns - The towns, each with size
  * @param {Array<Array<{strength: number}>>} held - Each town's things;
  *   changed here
  * @param {number} wanted - How many towns should make nothing
  */
-function emptyWeakest(held, wanted) {
+function emptyWeakest(towns, held, wanted) {
   const alreadyEmpty = held.filter((things) => things.length === 0).length
   held
     .map((things, town) => ({ things, town }))
     .filter(
-      ({ things }) => things.length > 0 && things.every(({ strength }) => strength < Infinity)
+      ({ things, town }) =>
+        towns[town].size !== 'large' &&
+        things.length > 0 &&
+        things.every(({ strength }) => strength < Infinity)
     )
     .sort((a, b) => a.things[0].strength - b.things[0].strength || a.town - b.town)
     .slice(0, Math.max(0, wanted - alreadyEmpty))
@@ -137,8 +178,9 @@ function emptyWeakest(held, wanted) {
 /**
  * Gives the board's towns their industries (see the module's notes).
  *
- * @param {Array<Object>} towns - The towns on the board, each with msa and
- *   industries (Tourism already given to the major cities, which keep it)
+ * @param {Array<Object>} towns - The towns on the board, each with msa, size
+ *   and industries. A town that already makes something (Tourism, see
+ *   `assignTourism`) keeps it and is given nothing else.
  * @param {Array<Object>} employment - The industries (see `candidatePairs`)
  * @param {Object} totalJobs - Each area's jobs in all industries, by area code
  * @param {Object} [config] - See `townIndustryConfig`
@@ -151,10 +193,12 @@ export function assignIndustries(towns, employment, totalJobs, config = townIndu
   // Each town's things, what it already makes first, never to be dropped
   const held = towns.map((town) => town.industries.map((made) => ({ made, strength: Infinity })))
 
-  // From the most extra jobs down, within the limits per town and per industry
+  // From the most extra jobs down, within the limits per town and per
+  // industry, passing over the towns that already have what they make
   const perIndustry = Math.max(1, Math.floor(config.maxTownShare * townCount))
   const townsOf = new Map()
   candidatePairs(towns, employment, totalJobs, config).forEach(({ town, industry, strength }) => {
+    if (towns[town].industries.length > 0) return
     const taken = townsOf.get(industry.industry) ?? 0
     if (held[town].length >= config.maxPerTown || taken >= perIndustry) return
     held[town].push({ made: { name: industry.label, industry: industry.industry }, strength })
@@ -165,7 +209,7 @@ export function assignIndustries(towns, employment, totalJobs, config = townIndu
   // some with none
   keepStrongest(held, 2, Math.floor(config.maxThreeShare * townCount))
   keepStrongest(held, 1, Math.floor(config.maxTwoShare * townCount))
-  emptyWeakest(held, Math.ceil(config.minNoneShare * townCount - ROUNDING_ALLOWANCE))
+  emptyWeakest(towns, held, Math.ceil(config.minNoneShare * townCount - ROUNDING_ALLOWANCE))
 
   return towns.map((town, index) => ({
     ...town,

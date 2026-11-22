@@ -9,7 +9,7 @@
  * - Placing towns at their main city, and leaving off those off the board
  * - The table of town points, which is empty except in the tests of it, so
  *   the rest can say where a town is through the lookups
- * - Town classification
+ * - Town classification, and which major cities get Tourism
  */
 
 import { readFileSync } from 'node:fs'
@@ -55,6 +55,7 @@ import { useIndustryStore } from '@/stores/industry'
 import { RequestError } from '@/composables/utils'
 import { readCache, writeCache } from '@/composables/database'
 import { useGridStore } from '@/stores/grid'
+import { townIndustryConfig, townSizeConfig } from '@/config/towns'
 import { pinSpeedUnit } from '../utils/boardScale'
 import { makeIslandGrid, makeIslandTowns, ISLAND_SPEED_UNIT_KM } from '../utils/islandBoard'
 
@@ -686,16 +687,11 @@ describe('Towns Store', () => {
       expect(minneapolis.size).toBe('large')
     })
 
-    it('should assign Tourism to large towns', async () => {
+    it('should assign Tourism to the biggest town', async () => {
       await townsStore.setupTowns('27')
 
-      const largeTowns = townsStore.towns.filter((t) => t.size === 'large')
-      expect(largeTowns.length).toBeGreaterThan(0)
-
-      largeTowns.forEach((town) => {
-        const hasTourism = town.industries.some((i) => i.name === 'Tourism')
-        expect(hasTourism).toBe(true)
-      })
+      const minneapolis = townsStore.towns.find((t) => t.msa === '12345')
+      expect(minneapolis.industries).toEqual([{ name: 'Tourism', industry: 9999 }])
     })
 
     it('should initialize towns with empty industries array', async () => {
@@ -705,7 +701,7 @@ describe('Towns Store', () => {
 
       await townsStore.setupTowns('27')
 
-      // All towns should have an industries array (may have Tourism for large towns)
+      // All towns should have an industries array (the biggest has Tourism)
       townsStore.towns.forEach((town) => {
         expect(Array.isArray(town.industries)).toBe(true)
       })
@@ -1092,11 +1088,60 @@ describe('Towns Store', () => {
       expect(msaCodes(townsStore.towns)).not.toContain('20500')
     })
 
-    it("should give a merged town its industries from both cities' jobs", async () => {
-      await townsStore.setupTowns('37')
+    describe('with a second major city', () => {
+      // Two major cities and one medium town of the five, one of the major
+      // cities to have Tourism, whatever the game's settings say today
+      let settings
+      beforeEach(() => {
+        settings = { sizes: { ...townSizeConfig }, tourismShare: townIndustryConfig.tourismShare }
+        Object.assign(townSizeConfig, { largeShare: 0.4, mediumShare: 0.2 })
+        townIndustryConfig.tourismShare = 2 / 7
+      })
+      afterEach(() => {
+        Object.assign(townSizeConfig, settings.sizes)
+        townIndustryConfig.tourismShare = settings.tourismShare
+      })
 
-      const merged = townsStore.towns.find((town) => town.msa === '39580')
-      expect(merged.industries.map(({ name }) => name)).toEqual(['Tourism', 'Computers'])
+      /**
+       * Sets the board up with Charlotte on it, far from the others.
+       * @param {number} population - Charlotte's people
+       * @returns {Promise<Object>} What each town makes, by its name
+       */
+      async function setupWithCharlotte(population) {
+        mockPopulationData.value.push({
+          msa_code: '16740',
+          name: 'Charlotte, NC',
+          population: String(population),
+          state_code: '37'
+        })
+        const findOthers = mockFindPrincipalCity.getMockImplementation()
+        mockFindPrincipalCity.mockImplementation(async (name, ...rest) =>
+          name.startsWith('Charlotte')
+            ? { lon: -80.84, lat: 35.23, name: 'Charlotte', stateFips: '37' }
+            : findOthers(name, ...rest)
+        )
+
+        await townsStore.setupTowns('37')
+
+        return Object.fromEntries(
+          townsStore.towns.map(({ name, industries }) => [name, industries.map((i) => i.name)])
+        )
+      }
+
+      it("should give a merged town its industries from both cities' jobs", async () => {
+        const made = await setupWithCharlotte(3000000)
+
+        expect(made.Charlotte).toEqual(['Tourism'])
+        expect(made['Raleigh-Durham']).toEqual(['Computers'])
+      })
+
+      it('should rank a merged town for Tourism by its combined people', async () => {
+        // Charlotte is bigger than Raleigh, but not than Raleigh and Durham together
+        const made = await setupWithCharlotte(2000000)
+
+        expect(made['Raleigh-Durham']).toEqual(['Tourism'])
+        expect(made.Charlotte).toEqual([])
+      })
     })
 
     it('should leave off the board a small town too close to another', async () => {

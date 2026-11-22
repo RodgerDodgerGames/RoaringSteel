@@ -82,12 +82,18 @@ export const townSpacingConfig = {
  */
 export const townIndustryConfig = {
   /**
+   * The share of the major cities, biggest first, that make Tourism and
+   * nothing else, rounded to the nearest city and always at least one. In
+   * Empire Builder it is 2 of 7: Chicago and New York.
+   */
+  tourismShare: 2 / 7,
+  /**
    * The smallest an industry's extra jobs can be, as a share of the town's
    * jobs, for the town to make it: below it, the industry is too small a
    * part of the town to build a railroad for
    */
   minExtraShare: 0.005,
-  /** The most things a town makes, its Tourism included */
+  /** The most things a town makes */
   maxPerTown: 3,
   /**
    * The largest share of the board's towns an industry can go to (always at

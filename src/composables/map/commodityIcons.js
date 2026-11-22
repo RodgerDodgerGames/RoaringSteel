@@ -338,7 +338,7 @@ export const commodityIconNames = {
   7112: 'american-football-helmet',
   // Theme Parks
   7131: 'carousel',
-  // Tourism: not a NAICS industry; the towns store gives it to every large town
+  // Tourism: not a NAICS industry; the biggest major cities are given it
   9999: 'photo-camera'
 }
 
@@ -359,8 +359,7 @@ export const COMMODITY_ICON_SIZE = 18
  * town's dot, with a 2px gap between dot and icon. A town with too many
  * commodities to fit around its dot that way gets a wider ring, so the icons
  * never overlap each other. The industry assignment holds every town to
- * three things, its Tourism included; the ring still widens should a town
- * ever have more.
+ * three things; the ring still widens should a town ever have more.
  * @param {number} dotSize - Width of the town's dot icon, in px
  * @param {number} count - How many icons go around it
  * @returns {number} Distance from the dot's center to each icon's center, in px

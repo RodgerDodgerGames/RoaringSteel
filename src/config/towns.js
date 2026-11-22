@@ -19,9 +19,9 @@
  */
 export const townSizeConfig = {
   /** The share of a board's towns that are major cities */
-  largeShare: 0.08,
+  largeShare: 0.11,
   /** The share of a board's towns that are medium towns */
-  mediumShare: 0.08
+  mediumShare: 0.22
 }
 
 /**

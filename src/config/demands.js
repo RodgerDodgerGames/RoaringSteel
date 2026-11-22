@@ -39,7 +39,7 @@ export const demandDeckConfig = {
    */
   pools: [
     { from: 0, to: 0.4 },
-    { from: 0.3, to: 0.7 },
-    { from: 0.6, to: 1 }
+    { from: 0.3, to: 0.6 },
+    { from: 0.5, to: 1 }
   ]
 }

@@ -84,6 +84,11 @@ export const CREDIT_GROUPS = [
         note:
           'Metro area populations (American Community Survey), jobs by industry (Quarterly ' +
           'Workforce Indicators), metro area locations (TIGERweb), and state outlines'
+      },
+      {
+        name: 'U.S. Geological Survey',
+        url: 'https://www.usgs.gov/tools/geographic-names-information-system-gnis',
+        note: 'Town locations (Geographic Names Information System)'
       }
     ]
   },

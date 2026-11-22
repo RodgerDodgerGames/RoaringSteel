@@ -3,7 +3,8 @@
  *
  * Manages town data for the game including loading, classification, and industry assignment.
  * Towns are populated from Census MSA (Metropolitan Statistical Area) data, placed at
- * each area's main city, and sorted into sizes by population rank (see townSizes.js).
+ * the downtown of each area's main city, and sorted into sizes by population rank
+ * (see townSizes.js).
  *
  * Data Flow:
  * 0. Look up the state's data window: the years the jobs data covers, which
@@ -11,7 +12,9 @@
  * 1. Fetch industry data from industryStore
  * 2. Fetch population data from Census API: every metro and micro area in
  *    the state, each of which is a town
- * 3. Place each MSA's town at its main city, from TigerWeb (see useTigerWeb.js)
+ * 3. Place each MSA's town at its main city: from the game's table of town
+ *    points (see townPoints.js), or from TigerWeb for an area not in it (see
+ *    useTigerWeb.js)
  * 4. Leave out the towns whose main city is off the board
  * 5. For the towns' areas the jobs data has no numbers for as areas, add up
  *    their counties' jobs instead (see the industry store's `fillAreas`)
@@ -44,6 +47,7 @@ import { defineStore } from 'pinia'
 import { useIndustryStore } from './industry'
 import useCensus from '../composables/setup/useCensus'
 import getMSALatLon, { findPrincipalCity } from '../composables/setup/useTigerWeb'
+import { atTownPoint, townPoint } from '../composables/setup/townPoints'
 import { sizeCounts } from '../composables/setup/townSizes'
 import { assignIndustries as assignTownIndustries } from '../composables/setup/townIndustries'
 import { mergeCities, combinedJobs, thinTowns } from '../composables/setup/townSpacing'
@@ -227,11 +231,12 @@ export const useTownsStore = defineStore('towns', () => {
    * Sets up the towns for a new game on a board of one state or several.
    *
    * A town is a metro or micro area, placed at its main city (see
-   * useTigerWeb.js). What is fetched for a state — each town's place, name
+   * `placeTown`). What is worked out for a state — each town's place, name
    * and population, its "site" — is kept in the browser's database (see
    * database.js), so the next game there need not ask again. The towns
-   * themselves are made from the sites afresh each game: those on the board
-   * kept, their sizes set and their industries assigned (see `playSites`).
+   * themselves are made from the sites afresh each game: moved to the table
+   * of town points, those on the board kept, their sizes set and their
+   * industries assigned (see `playSites`).
    * On a board of several states, an area that crosses a state line between
    * two of them is one town, its parts' people and jobs added together.
    *
@@ -472,9 +477,10 @@ export const useTownsStore = defineStore('towns', () => {
   }
 
   /**
-   * Where an MSA's town goes: at its main city (see `findPrincipalCity`),
-   * or, if TIGERweb has no such city, in the middle of the area, as towns
-   * used to be placed.
+   * Where an MSA's town goes: where the table of town points has it (see
+   * townPoints.js), with nothing to fetch. For an area not in the table, at
+   * its main city (see `findPrincipalCity`), or, if TIGERweb has no such
+   * city, in the middle of the area, as towns used to be placed.
    * @param {string} msaCode - The MSA's code
    * @param {string} msaName - Its name, as the Census Bureau writes it
    * @returns {Promise<{lon: number, lat: number, name: string|null, stateFips: string|null}|null>}
@@ -483,6 +489,8 @@ export const useTownsStore = defineStore('towns', () => {
    * @throws When a lookup fails (see useTigerWeb.js)
    */
   async function placeTown(msaCode, msaName) {
+    const known = townPoint(msaCode)
+    if (known) return known
     const city = await findPrincipalCity(msaName)
     if (city) return { lon: city.lon, lat: city.lat, name: city.name, stateFips: city.stateFips }
     const middle = await getMSALatLon(msaCode)
@@ -573,6 +581,10 @@ export const useTownsStore = defineStore('towns', () => {
    * the board, each with its size and industries, spaced out (see
    * `assignTowns`). A board none of whose towns is on it cannot be played:
    * `error` says so.
+   *
+   * Each site is moved to the table of town points first, before it is
+   * judged on the board or off: sites from the cache may have older points,
+   * and San Francisco's was out at sea (#180).
    * @param {{dataWindow: Object, sites: Array}} built - The sites, and the
    *   data window they were built for
    * @param {Function} isOnBoard - The board's point test (see `regionTest`)
@@ -581,6 +593,7 @@ export const useTownsStore = defineStore('towns', () => {
     setStep(SETUP_STEPS.assigning, 'Assigning industries to towns…')
     dataWindow.value = built.dataWindow
     towns.value = built.sites
+      .map(atTownPoint)
       .filter((site) => isOnBoard({ lat: site.lat, lng: site.lon }))
       .map((site) => ({ ...site, industries: [] }))
     if (towns.value.length === 0) error.value = NO_TOWNS_ON_BOARD_MESSAGE

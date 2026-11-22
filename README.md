@@ -31,6 +31,7 @@ The game's About dialog lists every credit; the list lives in `src/config/credit
 - Land cover: [Annual National Land Cover Database](https://www.mrlc.gov/data/project/annual-nlcd) (Annual NLCD), U.S. Geological Survey and the MRLC Consortium
 - Rivers, lakes, sea and bays: [Natural Earth](https://www.naturalearthdata.com/). Made with Natural Earth. Free vector and raster map data @ naturalearthdata.com.
 - Towns and industries: [U.S. Census Bureau](https://www.census.gov/data/developers.html) (American Community Survey, Quarterly Workforce Indicators, TIGERweb). This product uses the Census Bureau Data API but is not endorsed or certified by the Census Bureau.
+- Town locations: [U.S. Geological Survey](https://www.usgs.gov/tools/geographic-names-information-system-gnis) (Geographic Names Information System)
 - Commodity icons: [game-icons.net](https://game-icons.net) (CC BY 3.0; authors in `src/assets/icons/commodities/CREDITS.md`)
 - Typefaces: Eutemia I, Saddlebag and Steelplate Textura, from [1001 Fonts](https://www.1001fonts.com/)
 - Interface icons: [Font Awesome](https://fontawesome.com/)
@@ -47,6 +48,8 @@ scripts (run by hand, never at game time; each file's header says when)
 - `node scripts/build-national-shares.mjs`: fills in each industry's share of
   the country's jobs in game_industries.csv. Run it after adding an industry.
 - `node scripts/build-water-data.mjs`: rebuilds water.json
+- `node scripts/build-town-points.mjs`: rebuilds src/config/townPoints.json,
+  where each town goes. Run it when the government redraws its metro areas.
 
 src/assets
 - icons/towns

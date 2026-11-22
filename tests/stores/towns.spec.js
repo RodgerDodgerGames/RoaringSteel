@@ -7,10 +7,14 @@
  * - Error handling
  * - Cache usage, and the data window it was built for
  * - Placing towns at their main city, and leaving off those off the board
+ * - The table of town points, which is empty except in the tests of it, so
+ *   the rest can say where a town is through the lookups
  * - Town classification
  */
 
+import { readFileSync } from 'node:fs'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { distance } from '@turf/turf'
 
 // Create hoisted mocks
 const mockFetchPopulationData = vi.hoisted(() => vi.fn())
@@ -19,6 +23,8 @@ const mockGetMSALatLon = vi.hoisted(() => vi.fn())
 const mockFindPrincipalCity = vi.hoisted(() => vi.fn())
 const mockUseCensus = vi.hoisted(() => vi.fn())
 const mockFetchDataWindow = vi.hoisted(() => vi.fn())
+const mockTownPoint = vi.hoisted(() => vi.fn())
+const mockAtTownPoint = vi.hoisted(() => vi.fn())
 
 vi.mock('@/composables/setup/useCensus', () => ({
   default: (...args) => {
@@ -37,6 +43,11 @@ vi.mock('@/composables/setup/dataWindow', () => ({
 vi.mock('@/composables/setup/useTigerWeb', () => ({
   default: mockGetMSALatLon,
   findPrincipalCity: mockFindPrincipalCity
+}))
+
+vi.mock('@/composables/setup/townPoints', () => ({
+  townPoint: mockTownPoint,
+  atTownPoint: mockAtTownPoint
 }))
 
 import { useTownsStore, mergeSites, percentOf, SETUP_STEPS } from '@/stores/towns'
@@ -95,6 +106,8 @@ describe('Towns Store', () => {
     // No main city found unless a test says so: the town goes in the middle
     // of its area, at the coordinates above
     mockFindPrincipalCity.mockResolvedValue(null)
+    mockTownPoint.mockReturnValue(null)
+    mockAtTownPoint.mockImplementation((site) => site)
 
     industryStore = useIndustryStore()
     // The industry fetch is the industry store's to test. Stubbed here, the
@@ -811,6 +824,73 @@ describe('Towns Store', () => {
       await townsStore.setupTowns('37')
 
       expect(townsStore.towns[0].name).toBe('Winston-Salem')
+    })
+  })
+
+  describe('towns in the table of town points', () => {
+    /** California, as the game's own outlines draw it */
+    const california = JSON.parse(
+      readFileSync('public/data/us-states.geojson', 'utf8')
+    ).features.find(({ properties }) => properties.STATE === '06')
+
+    /** Where the Census Bureau puts San Francisco: out by the Farallon Islands */
+    const atSea = { lon: -123.0322294, lat: 37.7272391, name: 'San Francisco', stateFips: '06' }
+
+    /** Expects San Francisco on the board, within a kilometer or two of City Hall */
+    function expectDowntown() {
+      const town = townsStore.towns.find(({ msa }) => msa === '41860')
+      expect(town).toMatchObject({ name: 'San Francisco', stateCode: '06' })
+      expect(distance([town.lon, town.lat], [-122.4193, 37.7793])).toBeLessThan(2)
+    }
+
+    beforeEach(async () => {
+      // The game's own table
+      const table = await vi.importActual('@/composables/setup/townPoints')
+      mockTownPoint.mockImplementation(table.townPoint)
+      mockAtTownPoint.mockImplementation(table.atTownPoint)
+      mockPopulationData.value = [
+        {
+          msa_code: '41860',
+          name: 'San Francisco-Oakland-Fremont, CA Metro Area',
+          population: '4600000',
+          state_code: '06'
+        }
+      ]
+      mockFindPrincipalCity.mockResolvedValue(atSea)
+    })
+
+    it('should put San Francisco downtown, on the California board (#180)', async () => {
+      await townsStore.setupTowns('06', california)
+
+      expectDowntown()
+    })
+
+    it('should place a town in the table without looking it up', async () => {
+      await townsStore.setupTowns('06', california)
+
+      expect(mockFindPrincipalCity).not.toHaveBeenCalled()
+      expect(mockGetMSALatLon).not.toHaveBeenCalled()
+    })
+
+    it('should move a town cached at its old point before judging if it is on the board', async () => {
+      const { lon, lat, name, stateFips } = atSea
+      const site = { msa: '41860', fullName: name, name, stateCode: stateFips, population: 4600000 }
+      await writeCache('townSites_06', { dataWindow: WINDOW, sites: [{ ...site, lon, lat }] })
+
+      await townsStore.setupTowns('06', california)
+
+      expectDowntown()
+    })
+
+    it('should move cached towns when the data window cannot be looked up', async () => {
+      const { lon, lat, name, stateFips } = atSea
+      const site = { msa: '41860', fullName: name, name, stateCode: stateFips, population: 4600000 }
+      await writeCache('townSites_06', { dataWindow: WINDOW, sites: [{ ...site, lon, lat }] })
+      mockFetchDataWindow.mockRejectedValue(new Error('down'))
+
+      await townsStore.setupTowns('06', california)
+
+      expectDowntown()
     })
   })
 

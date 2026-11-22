@@ -5,10 +5,18 @@
  * towns, each a share of the board's towns. A board needs at least one major
  * city, since the game is won by joining them, and a lopsided board — one
  * city far bigger than the rest — must still get a few of each.
+ *
+ * The shares are settings meant to be changed after playtests, so the tests
+ * use shares of their own, and check the rules rather than whatever the
+ * settings say today.
  */
 
 import { describe, it, expect } from 'vitest'
+import { townSizeConfig } from '@/config/towns'
 import { sizeCounts, assignSizes } from '@/composables/setup/townSizes'
+
+/** The tests' own shares */
+const SHARES = { largeShare: 0.08, mediumShare: 0.08 }
 
 /** Wisconsin's metro and micro areas with their main city in the state, 2023 */
 const WISCONSIN = [
@@ -45,7 +53,10 @@ const named = (towns, size) => towns.filter((town) => town.size === size).map((t
 
 describe('assignSizes', () => {
   it('should give Wisconsin two major cities and two medium towns, though Milwaukee dwarfs the rest', () => {
-    const towns = assignSizes(WISCONSIN.map((town) => ({ ...town })))
+    const towns = assignSizes(
+      WISCONSIN.map((town) => ({ ...town })),
+      sizeCounts(WISCONSIN.length, SHARES)
+    )
 
     expect(named(towns, 'large')).toEqual(['Milwaukee', 'Madison'])
     expect(named(towns, 'medium')).toEqual(['Green Bay', 'Appleton'])
@@ -53,11 +64,14 @@ describe('assignSizes', () => {
   })
 
   it('should size towns by population, whatever order they come in', () => {
-    const towns = assignSizes([
-      { name: 'Small', population: 10 },
-      { name: 'Big', population: 1000 },
-      { name: 'Middle', population: 100 }
-    ])
+    const towns = assignSizes(
+      [
+        { name: 'Small', population: 10 },
+        { name: 'Big', population: 1000 },
+        { name: 'Middle', population: 100 }
+      ],
+      sizeCounts(3, SHARES)
+    )
 
     expect(named(towns, 'large')).toEqual(['Big'])
     expect(named(towns, 'medium')).toEqual(['Middle'])
@@ -67,17 +81,31 @@ describe('assignSizes', () => {
 
 describe('sizeCounts', () => {
   it('should give a board with any towns at least one major city', () => {
-    expect(sizeCounts(1).large).toBe(1)
-    expect(sizeCounts(5).large).toBe(1)
+    expect(sizeCounts(1, SHARES).large).toBe(1)
+    expect(sizeCounts(5, SHARES).large).toBe(1)
   })
 
   it('should give a board of three or more towns at least one medium town', () => {
-    expect(sizeCounts(2).medium).toBe(0)
-    expect(sizeCounts(3).medium).toBe(1)
+    expect(sizeCounts(2, SHARES).medium).toBe(0)
+    expect(sizeCounts(3, SHARES).medium).toBe(1)
   })
 
   it('should grow the major cities and medium towns with the board', () => {
-    expect(sizeCounts(50)).toEqual({ large: 4, medium: 4 })
+    expect(sizeCounts(50, SHARES)).toEqual({ large: 4, medium: 4 })
+  })
+
+  it("should follow the game's settings when given no shares", () => {
+    const saved = { ...townSizeConfig }
+    try {
+      Object.assign(townSizeConfig, { largeShare: 0.3, mediumShare: 0.4 })
+
+      expect(sizeCounts(10)).toEqual({ large: 3, medium: 4 })
+      const towns = assignSizes(WISCONSIN.slice(0, 10).map((town) => ({ ...town })))
+      expect(named(towns, 'large')).toHaveLength(3)
+      expect(named(towns, 'medium')).toHaveLength(4)
+    } finally {
+      Object.assign(townSizeConfig, saved)
+    }
   })
 
   it('should follow the shares it is given', () => {

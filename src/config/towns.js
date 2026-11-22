@@ -9,9 +9,9 @@
  * The towns are ranked by population, and the biggest are made major cities
  * and the next ones medium towns, each a share of all the towns on the
  * board. So every board gets a few of each, in proportion to how many towns
- * it has, however lopsided its populations: Wisconsin, with Milwaukee more
- * than twice the size of the next city, gets Milwaukee and Madison as major
- * cities and Green Bay and Appleton as medium towns.
+ * it has, however lopsided its populations: that Milwaukee is more than
+ * twice the size of Wisconsin's next city makes no difference to how many
+ * of each Wisconsin gets.
  *
  * Shares are rounded to whole towns. A board with any towns has at least one
  * major city, since a game is won by joining them; one with three or more has

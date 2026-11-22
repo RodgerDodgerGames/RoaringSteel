@@ -38,8 +38,8 @@ export const demandDeckConfig = {
    * flat board's.
    */
   pools: [
-    { from: 0, to: 0.4 },
-    { from: 0.3, to: 0.6 },
+    { from: 0, to: 0.3 },
+    { from: 0.2, to: 0.6 },
     { from: 0.5, to: 1 }
   ]
 }

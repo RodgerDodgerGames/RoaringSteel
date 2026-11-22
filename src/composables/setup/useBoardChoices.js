@@ -5,7 +5,8 @@
  * grouping of regions — see config/regions.js — or single states), the one
  * being shown, and the boards it offers (see boards.js).
  *
- * The state outlines are fetched once, when the screen opens. A grouping's
+ * The state outlines are fetched once, when the screen opens, and only those
+ * of the lower 48 and DC are kept (see lower48Outlines). A grouping's
  * boards are worked out the first time it is shown, and kept for the rest of
  * the visit. Joining states into regions takes about a second for the
  * biggest; the work waits until the button just clicked has been drawn
@@ -15,7 +16,7 @@
  */
 
 import { ref, shallowRef, watch } from 'vue'
-import { boardGroupings, boardsFor } from '@/composables/setup/boards'
+import { boardGroupings, boardsFor, lower48Outlines } from '@/composables/setup/boards'
 
 /** Where the state outlines are */
 const STATES_FILE = '/data/us-states.geojson'
@@ -27,12 +28,13 @@ const STATES_FILE = '/data/us-states.geojson'
  *   back to change it (see `boardGrouping`). The first grouping offered when
  *   it is left out or names no grouping.
  * @returns {Object} `groupings` (every way of choosing), `grouping` (the
- *   id of the one shown), `boards` (its boards), `stateFeatures` (every
- *   state's outline, for drawing the state lines), `error` (why the outlines
- *   could not be had, or null) and `load` (fetches the outlines)
+ *   id of the one shown), `boards` (its boards), `stateFeatures` (the
+ *   outlines of the lower 48 and DC, for drawing the state lines), `error`
+ *   (why the outlines could not be had, or null) and `load` (fetches the
+ *   outlines)
  */
 export function useBoardChoices(initialGrouping = null) {
-  /** Every state's outline, once fetched */
+  /** The outlines of the lower 48 and DC, once fetched */
   const stateFeatures = shallowRef([])
 
   /** Every way of choosing a board, in the order the screen offers them */
@@ -77,7 +79,7 @@ export function useBoardChoices(initialGrouping = null) {
       if (!response.ok) throw new Error(`State outlines request failed: ${response.status}`)
       const { features } = await response.json()
       if (!Array.isArray(features)) throw new Error('The state outlines file has no features')
-      stateFeatures.value = features
+      stateFeatures.value = lower48Outlines(features)
       error.value = null
     } catch (e) {
       console.error('Could not load the state outlines:', e)

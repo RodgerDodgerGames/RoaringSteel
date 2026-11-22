@@ -18,9 +18,8 @@
  * regions put Pennsylvania and Missouri in two each; those boards overlap on
  * the map, and both include the whole state.
  *
- * Alaska and Hawaii are left out of every region: a board is one piece of
- * land, and they are far from the rest. They can still be played on their
- * own, as states.
+ * Alaska and Hawaii are left out of every region, as the Area Select screen
+ * offers only the lower 48 and DC (see lower48Outlines in boards.js).
  *
  * @module config/regions
  */

@@ -2,12 +2,14 @@
  * Board Choices Tests
  *
  * The Area Select screen offers boards by grouping: regions, or single
- * states. Switching grouping must show that grouping's boards, and a
- * missing or broken outlines file must say so rather than break the screen.
+ * states, in the lower 48 and DC only. Switching grouping must show that
+ * grouping's boards, and a missing or broken outlines file must say so rather
+ * than break the screen.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { flushPromises } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
 import { useBoardChoices } from '@/composables/setup/useBoardChoices'
 import { STATES_GROUPING } from '@/composables/setup/boards'
 
@@ -90,6 +92,27 @@ describe('useBoardChoices', () => {
       'Connecticut',
       'Rhode Island'
     ])
+  })
+
+  it('should offer only the lower 48 and DC from the real outlines file', async () => {
+    const file = JSON.parse(readFileSync('public/data/us-states.geojson', 'utf8'))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => file }))
+    )
+    const choices = useBoardChoices(STATES_GROUPING)
+    await choices.load()
+    await settle()
+
+    // The outlines draw the state lines and set the map's extent; the boards are what is clicked
+    for (const shown of [choices.stateFeatures.value, choices.boards.value]) {
+      const names = shown.map(({ properties }) => properties.NAME)
+      expect(names).toHaveLength(49)
+      expect(names).toContain('District of Columbia')
+      expect(names).not.toContain('Alaska')
+      expect(names).not.toContain('Hawaii')
+      expect(names).not.toContain('Puerto Rico')
+    }
   })
 
   it('should open on the first grouping when the one asked for does not exist', () => {

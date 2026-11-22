@@ -32,7 +32,7 @@ import AboutDialog from '@/components/dialogs/AboutDialog.vue'
 import { usePlayerStore } from '@/stores/players'
 import { useGameStore } from '@/stores/game'
 import { useMapStore } from '@/stores/map'
-import { formatCurrency } from '@/composables/utils'
+import { formatShortCurrency } from '@/composables/utils'
 import { gameRules } from '@/config/game'
 import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 
@@ -126,7 +126,7 @@ function openDialog(name) {
           <i class="fas fa-robot"></i>
         </span>
         <span class="player-chip__name">{{ player.name }}</span>
-        <span class="player-chip__cash">{{ formatCurrency(player.cash) }}</span>
+        <span class="player-chip__cash">{{ formatShortCurrency(player.cash) }}</span>
       </li>
     </ol>
 

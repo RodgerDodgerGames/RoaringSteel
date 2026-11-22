@@ -43,7 +43,7 @@ import { useTrackStore } from '@/stores/track'
 import { useGameStore } from '@/stores/game'
 import { useGridStore } from '@/stores/grid'
 import { useTownsStore } from '@/stores/towns'
-import { formatCurrency } from '@/composables/utils'
+import { formatCurrency, formatShortCurrency } from '@/composables/utils'
 import { gameRules } from '@/config/game'
 import { makeTestGrid, CELL } from '../utils/testGrid'
 import { pinPlainScale } from '../utils/boardScale'
@@ -144,7 +144,7 @@ function mountBuildTrack(map, towns = L.layerGroup([L.marker([40, -100])]), grid
   let api
   const Host = defineComponent({
     setup() {
-      api = useBuildTrack(formatCurrency)
+      api = useBuildTrack()
       return () => null
     }
   })
@@ -968,7 +968,7 @@ describe('useBuildTrack', () => {
       vi.advanceTimersByTime(200)
 
       // One cell of water: a speed unit's worth of bridge
-      const bridge = formatCurrency(gameRules.bridges.perSpeedUnit)
+      const bridge = formatShortCurrency(gameRules.bridges.perSpeedUnit)
       expect(hintMarker.getTooltip().getContent()).toContain(`Cost: ${bridge} (bridge ${bridge})`)
     })
 
@@ -1054,7 +1054,7 @@ describe('useBuildTrack', () => {
     function mountWithoutMap() {
       const Host = defineComponent({
         setup() {
-          useBuildTrack(formatCurrency)
+          useBuildTrack()
           return () => null
         }
       })
@@ -1332,7 +1332,7 @@ describe('useBuildTrack', () => {
 
       expect(api.overBudgetBy.value).toBe(1500)
       expect(hintMarker.getTooltip().getContent()).toBe(
-        `Insufficient funds: -${formatCurrency(1500)}`
+        `Insufficient funds: -${formatShortCurrency(1500)}`
       )
       expect(map.getContainer().classList.contains('is-over-budget')).toBe(true)
     })

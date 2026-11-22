@@ -8,13 +8,13 @@
   Each contract is one line, read the way it is played — the load, then
   where it goes, then what it pays:
 
-    Lumber [icon] → Cheyenne      $28k
+    Lumber [icon] → Cheyenne      $28M
 
   so a whole card reads at a glance, and the strip of cards stays short
   enough to leave the map most of the screen. The load's icon is the one the
   map shows round the towns that make it. The payoff is always in the short
-  form: payoffs are rounded to whole thousands (see payoffs.js), so it loses
-  nothing.
+  form, "$28M" rather than "$28 million" (see formatShortCurrency in
+  utils.js).
 
   The town name and payoff are shown in full. When the line runs out of
   room, the commodity name gives way, cut short mid-word with an ellipsis
@@ -22,7 +22,7 @@
   line wraps instead, the load on a line of its own and the town under it:
 
     Lumber [icon]
-      → Cheyenne                 $28k
+      → Cheyenne                 $28M
 
   In the hand of the player whose turn it is, each line is a button: pointing
   at it marks its towns on the map, and clicking it pins it there in its own

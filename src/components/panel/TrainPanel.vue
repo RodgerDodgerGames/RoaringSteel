@@ -41,7 +41,7 @@ import { useTrainsStore } from '@/stores/trains'
 import { useTrainStopStore, wantedLabel } from '@/stores/trainStop'
 import { whereaboutsParts } from '@/composables/trainStatus'
 import { commodityIconUrl } from '@/composables/map/commodityIcons'
-import { formatCurrency } from '@/composables/utils'
+import { formatCurrency, formatShortCurrency } from '@/composables/utils'
 
 const playerStore = usePlayerStore()
 const gameStore = useGameStore()
@@ -120,7 +120,7 @@ const loadBlock = computed(() =>
               :aria-label="`Deliver ${car.load} for ${formatCurrency(option.demand.payoff)}`"
               @click="deliver(option.cardId, option.line)"
             >
-              Deliver {{ formatCurrency(option.demand.payoff) }}
+              Deliver {{ formatShortCurrency(option.demand.payoff) }}
             </button>
             <button
               v-if="!car.deliveries.length"

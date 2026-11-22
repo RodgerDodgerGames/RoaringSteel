@@ -30,7 +30,7 @@ describe('turnHistory', () => {
       )
 
       expect(text).toBe(
-        'Ann delivered Coal to Pueblo for $12,000, picked up Beef in Pueblo, and headed for Denver.'
+        'Ann delivered Coal to Pueblo for $12 million, picked up Beef in Pueblo, and headed for Denver.'
       )
     })
 
@@ -72,7 +72,7 @@ describe('turnHistory', () => {
         nameOf
       )
 
-      expect(text).toBe('Ann ran to Pueblo and paid Bo $2,000 and Cy $1,000 in track fees.')
+      expect(text).toBe('Ann ran to Pueblo and paid Bo $2 million and Cy $1 million in track fees.')
     })
 
     it("should add up the turn's track into one figure, with every town it reached", () => {
@@ -85,7 +85,7 @@ describe('turnHistory', () => {
         nameOf
       )
 
-      expect(text).toBe('Ann built $10,000 of track, reaching Denver, Boulder, and Golden.')
+      expect(text).toBe('Ann built $10 million of track, reaching Denver, Boulder, and Golden.')
     })
 
     it('should tell an upgrade, with the train it replaced', () => {
@@ -113,7 +113,7 @@ describe('turnHistory', () => {
         nameOf
       )
 
-      expect(text).toBe('Ann delivered Coal to Pueblo for $12,000, and won the game!')
+      expect(text).toBe('Ann delivered Coal to Pueblo for $12 million, and won the game!')
     })
   })
 
@@ -132,10 +132,10 @@ describe('turnHistory', () => {
 
       expect(lines).toEqual([
         'Put the train in Pueblo',
-        'Ran to Denver, paying Bo $1,000 in track fees',
+        'Ran to Denver, paying Bo $1 million in track fees',
         'Headed for Boulder, stopping short',
-        'Built $5,000 of track, reaching Golden',
-        'Built $3,000 of track'
+        'Built $5 million of track, reaching Golden',
+        'Built $3 million of track'
       ])
     })
 

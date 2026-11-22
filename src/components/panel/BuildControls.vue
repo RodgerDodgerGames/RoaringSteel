@@ -25,7 +25,7 @@ import { usePlayerStore } from '@/stores/players'
 import { useTrackStore } from '@/stores/track'
 import { useGameStore } from '@/stores/game'
 import { gameRules } from '@/config/game'
-import { formatCurrency } from '@/composables/utils'
+import { formatCurrency, formatShortCurrency } from '@/composables/utils'
 import { useRevealOnChange } from '@/composables/useRevealOnChange'
 
 // The game view's build-track instance; see the note at the top
@@ -96,7 +96,7 @@ useRevealOnChange(useTemplateRef('sectionsTotalRow'), [() => sectionsThisTurn.va
     <div class="build-controls__budget">
       <div class="is-flex is-justify-content-space-between is-align-items-baseline">
         <span>Available to build</span>
-        <span class="build-controls__available">{{ formatCurrency(availableToSpend) }}</span>
+        <span class="build-controls__available">{{ formatShortCurrency(availableToSpend) }}</span>
       </div>
       <progress
         class="progress is-small is-warning mt-2 mb-1"
@@ -105,7 +105,8 @@ useRevealOnChange(useTemplateRef('sectionsTotalRow'), [() => sectionsThisTurn.va
         :aria-label="`Building allowance used: ${formatCurrency(spentThisTurn)}`"
       ></progress>
       <p class="build-controls__note">
-        {{ formatCurrency(spentThisTurn) }} of {{ formatCurrency(gameRules.trackBudgetPerTurn) }}
+        {{ formatShortCurrency(spentThisTurn) }} of
+        {{ formatShortCurrency(gameRules.trackBudgetPerTurn) }}
         turn allowance used
       </p>
     </div>
@@ -129,13 +130,13 @@ useRevealOnChange(useTemplateRef('sectionsTotalRow'), [() => sectionsThisTurn.va
     <!-- The line being drawn: its running cost, and whether it can be paid for -->
     <div v-if="isDrawingActive" ref="pending" class="build-controls__pending">
       <span>This line so far</span>
-      <span class="has-text-weight-bold">{{ formatCurrency(pendingCost) }}</span>
+      <span class="has-text-weight-bold">{{ formatShortCurrency(pendingCost) }}</span>
     </div>
 
     <!-- These share one ref: at most one of them is shown -->
     <p v-if="overBudgetBy > 0" ref="notice" class="has-text-danger has-text-weight-bold mb-0">
-      Insufficient funds: -{{ formatCurrency(overBudgetBy) }}. Clicking there ends the line at the
-      last point.
+      Insufficient funds: -{{ formatShortCurrency(overBudgetBy) }}. Clicking there ends the line at
+      the last point.
     </p>
     <!-- Bright rather than light, so it is not missed: part of what the
          player drew is not on the map -->
@@ -162,12 +163,12 @@ useRevealOnChange(useTemplateRef('sectionsTotalRow'), [() => sectionsThisTurn.va
       <ol class="build-controls__sections">
         <li v-for="(section, index) in sectionsThisTurn" :key="section.id">
           <span>Section {{ index + 1 }}</span>
-          <span>{{ formatCurrency(section.cost) }}</span>
+          <span>{{ formatShortCurrency(section.cost) }}</span>
         </li>
       </ol>
       <div ref="sectionsTotalRow" class="build-controls__total">
         <span>Total</span>
-        <span>{{ formatCurrency(sectionsTotal) }}</span>
+        <span>{{ formatShortCurrency(sectionsTotal) }}</span>
       </div>
     </div>
   </div>

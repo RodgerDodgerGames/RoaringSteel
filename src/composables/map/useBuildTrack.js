@@ -25,6 +25,7 @@ import {
 } from '@/composables/map/trackStyles'
 import { bridgeSpans } from '@/composables/map/bridges'
 import { gameRules } from '@/config/game'
+import { formatCurrency, formatShortCurrency } from '@/composables/utils'
 
 /**
  * Injection key for the one build-track instance a game view runs.
@@ -49,10 +50,9 @@ export const buildTrackKey = Symbol('buildTrack')
  * composable is the drawing tool in front of it, and draws on the map
  * whatever track the track store holds.
  *
- * @param {Function} formatCurrency - Utility function to format currency values
  * @returns {Object} - Exposes reactive state, computed properties, and functions for map drawing
  */
-export default function useBuildTrack(formatCurrency) {
+export default function useBuildTrack() {
   // ================== STATE VARIABLES ==================
 
   const workingLayer = ref(null) // Reference to the currently drawn line layer
@@ -987,7 +987,7 @@ export default function useBuildTrack(formatCurrency) {
     hintMarker.setTooltipContent(
       message ??
         (short > 0
-          ? `Insufficient funds: -${formatCurrency(short)}`
+          ? `Insufficient funds: -${formatShortCurrency(short)}`
           : `${legTooltip(leg)}${endsOnWater ? ': keep going, a bridge has to reach land' : ''}`)
     )
     hintMarker
@@ -1010,8 +1010,8 @@ export default function useBuildTrack(formatCurrency) {
    * @returns {string} The tooltip's text
    */
   function legTooltip({ cost, bridges }) {
-    const price = `Cost: ${formatCurrency(cost)}`
-    return bridges > 0 ? `${price} (bridge ${formatCurrency(bridges)})` : price
+    const price = `Cost: ${formatShortCurrency(cost)}`
+    return bridges > 0 ? `${price} (bridge ${formatShortCurrency(bridges)})` : price
   }
 
   // ================== UTILITY FUNCTIONS ==================

@@ -14,7 +14,7 @@ import { storeToRefs } from 'pinia'
 import { useGameStore } from '@/stores/game'
 import { usePlayerStore } from '@/stores/players'
 import { useVictory } from '@/composables/victory'
-import { formatCurrency } from '@/composables/utils'
+import { formatShortCurrency } from '@/composables/utils'
 
 const emit = defineEmits(['close', 'new-game'])
 
@@ -59,7 +59,7 @@ const winner = computed(() => playerStore.players.find((p) => p.id === winnerId.
                 <span class="game-over__swatch" :style="{ background: row.player.color }"></span>
                 {{ row.player.name }}
               </td>
-              <td class="has-text-right">{{ formatCurrency(row.cash) }}</td>
+              <td class="has-text-right">{{ formatShortCurrency(row.cash) }}</td>
               <td class="has-text-right">{{ row.citiesJoined }} of {{ row.citiesNeeded }}</td>
             </tr>
           </tbody>

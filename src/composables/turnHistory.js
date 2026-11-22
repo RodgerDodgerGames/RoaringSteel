@@ -4,11 +4,12 @@
  * Puts the game's turn history into words for the people at the table (see
  * the history store, which keeps it). Every turn can be read two ways:
  * - as a summary, one sentence for the whole turn: "Ann delivered Coal to
- *   Pueblo for $12,000, paid Bo $1,000 in track fees, and built $8,000 of
- *   track, reaching Denver.";
+ *   Pueblo for $12 million, paid Bo $1 million in track fees, and built
+ *   $8 million of track, reaching Denver.";
  * - in full, one line for each thing the player did, in the order they did
- *   it: "Ran to Pueblo, paying Bo $1,000 to run on their track", "Delivered
- *   Coal to Pueblo for $12,000", "Built $5,000 of track, reaching Denver".
+ *   it: "Ran to Pueblo, paying Bo $1 million to run on their track",
+ *   "Delivered Coal to Pueblo for $12 million", "Built $5 million of track,
+ *   reaching Denver".
  *
  * A turn is { round, playerId, events, won, hadProblem }, and each event is
  * one of:
@@ -118,7 +119,7 @@ function movePlace({ town, onTrack, isEnd = false }) {
   return trackPointName({ near: town ? { name: town } : null, isEnd })
 }
 
-/** A section of track in words: "built $5,000 of track, reaching Denver" */
+/** A section of track in words: "built $5 million of track, reaching Denver" */
 function buildPhrase(cost, reached) {
   const reaching = reached.length ? `, reaching ${listOf(reached)}` : ''
   return `built ${formatCurrency(cost)} of track${reaching}`

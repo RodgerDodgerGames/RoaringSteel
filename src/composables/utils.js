@@ -270,47 +270,79 @@ export async function mapWithConcurrency(items, worker, options = {}) {
 }
 
 /**
- * Formats a number as US currency (e.g., "$1,234").
+ * How many of the game's dollars make one of Empire Builder's millions.
  *
- * @param {number} value - The numeric value to format
- * @returns {string} Formatted currency string
+ * The game counts money so that the board game's figures carry straight over
+ * (see config/game.js): its $20 million building allowance is 20,000 here.
+ * Players see every amount in millions, as the board game prints them, so
+ * the formatters below divide by this before showing anything.
  */
-export const formatCurrency = (value) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0
-  }).format(value)
-}
+const DOLLARS_PER_MILLION = 1000
 
 /**
- * Formats money compactly: "$20.3K", "$8K", "$1.3M".
+ * The number of millions, to three decimal places — one of the game's
+ * dollars — with trailing zeros dropped: "1.234", "28", "1,250".
+ *
+ * Three places keep every amount exact to the game's dollar, so a line's cost
+ * and what is left of the allowance always add back up to the allowance.
+ * Track prices can carry fractions of a dollar; those are rounded off.
  *
  * The smallest number of decimal places is set to none outright. Left out,
- * some browsers (Chrome among them) fill it in from the dollar's two decimal
- * places, cut to the one allowed, and a whole number of thousands comes out
- * as "$8.0K".
+ * some browsers (Chrome among them) have filled it in from a money format's
+ * two decimal places, and a whole amount came out as "8.0".
  */
-const shortCurrencyFormat = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  notation: 'compact',
+const millionsFormat = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 0,
-  maximumFractionDigits: 1
+  maximumFractionDigits: 3
 })
 
 /**
- * Formats a number as short US currency, to the nearest hundred dollars:
- * "$20.3k" for 20,300, "$8k" for 8,000, "$1.3M" for 1,250,000. An amount
- * under a thousand is given in full.
+ * An amount as a sign and a number of millions, ready for a "$" and a unit.
  *
- * The demand cards show every payoff this way: payoffs are rounded to
- * whole thousands, so nothing is lost.
+ * The sign goes in front of the "$" ("-$1.5M", not "$-1.5M"), so the number
+ * is formatted without it. An amount so small it rounds to zero takes no
+ * sign: "$0M", not "-$0M".
  *
- * @param {number} value - An amount of money
- * @returns {string} Short currency string
+ * @param {number} value - An amount of money, in the game's dollars
+ * @returns {{sign: string, number: string}} e.g. { sign: '-', number: '1.5' }
  */
-export const formatShortCurrency = (value) => shortCurrencyFormat.format(value).replace('K', 'k')
+function inMillions(value) {
+  const number = millionsFormat.format(Math.abs(value) / DOLLARS_PER_MILLION)
+  const sign = value < 0 && number !== '0' ? '-' : ''
+  return { sign, number }
+}
+
+/**
+ * Formats money for a sentence, in millions: "$12 million" for 12,000,
+ * "$1.234 million" for 1,234.
+ *
+ * Used wherever there is room for the word: the turn history, notices,
+ * messages, the legend, the goal to win. Tight spots use
+ * `formatShortCurrency`.
+ *
+ * @param {number} value - An amount of money, in the game's dollars
+ * @returns {string} e.g. "$12 million"
+ */
+export const formatCurrency = (value) => {
+  const { sign, number } = inMillions(value)
+  return `${sign}$${number} million`
+}
+
+/**
+ * Formats money compactly, in millions: "$28M" for 28,000, "$1.234M" for
+ * 1,234, "$1,250M" for 1,250,000.
+ *
+ * Used where space is short: the top bar, the cards, buttons, the build
+ * panel's figures, the map's tooltips and markers. Sentences use
+ * `formatCurrency`.
+ *
+ * @param {number} value - An amount of money, in the game's dollars
+ * @returns {string} e.g. "$28M"
+ */
+export const formatShortCurrency = (value) => {
+  const { sign, number } = inMillions(value)
+  return `${sign}$${number}M`
+}
 
 /**
  * Text made safe to put in HTML, as an element's text or an attribute's

@@ -19,7 +19,7 @@ import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { usePlayerStore } from '@/stores/players'
 import { useVictory } from '@/composables/victory'
-import { formatCurrency } from '@/composables/utils'
+import { formatCurrency, formatShortCurrency } from '@/composables/utils'
 
 const playerStore = usePlayerStore()
 const { activePlayer } = storeToRefs(playerStore)
@@ -38,7 +38,7 @@ const goal = computed(() => activePlayer.value && progress(activePlayer.value.id
     </div>
     <div class="player-card__cash">
       <span class="caps-label">Cash</span>
-      <span class="player-card__amount">{{ formatCurrency(activePlayer.cash) }}</span>
+      <span class="player-card__amount">{{ formatShortCurrency(activePlayer.cash) }}</span>
     </div>
     <p class="player-card__goal">
       To win: {{ formatCurrency(goal.cashNeeded) }} and {{ goal.citiesNeeded }} major cities joined

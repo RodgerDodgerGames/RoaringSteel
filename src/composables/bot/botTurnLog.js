@@ -26,11 +26,11 @@
  */
 
 import { debug } from '@/composables/debug'
-import { formatCurrency } from '@/composables/utils'
+import { formatShortCurrency } from '@/composables/utils'
 import { workableDemands } from './botPlanner'
 
 /** A dollar figure, or a dash for one there is none of */
-const money = (value) => (Number.isFinite(value) ? formatCurrency(value) : '—')
+const money = (value) => (Number.isFinite(value) ? formatShortCurrency(value) : '—')
 
 /**
  * The demands in hand as table rows, in hand order.

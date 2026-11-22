@@ -1,8 +1,10 @@
 /**
  * TigerWeb API Composable (useTigerWeb.js)
  *
- * Finds where each town goes on the map, from the Census Bureau's TIGERweb
- * service.
+ * Finds where a town goes on the map, from the Census Bureau's TIGERweb
+ * service, for an area the game's table of town points does not have (see
+ * townPoints.js). The table itself is built with `findPrincipalCity` (see
+ * scripts/build-town-points.mjs).
  *
  * A town is a metro or micro area (an MSA, or CBSA): a city and the whole
  * counties around it. The town is put at its main city — the first city in

@@ -4,8 +4,9 @@
  * The game's table of where each metro and micro area's town goes
  * (config/townPoints.json, written by scripts/build-town-points.mjs): at
  * the downtown of its main city, from the U.S. Geological Survey's place
- * names. The script's header says why not at the Census Bureau's point for
- * the city, and which few towns are left there.
+ * names, or just inside its state's outline where downtown is just outside.
+ * The script's header says why not at the Census Bureau's point for the
+ * city, and which few towns are left there.
  *
  * An area in the table needs no TIGERweb lookup. One that is not — a new
  * area, or one in Puerto Rico — is looked up (see useTigerWeb.js).

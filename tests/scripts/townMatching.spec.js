@@ -6,6 +6,8 @@
  */
 
 import { describe, it, expect } from 'vitest'
+import { distance } from '@turf/turf'
+import { regionOutline, regionTest } from '@/composables/map/region'
 import {
   areasFromLists,
   choosePoint,
@@ -133,32 +135,138 @@ describe('downtown', () => {
   })
 })
 
+describe('downtown, for the towns GNIS lists differently', () => {
+  it('should take the place it is told to, even across a county line', () => {
+    const places = gnis('Holland|Populated Place|26|139|42.7875|-86.1089')
+    const city = { name: 'Holland', stateFips: '26', lat: 42.77, lon: -86.12 }
+    const area = { code: '26090', counties: new Set(['26005']) }
+
+    expect(downtown(area, city, ['Holland'], places)).toMatchObject({ lat: 42.7875 })
+  })
+
+  it('should take the place it is told to, by another name', () => {
+    const places = gnis(
+      'Barnstable|Populated Place|25|001|41.7001|-70.2995',
+      'Hyannis|Populated Place|25|001|41.6529|-70.2828'
+    )
+    const city = { name: 'Barnstable Town', stateFips: '25', lat: 41.66, lon: -70.36 }
+    const area = { code: '12700', counties: new Set(['25001']) }
+
+    expect(downtown(area, city, ['Barnstable Town'], places)).toMatchObject({ lat: 41.6529 })
+  })
+
+  it('should fail when the place it is told to take is gone', () => {
+    const city = { name: 'Holland', stateFips: '26', lat: 42.77, lon: -86.12 }
+    const area = { code: '26090', counties: new Set(['26005']) }
+
+    expect(() => downtown(area, city, ['Holland'], gnis())).toThrow('26090')
+  })
+})
+
 describe('choosePoint', () => {
+  /** A square state, a degree across, and its border */
+  const state = {
+    type: 'Feature',
+    geometry: {
+      type: 'Polygon',
+      coordinates: [
+        [
+          [-107, 31],
+          [-106, 31],
+          [-106, 32],
+          [-107, 32],
+          [-107, 31]
+        ]
+      ]
+    }
+  }
+  const isInState = regionTest(state)
+  const border = regionOutline(isInState)
   const city = { name: 'El Paso', lat: 31.84781, lon: -106.43105 }
-  const place = { lat: 31.75872, lon: -106.48693 }
+  const choose = (place, from = city) => choosePoint(from, place, isInState, border)
+  const kmApart = (a, b) => distance([a.lon, a.lat], [b.lon, b.lat])
 
   it('should put the town downtown, rounded', () => {
-    expect(choosePoint(city, place, () => true)).toEqual({
+    expect(choose({ lat: 31.75872, lon: -106.48693 })).toEqual({
       lat: 31.7587,
       lon: -106.4869,
-      kept: null
+      note: null
     })
   })
 
-  it('should keep the Census point when downtown is outside the state', () => {
-    const isInState = ({ lat }) => lat > 31.8
+  it.each([
+    ['south', { lat: 30.999, lon: -106.5 }],
+    ['north', { lat: 32.015, lon: -106.5 }],
+    ['east', { lat: 31.5, lon: -105.99 }],
+    ['west', { lat: 31.5, lon: -107.01 }],
+    ['corner', { lat: 32.005, lon: -105.995 }]
+  ])('should nudge a downtown just past the %s of the border to just inside it', (side, place) => {
+    const point = choose(place)
+    const nearestOnBorder = {
+      lat: Math.min(32, Math.max(31, place.lat)),
+      lon: Math.min(-106, Math.max(-107, place.lon))
+    }
 
-    expect(choosePoint(city, place, isInState)).toMatchObject({
-      lat: 31.8478,
-      kept: 'outsideOutline'
+    expect(point.note).toBe('nudged')
+    expect(isInState({ lat: point.lat, lng: point.lon })).toBe(true)
+    expect(kmApart(point, nearestOnBorder)).toBeLessThan(0.1)
+  })
+
+  it('should nudge inward a downtown inside the border that rounds to outside it', () => {
+    const north = 31.99998
+    const rings = [
+      [-107, 31],
+      [-106, 31],
+      [-106, north],
+      [-107, north],
+      [-107, 31]
+    ]
+    const isIn = regionTest({
+      type: 'Feature',
+      geometry: { type: 'Polygon', coordinates: [rings] }
     })
+    const point = choosePoint(city, { lat: 31.99996, lon: -106.3 }, isIn, regionOutline(isIn))
+
+    expect(point.note).toBe('nudged')
+    expect(point.lat).toBeLessThan(north)
+    expect(point.lon).toBeCloseTo(-106.3, 3)
+  })
+
+  it('should nudge a downtown into a sharp corner', () => {
+    const rings = [
+      [-107, 31],
+      [-106, 31.5],
+      [-107, 31.6],
+      [-107, 31]
+    ]
+    const isIn = regionTest({
+      type: 'Feature',
+      geometry: { type: 'Polygon', coordinates: [rings] }
+    })
+    const point = choosePoint(city, { lat: 31.51, lon: -105.998 }, isIn, regionOutline(isIn))
+
+    expect(point.note).toBe('nudged')
+    expect(kmApart(point, { lat: 31.5, lon: -106 })).toBeLessThan(0.1)
+  })
+
+  it('should keep the Census point when downtown is too far outside to nudge', () => {
+    expect(choose({ lat: 32.1, lon: -106.5 })).toMatchObject({
+      lat: 31.8478,
+      note: 'outsideOutline'
+    })
+  })
+
+  it('should nudge even when the Census point is outside too', () => {
+    const atSea = { name: 'At Sea', lat: 40, lon: -120 }
+
+    expect(choose({ lat: 30.999, lon: -106.5 }, atSea).note).toBe('nudged')
   })
 
   it('should keep the Census point when there is no downtown', () => {
-    expect(choosePoint(city, null, () => true).kept).toBe('noMatch')
+    expect(choose(null).note).toBe('noMatch')
   })
 
   it('should refuse a town with no point inside the state', () => {
-    expect(() => choosePoint(city, null, () => false)).toThrow('El Paso')
+    expect(() => choose(null, { name: 'At Sea', lat: 40, lon: -120 })).toThrow('At Sea')
   })
 })

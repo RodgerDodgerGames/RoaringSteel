@@ -24,12 +24,14 @@
  * 2. The GNIS populated place of that name in one of the area's counties is
  *    taken: the nearest to the Census point, if several have the name. The
  *    counties tell San Francisco, California from San Francisco, Texas.
- * 3. The Census point is kept instead where no GNIS place matches by name
- *    and county (a few are there under another name, or across a county
- *    line: Heber City, Holland), or where downtown is just outside the
- *    state's outline as the game draws it. The
+ *    A few that GNIS has under another name, or across a county line, are
+ *    picked by hand (see `LISTED_AS` in townMatching.mjs).
+ * 3. A downtown just outside its state's outline is nudged just inside. The
  *    outlines are simplified, so a downtown on a border river, like El
- *    Paso's, can fall outside and would be left off the board.
+ *    Paso's, can fall outside, and would be left off the board.
+ * 4. The Census point is kept where GNIS has no such place (Fort Leonard
+ *    Wood, Lake of the Woods and Seneca Falls), or where downtown cannot be
+ *    nudged inside the outline (none, as this was written).
  *
  * Both the 2023 and the 2020 lists of areas are covered, as a state whose
  * jobs data runs behind is played from an older Census release, with that
@@ -128,36 +130,37 @@ async function readPlaces() {
   }
 }
 
-/** Builds the table and writes it, saying which areas kept their Census point */
+/** Builds the table and writes it, saying which towns are not right at downtown */
 async function main() {
   const { findPrincipalCity, parseCbsaName, cityCandidates } = await gameModule(
     'composables/setup/useTigerWeb.js'
   )
-  const { regionTest } = await gameModule('composables/map/region.js')
-  const inState = new Map(
-    JSON.parse(fs.readFileSync(STATES_FILE, 'utf8')).features.map((state) => [
-      state.properties.STATE,
-      regionTest(state)
-    ])
+  const { regionTest, regionOutline } = await gameModule('composables/map/region.js')
+  const states = new Map(
+    JSON.parse(fs.readFileSync(STATES_FILE, 'utf8')).features.map((state) => {
+      const isInState = regionTest(state)
+      return [state.properties.STATE, { isInState, border: regionOutline(isInState) }]
+    })
   )
   const [areas, places] = await Promise.all([readAreas(), readPlaces()])
   console.log(`${areas.length} areas`)
 
   const rows = []
-  const kept = { noMatch: [], outsideOutline: [], noCity: [] }
+  const noted = { nudged: [], noMatch: [], outsideOutline: [], noCity: [] }
   for (let i = 0; i < areas.length; i += LOOKUPS_AT_ONCE) {
     const batch = areas.slice(i, i + LOOKUPS_AT_ONCE)
     const cities = await Promise.all(batch.map(({ name }) => findPrincipalCity(name)))
     batch.forEach((area, j) => {
       const city = cities[j]
       if (!city) {
-        kept.noCity.push(area.name)
+        noted.noCity.push(area.name)
         return
       }
       const candidates = cityCandidates(parseCbsaName(area.name).cities)
       const place = downtown(area, city, candidates, places)
-      const point = choosePoint(city, place, inState.get(city.stateFips))
-      if (point.kept) kept[point.kept].push(area.name)
+      const { isInState, border } = states.get(city.stateFips)
+      const point = choosePoint(city, place, isInState, border)
+      if (point.note) noted[point.note].push(area.name)
       const row = [point.lat, point.lon, city.name, city.stateFips]
       // One area to a line, spaced as Prettier would, so a rebuild's diff reads easily
       rows.push(`  "${area.code}": [${row.map((value) => JSON.stringify(value)).join(', ')}]`)
@@ -166,9 +169,10 @@ async function main() {
 
   fs.writeFileSync(OUT_FILE, `{\n${rows.join(',\n')}\n}\n`)
   console.log(`Wrote ${rows.length} towns to ${path.relative(ROOT, OUT_FILE)}`)
-  console.log('Census point kept, no GNIS match:', kept.noMatch)
-  console.log('Census point kept, downtown outside the outline:', kept.outsideOutline)
-  console.log('Left to the game to look up, no main city found:', kept.noCity)
+  console.log('Downtown nudged inside the outline:', noted.nudged)
+  console.log('Census point kept, no GNIS match:', noted.noMatch)
+  console.log('Census point kept, downtown could not be nudged inside:', noted.outsideOutline)
+  console.log('Left to the game to look up, no main city found:', noted.noCity)
 }
 
 await main()

@@ -41,12 +41,34 @@ describe('townPoints', () => {
     ['11260', 'Anchorage', [-149.895, 61.2164]],
     ['49740', 'Yuma', [-114.6203, 32.7219]],
     ['27940', 'Juneau', [-134.4065, 58.2997]],
-    ['15580', 'Butte', [-112.5388, 46.0147]]
+    ['15580', 'Butte', [-112.5388, 46.0147]],
+    // Downtowns on a border, nudged just inside the simplified outline
+    ['21340', 'El Paso', [-106.4852, 31.7619]],
+    ['29700', 'Laredo', [-99.5069, 27.5075]],
+    ['31500', 'Madison', [-85.3804, 38.7361]],
+    ['24220', 'Grand Forks', [-97.0347, 47.9259]]
   ])('should put %s, %s, downtown (#180)', (code, name, center) => {
     const point = townPoint(code)
 
     expect(point.name).toBe(name)
-    expect(distance([point.lon, point.lat], center)).toBeLessThan(3)
+    expect(distance([point.lon, point.lat], center)).toBeLessThan(2)
+  })
+
+  // Listed in GNIS under another name, or in another county. Held closer:
+  // the Census point for Middlesborough is only 0.76 km from its city hall.
+  it.each([
+    ['25720', 'Heber', [-111.4142, 40.5086]],
+    ['26090', 'Holland', [-86.1093, 42.7873]],
+    ['11200', 'Amherst Town', [-72.5187, 42.3755]],
+    ['33180', 'Middlesborough', [-83.7169, 36.6083]],
+    ['45880', 'Town of Pecos', [-103.4963, 31.4255]],
+    // Barnstable's town hall is in Hyannis
+    ['12700', 'Barnstable Town', [-70.2825, 41.6515]]
+  ])('should put %s, %s, at the place picked by hand (#180)', (code, name, center) => {
+    const point = townPoint(code)
+
+    expect(point.name).toBe(name)
+    expect(distance([point.lon, point.lat], center)).toBeLessThan(0.7)
   })
 
   it('should have the areas of older Census releases, for states whose data runs behind', () => {

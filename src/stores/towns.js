@@ -54,6 +54,7 @@ import {
   assignTourism
 } from '../composables/setup/townIndustries'
 import { mergeCities, combinedJobs, thinTowns } from '../composables/setup/townSpacing'
+import { dropSameStateNamesakes, nameNamesakesByState } from '../composables/setup/uniqueNames'
 import { townSpacingConfig } from '@/config/towns'
 import { regionTest } from '@/composables/map/region'
 import { boardRulesFor } from '@/composables/map/buildRules'
@@ -595,10 +596,19 @@ export const useTownsStore = defineStore('towns', () => {
   function playSites(built, isOnBoard) {
     setStep(SETUP_STEPS.assigning, 'Assigning industries to towns…')
     dataWindow.value = built.dataWindow
-    towns.value = built.sites
+    const onBoard = built.sites
       .map(atTownPoint)
       .filter((site) => isOnBoard({ lat: site.lat, lng: site.lon }))
       .map((site) => ({ ...site, industries: [] }))
+    // Of towns sharing a name in one state, only the biggest plays (see
+    // uniqueNames.js)
+    towns.value = dropSameStateNamesakes(onBoard)
+    if (towns.value.length < onBoard.length) {
+      debug.log(
+        'Towns sharing a name with a bigger town in their state, left off the board:',
+        onBoard.filter((town) => !towns.value.includes(town)).map(({ name }) => name)
+      )
+    }
     if (towns.value.length === 0) error.value = NO_TOWNS_ON_BOARD_MESSAGE
     else assignTowns()
     setStep('')
@@ -738,6 +748,17 @@ export const useTownsStore = defineStore('towns', () => {
   }
 
   /**
+   * Gives every town that shares its name with another on the board its
+   * state: "Greenville, SC" and "Greenville, NC" (see uniqueNames.js), as
+   * demands name their destination by town name alone. The last step of
+   * town setup, once no more towns will be left off the board, and before
+   * the demand deck is built.
+   */
+  function nameTownsApart() {
+    towns.value = nameNamesakesByState(towns.value)
+  }
+
+  /**
    * Sets the complete towns array (used for loading saved games).
    * @param {Array} townsArray - Array of town objects
    */
@@ -762,6 +783,7 @@ export const useTownsStore = defineStore('towns', () => {
     clearError,
     reset,
     setTowns,
-    dropUnreachableTowns
+    dropUnreachableTowns,
+    nameTownsApart
   }
 })

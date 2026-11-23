@@ -152,6 +152,9 @@ async function handlePlayGameClick() {
     // Leave off any town track cannot reach, such as one on an island too
     // far out to bridge: the grid says where the water is
     await townsStore.dropUnreachableTowns()
+    // Then, with the board's towns final, tell apart towns that share a
+    // name: "Greenville, SC" and "Greenville, NC"
+    townsStore.nameTownsApart()
 
     // Build the demand deck, then deal every player their opening hand in
     // turn order — the Confirm Setup page committed the players before

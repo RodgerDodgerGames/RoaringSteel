@@ -230,7 +230,10 @@ export const gameRules = {
    * `unbridgeableWater` is what each cell of a stretch of lake or sea too
    * long to bridge adds, as a share of a bridge cell, past the cells a
    * bridge could span: a stand-in for the detour round it (see
-   * `waterStretchPrice` in payoffs.js). At 0.5 each adds half a bridge.
+   * `waterStretchPrice` in payoffs.js). At 1 each adds a whole bridge cell,
+   * $1,000 per speed unit. It was 0.5 while a bridge cost $2,000 per speed
+   * unit; when that dropped to $1,000 with the flat crossing fee (#187), it
+   * went to 1 so the detour stand-in stayed at $1,000 per speed unit.
    *
    * `route` brings the straight line's price part of the way toward the
    * cheapest route a computer player's search would find (see
@@ -262,7 +265,7 @@ export const gameRules = {
    */
   payoffs: {
     trackCostMultiple: 1.5,
-    unbridgeableWater: 0.5,
+    unbridgeableWater: 1,
     route: {
       weight: 0.5,
       searchCells: 20000

@@ -139,8 +139,8 @@ export function longHaulMultiplier(km, spanKm) {
  * costs more than going straight over, though by how much depends on the
  * shore. So it is still charged the fee and, for the cells a bridge could
  * span, the bridge price; and each cell past them adds
- * `gameRules.payoffs.unbridgeableWater` of a bridge cell — half, at today's
- * setting — as a stand-in for the detour.
+ * `gameRules.payoffs.unbridgeableWater` of a bridge cell — a whole one, at
+ * today's setting — as a stand-in for the detour.
  *
  * @param {number} cells - Water cells in a row
  * @param {number} bridgeCell - What bridging one water cell costs (see

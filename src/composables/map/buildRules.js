@@ -26,12 +26,25 @@
  * its cell counted as water. (Rivers are lines, not water cells, and are
  * never too wide to bridge.)
  *
- * Last, track may cross track already built — anyone's, the builder's own
- * included, and earlier legs of the same line — but not run alongside it
- * (see `gameRules.trackSpacing`): a line may only come close to track for a
- * short stretch, as it does when it crosses. Inside towns' cells this is
- * waived, since every player builds into the same cities and their lines
- * bunch up there.
+ * Track may cross track already built, but not run alongside it: a line may
+ * only come close to track for a short stretch, as it does when it crosses.
+ * How close, and for how long, depends on whose track it is:
+ * - the builder's own track, and the earlier legs of the same line: within
+ *   half a cell, for no more than a couple of cells (see
+ *   `gameRules.trackSpacing`) — enough to stop a line doubling back along
+ *   itself or weaving along another of the builder's lines;
+ * - other players' track: a good deal further off — a speed unit — and it
+ *   may only be crossed nearly square on (see `gameRules.rivalTrackSpacing`).
+ *   This is what makes building early in a good corridor pay: whoever is
+ *   there first takes the way, and the players who come later go round. A
+ *   finished section may not end beside other players' track either: a line
+ *   could otherwise be laid alongside it a section at a time, each section
+ *   only as long as a crossing, the way a bridge too long to build could be
+ *   built as two short ones if a line could end on water. Near towns, every
+ *   player still has to be able to build in, so within a speed unit of a
+ *   town the distance and the stretch are halved.
+ * Inside towns' cells spacing is waived altogether, since every player
+ * builds into the same cities and their lines bunch up there.
  *
  * And with the game setting that limits how many players may build into a
  * town on, a town that is full is closed to the players not already in it:
@@ -56,7 +69,13 @@
 import { gameRules } from '@/config/game'
 import { boardConfig } from '@/config/board'
 import { pointsAlongLine, cellPath, kmBetween, trackPriceScale } from '@/composables/map/trackCost'
-import { findCell, cellContaining, cellKm, isEmptyGrid } from '@/composables/map/cellGrid'
+import {
+  findCell,
+  cellContaining,
+  cellCenter,
+  cellKm,
+  isEmptyGrid
+} from '@/composables/map/cellGrid'
 import { riversFor } from '@/composables/map/waterData'
 import { regionTest } from '@/composables/map/region'
 import {
@@ -278,26 +297,27 @@ function kmToTrack(point, legs, count = legs.length) {
 }
 
 /**
- * Whether a line runs alongside track for longer than a crossing takes.
+ * Whether a line runs alongside the builder's own track for longer than a
+ * crossing takes (see `gameRules.trackSpacing`).
  *
  * The line is walked point by point, keeping a running total of the
  * distance it has been beside track — within `nearCells` of a cell of it —
  * without a break. A step counts only when the points at both ends of it are beside,
  * so the total is how far the line was beside, not one step more.
  *
- * Each leg is held up against the built track and against the line's own
- * earlier legs, so a line cannot double back along itself either. A bend
- * comes close to the leg before it for a few km, as a crossing does, and
- * that is allowed for the same reason.
+ * Each leg is held up against the builder's track and against the line's
+ * own earlier legs, so a line cannot double back along itself either. A
+ * bend comes close to the leg before it for a few km, as a crossing does,
+ * and that is allowed for the same reason.
  *
  * @param {Array<Array<Object>>} legPoints - Each leg's sample points
  * @param {Array<boolean>} inTown - Per sample point, in order, whether it is
  *   in a town's cell, where being beside track does not count
- * @param {Object} builtTrack - Built track (see `trackIndex`)
+ * @param {Object} ownTrack - The builder's own track (see `trackIndex`)
  * @param {Object} grid - The grid, whose cells the spacing is counted in
  * @returns {boolean} True if the line runs alongside track
  */
-function runsAlongside(legPoints, inTown, builtTrack, grid) {
+function runsAlongside(legPoints, inTown, ownTrack, grid) {
   const { nearCells, maxBesideCells } = gameRules.trackSpacing
   const nearKm = nearCells * cellKm(grid)
   const maxBesideKm = maxBesideCells * cellKm(grid)
@@ -306,7 +326,7 @@ function runsAlongside(legPoints, inTown, builtTrack, grid) {
   /** Whether a point on leg number `leg` is within the spacing of track */
   const isNearTrack = (point, leg) =>
     kmToTrack(point, ownLegs, leg) <= nearKm ||
-    kmToTrack(point, builtTrack.near(point, nearKm)) <= nearKm
+    kmToTrack(point, ownTrack.near(point, nearKm)) <= nearKm
 
   let besideKm = 0
   let previous = null
@@ -321,6 +341,161 @@ function runsAlongside(legPoints, inTown, builtTrack, grid) {
     }
   }
   return false
+}
+
+/**
+ * How far track has to keep from other players' track on a board, in km
+ * (see `gameRules.rivalTrackSpacing`, which gives it in speed units).
+ *
+ * Shared with the computer players' search (see `searchBoard` in
+ * botPathfinder.js), so it keeps to the same distances.
+ *
+ * @param {number} speedUnitKm - The board's speed unit (see boardScale.js)
+ * @returns {{open: {nearKm: number, maxKm: number}, town: {nearKm: number,
+ *   maxKm: number}, townWithinKm: number}} The spacing out in the open
+ *   (`open`) and near a town (`town`): how close counts as beside
+ *   (`nearKm`) and how far a line may be beside at a stretch (`maxKm`); and
+ *   how near a town a point has to be for the town's spacing to apply
+ *   (`townWithinKm`)
+ */
+export function rivalSpacing(speedUnitKm) {
+  const { nearSpeedUnits, maxBesideSpeedUnits, nearTown } = gameRules.rivalTrackSpacing
+  return {
+    open: { nearKm: nearSpeedUnits * speedUnitKm, maxKm: maxBesideSpeedUnits * speedUnitKm },
+    town: {
+      nearKm: nearTown.nearSpeedUnits * speedUnitKm,
+      maxKm: nearTown.maxBesideSpeedUnits * speedUnitKm
+    },
+    townWithinKm: nearTown.withinSpeedUnits * speedUnitKm
+  }
+}
+
+/**
+ * The centers of the cells towns sit in, kept per list of town cells (see
+ * `townCells`): a board's rules hold one list for as long as the towns and
+ * grid stay the same, and the line being drawn is checked against them on
+ * every move of the cursor. Held weakly, so a list no longer in play is let
+ * go.
+ */
+const townCentersByCells = new WeakMap()
+
+/**
+ * A test of whether a point is beside other players' track, and which
+ * spacing it is judged by there (see `rivalSpacing`): the town's, within
+ * reach of a town of any size, or the open country's elsewhere.
+ *
+ * How near a town a point is gets measured to the center of the grid cell
+ * the town sits in, the cells being all the rules hold of the towns. That is
+ * within half a cell of the town itself, a small part of a speed unit.
+ *
+ * Whether a point is near a town is only asked once it is near other
+ * players' track, so a line nowhere near any is not measured against every
+ * town on the board.
+ *
+ * @param {Object} rules - See `lineBlock`: `grid`, `speedUnitKm`,
+ *   `townCells` and `rivalTrack`
+ * @returns {Function} (point) => the spacing it breaks, `{nearKm, maxKm}`,
+ *   if it is beside other players' track; null if it is not
+ */
+function rivalZoneTest({ grid, speedUnitKm, townCells, rivalTrack }) {
+  const spacing = rivalSpacing(speedUnitKm)
+  // Far enough to find the track for either spacing, whichever is wider
+  const reachKm = Math.max(spacing.open.nearKm, spacing.town.nearKm)
+
+  /** Whether a point is near enough a town for the town's spacing */
+  const isNearTown = (point) => {
+    if (!townCentersByCells.has(townCells)) {
+      townCentersByCells.set(
+        townCells,
+        townCells.map((cell) => cellCenter(grid, cell))
+      )
+    }
+    const centers = townCentersByCells.get(townCells)
+    return centers.some((center) => kmBetween(point, center) <= spacing.townWithinKm)
+  }
+
+  return (point) => {
+    const km = kmToTrack(point, rivalTrack.near(point, reachKm))
+    if (km > reachKm) return null
+    const zone = isNearTown(point) ? spacing.town : spacing.open
+    return km <= zone.nearKm ? zone : null
+  }
+}
+
+/**
+ * Whether a line runs beside other players' track for longer than crossing
+ * it takes (see `gameRules.rivalTrackSpacing`).
+ *
+ * Like `runsAlongside`, the line is walked point by point, keeping a running
+ * total of how much it has been beside the track without a break. Each point
+ * is judged by the spacing where it is: the town's within reach of a town,
+ * the open country's elsewhere. So each step beside the track counts as a
+ * share of the limit where it is — a step near a town as twice the share of
+ * the same step in the open, the town's limit being half as long — and the
+ * line may not use up more than the whole limit in one stretch.
+ *
+ * The total runs on across a town's edge rather than starting again there:
+ * otherwise a line could run beside another player's line for as long as
+ * it liked past a string of towns, a fresh allowance at each one. A line
+ * heading straight into a town that another player's line runs into can
+ * still come in at about 37° to it or steeper.
+ *
+ * @param {Array<Object>} points - The line's sample points, in order
+ * @param {Array<boolean>} inTown - Per point, whether it is in a town's
+ *   cell, where being beside track does not count
+ * @param {Function} besideZone - From `rivalZoneTest`
+ * @returns {boolean} True if the line runs beside other players' track
+ */
+function runsBesideRival(points, inTown, besideZone) {
+  // How much of the limit this stretch beside the track has used, from 0 to 1
+  let used = 0
+  let previous = null
+  for (const [i, point] of points.entries()) {
+    const zone = inTown[i] ? null : besideZone(point)
+    if (!zone) used = 0
+    else if (previous?.zone) used += kmBetween(previous.point, point) / zone.maxKm
+    if (used > 1) return true
+    previous = { point, zone }
+  }
+  return false
+}
+
+/**
+ * The rules about where a finished line may end, as `lineBlock` names them
+ * when one is broken, each with the name `endBlockAt` gives the same thing.
+ * A line still being drawn may stop where these say a finished one may not,
+ * and a line too dear to build whole is cut back to a point where none of
+ * them is broken (see `fitLine` in trackBuilder.js).
+ */
+export const END_BLOCKS = Object.freeze({ endsOnWater: 'water', endsBesideRival: 'rivalTrack' })
+
+/**
+ * Why a line that keeps to every other rule may not end at a point, or null
+ * if it may. A finished section may not end:
+ * - on water (`'water'`), outside a town's cell: a bridge has to reach land;
+ * - beside other players' track (`'rivalTrack'`), outside a town's cell (see
+ *   the module notes).
+ *
+ * The place a line too dear to build whole is cut back to has to be one it
+ * may end at, so this is asked of each place it might be cut (see
+ * `affordableSection` in botPathfinder.js, and `fitLine` in
+ * trackBuilder.js). `lineBlock` asks the same of the end of every finished
+ * line, judging water by the last cell the line crosses rather than the
+ * cell nearest its last point, which is the same cell for any point on the
+ * grid.
+ *
+ * @param {{lat: number, lng: number}} point - Where the line would end
+ * @param {Object} rules - See `lineBlock`
+ * @returns {'water'|'rivalTrack'|null} What is in the way, or null
+ */
+export function endBlockAt(point, rules) {
+  const { grid, townCells, rivalTrack = NO_TRACK } = rules
+  const cell = findCell(point, grid)
+  if (townCells.includes(cell)) return null
+  if (isWaterCell(grid, cell)) return 'water'
+  if (!rivalTrack.legs.length) return null
+  const besideZone = rivalZoneTest({ ...rules, rivalTrack })
+  return besideZone(point) ? 'rivalTrack' : null
 }
 
 /**
@@ -365,22 +540,34 @@ export function isOutsideRegion(point, inTown, grid, isInRegion) {
  * @param {Function} rules.isInRegion - Whether a point is inside the region
  *   being played (see `regionTest` in region.js)
  * @param {Array<number>} rules.townCells - The cells towns sit in (see `townCells`)
- * @param {Object} [rules.builtTrack] - The track built so far (see
- *   `trackIndex`)
+ * @param {Object} [rules.ownTrack] - The track the player building has built
+ *   so far (see `trackIndex`); none if left out
+ * @param {Object} [rules.rivalTrack] - The track every other player has
+ *   built so far (see `trackIndex`); none if left out
  * @param {Map<number, Object>} [rules.closedCells] - The cells of the towns
  *   closed to the player building (see `closedCells`); none if left out
  * @param {Object} [options]
  * @param {boolean} [options.isFinished] - True for a finished line, which may
- *   not end on water; a line still being drawn may stop there for now
+ *   not end on water or beside other players' track; a line still being
+ *   drawn may stop there for now
  * @returns {{reason: 'outside', point: {lat: number, lng: number}}|{reason:
- *   'townFull', closed: Object}|{reason: 'water'|'alongside'|'endsOnWater'}|null}
+ *   'townFull', closed: Object}|{reason: 'water'|'alongside'|'besideRival'|
+ *   'endsOnWater'|'endsBesideRival'}|null}
  *   The rule broken — for the region, with the first point along the line
  *   that breaks it; for a full town, with the first such town along the line
  *   (its entry from `closedTowns`) — or null if the line may be built
  */
 export function lineBlock(
   latlngs,
-  { grid, speedUnitKm, isInRegion, townCells, builtTrack = NO_TRACK, closedCells = NONE_CLOSED },
+  {
+    grid,
+    speedUnitKm,
+    isInRegion,
+    townCells,
+    ownTrack = NO_TRACK,
+    rivalTrack = NO_TRACK,
+    closedCells = NONE_CLOSED
+  },
   { isFinished = false } = {}
 ) {
   // Each leg's sample points, and whether each point is in a town's cell,
@@ -408,11 +595,22 @@ export function lineBlock(
     return { reason: 'water' }
   }
 
-  if (runsAlongside(legPoints, inTown, builtTrack, grid)) return { reason: 'alongside' }
+  if (runsAlongside(legPoints, inTown, ownTrack, grid)) return { reason: 'alongside' }
 
+  // Only made when there is other players' track to keep from
+  const besideZone =
+    rivalTrack.legs.length && rivalZoneTest({ grid, speedUnitKm, townCells, rivalTrack })
+  if (besideZone && runsBesideRival(points, inTown, besideZone)) {
+    return { reason: 'besideRival' }
+  }
+
+  if (!isFinished) return null
   const end = path.at(-1)
-  if (isFinished && end !== undefined && isWaterCell(grid, end) && !towns.has(end)) {
+  if (end !== undefined && isWaterCell(grid, end) && !towns.has(end)) {
     return { reason: 'endsOnWater' }
+  }
+  if (besideZone && !inTown.at(-1) && besideZone(latlngs.at(-1))) {
+    return { reason: 'endsBesideRival' }
   }
   return null
 }
@@ -440,7 +638,11 @@ export function blockMessage(block, regionName) {
     case 'townFull':
       return townFullMessage(block.closed)
     case 'alongside':
-      return "Track can't run alongside track already built: cross it more squarely, or keep further away."
+      return "Track can't run alongside your own track: cross it more squarely, or keep further away."
+    case 'besideRival':
+      return "Track has to keep clear of other players' track: cross it nearly square on, or keep further away."
+    case 'endsBesideRival':
+      return "Track can't stop beside another player's track: carry on across it, or stop further away."
     default:
       return "Track can't go there."
   }

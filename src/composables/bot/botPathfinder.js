@@ -25,7 +25,11 @@
  *   going straight over ridges;
  * - it marks the cells right beside track already built and lets a line pass
  *   through no more than two of them in a row, which is about what crossing
- *   a line takes, so it crosses track rather than running alongside it.
+ *   a line takes, so it crosses track rather than running alongside it;
+ * - it marks the cells in other players' zones, the much wider distance the
+ *   rules keep lines from their track, and only lets a line into them at the
+ *   steep angles a crossing needs, so it crosses their track nearly square
+ *   on and keeps out of their way otherwise (see `rivalZones`).
  *
  * "Nearly always" is not good enough for a player who must never break the
  * rules, so every line found is then judged by the build rules themselves
@@ -55,7 +59,7 @@
 import { gameRules } from '@/config/game'
 import { pointsAlongLine, kmBetween, landCellPrice, cellPath } from '@/composables/map/trackCost'
 import { stepGrade } from '@/composables/map/climb'
-import { lineBlock, isOutsideRegion } from '@/composables/map/buildRules'
+import { lineBlock, isOutsideRegion, endBlockAt, rivalSpacing } from '@/composables/map/buildRules'
 import { regionOutline } from '@/composables/map/region'
 import {
   isWaterCell,
@@ -65,6 +69,9 @@ import {
 } from '@/composables/map/water'
 import {
   cellKm,
+  cellAt,
+  rowOf,
+  colOf,
   findCell,
   cellContaining,
   cellCenter,
@@ -74,6 +81,10 @@ import {
   reverseStep,
   stepsBetween
 } from '@/composables/map/cellGrid'
+import {
+  latitudeDegreesToMeters,
+  longitudeDegreesToMeters
+} from '@/composables/setup/useMapSupport'
 import { MinHeap } from '@/composables/network'
 
 /**
@@ -211,6 +222,183 @@ const BESIDE_PENALTY = 400
  * with no price (missing terrain data) as free to wander.
  */
 const STEP_COST = 50
+
+/**
+ * Where the search sees other players' zones (see `rivalZones`): how much
+ * nearer it keeps than the build rules, as a share of a cell. The search
+ * judges cells by their centers, and the rules judge a line at points a
+ * quarter of a cell apart all along it, so the search marks a little more
+ * than the rules would — half a cell further from the track, and half a
+ * cell less of each town's reach — to keep the lines it finds out of the
+ * zones the rules see.
+ */
+const RIVAL_ZONE_MARGIN_CELLS = 0.5
+
+/**
+ * The cells inside other players' zones, the distance a line has to keep
+ * from their track (see `gameRules.rivalTrackSpacing`), and how a line may
+ * move through them.
+ *
+ * The build rules count how far a line has been beside other players' track
+ * at a stretch. The search cannot keep that count the way it counts water
+ * cells and the cells right beside track (see `costField`): a zone is many
+ * cells across, so the count would need as many states per cell, and the
+ * search's memory grows with every one. Instead it judges each step into a
+ * zone cell by its angle to the track, which is what the length of a
+ * stretch comes down to:
+ * - out in the open, a step has to be at least as steep as a crossing must
+ *   be (about 60°, see `gameRules.rivalTrackSpacing`), whichever way it
+ *   goes, so a line only goes into a zone to cross straight through it.
+ *   Letting a line leave the track at a flatter angle than it came in
+ *   would let it zigzag along it — steeply onto it, slanting off, steeply
+ *   on again — every step steep enough on its own;
+ * - near a town, where lines head in to join it and set off out of it
+ *   alongside other players' lines, rather than cross them, a step only has
+ *   to be as steep as a line heading straight into a town another player's
+ *   line runs into may come in at (about 37°, see `runsBesideRival` in
+ *   buildRules.js). A crossing near a town flatter than a crossing in the
+ *   open is still refused by the rules, so a line planned like that is not
+ *   built (see the module notes) — rare, where the zones are this small;
+ * - a step that keeps its distance from the track is never allowed: that is
+ *   running along it.
+ * The angle is taken from the cell a step leaves, when that is in a zone
+ * too, and from the cell it lands in otherwise: the track near the cell a
+ * line is already in is the track it is crossing. And in the open, a line
+ * may not turn inside a zone (see `mayStepInZone` in `costField`).
+ *
+ * The search is the computer players' only judge of where track goes before
+ * the rules see the line (see the module notes), so it marks a little more
+ * than the rules would (see `RIVAL_ZONE_MARGIN_CELLS`); the rules still
+ * judge every line before it is built.
+ *
+ * Each straight leg of other players' track is measured from the center of
+ * every cell within reach of it, to the nearest point along the leg. The
+ * cells towns sit in are never in a zone: spacing does not count there.
+ *
+ * @param {Object} rules - See `searchBoard`
+ * @param {Uint8Array} isTownCell - Per cell, 1 for a town's cell
+ * @returns {{zone: Uint8Array, awayX: Float32Array, awayY: Float32Array,
+ *   minSin: Array<number>, kmPerLat: number, kmPerLng: number}|null} Per
+ *   cell, `zone`: 0 outside every zone, 1 in a zone in the open, 2 in a zone
+ *   near a town; `awayX` and `awayY`: the way out of the zone (a unit
+ *   vector, east and north, in km), straight away from the nearest point of
+ *   track; `minSin`: by zone (1 or 2, so its first entry is unused), the
+ *   sine of the shallowest angle to the track a step may take there; and
+ *   the km in a degree of latitude and of longitude, for measuring steps
+ *   the same way. Null when there is no other players' track.
+ */
+function rivalZones(rules, isTownCell) {
+  const { grid, rivalTrack } = rules
+  if (!rivalTrack?.legs.length) return null
+
+  const spacing = rivalSpacing(rules.speedUnitKm)
+  const size = grid.present.length
+  const cell = cellKm(grid)
+  const margin = RIVAL_ZONE_MARGIN_CELLS * cell
+  // A flat projection over the board, plenty for distances of a few cells
+  const midLat = grid.south + (grid.rows * grid.latStep) / 2
+  const kmPerLat = latitudeDegreesToMeters(1) / 1000
+  const kmPerLng = longitudeDegreesToMeters(1, midLat) / 1000
+  const centerX = (index) => (grid.west + (colOf(grid, index) + 0.5) * grid.lngStep) * kmPerLng
+  const centerY = (index) => (grid.south + (rowOf(grid, index) + 0.5) * grid.latStep) * kmPerLat
+
+  /**
+   * Every cell on the board within `km` of a stretch from one point to
+   * another — or of one point, given it twice — or a little further: the
+   * cells of the box around it, by index
+   */
+  const cellsNear = (from, to, km, visit) => {
+    const padLat = km / kmPerLat
+    const padLng = km / kmPerLng
+    const rowAt = (lat) => Math.floor((lat - grid.south) / grid.latStep)
+    const colAt = (lng) => Math.floor((lng - grid.west) / grid.lngStep)
+    const top = Math.min(grid.rows - 1, rowAt(Math.max(from.lat, to.lat) + padLat))
+    const right = Math.min(grid.cols - 1, colAt(Math.max(from.lng, to.lng) + padLng))
+    for (let r = Math.max(0, rowAt(Math.min(from.lat, to.lat) - padLat)); r <= top; r++) {
+      for (let c = Math.max(0, colAt(Math.min(from.lng, to.lng) - padLng)); c <= right; c++) {
+        const index = cellAt(grid, r, c)
+        if (index !== -1) visit(index)
+      }
+    }
+  }
+
+  // The cells well inside some town's reach, where the town's spacing applies
+  const nearTown = new Uint8Array(size)
+  const townKm = spacing.townWithinKm - margin
+  rules.townCells.forEach((town) => {
+    const x = centerX(town)
+    const y = centerY(town)
+    const center = cellCenter(grid, town)
+    cellsNear(center, center, townKm, (index) => {
+      if (Math.hypot(centerX(index) - x, centerY(index) - y) <= townKm) nearTown[index] = 1
+    })
+  })
+
+  // Per cell, the distance to the nearest point of track found so far, and
+  // the way straight out from it
+  const nearestKm = new Float32Array(size).fill(Infinity)
+  const awayX = new Float32Array(size)
+  const awayY = new Float32Array(size)
+  const reachKm = Math.max(spacing.open.nearKm, spacing.town.nearKm) + margin
+  rivalTrack.legs.forEach(([from, to]) => {
+    const fromX = from.lng * kmPerLng
+    const fromY = from.lat * kmPerLat
+    const legX = to.lng * kmPerLng - fromX
+    const legY = to.lat * kmPerLat - fromY
+    const lengthSquared = legX * legX + legY * legY
+    // Square to the leg, for a cell whose center is right on it, where the
+    // way to its nearest point is no guide to which way is out
+    const legLength = Math.sqrt(lengthSquared) || 1
+    const squareX = -legY / legLength
+    const squareY = legX / legLength
+
+    cellsNear(from, to, reachKm, (index) => {
+      if (isTownCell[index]) return
+      // From the nearest point along the leg to the cell's center
+      const x = centerX(index) - fromX
+      const y = centerY(index) - fromY
+      const t = lengthSquared ? Math.max(0, Math.min(1, (x * legX + y * legY) / lengthSquared)) : 0
+      const dx = x - t * legX
+      const dy = y - t * legY
+      const km = Math.hypot(dx, dy)
+      const zoneKm = (nearTown[index] ? spacing.town : spacing.open).nearKm + margin
+      if (km > zoneKm || km >= nearestKm[index]) return
+      nearestKm[index] = km
+      if (km > cell / 4) {
+        awayX[index] = dx / km
+        awayY[index] = dy / km
+      } else {
+        // Either side of the leg is out: square to it, either way
+        awayX[index] = squareX
+        awayY[index] = squareY
+      }
+    })
+  })
+
+  const zone = new Uint8Array(size)
+  for (let index = 0; index < size; index++) {
+    if (nearestKm[index] !== Infinity) zone[index] = nearTown[index] ? 2 : 1
+  }
+
+  // The shallowest angles allowed, as sines. In the open, a crossing's:
+  // beside the track for 2 × near / sin, at most the longest stretch. Near a
+  // town, a straight run into one on another player's line: beside it from
+  // near / sin out, the part outside the town's reach counted against the
+  // open limit and the rest against the town's (see `runsBesideRival`),
+  // using no more than the whole limit between them —
+  //   (open near / sin − reach) / open max + (town near / sin) / town max = 1
+  const { open, town, townWithinKm } = spacing
+  const minSin = [
+    0,
+    Math.min(1, (2 * open.nearKm) / open.maxKm),
+    Math.min(
+      1,
+      (open.nearKm / open.maxKm + town.nearKm / town.maxKm) / (1 + townWithinKm / open.maxKm)
+    )
+  ]
+
+  return { zone, awayX, awayY, minSin, kmPerLat, kmPerLng }
+}
 
 /**
  * Which cells of a grid are inside the region, kept per grid: worked out
@@ -459,8 +647,8 @@ function borderEdges(grid, outline) {
  * Everything the search needs to know about the board, worked out once per
  * search: which cells a line may pass through, which are water, which steps
  * cross rivers or leave the region, which cells are right beside track
- * already built, where the towns are, and the least any step of a line can
- * cost.
+ * already built, which are in other players' zones, where the towns are, and
+ * the least any step of a line can cost.
  *
  * The flags are per cell of the grid's whole rectangle, holes included (a
  * hole is never open), so a cell's index looks its flags up directly.
@@ -468,9 +656,10 @@ function borderEdges(grid, outline) {
  * @param {Object} rules - What lines are judged against, as the track builder
  *   holds them (`buildRules` in trackBuilder.js): `grid`, `priceScale` (the
  *   dollars per point of terrain cost, see `trackPriceScale`), `speedUnitKm`,
- *   `rivers`, `isInRegion`, `townCells`, `builtTrack` and `closedCells`
- *   (the towns full to the player building, whose cells are shut to the
- *   search like land outside the region — see townLimits.js)
+ *   `rivers`, `isInRegion`, `townCells`, `ownTrack` and `rivalTrack` (the
+ *   player building's track and everyone else's, see `trackIndex`), and
+ *   `closedCells` (the towns full to the player building, whose cells are
+ *   shut to the search like land outside the region — see townLimits.js)
  * @param {Array<Object>} towns - Every town, each with lat and lon
  * @returns {Object} The board, for `costField` and `planLine`
  */
@@ -496,10 +685,15 @@ export function searchBoard(rules, towns) {
   // Cells with a center within the spacing distance of built track. Track is
   // walked at the points the build rules check it at (see `pointsAlongLine`),
   // and the cells around each are measured; a quarter-cell gap between points
-  // is allowed for.
+  // is allowed for. The rules hold a line to this only against the player's
+  // own track; other players' is kept from much further off (see
+  // `rivalZones`). Counting it here too costs nothing a crossing of their
+  // track at the angle their zones allow would not already keep to, and
+  // keeps a line off their track itself.
   const nearKm = gameRules.trackSpacing.nearCells * cellKm(grid)
   const isBeside = new Uint8Array(size)
-  ;(rules.builtTrack?.legs ?? []).forEach((leg) => {
+  const builtLegs = [...(rules.ownTrack?.legs ?? []), ...(rules.rivalTrack?.legs ?? [])]
+  builtLegs.forEach((leg) => {
     pointsAlongLine(leg, grid).forEach((point) => {
       const middle = findCell(point, grid)
       if (middle === -1) return
@@ -544,6 +738,7 @@ export function searchBoard(rules, towns) {
     isWater,
     isTownCell,
     isBeside,
+    rival: rivalZones(rules, isTownCell),
     townIn,
     minStep
   }
@@ -592,6 +787,7 @@ export function costField(board, sources, { targets } = {}) {
     isWater,
     isTownCell,
     isBeside,
+    rival,
     townIn,
     minStep
   } = board
@@ -632,6 +828,55 @@ export function costField(board, sources, { targets } = {}) {
   const mayEnter = (index) => index !== -1 && isOpen[index]
   // Which steps cut across land outside the region (see `borderSteps`)
   const leavesRegion = regionSteps()
+
+  /**
+   * Whether other players' zones let a line take a step (see `rivalZones`).
+   * A step between two cells outside every zone always may. One into, out
+   * of or within a zone may not if it is at too shallow an angle to the
+   * track, or if, out in the open, it turns inside the zone. A step out
+   * counts too: part of it is still in the zone, and the rules count that
+   * part — the last step into a town's cell, which is in no zone, most of
+   * all, as a line slanting in to a town along another player's line would
+   * otherwise come in as flat as it liked.
+   *
+   * A line has to go straight through a zone in the open, as a crossing
+   * does. Two directions can each be steep enough against a slanting line
+   * of track — north and south-east against one 22° up from the east, say —
+   * and taken in turn they would run along it, every step allowed on its
+   * own. Near towns, where lines bend to join them, turning is allowed.
+   *
+   * Which way a line came into a cell is the way the search reached it most
+   * cheaply (`previous`): the search keeps one way into each of its states,
+   * so a cell reached more cheaply by a way that cannot go straight on
+   * leaves the search to find another way round, rather than a way through
+   * it from the other direction. The build rules still judge the line.
+   *
+   * @param {number} index - The cell the step leaves
+   * @param {number} next - The cell it goes into
+   * @param {number} cameFrom - The cell the line came into `index` from, or
+   *   -1 if the line starts in `index`
+   * @returns {boolean} True if the step may be taken
+   */
+  function mayStepInZone(index, next, cameFrom) {
+    const zoneType = rival?.zone[next] || rival?.zone[index]
+    if (!zoneType) return true
+    const rows = rowOf(grid, next) - rowOf(grid, index)
+    const cols = colOf(grid, next) - colOf(grid, index)
+    const isTurn =
+      cameFrom !== -1 &&
+      (rows !== rowOf(grid, index) - rowOf(grid, cameFrom) ||
+        cols !== colOf(grid, index) - colOf(grid, cameFrom))
+    if (rival.zone[index] === 1 && isTurn) return false
+    // The step, east and north, in km
+    const stepX = cols * grid.lngStep * rival.kmPerLng
+    const stepY = rows * grid.latStep * rival.kmPerLat
+    // The sine of its angle to the track, either way, taken from the cell it
+    // leaves if that is in a zone (see `rivalZones`)
+    const from = rival.zone[index] ? index : next
+    const sine =
+      Math.abs(stepX * rival.awayX[from] + stepY * rival.awayY[from]) / Math.hypot(stepX, stepY)
+    return sine >= rival.minSin[zoneType]
+  }
 
   sources.forEach((point) => {
     const index = findCell(point, grid)
@@ -678,6 +923,8 @@ export function costField(board, sources, { targets } = {}) {
       if (nextWater > maxCells) return
       const nextBeside = isBeside[next] ? beside + 1 : 0
       if (nextBeside > MAX_BESIDE_CELLS) return
+      const cameFrom = previous[state] === -1 ? -1 : Math.floor(previous[state] / STATES)
+      if (!mayStepInZone(index, next, cameFrom)) return
 
       // The cell's price, with the climb into it, any rivers the step
       // crosses, the flat fee for a crossing of lake or sea if the step
@@ -846,10 +1093,11 @@ export function planLine(board, sources, target, field = null) {
  * could be built by itself.
  *
  * Price only grows as a line gets longer, so the longest affordable start is
- * found by halving; then it is shortened, if need be, until it does not end
- * on water (a bridge has to reach land). The whole line keeps to every other
- * rule, so every start of it does too: ending on water is the only rule a
- * start of it can break, and only that is checked.
+ * found by halving; then it is shortened, if need be, until it ends
+ * somewhere a line may end: not on water (a bridge has to reach land), and
+ * not beside other players' track (see `endBlockAt`). The whole line keeps
+ * to every other rule, so every start of it does too: where it ends is the
+ * only thing a start of it can get wrong, and only that is checked.
  *
  * @param {Array<Object>} line - The whole line, buildable as a whole
  * @param {number} budget - What the player can spend
@@ -868,10 +1116,7 @@ export function affordableSection(line, budget, rules, price) {
     else tooDear = middle
   }
   for (let count = affordable; count >= 2; count--) {
-    const end = findCell(line[count - 1], rules.grid)
-    if (!isWaterCell(rules.grid, end) || rules.townCells.includes(end)) {
-      return line.slice(0, count)
-    }
+    if (!endBlockAt(line[count - 1], rules)) return line.slice(0, count)
   }
   return null
 }

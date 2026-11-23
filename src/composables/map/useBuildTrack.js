@@ -11,7 +11,7 @@ import { usePlayerStore } from '@/stores/players'
 import { useTrackStore } from '@/stores/track'
 import { useGameStore } from '@/stores/game'
 import { useGridStore } from '@/stores/grid'
-import { lineBlock } from '@/composables/map/buildRules'
+import { lineBlock, END_BLOCKS } from '@/composables/map/buildRules'
 import { isEmptyGrid } from '@/composables/map/cellGrid'
 import { useTrackBuilder } from '@/composables/trackBuilder'
 import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
@@ -810,7 +810,8 @@ export default function useBuildTrack() {
   /**
    * What the player is told when a line is cut short: how much of it was
    * built, and what stopped it — the turn's building allowance, their cash,
-   * or a bridge left short of land (see `fitLine` in trackBuilder.js).
+   * a bridge left short of land, or an end beside another player's track
+   * (see `fitLine` in trackBuilder.js).
    * @param {Object} fit - What `fitLine` returned for the line
    * @param {number} [builtCost] - What the part built cost; left out when
    *   none of the line was built
@@ -822,11 +823,20 @@ export default function useBuildTrack() {
       ? 'None of this line was built'
       : `Only ${formatCurrency(builtCost)} of this line was built`
 
-    // Water alone: the player could have paid for it all
+    // Where the line was cut back to, and why it could go no further, when
+    // the end it would have had is one no line may stop at (see `fitLine`)
+    const isWater = fit.backFrom === 'water'
+    const backTo = isWater
+      ? 'back to the last point on land'
+      : "back to the last point clear of other players' track"
+    const why = isWater
+      ? 'a bridge has to reach land'
+      : "track can't stop beside another player's track"
+
+    // Where it ends alone: the player could have paid for it all
     if (!fit.limit) {
-      return isNoneBuilt
-        ? `${built} — it ends out on the water, and a bridge has to reach land.`
-        : `${built}, back to the last point on land — a bridge has to reach land.`
+      const endsAt = isWater ? 'it ends out on the water' : "it ends beside another player's track"
+      return isNoneBuilt ? `${built} — ${endsAt}, and ${why}.` : `${built}, ${backTo} — ${why}.`
     }
 
     // What ran out, as the player would see it: the allowance is quoted as
@@ -839,11 +849,12 @@ export default function useBuildTrack() {
           ? `the ${formatCurrency(fit.available)} left of your ${fullAllowance} turn allowance`
           : `your ${fullAllowance} turn allowance`
     if (isNoneBuilt) {
-      return fit.toLand
-        ? `${built} — the only part of it you could pay for ends on water, and a bridge has to reach land.`
+      const endsAt = isWater ? 'ends on water' : "ends beside another player's track"
+      return fit.backFrom
+        ? `${built} — the only part of it you could pay for ${endsAt}, and ${why}.`
         : `${built} — its first leg would have gone over ${limit}.`
     }
-    const where = fit.toLand ? ', back to the last point on land' : ''
+    const where = fit.backFrom ? `, ${backTo}` : ''
     return `${built}${where} — the rest would have gone over ${limit}.`
   }
 
@@ -966,17 +977,18 @@ export default function useBuildTrack() {
     // line's running total: counted, it could push the total over budget, and
     // the panel would blame money for a leg the border rules out.
     //
-    // Checked as if the line were finished here, so a leg ending on water
-    // can say so before the player double-clicks and loses the line. That
-    // is only a warning while drawing goes on, and `lineBlock` checks it
-    // last, so it is never in the way of a rule that is actually broken.
+    // Checked as if the line were finished here, so a leg ending on water,
+    // or beside another player's track, can say so before the player
+    // double-clicks and loses the line. Those are only warnings while
+    // drawing goes on, and `lineBlock` checks them last, so they are never in
+    // the way of a rule that is actually broken.
     const block = lineBlock(
       [...workingLayer.value.getLatLngs(), latlng],
       builder.buildRules.value,
       { isFinished: true }
     )
-    const endsOnWater = block?.reason === 'endsOnWater'
-    const message = block && !endsOnWater ? builder.describeBlock(block) : null
+    const endWarning = END_WARNINGS[END_BLOCKS[block?.reason]] ?? null
+    const message = block && !endWarning ? builder.describeBlock(block) : null
     const leg = repriceLine(message ? undefined : latlng)
 
     // A leg the player cannot pay for says by how much, in red, in place of
@@ -988,7 +1000,7 @@ export default function useBuildTrack() {
       message ??
         (short > 0
           ? `Insufficient funds: -${formatShortCurrency(short)}`
-          : `${legTooltip(leg)}${endsOnWater ? ': keep going, a bridge has to reach land' : ''}`)
+          : `${legTooltip(leg)}${endWarning ? `: ${endWarning}` : ''}`)
     )
     hintMarker
       .getTooltip()
@@ -1138,6 +1150,17 @@ export default function useBuildTrack() {
    * can spend (see map.css). The X is drawn in `BLOCKED_LEG_COLOR`.
    */
   const OVER_BUDGET_CLASS = 'is-over-budget'
+
+  /**
+   * The rules about where a finished line may end, which are only warnings
+   * while a line is still being drawn (see `END_BLOCKS` in buildRules.js),
+   * with what the cursor's tooltip tells the player: the line may not stop
+   * here, but it is not finished yet, so keep going.
+   */
+  const END_WARNINGS = {
+    water: 'keep going, a bridge has to reach land',
+    rivalTrack: "keep going, track can't stop beside another player's track"
+  }
 
   /** Leaflet's own line blue, for a line drawn by a player with no color */
   const UNOWNED_DRAWING_COLOR = '#3388ff'

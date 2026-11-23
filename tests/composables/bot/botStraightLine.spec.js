@@ -44,7 +44,7 @@ function rulesWith(segments = []) {
     rivers: riverIndex(grid, makeRivers()),
     isInRegion: regionTest(makeRegion()),
     townCells: townCells(towns, grid),
-    builtTrack: trackIndex(builtLegs(segments))
+    rivalTrack: trackIndex(builtLegs(segments))
   }
 }
 

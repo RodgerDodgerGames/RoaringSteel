@@ -967,8 +967,10 @@ describe('useBuildTrack', () => {
       hintMarker.setLatLng(centerOf(1))
       vi.advanceTimersByTime(200)
 
-      // One cell of water: a speed unit's worth of bridge
-      const bridge = formatShortCurrency(gameRules.bridges.perSpeedUnit)
+      // One cell of water: the crossing's flat fee and a speed unit's worth
+      // of bridge
+      const { waterCrossing, perSpeedUnit } = gameRules.bridges
+      const bridge = formatShortCurrency(waterCrossing + perSpeedUnit)
       expect(hintMarker.getTooltip().getContent()).toContain(`Cost: ${bridge} (bridge ${bridge})`)
     })
 

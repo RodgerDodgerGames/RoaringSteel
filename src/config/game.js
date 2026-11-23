@@ -140,10 +140,15 @@ export const gameRules = {
    * The water is Natural Earth's rivers, lakes and sea (see
    * composables/map/water.js and scripts/build-water-data.mjs).
    *
-   * Lakes and the sea are grid cells of water. A crossing of them pays
-   * `perSpeedUnit` for every speed unit of water it spans (see
-   * composables/boardScale.js), as track pays per speed unit of land, so a
-   * bridge costs the same share of a turn's allowance on every board. A
+   * Lakes and the sea are grid cells of water. Each crossing of them — each
+   * unbroken stretch of water cells along a line — pays a flat
+   * `waterCrossing`, plus `perSpeedUnit` for every speed unit of water it
+   * spans (see composables/boardScale.js), as track pays per speed unit of
+   * land, so a bridge costs the same share of a turn's allowance on every
+   * board. The cell a town sits in is land to a bridge (see
+   * `longestCrossing` in water.js): track into a town on the shore pays the
+   * per-speed-unit rate for the town's cell if its center is in the water,
+   * but no flat fee unless the line crosses more water to get there. A
    * crossing longer than `maxSpeedUnits` cannot be built at all: then the
    * line has to go around. A crossing may reach out over water beyond the
    * region's border, as long as it comes back to the region's land.
@@ -152,11 +157,16 @@ export const gameRules = {
    * run alongside one freely, and pays `riverCrossing` each time it crosses
    * one, however wide the river. No river is too wide to bridge.
    *
-   * Both prices are $2,000, decided 2026-11-05. The limit of 3 speed units
-   * is about 17 km on a board Colorado's size and about 14 km on a small one.
+   * Both flat fees are $2,000 (decided 2026-11-05 for rivers, 2026-11-22 for
+   * lakes and sea, #187). Before the lake fee, a lake was only charged by
+   * the speed unit, at $2,000, so a short lake bridge cost less than any
+   * river one; with the fee, the distance charge dropped to $1,000. The
+   * limit of 2 speed units is about 11 km on a board Colorado's size and
+   * about 9 km on a small one, so the longest lake bridge costs $4,000.
    */
   bridges: {
-    perSpeedUnit: 2000,
+    waterCrossing: 2000,
+    perSpeedUnit: 1000,
     maxSpeedUnits: 2,
     riverCrossing: 2000
   },

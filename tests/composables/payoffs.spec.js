@@ -99,6 +99,8 @@ const haulPrice = (from, to, onBoard) => haulPricer(onBoard)(from, to)
 const BRIDGE = gameRules.bridges.perSpeedUnit
 /** The most water cells a bridge may span, on the test boards */
 const MAX_BRIDGE_CELLS = gameRules.bridges.maxSpeedUnits
+/** The flat fee each crossing of lake or sea pays, on top of its cells */
+const FEE = gameRules.bridges.waterCrossing
 
 describe('payoffs', () => {
   // The bonus, the multiple, the water share and the track knobs are tuning
@@ -208,19 +210,23 @@ describe('payoffs', () => {
   })
 
   describe('waterStretchPrice', () => {
-    it('should bridge every cell of a stretch a bridge can span', () => {
-      expect(waterStretchPrice(3, 2000, 3)).toBe(6000)
+    it('should charge the crossing fee and every cell of a stretch a bridge can span', () => {
+      expect(waterStretchPrice(3, 2000, 3)).toBe(FEE + 6000)
+    })
+
+    it('should charge the crossing fee once, however short the stretch', () => {
+      expect(waterStretchPrice(1, 2000, 3)).toBe(FEE + 2000)
     })
 
     it('should add half a bridge for each cell past what a bridge can span', () => {
-      // Three cells bridged, then two more at half a bridge each
-      expect(waterStretchPrice(5, 2000, 3)).toBe(3 * 2000 + 2 * 1000)
+      // The fee and three cells bridged, then two more at half a bridge each
+      expect(waterStretchPrice(5, 2000, 3)).toBe(FEE + 3 * 2000 + 2 * 1000)
     })
 
     it('should add the configured share of a bridge past what a bridge can span', () => {
       gameRules.payoffs.unbridgeableWater = 0.25
 
-      expect(waterStretchPrice(5, 2000, 3)).toBe(3 * 2000 + 2 * 500)
+      expect(waterStretchPrice(5, 2000, 3)).toBe(FEE + 3 * 2000 + 2 * 500)
     })
 
     it('should add nothing for no water', () => {
@@ -267,7 +273,7 @@ describe('payoffs', () => {
       const grid = rowOf([100, ...water, 100])
 
       expect(haulPrice(townAt('A', 0), townAt('B', water.length + 1), board(grid))).toBe(
-        200 + MAX_BRIDGE_CELLS * BRIDGE
+        200 + FEE + MAX_BRIDGE_CELLS * BRIDGE
       )
     })
 
@@ -276,15 +282,17 @@ describe('payoffs', () => {
       const grid = rowOf([100, ...water, 100])
 
       expect(haulPrice(townAt('A', 0), townAt('B', water.length + 1), board(grid))).toBe(
-        200 + MAX_BRIDGE_CELLS * BRIDGE + 2 * (BRIDGE / 2)
+        200 + FEE + MAX_BRIDGE_CELLS * BRIDGE + 2 * (BRIDGE / 2)
       )
     })
 
-    it('should price each stretch of water on its own', () => {
+    it('should price each stretch of water on its own, each paying the crossing fee', () => {
       // Two short stretches, each bridgeable, together longer than a bridge
       const grid = rowOf([100, 'W', 'W', 100, 'W', 'W', 100])
 
-      expect(haulPrice(townAt('A', 0), townAt('B', 6), board(grid))).toBe(300 + 4 * BRIDGE)
+      expect(haulPrice(townAt('A', 0), townAt('B', 6), board(grid))).toBe(
+        300 + 2 * FEE + 4 * BRIDGE
+      )
     })
 
     it("should end a stretch of water at a town's cell, still bridging the cell", () => {
@@ -298,11 +306,12 @@ describe('payoffs', () => {
 
       // Without the town: one stretch, the cells past what a bridge spans at half a bridge each
       expect(haulPrice(from, to, board(grid))).toBe(
-        200 + MAX_BRIDGE_CELLS * BRIDGE + (MAX_BRIDGE_CELLS + 1) * (BRIDGE / 2)
+        200 + FEE + MAX_BRIDGE_CELLS * BRIDGE + (MAX_BRIDGE_CELLS + 1) * (BRIDGE / 2)
       )
-      // With it: two stretches a bridge long, each bridged, and the town's cell bridged too
+      // With it: two stretches a bridge long, each bridged with its own fee,
+      // and the town's cell bridged too, but with no fee of its own
       expect(haulPrice(from, to, board(grid, { townCells: [townCell] }))).toBe(
-        200 + water.length * BRIDGE
+        200 + 2 * FEE + water.length * BRIDGE
       )
     })
 
@@ -536,10 +545,11 @@ describe('payoffs', () => {
     })
 
     it('should pay for the bridges a haul over water needs', () => {
-      // Three cells of land and two of water: 3,000 of track and two bridges
+      // Three cells of land and two of water: 3,000 of track and a bridge
+      // two cells long
       const bay = rowOf([1000, 'W', 'W', 1000, 1000, 1000])
 
-      expect(payoffOn(bay)).toBe(4 * (3000 + 2 * BRIDGE))
+      expect(payoffOn(bay)).toBe(4 * (3000 + FEE + 2 * BRIDGE))
     })
 
     it('should never pay less than the minimum, however cheap the haul', () => {

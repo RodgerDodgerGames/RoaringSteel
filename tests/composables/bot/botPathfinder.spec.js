@@ -340,6 +340,24 @@ describe('botPathfinder', () => {
       expect(riverCrossings(line, rules.grid, rules.rivers)).toHaveLength(1)
     })
 
+    it('should add the flat fee once for the stretch of water a line has to bridge', () => {
+      // The channel runs the whole height of the board between Fir and
+      // Dogwood: every way between them bridges it, and the cheapest once
+      const from = [pointOf(townNamed('Fir'))]
+      const to = pointOf(townNamed('Dogwood'))
+      const { waterCrossing } = gameRules.bridges
+
+      const withFee = costField(board, from).costTo(to)
+      gameRules.bridges.waterCrossing = 0
+      try {
+        const withoutFee = costField(searchBoard(rules, towns), from).costTo(to)
+
+        expect(withFee - withoutFee).toBeCloseTo(waterCrossing, 6)
+      } finally {
+        gameRules.bridges.waterCrossing = waterCrossing
+      }
+    })
+
     it('should cost nothing it cannot reach as Infinity', () => {
       const field = costField(board, [pointOf(townNamed('Alder'))])
 

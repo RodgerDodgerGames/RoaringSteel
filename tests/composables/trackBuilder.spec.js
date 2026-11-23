@@ -375,7 +375,8 @@ describe('useTrackBuilder', () => {
     it('should cut back past an affordable vertex on water to the last one on land', () => {
       setWaterGrid()
       const overWater = [centerOf(0), centerOf(1), centerOf(2), centerOf(3)]
-      const bridge = gameRules.bridges.perSpeedUnit
+      // The first water cell's bridge, with the crossing's flat fee
+      const bridge = gameRules.bridges.waterCrossing + gameRules.bridges.perSpeedUnit
       // Enough to reach the water, not to cross it
       playerStore.updatePlayer(ANN, { cash: 2500 + bridge })
 

@@ -96,8 +96,8 @@ const commodities = computed(() => legendCommodities(towns.value))
  * What bridges cost, as the water rows say it. Distances are in the units a
  * train's speed is counted in, as everywhere the player sees one.
  */
-const { perSpeedUnit, maxSpeedUnits, riverCrossing } = gameRules.bridges
-const lakeText = `Lakes and bays: bridged at ${formatCurrency(perSpeedUnit)} per 1 of distance, up to ${maxSpeedUnits}`
+const { waterCrossing, perSpeedUnit, maxSpeedUnits, riverCrossing } = gameRules.bridges
+const lakeText = `Lakes and bays: bridged at ${formatCurrency(waterCrossing)} a crossing plus ${formatCurrency(perSpeedUnit)} per 1 of distance, up to ${maxSpeedUnits}`
 const riverText = `Rivers: bridged at ${formatCurrency(riverCrossing)} a crossing`
 </script>
 

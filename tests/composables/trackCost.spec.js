@@ -6,8 +6,9 @@
  * down as well as up while a leg is being placed.
  *
  * Lake and sea cells are bridged instead, each at the bridge's price per
- * speed unit of its width, whatever the cell's own cost; and each crossing
- * of a river adds a river bridge.
+ * speed unit of its width, whatever the cell's own cost, and each crossing
+ * of them pays a flat fee besides; and each crossing of a river adds a
+ * river bridge.
  *
  * A land cell's price is its terrain cost — land cover, roughness, and the
  * line's climb into it from the cell before, each weighed by its tuning
@@ -60,11 +61,12 @@ const CELL_KM = CELL_METERS / 1000
  * @param {Object} [rivers] - Rivers on the grid (see `riverIndex`)
  * @returns {Object} The board
  */
-const board = (grid, priceScale = 1, rivers = null) => ({
+const board = (grid, priceScale = 1, rivers = null, townCells = []) => ({
   grid,
   priceScale,
   speedUnitKm: CELL_KM,
-  rivers
+  rivers,
+  townCells
 })
 
 // The knobs are meant to be edited after playtests. Every test here starts
@@ -258,6 +260,8 @@ describe('trackCost', () => {
   describe('bridges', () => {
     // A water cell's bridge on these grids: one speed unit's worth
     const BRIDGE = gameRules.bridges.perSpeedUnit
+    // The flat fee each crossing of lake or sea pays on top of its cells
+    const FEE = gameRules.bridges.waterCrossing
     const RIVER = gameRules.bridges.riverCrossing
 
     /**
@@ -273,23 +277,53 @@ describe('trackCost', () => {
       })
     }
 
-    it("should charge a bridge for a lake cell instead of the cell's own cost", () => {
+    it("should charge a bridge and the crossing fee for a lake cell instead of the cell's own cost", () => {
       const grid = rowWithWater([100, 'W', 300])
 
-      expect(linePrice([centerOf(0), centerOf(2)], board(grid)).total).toBe(100 + BRIDGE + 300)
+      expect(linePrice([centerOf(0), centerOf(2)], board(grid)).total).toBe(
+        100 + FEE + BRIDGE + 300
+      )
     })
 
-    it('should charge every cell of a crossing the same, so it costs by how far it spans', () => {
+    it('should charge every cell of a crossing the same, and the fee once, so it costs by how far it spans', () => {
       const grid = rowWithWater([100, 'W', 'W', 'W', 300])
 
-      expect(linePrice([centerOf(0), centerOf(4)], board(grid)).total).toBe(400 + 3 * BRIDGE)
+      expect(linePrice([centerOf(0), centerOf(4)], board(grid)).total).toBe(400 + FEE + 3 * BRIDGE)
     })
 
-    it('should charge a lake cell crossed twice once', () => {
+    it('should charge the fee for each separate crossing', () => {
+      // Over to an island and on over more water: two bridges
+      const grid = rowWithWater([100, 'W', 200, 'W', 300])
+
+      expect(linePrice([centerOf(0), centerOf(4)], board(grid)).total).toBe(
+        600 + 2 * FEE + 2 * BRIDGE
+      )
+    })
+
+    it('should charge a lake cell crossed twice once, fee and all', () => {
       const grid = rowWithWater([100, 'W', 300])
 
       expect(linePrice([centerOf(0), centerOf(2), centerOf(0)], board(grid)).total).toBe(
-        100 + BRIDGE + 300
+        100 + FEE + BRIDGE + 300
+      )
+    })
+
+    it("should charge no fee for a town's cell in the water, only its bridge", () => {
+      // A town on the shore whose cell's center is in the lake
+      const grid = rowWithWater([100, 200, 'W'])
+
+      expect(linePrice([centerOf(0), centerOf(2)], board(grid, 1, null, [2])).total).toBe(
+        300 + BRIDGE
+      )
+    })
+
+    it("should end a crossing at a town's cell, so water either side pays a fee each", () => {
+      // A town on an island whose cell's center is in the water, with lake
+      // either side of it
+      const grid = rowWithWater([100, 'W', 'W', 'W', 300])
+
+      expect(linePrice([centerOf(0), centerOf(4)], board(grid, 1, null, [2])).total).toBe(
+        400 + 2 * FEE + 3 * BRIDGE
       )
     })
 
@@ -321,8 +355,8 @@ describe('trackCost', () => {
       ])
 
       expect(linePrice([centerOf(0), centerOf(3)], board(grid, 1, rivers))).toEqual({
-        total: 800 + BRIDGE + RIVER,
-        bridges: BRIDGE + RIVER
+        total: 800 + FEE + BRIDGE + RIVER,
+        bridges: FEE + BRIDGE + RIVER
       })
     })
   })
@@ -338,11 +372,11 @@ describe('trackCost', () => {
         south: -CELL / 2,
         cell: (row, col) => (col === 1 ? { water: true } : { landCover: 100 * (col + 1) })
       })
-      const { perSpeedUnit } = gameRules.bridges
+      const bridge = gameRules.bridges.waterCrossing + gameRules.bridges.perSpeedUnit
 
       expect(linePrice([centerOf(0), centerOf(2)], board(grid, 3))).toEqual({
-        total: 3 * 100 + perSpeedUnit + 3 * 300,
-        bridges: perSpeedUnit
+        total: 3 * 100 + bridge + 3 * 300,
+        bridges: bridge
       })
     })
 
@@ -386,8 +420,11 @@ describe('trackCost', () => {
   })
 
   describe('climb', () => {
-    /** One water cell's bridge: the speed unit here is one cell wide */
-    const BRIDGE = gameRules.bridges.perSpeedUnit
+    /**
+     * A one-cell crossing's bridge: the flat fee, and one cell's worth, the
+     * speed unit here being one cell wide
+     */
+    const BRIDGE = gameRules.bridges.waterCrossing + gameRules.bridges.perSpeedUnit
 
     /**
      * How high to climb over one cell to make a grade some multiple of the

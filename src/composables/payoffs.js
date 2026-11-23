@@ -131,27 +131,32 @@ export function longHaulMultiplier(km, spanKm) {
  * What a stretch of lake or sea along a haul adds to its price, given how
  * many water cells the stretch has in a row.
  *
- * A stretch no longer than a bridge may span (`maxCells`) is bridged, every
- * cell at the bridge price, as track built across it would be.
+ * A stretch no longer than a bridge may span (`maxCells`) is bridged, as
+ * track built across it would be: the flat fee for a crossing
+ * (`gameRules.bridges.waterCrossing`), and every cell at the bridge price.
  *
  * A longer stretch cannot be bridged: a real line has to go round it, which
  * costs more than going straight over, though by how much depends on the
- * shore. So the cells a bridge could span are still charged as a bridge,
- * and each cell past them adds `gameRules.payoffs.unbridgeableWater` of a
- * bridge — half, at today's setting — as a stand-in for the detour.
+ * shore. So it is still charged the fee and, for the cells a bridge could
+ * span, the bridge price; and each cell past them adds
+ * `gameRules.payoffs.unbridgeableWater` of a bridge cell — a whole one, at
+ * today's setting — as a stand-in for the detour.
  *
  * @param {number} cells - Water cells in a row
  * @param {number} bridgeCell - What bridging one water cell costs (see
  *   `bridgeCellPrice` in water.js)
  * @param {number} maxCells - The most water cells a bridge may span (see
  *   `maxBridgeCells` in water.js)
- * @returns {number} Dollars
+ * @returns {number} Dollars; 0 for no cells
  */
 export function waterStretchPrice(cells, bridgeCell, maxCells) {
+  if (cells === 0) return 0
   const bridged = Math.min(cells, maxCells)
   const beyond = cells - bridged
   return Math.round(
-    bridged * bridgeCell + beyond * bridgeCell * gameRules.payoffs.unbridgeableWater
+    gameRules.bridges.waterCrossing +
+      bridged * bridgeCell +
+      beyond * bridgeCell * gameRules.payoffs.unbridgeableWater
   )
 }
 

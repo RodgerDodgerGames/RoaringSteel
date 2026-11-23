@@ -597,7 +597,7 @@ export function costField(board, sources, { targets } = {}) {
   } = board
   const size = grid.present.length
   const maxCells = Math.min(maxBridgeCells(grid, rules.speedUnitKm), MAX_SEARCH_BRIDGE_CELLS)
-  const { riverCrossing } = gameRules.bridges
+  const { riverCrossing, waterCrossing } = gameRules.bridges
 
   // A search state is a cell plus the two running counts, packed into one
   // number: cell * STATES + water * (MAX_BESIDE_CELLS + 1) + beside
@@ -639,7 +639,9 @@ export function costField(board, sources, { targets } = {}) {
     startIn.set(index, point)
     const water = isWater[index] && !isTownCell[index] ? 1 : 0
     const state = pack(index, water, isBeside[index])
-    cost[state] = startPrice[index]
+    // A line starting out over water starts a crossing, which pays its flat
+    // fee as building would (see `linePrice` in trackCost.js)
+    cost[state] = startPrice[index] + (water ? waterCrossing : 0)
     frontier.push(cost[state] + estimate(index), state)
   })
 
@@ -678,11 +680,15 @@ export function costField(board, sources, { targets } = {}) {
       if (nextBeside > MAX_BESIDE_CELLS) return
 
       // The cell's price, with the climb into it, any rivers the step
-      // crosses, and the search's own nudges
+      // crosses, the flat fee for a crossing of lake or sea if the step
+      // starts one (from land or a town's cell onto open water, see
+      // `linePrice` in trackCost.js), and the search's own nudges
       const rivers = riverSteps[index * NEIGHBOR_STEPS + stepOut]
+      const startsCrossing = isBridge && water === 0
       const step =
         stepPrice[index * NEIGHBOR_STEPS + stepOut] +
         rivers * riverCrossing +
+        (startsCrossing ? waterCrossing : 0) +
         (STEP_COST + (isBeside[next] ? BESIDE_PENALTY : 0)) * priceScale
       const nextState = pack(next, nextWater, nextBeside)
       if (here + step < cost[nextState]) {

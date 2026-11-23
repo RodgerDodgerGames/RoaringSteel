@@ -259,6 +259,16 @@ export function cellPath(latlngs, grid) {
  * crossing (see `bridgeCellPrice`). And each place the line crosses a river
  * adds a river bridge (see `riverCrossings`).
  *
+ * Each crossing of lake or sea — an unbroken stretch of water cells along
+ * the line — also pays the flat `gameRules.bridges.waterCrossing`, once, so
+ * even the shortest lake bridge costs as much as a river one. A town's cell
+ * ends a stretch, as it does when a bridge is measured (see
+ * `longestCrossing` in water.js): a town on the shore is the land a bridge
+ * reaches, so track into it pays no fee for the town's own cell, though it
+ * still pays the per-cell rate if that cell's center is in the water. A
+ * stretch the line has already paid for, coming back over its own bridge,
+ * is not charged the fee again, as its cells are not charged again.
+ *
  * @param {Array<{lat: number, lng: number}>} latlngs - The line's vertices
  * @param {Object} board - What the line is priced against, as the track
  *   builder holds it (`buildRules` in trackBuilder.js)
@@ -269,20 +279,46 @@ export function cellPath(latlngs, grid) {
  *   boardScale.js), which bridges are priced by
  * @param {Object|null} [board.rivers] - The rivers on the board (see
  *   `riverIndex` in water.js); none if left out
+ * @param {Array<number>} [board.townCells] - The cells towns sit in (see
+ *   `townCells` in buildRules.js), which end a stretch of water; none if
+ *   left out
  * @returns {{total: number, bridges: number}} The price, and the part of it
  *   that is bridges
  */
-export function linePrice(latlngs, { grid, priceScale, speedUnitKm, rivers = null }) {
+export function linePrice(
+  latlngs,
+  { grid, priceScale, speedUnitKm, rivers = null, townCells = [] }
+) {
   const waterCell = bridgeCellPrice(grid, speedUnitKm)
+  const { waterCrossing } = gameRules.bridges
+  const towns = new Set(townCells)
   let total = 0
   let bridges = 0
   // Cells already paid for: each is charged once, however often it is crossed
   const charged = new Set()
+  // Whether the cell before was open water (not a town's), so this one
+  // carries on the same crossing; and whether that crossing has paid its fee
+  let inCrossing = false
+  let crossingPaid = false
 
   cellPath(latlngs, grid).forEach((cell, i, path) => {
+    const isWater = isWaterCell(grid, cell)
+    const isOpenWater = isWater && !towns.has(cell)
+    if (!isOpenWater) inCrossing = false
+    else if (!inCrossing) {
+      inCrossing = true
+      crossingPaid = false
+    }
     if (charged.has(cell)) return
     charged.add(cell)
-    if (isWaterCell(grid, cell)) {
+    // The fee falls on the first cell of the crossing not paid for already,
+    // so a line coming back over its own bridge does not pay it twice
+    if (isOpenWater && !crossingPaid) {
+      crossingPaid = true
+      bridges += waterCrossing
+      total += waterCrossing
+    }
+    if (isWater) {
       bridges += waterCell
       total += waterCell
     } else {

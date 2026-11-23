@@ -208,7 +208,11 @@ export const gameRules = {
    * of a town, of any size, track only has to keep `nearTown.nearSpeedUnits`
    * from other players' track, for at most `nearTown.maxBesideSpeedUnits` at
    * a stretch — half the open-country numbers, so the same 60° crossing.
-   * Inside the grid cell a town sits in, spacing does not count at all.
+   * A stretch beside another player's track that runs from the open into a
+   * town's reach counts each part against the limit where it is, so a line
+   * heading straight into a town another player's line runs into may come
+   * in at about 37° to it or steeper. Inside the grid cell a town sits in,
+   * spacing does not count at all.
    */
   rivalTrackSpacing: {
     nearSpeedUnits: 1,

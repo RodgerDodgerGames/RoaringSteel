@@ -51,10 +51,10 @@ import {
   builtLegs,
   trackIndex,
   closedCells,
-  endBlockAt
+  endBlockAt,
+  END_BLOCKS
 } from '@/composables/map/buildRules'
-import { isEmptyGrid, cellContaining } from '@/composables/map/cellGrid'
-import { isWaterCell } from '@/composables/map/water'
+import { isEmptyGrid } from '@/composables/map/cellGrid'
 import { pointKey, townKey, liesOnTrack } from '@/composables/network'
 import { formatCurrency } from '@/composables/utils'
 import { startTowns, startRuleMessage } from '@/composables/startRule'
@@ -308,7 +308,7 @@ export function useTrackBuilder() {
    *   - `available`: what the player had to spend, before building;
    *   - `backFrom`: when the cut went back past a vertex that could be paid
    *     for, why the line could not end there: 'water' or 'rivalTrack' (see
-   *     `endBlockAt`); null when it did not.
+   *     `END_BLOCKS`); null when it did not.
    */
   function fitLine(playerId, latlngs) {
     const available = playerStore.availableForTrack(playerId)
@@ -319,19 +319,19 @@ export function useTrackBuilder() {
     if (!Number.isFinite(whole)) return uncut
 
     const isAffordable = whole <= available
-    const endReason = lineBlock(latlngs, buildRules.value, { isFinished: true })?.reason
-    const endsBadly = endReason === 'endsOnWater' || endReason === 'endsBesideRival'
-    if (isAffordable && !endsBadly) return uncut
+    /** Which rule about where it ends a line breaks, as `endBlockAt` names it, or null */
+    const endBlock = (points) =>
+      END_BLOCKS[lineBlock(points, buildRules.value, { isFinished: true })?.reason] ?? null
+    if (isAffordable && !endBlock(latlngs)) return uncut
 
     const points = affordableSection(latlngs, available, buildRules.value, price)
     // Cut short of a vertex that could be paid for only if the vertex after
     // the cut could still have been: then it was where the line would have
-    // ended, not money, that stopped it there, and that vertex says why
+    // ended, not money, that stopped it there, and the line ending at that
+    // vertex says why
     const kept = points?.length ?? 1
-    const backFrom =
-      price(latlngs.slice(0, kept + 1)) <= available
-        ? endBlockAt(latlngs[kept], buildRules.value)
-        : null
+    const upToNext = latlngs.slice(0, kept + 1)
+    const backFrom = price(upToNext) <= available ? endBlock(upToNext) : null
     if (isAffordable) return { points, isCut: true, limit: null, available, backFrom }
 
     const allowance = playerStore.trackBudgetRemaining(playerId)
@@ -440,31 +440,26 @@ export function useTrackBuilder() {
   }
 
   /**
-   * The cells of the towns on the board, as a set, so a point can be checked
-   * for being in one quickly. A town on the shore can be built to across
-   * water, so a line may end in a town's cell even when it is water.
-   */
-  const townCellSet = computed(() => new Set(boardRules.value.townCells))
-
-  /**
-   * Whether a point of a line is out on water: in a lake or sea cell that is
-   * not a town's. A finished line may not end at such a point (see
-   * `lineBlock` in buildRules.js, which judges a line's end the same way).
+   * Whether a line may not be left ending at a point: out on water, or
+   * beside another player's track (see `endBlockAt` in buildRules.js).
+   * Track is only torn up by the player whose turn it is, so the other
+   * players' track is theirs.
    * @param {{lat: number, lng: number}} point - The point
-   * @returns {boolean} True if the point is on water
+   * @returns {boolean} True if a line may not end there
    */
-  function isOnWater(point) {
-    const { grid } = boardRules.value
-    if (isEmptyGrid(grid)) return false
-    const cell = cellContaining(point, grid)
-    return cell !== -1 && isWaterCell(grid, cell) && !townCellSet.value.has(cell)
+  function mayNotEndAt(point) {
+    if (isEmptyGrid(gridStore.grid)) return false
+    return endBlockAt(point, buildRules.value) !== null
   }
 
   /**
    * What tearing up the far end of a line leaves of it: its last leg comes
-   * off, and so does every leg before that back to the last point on land,
-   * so a bridge comes off whole however many legs it spans — a line may not
-   * be left ending out on the water.
+   * off, and so does every leg before that back to the last point a line
+   * may end at, so a bridge comes off whole however many legs it spans — a
+   * line may not be left ending out on the water — and so does a crossing
+   * of another player's track: a line may not be left ending beside it
+   * either, or a line could be built across their track and then cut back
+   * to stop alongside it, getting round the rule against stopping there.
    *
    * The map highlights what this returns as the part a click would remove,
    * and `removeTrackEnd` removes the same part, so the two always agree.
@@ -479,7 +474,7 @@ export function useTrackBuilder() {
    */
   function removableEnd(coordinates) {
     let keep = coordinates.length - 1
-    while (keep >= 2 && isOnWater(coordinates[keep - 1])) keep--
+    while (keep >= 2 && mayNotEndAt(coordinates[keep - 1])) keep--
     if (keep < 2) keep = 0
     return { keep, stretch: coordinates.slice(Math.max(keep, 1) - 1) }
   }

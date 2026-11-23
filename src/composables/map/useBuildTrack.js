@@ -11,7 +11,7 @@ import { usePlayerStore } from '@/stores/players'
 import { useTrackStore } from '@/stores/track'
 import { useGameStore } from '@/stores/game'
 import { useGridStore } from '@/stores/grid'
-import { lineBlock } from '@/composables/map/buildRules'
+import { lineBlock, END_BLOCKS } from '@/composables/map/buildRules'
 import { isEmptyGrid } from '@/composables/map/cellGrid'
 import { useTrackBuilder } from '@/composables/trackBuilder'
 import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
@@ -987,7 +987,7 @@ export default function useBuildTrack() {
       builder.buildRules.value,
       { isFinished: true }
     )
-    const endWarning = END_WARNINGS[block?.reason] ?? null
+    const endWarning = END_WARNINGS[END_BLOCKS[block?.reason]] ?? null
     const message = block && !endWarning ? builder.describeBlock(block) : null
     const leg = repriceLine(message ? undefined : latlng)
 
@@ -1152,14 +1152,14 @@ export default function useBuildTrack() {
   const OVER_BUDGET_CLASS = 'is-over-budget'
 
   /**
-   * The rules about where a finished line may end that are only warnings
-   * while a line is still being drawn (see `lineBlock`), by the reason
-   * `lineBlock` gives, with what the cursor's tooltip tells the player: the
-   * line may not stop here, but it is not finished yet, so keep going.
+   * The rules about where a finished line may end, which are only warnings
+   * while a line is still being drawn (see `END_BLOCKS` in buildRules.js),
+   * with what the cursor's tooltip tells the player: the line may not stop
+   * here, but it is not finished yet, so keep going.
    */
   const END_WARNINGS = {
-    endsOnWater: 'keep going, a bridge has to reach land',
-    endsBesideRival: "keep going, track can't stop beside another player's track"
+    water: 'keep going, a bridge has to reach land',
+    rivalTrack: "keep going, track can't stop beside another player's track"
   }
 
   /** Leaflet's own line blue, for a line drawn by a player with no color */

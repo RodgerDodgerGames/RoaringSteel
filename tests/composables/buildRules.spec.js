@@ -364,6 +364,25 @@ describe("lineBlock beside other players' track", () => {
     expect(lineBlock(line, rules({ towns: [4] }), { isFinished: true })).toBeNull()
   })
 
+  it('should not give a line a fresh allowance at each town it passes', () => {
+    // Two rows of ten cells, with Bo's line a quarter of a cell north of the
+    // equator and a town in the second row, its center a cell and a quarter
+    // from Bo's line. Ann's line runs four tenths of a speed unit from Bo's,
+    // past the edge of the town's reach: two speed units beside it in the
+    // open, a little over one within the town's reach, and two more in the
+    // open. Each part alone is within its limit; together they are not.
+    const longGrid = makeTestGrid({ rows: 2, cols: 10 })
+    const passRules = {
+      grid: longGrid,
+      speedUnitKm: SPEED_UNIT_KM,
+      isInRegion: everywhere,
+      townCells: [15],
+      rivalTrack: trackIndex(builtLegs([{ coordinates: [pt(0, 0.25), pt(10, 0.25)] }]))
+    }
+
+    expect(lineBlock([pt(3, 0.65), pt(8, 0.65)], passRules)).toEqual({ reason: 'besideRival' })
+  })
+
   it("should let a line stop beside it inside a town's cell", () => {
     // Along Bo's track, right beside it, inside cell 4 only
     const line = [pt(4.05, 0.3), pt(4.95, 0.3)]

@@ -522,6 +522,19 @@ describe('useTrackBuilder', () => {
       expect(annsLine().cost).toBe(keptCost)
     })
 
+    it("should take a crossing of another player's track off whole, so the line does not stop beside it", () => {
+      // Bo's line north to south through cell 2 near its east side; a speed
+      // unit is a cell on this board
+      trackStore.addSegment({ ownerId: BO, coordinates: [at(-2, 2.3), at(4, 2.3)] })
+      // Across it square on: the vertex at 3.5 cells is seven tenths of a
+      // speed unit past it, beside it; the one at 4.5 is clear
+      const clear = { lat: 0, lng: 1.2 * CELL }
+      const { segment } = build([centerOf(0), clear, centerOf(3), centerOf(4)])
+
+      expect(builder.removeTrackEnd(ANN, segment.id).ok).toBe(true)
+      expect(annsLine().coordinates).toEqual([centerOf(0), clear])
+    })
+
     it('should take a line off whole when its bridge leaves from its start', () => {
       setBoard(['1,1'])
       const { segment, cost } = build([centerOf(0), centerOf(1), centerOf(2)])

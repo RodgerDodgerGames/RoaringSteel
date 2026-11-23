@@ -254,9 +254,11 @@ const RIVAL_ZONE_MARGIN_CELLS = 0.5
  *   on again — every step steep enough on its own;
  * - near a town, where lines head in to join it and set off out of it
  *   alongside other players' lines, rather than cross them, a step only has
- *   to be as steep as takes a line from on the track out of the town's
- *   smaller zone within its limit (about 26°, the stretch being near /
- *   sin(angle));
+ *   to be as steep as a line heading straight into a town another player's
+ *   line runs into may come in at (about 37°, see `runsBesideRival` in
+ *   buildRules.js). A crossing near a town flatter than a crossing in the
+ *   open is still refused by the rules, so a line planned like that is not
+ *   built (see the module notes) — rare, where the zones are this small;
  * - a step that keeps its distance from the track is never allowed: that is
  *   running along it.
  * The angle is taken from the cell a step leaves, when that is in a zone
@@ -378,14 +380,21 @@ function rivalZones(rules, isTownCell) {
     if (nearestKm[index] !== Infinity) zone[index] = nearTown[index] ? 2 : 1
   }
 
-  // The shallowest angles allowed, as sines: in the open, a crossing's
-  // (2 × near / longest stretch); near a town, the angle that takes a line
-  // from on the track out of the zone within the longest stretch (near /
-  // longest stretch)
+  // The shallowest angles allowed, as sines. In the open, a crossing's:
+  // beside the track for 2 × near / sin, at most the longest stretch. Near a
+  // town, a straight run into one on another player's line: beside it from
+  // near / sin out, the part outside the town's reach counted against the
+  // open limit and the rest against the town's (see `runsBesideRival`),
+  // using no more than the whole limit between them —
+  //   (open near / sin − reach) / open max + (town near / sin) / town max = 1
+  const { open, town, townWithinKm } = spacing
   const minSin = [
     0,
-    Math.min(1, (2 * spacing.open.nearKm) / spacing.open.maxKm),
-    Math.min(1, spacing.town.nearKm / spacing.town.maxKm)
+    Math.min(1, (2 * open.nearKm) / open.maxKm),
+    Math.min(
+      1,
+      (open.nearKm / open.maxKm + town.nearKm / town.maxKm) / (1 + townWithinKm / open.maxKm)
+    )
   ]
 
   return { zone, awayX, awayY, minSin, kmPerLat, kmPerLng }
@@ -822,9 +831,13 @@ export function costField(board, sources, { targets } = {}) {
 
   /**
    * Whether other players' zones let a line take a step (see `rivalZones`).
-   * A step into a cell outside every zone always may. One into a zone may
-   * not if it is at too shallow an angle to the track, or if, out in the
-   * open, it turns inside the zone.
+   * A step between two cells outside every zone always may. One into, out
+   * of or within a zone may not if it is at too shallow an angle to the
+   * track, or if, out in the open, it turns inside the zone. A step out
+   * counts too: part of it is still in the zone, and the rules count that
+   * part — the last step into a town's cell, which is in no zone, most of
+   * all, as a line slanting in to a town along another player's line would
+   * otherwise come in as flat as it liked.
    *
    * A line has to go straight through a zone in the open, as a crossing
    * does. Two directions can each be steep enough against a slanting line
@@ -845,7 +858,7 @@ export function costField(board, sources, { targets } = {}) {
    * @returns {boolean} True if the step may be taken
    */
   function mayStepInZone(index, next, cameFrom) {
-    const zoneType = rival?.zone[next]
+    const zoneType = rival?.zone[next] || rival?.zone[index]
     if (!zoneType) return true
     const rows = rowOf(grid, next) - rowOf(grid, index)
     const cols = colOf(grid, next) - colOf(grid, index)

@@ -371,6 +371,15 @@ export function rivalSpacing(speedUnitKm) {
 }
 
 /**
+ * The centers of the cells towns sit in, kept per list of town cells (see
+ * `townCells`): a board's rules hold one list for as long as the towns and
+ * grid stay the same, and the line being drawn is checked against them on
+ * every move of the cursor. Held weakly, so a list no longer in play is let
+ * go.
+ */
+const townCentersByCells = new WeakMap()
+
+/**
  * A test of whether a point is beside other players' track, and which
  * spacing it is judged by there (see `rivalSpacing`): the town's, within
  * reach of a town of any size, or the open country's elsewhere.
@@ -392,12 +401,17 @@ function rivalZoneTest({ grid, speedUnitKm, townCells, rivalTrack }) {
   const spacing = rivalSpacing(speedUnitKm)
   // Far enough to find the track for either spacing, whichever is wider
   const reachKm = Math.max(spacing.open.nearKm, spacing.town.nearKm)
-  let townCenters = null
 
   /** Whether a point is near enough a town for the town's spacing */
   const isNearTown = (point) => {
-    townCenters ??= townCells.map((cell) => cellCenter(grid, cell))
-    return townCenters.some((center) => kmBetween(point, center) <= spacing.townWithinKm)
+    if (!townCentersByCells.has(townCells)) {
+      townCentersByCells.set(
+        townCells,
+        townCells.map((cell) => cellCenter(grid, cell))
+      )
+    }
+    const centers = townCentersByCells.get(townCells)
+    return centers.some((center) => kmBetween(point, center) <= spacing.townWithinKm)
   }
 
   return (point) => {
@@ -412,16 +426,19 @@ function rivalZoneTest({ grid, speedUnitKm, townCells, rivalTrack }) {
  * Whether a line runs beside other players' track for longer than crossing
  * it takes (see `gameRules.rivalTrackSpacing`).
  *
- * Like `runsAlongside`, the line is walked point by point with a running
- * total of how far it has been beside the track without a break. Each point
+ * Like `runsAlongside`, the line is walked point by point, keeping a running
+ * total of how much it has been beside the track without a break. Each point
  * is judged by the spacing where it is: the town's within reach of a town,
- * the open country's elsewhere. The total starts again where the line passes
- * from one to the other, so a line heading into a town is held to the
- * town's limit only for the part of it near the town. Kept running, a line
- * that came along beside a rival line in the open, as close as crossing it
- * at a slant allows, would arrive at the town's edge with nearly all of the
- * town's shorter limit already spent, and be refused the town — the
- * opposite of what easing the rule near towns is for.
+ * the open country's elsewhere. So each step beside the track counts as a
+ * share of the limit where it is — a step near a town as twice the share of
+ * the same step in the open, the town's limit being half as long — and the
+ * line may not use up more than the whole limit in one stretch.
+ *
+ * The total runs on across a town's edge rather than starting again there:
+ * otherwise a line could run beside another player's line for as long as
+ * it liked past a string of towns, a fresh allowance at each one. A line
+ * heading straight into a town that another player's line runs into can
+ * still come in at about 37° to it or steeper.
  *
  * @param {Array<Object>} points - The line's sample points, in order
  * @param {Array<boolean>} inTown - Per point, whether it is in a town's
@@ -430,17 +447,27 @@ function rivalZoneTest({ grid, speedUnitKm, townCells, rivalTrack }) {
  * @returns {boolean} True if the line runs beside other players' track
  */
 function runsBesideRival(points, inTown, besideZone) {
-  let besideKm = 0
+  // How much of the limit this stretch beside the track has used, from 0 to 1
+  let used = 0
   let previous = null
   for (const [i, point] of points.entries()) {
     const zone = inTown[i] ? null : besideZone(point)
-    if (!zone || zone !== previous?.zone) besideKm = 0
-    else besideKm += kmBetween(previous.point, point)
-    if (zone && besideKm > zone.maxKm) return true
+    if (!zone) used = 0
+    else if (previous?.zone) used += kmBetween(previous.point, point) / zone.maxKm
+    if (used > 1) return true
     previous = { point, zone }
   }
   return false
 }
+
+/**
+ * The rules about where a finished line may end, as `lineBlock` names them
+ * when one is broken, each with the name `endBlockAt` gives the same thing.
+ * A line still being drawn may stop where these say a finished one may not,
+ * and a line too dear to build whole is cut back to a point where none of
+ * them is broken (see `fitLine` in trackBuilder.js).
+ */
+export const END_BLOCKS = Object.freeze({ endsOnWater: 'water', endsBesideRival: 'rivalTrack' })
 
 /**
  * Why a line that keeps to every other rule may not end at a point, or null

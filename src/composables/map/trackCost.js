@@ -302,7 +302,8 @@ export function linePrice(
   let crossingPaid = false
 
   cellPath(latlngs, grid).forEach((cell, i, path) => {
-    const isOpenWater = isWaterCell(grid, cell) && !towns.has(cell)
+    const isWater = isWaterCell(grid, cell)
+    const isOpenWater = isWater && !towns.has(cell)
     if (!isOpenWater) inCrossing = false
     else if (!inCrossing) {
       inCrossing = true
@@ -317,7 +318,7 @@ export function linePrice(
       bridges += waterCrossing
       total += waterCrossing
     }
-    if (isWaterCell(grid, cell)) {
+    if (isWater) {
       bridges += waterCell
       total += waterCell
     } else {

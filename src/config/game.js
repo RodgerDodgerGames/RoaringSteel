@@ -162,22 +162,62 @@ export const gameRules = {
   },
 
   /**
-   * How track may meet track already built. As in Empire Builder, where lines
-   * may cross at a milepost but never share the way between two, new track
-   * may cross built track but not run alongside it.
+   * How track may meet the builder's own track already built (and the earlier
+   * legs of the line being drawn). As in Empire Builder, where lines may
+   * cross at a milepost but never share the way between two, new track may
+   * cross built track but not run alongside it. Other players' track is kept
+   * further from (see `rivalTrackSpacing`).
    *
-   * Counted in grid cells, the board's mileposts, so the rule is the same on
-   * every board. New track is "beside" built track wherever it is within
-   * `nearCells` of a cell of it — half a cell, the width of the band a line
-   * runs down the middle of. It may be beside built track for at most
-   * `maxBesideCells` at a stretch. Crossing square on takes about one cell of
-   * that (half a cell each side); the stretch grows as the angle flattens, so
-   * two cells lets a line cross at anything steeper than about 30°, and stops
-   * it running along, or weaving along, a line.
+   * Counted in grid cells, the board's mileposts. New track is "beside" built
+   * track wherever it is within `nearCells` of a cell of it — half a cell,
+   * the width of the band a line runs down the middle of. It may be beside
+   * built track for at most `maxBesideCells` at a stretch. Crossing square on
+   * takes about one cell of that (half a cell each side); the stretch grows
+   * as the angle flattens, so two cells lets a line cross at anything steeper
+   * than about 30°, and stops it running along, or weaving along, a line.
    */
   trackSpacing: {
     nearCells: 0.5,
     maxBesideCells: 2
+  },
+
+  /**
+   * How far new track has to keep from other players' track. This is what
+   * makes building early in a good corridor pay, as it does in Empire
+   * Builder: whoever builds there first takes the way, and anyone who comes
+   * later has to go round, by a longer, dearer or less direct route.
+   *
+   * Counted in speed units (see boardScale.js), the distance a train runs
+   * for each point of its speed, so the rule is the same in game terms on
+   * every board, whatever the size of its grid cells.
+   *
+   * New track is "beside" another player's track wherever it is within
+   * `nearSpeedUnits` of it, and it may be beside it for at most
+   * `maxBesideSpeedUnits` at a stretch. That stretch is what crossing takes:
+   * square on, a line is beside the track for twice `nearSpeedUnits` (one on
+   * each side), and the flatter the crossing the longer it is beside —
+   * 2 × near / sin(angle). At 1 and 2.3, a line may cross another player's
+   * track at about 60° or steeper (2 / sin 60° = 2.31), and no flatter.
+   *
+   * A finished section may not end beside another player's track either:
+   * without that, a line could be laid alongside it a section at a time,
+   * each one within the limit (see buildRules.js).
+   *
+   * Near towns the rule is eased, so every player allowed into a town can
+   * still build into it once others have: within `nearTown.withinSpeedUnits`
+   * of a town, of any size, track only has to keep `nearTown.nearSpeedUnits`
+   * from other players' track, for at most `nearTown.maxBesideSpeedUnits` at
+   * a stretch — half the open-country numbers, so the same 60° crossing.
+   * Inside the grid cell a town sits in, spacing does not count at all.
+   */
+  rivalTrackSpacing: {
+    nearSpeedUnits: 1,
+    maxBesideSpeedUnits: 2.3,
+    nearTown: {
+      withinSpeedUnits: 1,
+      nearSpeedUnits: 0.5,
+      maxBesideSpeedUnits: 1.15
+    }
   },
 
   /**

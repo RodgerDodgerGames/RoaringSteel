@@ -68,7 +68,7 @@ function rulesWith(segments = [], { withRiver = true } = {}) {
     rivers: withRiver ? riverIndex(grid, makeRivers()) : null,
     isInRegion: regionTest(makeRegion()),
     townCells: townCells(towns, grid),
-    builtTrack: trackIndex(builtLegs(segments))
+    rivalTrack: trackIndex(builtLegs(segments))
   }
 }
 
@@ -217,6 +217,119 @@ describe('botPathfinder', () => {
       // A wall of track down column 10, all the way up the board
       const wall = [{ coordinates: [centerAt(0, 10), centerAt(ROWS - 1, 10)] }]
       rules = rulesWith(wall)
+      board = searchBoard(rules, towns)
+
+      const line = planLine(board, [pointOf(townNamed('Ivy'))], pointOf(townNamed('Gum')))
+
+      expect(line).not.toBeNull()
+      expect(lineBlock(line, rules, { isFinished: true })).toBeNull()
+    })
+
+    it("should cross another player's slanting track nearly square on, not along the way", () => {
+      // A line of track 30° up from the east, from the south edge to the
+      // east edge, between Alder (north of it) and Cedar (south of it). The
+      // way from one to the other runs east, which would cross it at about
+      // 25°, far too flat.
+      const slant = [{ coordinates: [centerAt(0, 4), centerAt(12, 25)] }]
+      rules = rulesWith(slant)
+      board = searchBoard(rules, towns)
+
+      const line = planLine(board, [pointOf(townNamed('Alder'))], pointOf(townNamed('Cedar')))
+
+      expect(line).not.toBeNull()
+      expect(lineBlock(line, rules, { isFinished: true })).toBeNull()
+    })
+
+    it("should cross another player's track at 45° to the way only by turning square to it", () => {
+      // Open, even ground, with another player's line running 45° across
+      // it from corner to corner. Straight east from one side to the other
+      // would cross it at 45°, which the rules do not allow.
+      const grid = makeTestGrid({ rows: 12, cols: 16, cell: () => ({ landCover: 400 }) })
+      const at = (row, col) => ({ lat: (row + 0.5) * CELL, lng: (col + 0.5) * CELL })
+      const plainRules = {
+        grid,
+        priceScale: 1,
+        speedUnitKm: SPEED_UNIT_KM,
+        rivers: null,
+        isInRegion: regionTest(null),
+        townCells: [],
+        rivalTrack: trackIndex(builtLegs([{ coordinates: [at(-1, 3), at(13, 17)] }]))
+      }
+
+      const line = planLine(searchBoard(plainRules, []), [at(6, 1)], at(6, 14))
+
+      expect(line).not.toBeNull()
+      expect(lineBlock(line, plainRules, { isFinished: true })).toBeNull()
+    })
+
+    describe('where another player took the only cheap way', () => {
+      /**
+       * A valley through dear ground, from the west edge at one row to the
+       * east edge at another, with a town at each end and another player's
+       * line down the middle of it. The valley is every cell within 1.2
+       * cells of the line, and a speed unit of 1.4 cells puts all of it
+       * inside their zone, so the cheap way is closed and a line between the
+       * towns has to climb out of it.
+       * @param {number} westRow - The row the valley leaves the west edge at
+       * @param {number} eastRow - The row it reaches the east edge at
+       * @returns {{rules: Object, line: Array<Object>|null}} The board's
+       *   rules, and the line planned from the west town to the east one
+       */
+      function planThroughValley(westRow, eastRow) {
+        const ROWS_HERE = 12
+        const COLS_HERE = 16
+        const at = (row, col) => ({ lat: (row + 0.5) * CELL, lng: (col + 0.5) * CELL })
+        const west = at(westRow, 0)
+        const east = at(eastRow, COLS_HERE - 1)
+        // How far a cell's center is from the line, in cells
+        const offLine = (row, col) => {
+          const dx = COLS_HERE - 1
+          const dy = eastRow - westRow
+          const t = Math.max(
+            0,
+            Math.min(1, (col * dx + (row - westRow) * dy) / (dx * dx + dy * dy))
+          )
+          return Math.hypot(col - t * dx, row - westRow - t * dy)
+        }
+        const grid = makeTestGrid({
+          rows: ROWS_HERE,
+          cols: COLS_HERE,
+          cell: (row, col) => ({ landCover: offLine(row, col) <= 1.2 ? 100 : 3000 })
+        })
+        const rules = {
+          grid,
+          priceScale: 1,
+          speedUnitKm: 1.4 * SPEED_UNIT_KM,
+          rivers: null,
+          isInRegion: regionTest(null),
+          townCells: [westRow * COLS_HERE, eastRow * COLS_HERE + COLS_HERE - 1],
+          rivalTrack: trackIndex(builtLegs([{ coordinates: [west, east] }]))
+        }
+        return { rules, line: planLine(searchBoard(rules, []), [west], east) }
+      }
+
+      it('should keep out of their zone and go over dear ground', () => {
+        const { rules: valleyRules, line } = planThroughValley(6, 6)
+
+        expect(line).not.toBeNull()
+        expect(lineBlock(line, valleyRules, { isFinished: true })).toBeNull()
+      })
+
+      it('should not zigzag along their line where it slants, a steep step at a time', () => {
+        // About 22° up from the east: steps north and south-east are both
+        // steep against it, and taken in turn would run along it
+        const { rules: valleyRules, line } = planThroughValley(3, 9)
+
+        expect(line).not.toBeNull()
+        expect(lineBlock(line, valleyRules, { isFinished: true })).toBeNull()
+      })
+    })
+
+    it("should still reach a town another player's line runs into from the same side", () => {
+      // Another player's line from Ivy straight to Gum, the way a line of
+      // this player's from Ivy would go
+      const rival = [{ coordinates: [pointOf(townNamed('Ivy')), pointOf(townNamed('Gum'))] }]
+      rules = rulesWith(rival)
       board = searchBoard(rules, towns)
 
       const line = planLine(board, [pointOf(townNamed('Ivy'))], pointOf(townNamed('Gum')))
@@ -407,6 +520,22 @@ describe('botPathfinder', () => {
       const line = planLine(board, [pointOf(townNamed('Alder'))], pointOf(townNamed('Juniper')))
 
       expect(affordableSection(line, 1e9, rules, priceOn(rules))).toEqual(line)
+    })
+
+    it("should not stop beside another player's track", () => {
+      // A wall of another player's track down column 10, which every line
+      // from Ivy to Gum crosses
+      const wall = [{ coordinates: [centerAt(0, 10), centerAt(ROWS - 1, 10)] }]
+      rules = rulesWith(wall)
+      board = searchBoard(rules, towns)
+      const line = planLine(board, [pointOf(townNamed('Ivy'))], pointOf(townNamed('Gum')))
+
+      // Every budget that runs out somewhere along the line
+      for (let budget = 1000; budget < priceOn(rules)(line); budget += 500) {
+        const section = affordableSection(line, budget, rules, priceOn(rules))
+        if (!section) continue
+        expect(lineBlock(section, rules, { isFinished: true })).toBeNull()
+      }
     })
 
     it('should not stop part way over water', () => {

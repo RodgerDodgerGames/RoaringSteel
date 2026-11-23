@@ -1008,10 +1008,11 @@ describe('useBuildTrack', () => {
     })
   })
 
-  describe('beside track already built', () => {
-    /** A three-by-five block of cells north of the equator, each costing 100 */
-    const grid = makeTestGrid({ rows: 3, cols: 5, cell: () => ({ landCover: 100 }) })
+  describe("beside another player's track", () => {
+    /** A four-by-five block of cells north of the equator, each costing 100 */
+    const grid = makeTestGrid({ rows: 4, cols: 5, cell: () => ({ landCover: 100 }) })
     const centerOf = (row, col) => L.latLng((row + 0.5) * CELL, (col + 0.5) * CELL)
+    let api
 
     /** Finishes a line along the given cell centers, as Geoman hands it over */
     function finishLine(...centers) {
@@ -1021,21 +1022,30 @@ describe('useBuildTrack', () => {
     }
 
     beforeEach(() => {
-      // Bo's line along the middle row, built on an earlier turn
+      // Bo's line along the second row, built on an earlier turn
       trackStore.addSegment({
         ownerId: 2,
         coordinates: [centerOf(1, 0), centerOf(1, 4)],
         cost: 500,
         turn: 0
       })
-      // A city on the top row for Ann's lines to start from
-      mountBuildTrack(map, L.layerGroup([L.marker(centerOf(0, 2))]), grid)
+      // A city on the first row for Ann's lines to start from
+      ;({ api } = mountBuildTrack(map, L.layerGroup([L.marker(centerOf(0, 2))]), grid))
     })
 
-    it('should build a line that crosses it', () => {
-      finishLine(centerOf(0, 2), centerOf(2, 2))
+    it('should build a line that crosses it and gets clear', () => {
+      // Ends two cells — two speed units on this board — past Bo's line
+      finishLine(centerOf(0, 2), centerOf(3, 2))
 
       expect(trackStore.segments).toHaveLength(2)
+    })
+
+    it('should not build a line that stops just past it, and say why', () => {
+      // Ends one cell — one speed unit — past Bo's line: still beside it
+      finishLine(centerOf(0, 2), centerOf(2, 2))
+
+      expect(trackStore.segments).toHaveLength(1)
+      expect(api.budgetNotice.value).toMatch(/beside another player's track/)
     })
 
     it('should not build a line that runs alongside it', () => {

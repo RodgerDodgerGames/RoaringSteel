@@ -101,6 +101,33 @@ describe('useTrackBuilder', () => {
     expect(builder.buildSection(ANN, [middle, { lat: -2 * CELL, lng: middle.lng }]).ok).toBe(true)
   })
 
+  describe('keeping away from track already built', () => {
+    /**
+     * Out of the major city and along the row seven tenths of a cell north
+     * of its middle, to the far end: further than a line has to keep from
+     * the player's own track, nearer than a speed unit (a cell on this board)
+     */
+    const alongside = [
+      centerOf(0),
+      { lat: 0.7 * CELL, lng: 1.5 * CELL },
+      { lat: 0.7 * CELL, lng: 4.5 * CELL }
+    ]
+
+    it("should let a line run near the player's own track", () => {
+      trackStore.addSegment({ ownerId: ANN, coordinates: [centerOf(0), centerOf(4)] })
+
+      expect(builder.buildSection(ANN, alongside).ok).toBe(true)
+    })
+
+    it("should not let a line run that near another player's track", () => {
+      trackStore.addSegment({ ownerId: BO, coordinates: [centerOf(0), centerOf(4)] })
+
+      expect(builder.buildSection(ANN, alongside).error).toMatch(
+        /keep clear of other players' track/
+      )
+    })
+  })
+
   it("should not start a section part way along another player's leg", () => {
     trackStore.addSegment({ ownerId: BO, coordinates: [centerOf(1), centerOf(4)] })
     const middle = centerOf(2)
@@ -318,7 +345,7 @@ describe('useTrackBuilder', () => {
         isCut: false,
         limit: null,
         available: 20000,
-        toLand: false
+        backFrom: null
       })
     })
 
@@ -331,7 +358,7 @@ describe('useTrackBuilder', () => {
         isCut: true,
         limit: 'cash',
         available: 2500,
-        toLand: false
+        backFrom: null
       })
     })
 
@@ -368,7 +395,7 @@ describe('useTrackBuilder', () => {
         points: [centerOf(0), centerOf(1)],
         isCut: true,
         limit: null,
-        toLand: true
+        backFrom: 'water'
       })
     })
 
@@ -381,7 +408,32 @@ describe('useTrackBuilder', () => {
 
       expect(builder.fitLine(ANN, overWater)).toMatchObject({
         points: [centerOf(0), centerOf(1)],
-        toLand: true
+        backFrom: 'water'
+      })
+    })
+
+    it("should cut a line that stops beside another player's track back to clear of it", () => {
+      // Bo's line north to south across the row, through cell 2 near its
+      // east side; a speed unit is a cell on this board
+      const boX = 2.8 * CELL
+      trackStore.addSegment({
+        ownerId: BO,
+        coordinates: [
+          { lat: -3 * CELL, lng: boX },
+          { lat: 3 * CELL, lng: boX }
+        ]
+      })
+      // Square across Bo's line, to the middle of the next cell: seven tenths
+      // of a speed unit past it, so still beside it. The vertex before is a
+      // speed unit and a half short of it, in the clear.
+      const clear = { lat: 0, lng: 1.2 * CELL }
+      const line = [centerOf(0), clear, centerOf(3)]
+
+      expect(builder.fitLine(ANN, line)).toMatchObject({
+        points: [centerOf(0), clear],
+        isCut: true,
+        limit: null,
+        backFrom: 'rivalTrack'
       })
     })
   })

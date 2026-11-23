@@ -12,7 +12,10 @@
  *
  * Track may cross track already built, but not run alongside it: a line may
  * come close to built track only for the short stretch a crossing takes,
- * except inside the cells towns sit in.
+ * except inside the cells towns sit in. Other players' track is kept from
+ * much further off — a speed unit — and may only be crossed nearly square
+ * on; a finished line may not stop beside it, and near towns the distance
+ * is halved.
  *
  * A town full to the player building may not be built into at all: no line
  * of theirs may enter its cell, even to pass through.
@@ -25,7 +28,8 @@ import {
   trackIndex,
   lineBlock,
   blockMessage,
-  closedCells
+  closedCells,
+  endBlockAt
 } from '@/composables/map/buildRules'
 import { regionTest } from '@/composables/map/region'
 import { gameRules } from '@/config/game'
@@ -214,7 +218,7 @@ describe('lineBlock beside track already built', () => {
     speedUnitKm: SPEED_UNIT_KM,
     isInRegion: everywhere,
     townCells: towns,
-    builtTrack: trackIndex(builtLegs(bosTrack))
+    ownTrack: trackIndex(builtLegs(bosTrack))
   })
 
   it('should let a line cross it square on', () => {
@@ -280,10 +284,122 @@ describe('lineBlock beside track already built', () => {
     }))
     const farRules = {
       ...rules(),
-      builtTrack: trackIndex(builtLegs([...elsewhere, { coordinates: [pt(30, 0), pt(36, 0)] }]))
+      ownTrack: trackIndex(builtLegs([...elsewhere, { coordinates: [pt(30, 0), pt(36, 0)] }]))
     }
 
     expect(lineBlock([pt(20, 0.2), pt(35, 0.2)], farRules)).toEqual({ reason: 'alongside' })
+  })
+})
+
+describe("lineBlock beside other players' track", () => {
+  /** A region far bigger than any line here, so only the track is in the way */
+  const everywhere = () => true
+
+  /**
+   * Bo's track: one straight line 8 cells east along the equator. A speed
+   * unit is a cell here, so a line has to keep a cell from it.
+   */
+  const bosTrack = trackIndex(builtLegs([{ coordinates: [pt(0, 0), pt(8, 0)] }]))
+
+  /** The rules for Ann, with Bo's track as other players' (or as her own) */
+  const rules = ({ towns = [], isOwn = false } = {}) => ({
+    grid,
+    speedUnitKm: SPEED_UNIT_KM,
+    isInRegion: everywhere,
+    townCells: towns,
+    ...(isOwn ? { ownTrack: bosTrack } : { rivalTrack: bosTrack })
+  })
+
+  it('should let a line cross it square on', () => {
+    expect(lineBlock([pt(4, -3), pt(4, 3)], rules(), { isFinished: true })).toBeNull()
+  })
+
+  it('should let a line cross it at 70°', () => {
+    // 6 cells north for 2.2 east: about 70°
+    expect(lineBlock([pt(2.9, -3), pt(5.1, 3)], rules())).toBeNull()
+  })
+
+  it('should refuse a line crossing it at 45°, which the own-track rule allows', () => {
+    const line = [pt(1, -3), pt(7, 3)]
+
+    expect(lineBlock(line, rules())).toEqual({ reason: 'besideRival' })
+    expect(lineBlock(line, rules({ isOwn: true }))).toBeNull()
+  })
+
+  it("should refuse a line running alongside it nine tenths of a speed unit away, though a player's own track allows that", () => {
+    const line = [pt(1, 0.9), pt(6, 0.9)]
+
+    expect(lineBlock(line, rules())).toEqual({ reason: 'besideRival' })
+    expect(lineBlock(line, rules({ isOwn: true }))).toBeNull()
+  })
+
+  it('should let a line run alongside it more than a speed unit away', () => {
+    expect(lineBlock([pt(1, 1.2), pt(6, 1.2)], rules(), { isFinished: true })).toBeNull()
+  })
+
+  it('should refuse a finished line that stops beside it, but let one being drawn pause there', () => {
+    const line = [pt(4, -3), pt(4, 0.8)]
+
+    expect(lineBlock(line, rules(), { isFinished: true })).toEqual({ reason: 'endsBesideRival' })
+    expect(lineBlock(line, rules())).toBeNull()
+  })
+
+  it('should refuse a short stretch alongside it that stops there, so stretches cannot be chained', () => {
+    // Two speed units alongside: within what a crossing may take, but
+    // ending beside, a next section could carry on from it for as long again
+    const line = [pt(1, 0.5), pt(3, 0.5)]
+
+    expect(lineBlock(line, rules())).toBeNull()
+    expect(lineBlock(line, rules(), { isFinished: true })).toEqual({ reason: 'endsBesideRival' })
+  })
+
+  it('should halve the distance near a town', () => {
+    // A town in cell 4, half a cell north of Bo's track. The line ends a
+    // cell east of the town's cell, within a speed unit of the town and
+    // seven tenths of one from Bo's track: beside it in the open, not near
+    // the town.
+    const line = [pt(7.3, 3), pt(5.3, 0.7)]
+
+    expect(lineBlock(line, rules(), { isFinished: true })).toEqual({ reason: 'endsBesideRival' })
+    expect(lineBlock(line, rules({ towns: [4] }), { isFinished: true })).toBeNull()
+  })
+
+  it("should let a line stop beside it inside a town's cell", () => {
+    // Along Bo's track, right beside it, inside cell 4 only
+    const line = [pt(4.05, 0.3), pt(4.95, 0.3)]
+
+    expect(lineBlock(line, rules())).toBeNull()
+    expect(lineBlock(line, rules(), { isFinished: true })).toEqual({ reason: 'endsBesideRival' })
+    expect(lineBlock(line, rules({ towns: [4] }), { isFinished: true })).toBeNull()
+  })
+})
+
+describe('endBlockAt', () => {
+  /** Bo's track down the middle of cell 6 */
+  const rivalTrack = trackIndex(builtLegs([{ coordinates: [pt(6.5, -3), pt(6.5, 3)] }]))
+  const endRules = (towns = []) => ({
+    grid: makeTestGrid({
+      rows: 1,
+      cols: 8,
+      cell: (row, col) => (col === 2 ? { water: true } : {})
+    }),
+    speedUnitKm: SPEED_UNIT_KM,
+    townCells: towns,
+    rivalTrack
+  })
+
+  it("should let a line end on land clear of other players' track", () => {
+    expect(endBlockAt(at(4), endRules())).toBeNull()
+  })
+
+  it('should not let a line end on water, unless in a town', () => {
+    expect(endBlockAt(at(2), endRules())).toBe('water')
+    expect(endBlockAt(at(2), endRules([2]))).toBeNull()
+  })
+
+  it("should not let a line end beside another player's track, unless in a town", () => {
+    expect(endBlockAt(at(6), endRules())).toBe('rivalTrack')
+    expect(endBlockAt(at(6), endRules([6]))).toBeNull()
   })
 })
 

@@ -125,6 +125,17 @@ export function haloShadow(colors) {
 }
 
 /**
+ * How far a halo's rim and rings reach out from what it is drawn round. A
+ * box-shadow takes no room on the page, so anything laid out beside a haloed
+ * element (the off-map labels, see useOffMapMarks) adds this to keep clear.
+ * @param {number} count - How many colors the halo has
+ * @returns {number} Pixels, on each side
+ */
+export function haloWidth(count) {
+  return HALO_RIM + HALO_RING * count
+}
+
+/**
  * Marks or unmarks a town dot, name or commodity icon.
  * @param {HTMLElement} element - The element
  * @param {boolean} isMarked - Whether it belongs to a marked demand line

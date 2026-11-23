@@ -199,6 +199,69 @@
   opacity: 0.25 !important;
 }
 
+/*
+  The labels on the Build view's edge pointing to marked towns off the
+  screen (see useOffMapMarks). The layer covers the map but takes no
+  clicks, so the map works under it; only the labels take clicks. It sits
+  over the town dots (600) and under popups (700) and Leaflet's controls.
+  Each label is moved into place with a transform, from the top-left corner.
+  Coal with a paper name, like a town's name on the map, haloed in its
+  line's colors by an inline box-shadow.
+*/
+.offmap-marks {
+  position: absolute;
+  inset: 0;
+  z-index: 650;
+  pointer-events: none;
+}
+
+.offmap-mark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.15em 0.6em;
+  border: 0;
+  border-radius: 999px;
+  background: var(--coal);
+  color: #fff;
+  font-family: var(--font-town-name);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.offmap-mark__arrow {
+  font-size: 0.85em;
+}
+
+/* On the right side the arrow comes last, nearest the edge it points past;
+   the name and commodity keep their order */
+.offmap-mark.is-right .offmap-mark__arrow {
+  order: 1;
+}
+
+/* The commodity's icon in a producer's label: white on a black square, as
+   on the map, rounded the same way */
+.offmap-mark__icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+
+/* The commodity wanted at a destination, a step quieter than the town */
+.offmap-mark__commodity {
+  font-weight: 400;
+  text-transform: none;
+}
+
 /* The names of rivers, lakes and bays (see waterLayer.js). The marker is an
    empty point; the name is centered on it and turned to its angle. */
 .water-label-anchor {

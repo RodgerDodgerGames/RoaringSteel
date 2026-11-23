@@ -12,6 +12,8 @@
   - Every player's train, where it stands (trainMarkers.js)
   - While the player chooses on the map where to run their train, the points
     on the track it can stop at (trackStopMarkers.js)
+  - In the Build view, a label on the map's edge for each marked demand
+    town off the screen, pointing the way it lies (useOffMapMarks.js)
   - A Credits link in the corner, opening the About dialog, in place of
     Leaflet's credit line (every credit is listed there)
 
@@ -43,6 +45,7 @@ import { useRegionMask } from '@/composables/map/regionMask'
 import { useWaterLayer } from '@/composables/map/waterLayer'
 import { useTrainMarkers } from '@/composables/map/trainMarkers'
 import { useTrackStopMarkers } from '@/composables/map/trackStopMarkers'
+import { useOffMapMarks } from '@/composables/map/useOffMapMarks'
 import MapCreditsLink from '@/components/map/MapCreditsLink.vue'
 import { hillshadeConfig } from '@/config/map'
 
@@ -59,6 +62,7 @@ const regionMask = useRegionMask()
 const waterLayer = useWaterLayer()
 const trainMarkers = useTrainMarkers()
 const trackStopMarkers = useTrackStopMarkers()
+const offMapMarks = useOffMapMarks()
 
 onMounted(() => {
   // No starting view: useMapView gives the map its view below. No credit
@@ -107,6 +111,8 @@ onMounted(() => {
     trainMarkers.attach(map.value)
     // the points on the track a train can stop at, while they are chosen from
     trackStopMarkers.attach(map.value)
+    // in the Build view, labels on the edge pointing to marked towns off it
+    offMapMarks.attach(map.value)
   }
 })
 

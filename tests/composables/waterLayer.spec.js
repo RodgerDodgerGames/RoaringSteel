@@ -19,10 +19,10 @@ import { river, lake, waterFeature } from '../utils/testWater'
 
 describe('riverWeight', () => {
   it('should draw a river by the first class its rank falls in', () => {
-    const [major, , minor] = waterStyleConfig.riverWeights
+    const [major, minor] = waterStyleConfig.riverWeights
 
     expect(riverWeight(major.maxRank)).toBe(major.weight)
-    expect(riverWeight(12)).toBe(minor.weight)
+    expect(riverWeight(major.maxRank + 1)).toBe(minor.weight)
   })
 })
 

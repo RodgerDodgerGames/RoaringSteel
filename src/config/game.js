@@ -152,13 +152,23 @@ export const gameRules = {
    * run alongside one freely, and pays `riverCrossing` each time it crosses
    * one, however wide the river. No river is too wide to bridge.
    *
+   * Only the major rivers are played with: those Natural Earth ranks
+   * `maxRiverRank` or better (its `scalerank`, lower is more important — the
+   * Mississippi is 5, the Minnesota River 7, Colorado's South Platte 8). The
+   * rest are dropped as the water data loads (see `prepareWaterData` in
+   * composables/map/waterData.js): not drawn, not named and free to cross,
+   * so a board has a handful of rivers, as Empire Builder's does. At 7, a
+   * sub-region board has between 1 river (Florida) and about 20 (Southeast),
+   * against 20 to 200 with every river kept. Decided 2026-11-22 (#185).
+   *
    * Both prices are $2,000, decided 2026-11-05. The limit of 3 speed units
    * is about 17 km on a board Colorado's size and about 14 km on a small one.
    */
   bridges: {
     perSpeedUnit: 2000,
     maxSpeedUnits: 2,
-    riverCrossing: 2000
+    riverCrossing: 2000,
+    maxRiverRank: 7
   },
 
   /**

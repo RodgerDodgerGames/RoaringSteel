@@ -11,6 +11,11 @@
  * `lakes` and `sea` (polygons) and `bays` (label points) — each feature
  * with its `name`, `rank` and `label` (see the script).
  *
+ * The file has every river Natural Earth draws, down to minor ones; the
+ * game plays with only the major ones (see `gameRules.bridges.maxRiverRank`),
+ * so the rest are dropped here as the file is loaded, before anything reads
+ * it.
+ *
  * Pure functions over plain data, so they can be tested without a server.
  *
  * @module composables/map/waterData
@@ -18,18 +23,27 @@
 
 import { bbox } from '@turf/turf'
 import { riverIndex } from '@/composables/map/water'
+import { gameRules } from '@/config/game'
 
 /** The parts of the water file, each a FeatureCollection */
 const PARTS = ['rivers', 'lakes', 'sea', 'bays']
 
 /**
- * The water file made ready to search: every feature given its bounding box
- * (`bbox`, [west, south, east, north]), so the water near a board is found
- * without looking through every point of every river.
+ * The water file made ready to play on and search: the minor rivers dropped,
+ * so only those ranked `gameRules.bridges.maxRiverRank` or better are drawn,
+ * named and priced; and every feature given its bounding box (`bbox`,
+ * [west, south, east, north]), so the water near a board is found without
+ * looking through every point of every river.
  * @param {Object} raw - The file as read
- * @returns {Object} The same data, each feature with its `bbox`
+ * @returns {Object} The same data, minor rivers gone, each feature with its
+ *   `bbox`
  */
 export function prepareWaterData(raw) {
+  if (raw.rivers) {
+    raw.rivers.features = raw.rivers.features.filter(
+      ({ properties }) => properties.rank <= gameRules.bridges.maxRiverRank
+    )
+  }
   PARTS.forEach((part) => {
     raw[part]?.features.forEach((feature) => {
       feature.bbox = bbox(feature)

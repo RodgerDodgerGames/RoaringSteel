@@ -1,14 +1,37 @@
 /**
  * Water Data Tests
  *
- * The water file covers the whole country; a board uses only the water near
- * it, found by each feature's bounding box.
+ * The water file covers the whole country, minor rivers and all; the game
+ * plays with only the major rivers, and a board uses only the water near it,
+ * found by each feature's bounding box.
  */
 
 import { describe, it, expect } from 'vitest'
 import { prepareWaterData, featuresIn, riversFor } from '@/composables/map/waterData'
 import { makeTestGrid, CELL } from '../utils/testGrid'
 import { waterData, river } from '../utils/testWater'
+import { gameRules } from '@/config/game'
+
+describe('prepareWaterData', () => {
+  const { maxRiverRank } = gameRules.bridges
+  const course = [
+    { lat: 0, lng: 0 },
+    { lat: 1, lng: 1 }
+  ]
+
+  it('should keep only the major rivers, those ranked up to the rule', () => {
+    const data = prepareWaterData(
+      waterData({
+        rivers: [
+          river(course, { name: 'Major', rank: maxRiverRank }),
+          river(course, { name: 'Minor', rank: maxRiverRank + 1 })
+        ]
+      })
+    )
+
+    expect(data.rivers.features.map(({ properties }) => properties.name)).toEqual(['Major'])
+  })
+})
 
 describe('featuresIn', () => {
   it('should find the features that reach into an area, and only those', () => {

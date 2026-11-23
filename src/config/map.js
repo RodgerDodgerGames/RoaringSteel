@@ -60,15 +60,16 @@ export const waterStyleConfig = {
   /**
    * How thick a river is drawn, in px, by Natural Earth's rank for it
    * (`rank`, its `scalerank`: lower is more important — the Rio Grande is 4,
-   * a river like the Yampa 10). The first class whose `maxRank` the river's
-   * rank is within sets its weight. Drawn this way so the ranks can be judged
-   * on real boards before deciding whether river bridges should be priced by
-   * them; for now every river costs the same to cross.
+   * the Minnesota River 7). The first class whose `maxRank` the river's rank
+   * is within sets its weight. Only rivers up to `gameRules.bridges.maxRiverRank`
+   * are on the board at all, so two classes are enough: the great rivers
+   * (the Mississippi, the Rio Grande and the Southwest's Colorado are 5 or
+   * better) thick, the rest thin. Every river costs the same to cross
+   * whatever its weight.
    */
   riverWeights: [
-    { maxRank: 6, weight: 4 },
-    { maxRank: 9, weight: 2.5 },
-    { maxRank: Infinity, weight: 1.5 }
+    { maxRank: 5, weight: 4 },
+    { maxRank: Infinity, weight: 2.5 }
   ],
 
   /**

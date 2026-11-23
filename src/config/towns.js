@@ -66,7 +66,7 @@ export const townSpacingConfig = {
    * A small town closer than this to a town kept ahead of it is left off
    * the board
    */
-  gapUnits: 4
+  gapUnits: 6
 }
 
 /**

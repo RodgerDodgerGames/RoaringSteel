@@ -19,14 +19,18 @@
  * Colorado. That is on purpose: water should shape a board without
  * dominating it, as Empire Builder's handful of rivers does. (Water data was
  * compared on 2026-11-05; see the "Task 4 research" tab of the playtest
- * follow-up plan.)
+ * follow-up plan.) Even that is more than a board should have, so only the
+ * major rivers and the big lakes are kept (see waterFilters.mjs).
  *
  * What it keeps, each a GeoJSON FeatureCollection:
- * - `rivers`: river lines from the main rivers file and the North America
- *   supplement. Lines through lakes ("Lake Centerline") are left out: a
- *   lake is crossed as a lake, not as a river.
- * - `lakes`: lake and reservoir outlines, from the main lakes file and the
- *   North America supplement.
+ * - `rivers`: the major river lines (`isMajorRiver`) from the main rivers
+ *   file and the North America supplement. Lines through lakes ("Lake
+ *   Centerline") are kept only where the lake is not (see
+ *   `centerlineOutsideLakes`): a kept lake is crossed as a lake, not as a
+ *   river, but a dropped one leaves the river running on through it.
+ * - `lakes`: the big lake and reservoir outlines (`isBigLake`), from the
+ *   main lakes file and the North America supplement, each judged by its
+ *   whole size before it is cut to the country.
  * - `sea`: the ocean, as polygons.
  * - `bays`: a label point for each named bay, sound and gulf, for the map's
  *   labels only (the water itself is in `sea`).
@@ -43,6 +47,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { bboxClip, bbox, pointOnFeature } from '@turf/turf'
+import { isMajorRiver, isBigLake, centerlineOutsideLakes } from './waterFilters.mjs'
 
 /** The Natural Earth release the data is taken from */
 const RELEASE = 'v5.1.2'
@@ -243,14 +248,23 @@ async function main() {
     ].map(download)
   )
 
-  const isRiver = ({ properties }) => properties.featurecla !== 'Lake Centerline'
+  // Lakes are judged before `trim` cuts and splits them, so by whole size
+  const keptLakes = [...lakes.features, ...lakesNA.features].filter(isBigLake)
+  // The major rivers, each carried through the lakes that were dropped by
+  // what is left of its lake centerlines once the kept lakes are cut out
+  const keptRivers = [...rivers.features, ...riversNA.features]
+    .filter(isMajorRiver)
+    .map((feature) =>
+      feature.properties.featurecla === 'Lake Centerline'
+        ? centerlineOutsideLakes(feature, keptLakes)
+        : feature
+    )
+    .filter(Boolean)
   const collection = (features) => ({ type: 'FeatureCollection', features })
   const water = {
     source: `Natural Earth 10m physical vectors, ${RELEASE}`,
-    rivers: collection(
-      trim([...rivers.features, ...riversNA.features].filter(isRiver), boxes, riverName)
-    ),
-    lakes: collection(trim([...lakes.features, ...lakesNA.features], boxes)),
+    rivers: collection(trim(keptRivers, boxes, riverName)),
+    lakes: collection(trim(keptLakes, boxes)),
     sea: collection(trim(ocean.features, boxes)),
     bays: collection(bayLabels(marine.features, boxes))
   }

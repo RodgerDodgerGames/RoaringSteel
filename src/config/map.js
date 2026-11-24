@@ -61,11 +61,11 @@ export const waterStyleConfig = {
    * How thick a river is drawn, in px, by Natural Earth's rank for it
    * (`rank`, its `scalerank`: lower is more important — the Rio Grande is 4,
    * the Minnesota River 7). The first class whose `maxRank` the river's rank
-   * is within sets its weight. Only rivers up to `gameRules.bridges.maxRiverRank`
-   * are on the board at all, so two classes are enough: the great rivers
-   * (the Mississippi, the Rio Grande and the Southwest's Colorado are 5 or
-   * better) thick, the rest thin. Every river costs the same to cross
-   * whatever its weight.
+   * is within sets its weight. Only rivers up to rank 7 are in the water
+   * data at all (see scripts/waterFilters.mjs), so two classes are enough:
+   * the great rivers (the Mississippi, the Rio Grande and the Southwest's
+   * Colorado are 5 or better) thick, the rest thin. Every river costs the
+   * same to cross whatever its weight.
    */
   riverWeights: [
     { maxRank: 5, weight: 4 },

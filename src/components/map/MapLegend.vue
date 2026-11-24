@@ -26,7 +26,6 @@ import { haloShadow } from '@/composables/map/useTowns'
 import {
   UNOWNED_TRACK_COLOR,
   RAIL_STYLE,
-  CASING_STYLE,
   TIES_STYLE,
   BRIDGE_DECK_STYLE,
   BRIDGE_POST_STYLE
@@ -62,12 +61,12 @@ const trackColor = computed(
 
 /**
  * Where the track sample's lines run, in the sample's own px. The ends are
- * inset by half the casing's width, so its round caps are not cut off.
+ * inset by half the rail's width, so its round caps are not cut off.
  */
 const SAMPLE_LENGTH = 36
 const sampleEnds = {
-  x1: CASING_STYLE.weight / 2,
-  x2: SAMPLE_LENGTH - CASING_STYLE.weight / 2,
+  x1: RAIL_STYLE.weight / 2,
+  x2: SAMPLE_LENGTH - RAIL_STYLE.weight / 2,
   y1: TIES_STYLE.weight / 2,
   y2: TIES_STYLE.weight / 2
 }
@@ -144,8 +143,8 @@ const riverText = `Rivers: bridged at ${formatCurrency(riverCrossing)} a crossin
           {{ riverText }}
         </li>
         <li class="map-legend__row">
-          <!-- A short piece of track, drawn the way the map draws it: a dark
-               casing and ties under a rail in the builder's color -->
+          <!-- A short piece of track, drawn the way the map draws it: ties
+               under a rail, both in the builder's color -->
           <svg
             class="map-legend__symbol"
             :width="SAMPLE_LENGTH"
@@ -154,13 +153,7 @@ const riverText = `Rivers: bridged at ${formatCurrency(riverCrossing)} a crossin
           >
             <line
               v-bind="sampleEnds"
-              :stroke="CASING_STYLE.color"
-              :stroke-width="CASING_STYLE.weight"
-              stroke-linecap="round"
-            />
-            <line
-              v-bind="sampleEnds"
-              :stroke="TIES_STYLE.color"
+              :stroke="trackColor"
               :stroke-width="TIES_STYLE.weight"
               :stroke-dasharray="TIES_STYLE.dashArray"
             />

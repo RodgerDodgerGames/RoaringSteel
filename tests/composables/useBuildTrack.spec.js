@@ -573,9 +573,8 @@ describe('useBuildTrack', () => {
 
   describe('a newly built section', () => {
     /**
-     * The rail goes on top of everything drawn with it. The ties share its
-     * color, but a bridge's light gray deck, drawn in a pane between the two,
-     * would hide the rail on every crossing if the rail sat lower.
+     * The rail goes on top of the ties drawn with it, in a pane of its own
+     * above theirs. (This section crosses no water, so it has no bridge.)
      */
     it('should draw its rail above its ties', () => {
       mountBuildTrack(map)

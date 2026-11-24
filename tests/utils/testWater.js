@@ -11,9 +11,8 @@
  * A feature with the properties the water file gives every feature.
  * @param {Object} geometry - GeoJSON geometry
  * @param {Object} [properties] - name, rank and label; unnamed, rank 5,
- *   named from zoom 7 if left out. Rank 5 is a major river, one the game
- *   keeps (see `gameRules.bridges.maxRiverRank`), so a test's rivers are
- *   on the board unless it gives a minor rank.
+ *   named from zoom 7 if left out. Rank 5 is a major river, like those the
+ *   water file keeps (see scripts/waterFilters.mjs).
  * @returns {Object} The feature
  */
 export function waterFeature(geometry, properties = {}) {

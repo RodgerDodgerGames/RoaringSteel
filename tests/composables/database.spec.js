@@ -63,6 +63,23 @@ describe('database', () => {
       expect(await readCache('townSites_27')).toBe('kept')
     })
 
+    it('should throw away grids kept by version 7, built before the small lakes were dropped', async () => {
+      // A browser that last ran version 7, with a grid and a current cache in it
+      const old = await openDB('roaring-steel', 7, {
+        upgrade(db) {
+          db.createObjectStore('autosaves', { keyPath: 'id', autoIncrement: true })
+          db.createObjectStore('grids', { keyPath: ['state', 'cellSize', 'landCoverYear'] })
+          db.createObjectStore('caches')
+        }
+      })
+      await old.put('grids', { state: '27', cellSize: 10000, landCoverYear: 2023, grid: grid('a') })
+      await old.put('caches', 'sites', 'townSites_27')
+      old.close()
+
+      expect(await getGrid('27', 10000, 2023)).toBeUndefined()
+      expect(await readCache('townSites_27')).toBe('sites')
+    })
+
     it('should throw away the finished towns and test-list jobs earlier versions kept, but not what is read now', async () => {
       // A browser that last ran version 3, with each kind of cache in it
       const old = await openDB('roaring-steel', 3, {

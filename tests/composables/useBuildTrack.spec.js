@@ -573,10 +573,10 @@ describe('useBuildTrack', () => {
 
   describe('a newly built section', () => {
     /**
-     * The rail is the thinnest of the three lines, so if it is not on top the
-     * casing and ties cover it and the player's color never shows.
+     * The rail goes on top of the ties drawn with it, in a pane of its own
+     * above theirs. (This section crosses no water, so it has no bridge.)
      */
-    it('should draw its rail above its casing and ties', () => {
+    it('should draw its rail above its ties', () => {
       mountBuildTrack(map)
       const line = createDrawnLine(map)
 
@@ -585,7 +585,7 @@ describe('useBuildTrack', () => {
       // The fake map has no overlay pane of its own; Leaflet gives it z-index 400
       const zIndexOf = (layer) => map.getPane(layer.options.pane)?.style.zIndex ?? 400
       const decorations = map.allLayers().filter((layer) => layer !== line)
-      expect(decorations).toHaveLength(2)
+      expect(decorations).toHaveLength(1)
       decorations.forEach((decoration) =>
         expect(zIndexOf(line)).toBeGreaterThan(zIndexOf(decoration))
       )

@@ -18,7 +18,6 @@ import { BUILD_VIEW, PLAN_VIEW } from '@/composables/map/mapViews'
 import {
   UNOWNED_TRACK_COLOR,
   RAIL_STYLE,
-  CASING_STYLE,
   TIES_STYLE,
   BRIDGE_DECK_STYLE,
   BRIDGE_POST_STYLE
@@ -504,7 +503,7 @@ export default function useBuildTrack() {
    * each time, because whose track is "own" changes with the turn. Own track
    * has the option taken off rather than set to false: to Geoman, false
    * means "snap to this even if it is otherwise ignored", which is more than
-   * is meant here. Only the rails need it: their casing and ties never snap
+   * is meant here. Only the rails need it: their ties and bridges never snap
    * (see trackStyles.js).
    *
    * @param {number} playerId - The player about to draw
@@ -681,8 +680,8 @@ export default function useBuildTrack() {
   }
 
   /**
-   * Takes one section's layer (its rail) off the map, along with the casing,
-   * ties and any bridges drawn with it. They are one piece of track to the
+   * Takes one section's layer (its rail) off the map, along with the ties
+   * and any bridges drawn with it. They are one piece of track to the
    * player, so none may be left behind without the others.
    *
    * Only the map changes here; whether the section also leaves the track store
@@ -1124,7 +1123,7 @@ export default function useBuildTrack() {
       // over in its "layer pane", overriding any pane passed with the line's
       // own options. Making that the rail pane does two jobs: the finished line
       // is already where it belongs as the track's rail, and the line being
-      // drawn sits above the casing and ties of existing track, so it never
+      // drawn sits above the ties and bridges of existing track, so it never
       // disappears under them where it meets or crosses it.
       panes: { layerPane: RAILS_PANE }
     })
@@ -1168,13 +1167,13 @@ export default function useBuildTrack() {
   /**
    * The Leaflet panes finished track is drawn in, one per piece, lowest first.
    *
-   * Track is three lines stacked on the same route: a dark casing, the ties,
-   * and the rail in the owner's color; where it crosses water, a bridge's
+   * Track is two lines stacked on the same route, both in the owner's color:
+   * the ties, and the rail over them; where it crosses water, a bridge's
    * deck and posts go between the ties and the rail. Giving each piece its
-   * own pane puts every casing below every set of ties, and every set of
-   * ties below every bridge and every rail, across all sections. With one shared pane, the newest section would
-   * be drawn entirely over the older ones, and its casing would cut a dark
-   * notch across the rail wherever two sections meet.
+   * own pane puts every set of ties below every bridge and every rail, across
+   * all sections. With one shared pane, the newest section would be drawn
+   * entirely over the older ones, and its wide ties would cut across the
+   * rail of another player's track wherever the two meet or cross.
    *
    * Above them all is the pane removal mode's targets go in (see
    * `drawRemovalTargets`), so a target takes the click over the track under it.
@@ -1184,22 +1183,19 @@ export default function useBuildTrack() {
    * Geoman draws in the rail pane too (see `setGeomanOptions`).
    */
   const TRACK_PANES = [
-    { name: 'trackCasing', zIndex: 410 },
     { name: 'trackTies', zIndex: 420 },
     { name: 'trackBridges', zIndex: 425 },
     { name: 'trackRails', zIndex: 430 },
     { name: 'trackRemoval', zIndex: 440 }
   ]
-  const [CASING_PANE, TIES_PANE, BRIDGES_PANE, RAILS_PANE, REMOVAL_PANE] = TRACK_PANES.map(
-    (pane) => pane.name
-  )
+  const [TIES_PANE, BRIDGES_PANE, RAILS_PANE, REMOVAL_PANE] = TRACK_PANES.map((pane) => pane.name)
 
   /**
    * Removal mode's targets: wider than the track, so the end of a line is
    * easy to hit, and invisible until the cursor is over one (see
    * `drawRemovalTargets`). Leaflet still sends an invisible line the cursor's
    * events, since only its opacity is 0. Kept out of Geoman's snapping, like
-   * the casing and ties.
+   * the ties and bridges.
    */
   const REMOVAL_TARGET_STYLE = {
     color: BLOCKED_LEG_COLOR,
@@ -1262,15 +1258,14 @@ export default function useBuildTrack() {
   }
 
   /**
-   * Draws a track layer as railway: a rail in the owning player's color over
-   * dark ties and a dark casing, so each player's network can be told apart
-   * and pale colors still show up. Track whose owner is not a player in the
-   * game (a damaged save) has a black rail.
+   * Draws a track layer as railway: a rail over ties, both in the owning
+   * player's color, so each player's network can be told apart. Track whose
+   * owner is not a player in the game (a damaged save) is black.
    *
-   * The layer itself becomes the rail. The casing and ties are two more lines
-   * on the same route, kept on the layer as its `decorations`, so they come
-   * off the map with it. So are the section's bridges, where it crosses
-   * lakes, the sea or rivers (see bridges.js): a solid deck over the ties,
+   * The layer itself becomes the rail. The ties are one more line on the
+   * same route, kept on the layer as its `decorations`, so they come off the
+   * map with it. So are the section's bridges, where it crosses lakes, the
+   * sea or rivers (see bridges.js): a solid light gray deck over the ties,
    * with a post at each end.
    *
    * @param {Object} layer - A track layer, created in the rail pane
@@ -1278,15 +1273,15 @@ export default function useBuildTrack() {
    */
   function styleTracks(layer, ownerId) {
     const latlngs = layer.getLatLngs()
-    layer.setStyle({ color: playerStore.colorOf(ownerId) ?? UNOWNED_TRACK_COLOR, ...RAIL_STYLE })
+    const color = playerStore.colorOf(ownerId) ?? UNOWNED_TRACK_COLOR
+    layer.setStyle({ color, ...RAIL_STYLE })
 
     // The board parts only: the track built so far plays no part in where
     // this section's bridges are
     const { grid, rivers } = builder.boardRules.value
     const bridges = isEmptyGrid(grid) ? [] : bridgeSpans(latlngs, grid, rivers)
     layer.decorations = [
-      L.polyline(latlngs, { ...CASING_STYLE, pane: CASING_PANE }),
-      L.polyline(latlngs, { ...TIES_STYLE, pane: TIES_PANE }),
+      L.polyline(latlngs, { ...TIES_STYLE, color, pane: TIES_PANE }),
       ...bridges.flatMap((span) => [
         L.polyline(span, { ...BRIDGE_DECK_STYLE, pane: BRIDGES_PANE }),
         L.circleMarker(span[0], { ...BRIDGE_POST_STYLE, pane: BRIDGES_PANE }),
@@ -1297,7 +1292,7 @@ export default function useBuildTrack() {
   }
 
   /**
-   * Takes a track layer's casing, ties and bridges off the map, leaving the
+   * Takes a track layer's ties and bridges off the map, leaving the
    * rail (the layer itself) alone. Used before redrawing, and when a section
    * is removed.
    *

@@ -11,8 +11,9 @@
  * places a color is shown:
  * - behind black text (setup buttons, the confirm cards, player chips), so
  *   none is dark;
- * - as track on the terrain map, drawn with a dark outline, so none is so pale
- *   it washes out against the light background.
+ * - as track on the terrain map, where the rail and its ties are both drawn
+ *   in the color with no outline, so the paler ones (yellow, lime) stand out
+ *   less against the light background than the rest.
  *
  * None may be too close to the plum the towns are drawn in (TOWN_COLOR in
  * composables/map/townIcons.js), or a player's track would blend into the
